@@ -38,6 +38,7 @@ export default function Landing() {
       </header>
 
       <section className="hero">
+        <img className="hero-logo" src="/zaieze-branco.png" alt="ZAIEZE" />
         <h1>Sistemas Inteligentes para a Moda</h1>
         <p>
           Organize a venda online da sua equipe pelo WhatsApp: carteira por vendedora, estoque em grade

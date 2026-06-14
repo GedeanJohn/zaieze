@@ -1,0 +1,9 @@
+Fonte da marca ZAIEZE: NUSAR.
+
+Coloque os arquivos da fonte aqui com estes nomes (o @font-face em styles.css já aponta para eles):
+
+  nusar.woff2   (preferencial)
+  nusar.woff    (fallback)
+
+Enquanto o arquivo não estiver presente, a landing usa uma pilha de fontes
+geométricas semelhantes (Century Gothic / Futura / Questrial / system-ui).

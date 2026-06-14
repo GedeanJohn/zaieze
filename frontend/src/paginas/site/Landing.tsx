@@ -29,7 +29,7 @@ export default function Landing() {
   return (
     <div className="site">
       <header className="site-top">
-        <div className="site-logo">zaieze<span>.</span></div>
+        <img className="site-logo-img" src="/zaieze-branco.png" alt="ZAIEZE" />
         <nav>
           <a href="#planos">Planos</a>
           <a href="#como">Como funciona</a>
@@ -38,10 +38,10 @@ export default function Landing() {
       </header>
 
       <section className="hero">
-        <h1>O sistema de vendas, relacionamento e estoque<br /> feito para <em>lojas de moda</em></h1>
+        <h1>Sistemas Inteligentes para a Moda</h1>
         <p>
-          CRM com carteira por vendedora, WhatsApp integrado, estoque em grade e IA que recupera clientes
-          e gira o que está parado. Seu painel no ar em minutos, no seu próprio endereço.
+          Organize a venda online da sua equipe pelo WhatsApp: carteira por vendedora, estoque em grade
+          e IA que recupera clientes e gira o que está parado. Seu painel no ar em minutos, no seu próprio endereço.
         </p>
         <div className="hero-acoes">
           <a className="btn grande" href="#planos">Ver planos</a>
@@ -78,7 +78,7 @@ export default function Landing() {
       </section>
 
       <footer className="site-rodape">
-        <div>zaieze · ModaCRM AI © {new Date().getFullYear()}</div>
+        <div>ZAIEZE · Sistemas Inteligentes para a Moda © {new Date().getFullYear()}</div>
         <div>Pagamento seguro via Mercado Pago</div>
       </footer>
     </div>

@@ -75,6 +75,10 @@ async function main() {
   const rede = await prisma.rede.create({
     data: { nome: 'Luna Brand', slug: 'luna-brand', plano: 'ELITE' },
   })
+  // Assinatura ativa da rede demo — permite testar online sem passar pelo checkout
+  await prisma.assinatura.create({
+    data: { redeId: rede.id, plano: 'ELITE', status: 'ATIVA', valor: 697, simulada: false },
+  })
   await prisma.usuario.create({
     data: {
       redeId: rede.id, nome: 'Gustavo Prado', email: 'gestor@lunabrand.com.br',

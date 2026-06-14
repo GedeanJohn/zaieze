@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: modacrm_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: modacrm
+      POSTGRES_PASSWORD: modacrm_dev_2026
+      POSTGRES_DB: modacrm
+    ports:
+      - "5443:5432"
+    volumes:
+      - modacrm_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U modacrm -d modacrm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  modacrm_pgdata:

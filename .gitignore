@@ -1,0 +1,21 @@
+# Dependências
+node_modules/
+
+# Build / artefatos
+dist/
+*.tsbuildinfo
+
+# Ambiente / segredos
+.env
+.env.local
+*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# SO / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

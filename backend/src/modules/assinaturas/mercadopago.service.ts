@@ -1,0 +1,59 @@
+import type { Plano } from '@prisma/client'
+import { env } from '../../env'
+
+const PRECO_PLANO: Record<Plano, number> = { START: 97, PRO: 297, ELITE: 697 }
+
+export function valorDoPlano(plano: Plano): number {
+  return PRECO_PLANO[plano]
+}
+
+/** Sem token configurado, o checkout opera em modo simulado (igual Evolution/Claude no projeto). */
+export function mpConfigurado(): boolean {
+  return Boolean(env.MERCADOPAGO_ACCESS_TOKEN)
+}
+
+interface PreapprovalResult {
+  id: string
+  initPoint: string
+}
+
+/**
+ * Cria uma assinatura recorrente mensal (preapproval) no Mercado Pago.
+ * Só é chamada quando MERCADOPAGO_ACCESS_TOKEN está presente.
+ */
+export async function criarPreapproval(opts: {
+  plano: Plano
+  valor: number
+  email: string
+  redeSlug: string
+  backUrl: string
+}): Promise<PreapprovalResult> {
+  const resp = await fetch('https://api.mercadopago.com/preapproval', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.MERCADOPAGO_ACCESS_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      reason: `ModaCRM AI — Plano ${opts.plano}`,
+      external_reference: opts.redeSlug,
+      payer_email: opts.email,
+      back_url: opts.backUrl,
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: 'months',
+        transaction_amount: opts.valor,
+        currency_id: 'BRL',
+      },
+      status: 'pending',
+    }),
+  })
+
+  if (!resp.ok) {
+    const txt = await resp.text()
+    throw Object.assign(new Error(`Mercado Pago respondeu ${resp.status}: ${txt}`), { statusCode: 502 })
+  }
+
+  const data = (await resp.json()) as { id: string; init_point: string }
+  return { id: data.id, initPoint: data.init_point }
+}

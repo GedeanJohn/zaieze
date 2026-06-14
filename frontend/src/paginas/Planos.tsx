@@ -21,7 +21,13 @@ interface Assinatura {
   status: 'PENDENTE' | 'ATIVA' | 'CANCELADA'
   valor: string
   simulada: boolean
+  cicloFimEm: string | null
+  cancelamentoSolicitadoEm: string | null
   createdAt: string
+}
+
+function fmtData(iso: string | null): string {
+  return iso ? new Date(iso).toLocaleDateString('pt-BR') : '—'
 }
 
 const ORDEM: Record<Plano, number> = { START: 0, PRO: 1, ELITE: 2 }
@@ -61,11 +67,24 @@ export default function Planos() {
   }
 
   async function cancelar() {
-    if (!window.confirm('Cancelar a assinatura? O acesso segue até o fim do ciclo vigente.')) return
+    if (!window.confirm('Cancelar a assinatura? O acesso continua até o fim do ciclo já pago e não há nova cobrança.')) return
     setErro(''); setMsg(''); setOcupado(true)
     try {
-      await api.post('/assinaturas/cancelar', {})
-      setMsg('Assinatura cancelada.')
+      const { data } = await api.post('/assinaturas/cancelar', {})
+      setMsg(`Cancelamento agendado. Acesso garantido até ${fmtData(data.acessoAte)} — depois disso a conta é encerrada.`)
+      carregar()
+    } catch (e) {
+      setErro(mensagemDeErro(e))
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  async function reativar() {
+    setErro(''); setMsg(''); setOcupado(true)
+    try {
+      await api.post('/assinaturas/reativar', {})
+      setMsg('Assinatura reativada — a renovação volta a valer normalmente.')
       carregar()
     } catch (e) {
       setErro(mensagemDeErro(e))
@@ -99,23 +118,35 @@ export default function Planos() {
         </div>
       )}
 
-      {assinatura && (
-        <div className="cartao" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Sua assinatura</div>
-            <div style={{ fontSize: 18 }}>
-              <strong>{assinatura.plano}</strong> · {formataReal(assinatura.valor)}/mês ·{' '}
-              <span className={`selo ${assinatura.status === 'ATIVA' ? 'ok' : assinatura.status === 'CANCELADA' ? 'baixo' : 'ATACADO'}`}>
-                {rotuloStatus[assinatura.status]}
-              </span>
-              {assinatura.simulada && <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>  (simulada)</span>}
+      {assinatura && (() => {
+        const agendado = !!assinatura.cancelamentoSolicitadoEm && assinatura.status !== 'CANCELADA'
+        return (
+          <div className="cartao" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Sua assinatura</div>
+              <div style={{ fontSize: 18 }}>
+                <strong>{assinatura.plano}</strong> · {formataReal(assinatura.valor)}/mês ·{' '}
+                <span className={`selo ${assinatura.status === 'ATIVA' ? 'ok' : assinatura.status === 'CANCELADA' ? 'baixo' : 'ATACADO'}`}>
+                  {rotuloStatus[assinatura.status]}
+                </span>
+                {assinatura.simulada && <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>  (simulada)</span>}
+              </div>
+              <div style={{ fontSize: 13, color: agendado ? 'var(--danger)' : 'var(--ink-soft)', marginTop: 4 }}>
+                {assinatura.status === 'CANCELADA'
+                  ? 'Conta encerrada.'
+                  : agendado
+                    ? `Cancelamento agendado — acesso até ${fmtData(assinatura.cicloFimEm)}, sem nova cobrança.`
+                    : assinatura.cicloFimEm ? `Renova em ${fmtData(assinatura.cicloFimEm)}.` : ''}
+              </div>
             </div>
+            {assinatura.status !== 'CANCELADA' && (
+              agendado
+                ? <button className="btn" onClick={reativar} disabled={ocupado}>Reativar assinatura</button>
+                : <button className="btn secundario" onClick={cancelar} disabled={ocupado}>Cancelar assinatura</button>
+            )}
           </div>
-          {assinatura.status !== 'CANCELADA' && (
-            <button className="btn secundario" onClick={cancelar} disabled={ocupado}>Cancelar assinatura</button>
-          )}
-        </div>
-      )}
+        )
+      })()}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
         {dados.planos.map((p) => {

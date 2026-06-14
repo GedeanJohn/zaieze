@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
+import { aplicarFimDeCiclo } from '../assinaturas/assinatura.service'
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -26,16 +27,24 @@ export async function authRoutes(app: FastifyInstance) {
     if (!usuario || !usuario.ativo || !(await bcrypt.compare(body.senha, usuario.senhaHash))) {
       return reply.code(401).send({ erro: 'E-mail ou senha inválidos' })
     }
-    if (usuario.loja && (!usuario.loja.ativo || !usuario.loja.rede.ativo)) {
-      return reply.code(403).send({ erro: 'Loja ou rede desativada' })
-    }
-    if (usuario.rede && !usuario.rede.ativo) {
-      return reply.code(403).send({ erro: 'Rede desativada' })
-    }
 
     // redeId do gestor vem direto; do gerente/vendedora, via loja
     const redeId = usuario.redeId ?? usuario.loja?.rede.id ?? null
     const rede = usuario.rede ?? usuario.loja?.rede ?? null
+
+    // Política de fim de ciclo: se a assinatura foi cancelada e o ciclo venceu, isto
+    // desativa a rede agora (corta o acesso de todas as lojas no próximo passo).
+    if (redeId) await aplicarFimDeCiclo(redeId)
+    const redeAtiva = redeId
+      ? ((await prisma.rede.findUnique({ where: { id: redeId }, select: { ativo: true } }))?.ativo ?? false)
+      : true
+
+    if (usuario.loja && (!usuario.loja.ativo || !redeAtiva)) {
+      return reply.code(403).send({ erro: 'Loja ou rede desativada' })
+    }
+    if (usuario.rede && !redeAtiva) {
+      return reply.code(403).send({ erro: 'Rede desativada' })
+    }
 
     // Isolamento por subdomínio (wildcard): a conta só entra no seu próprio tenant.
     // SUPER_ADMIN (operador do SaaS) acessa de qualquer endereço.

@@ -77,7 +77,10 @@ async function main() {
   })
   // Assinatura ativa da rede demo — permite testar online sem passar pelo checkout
   await prisma.assinatura.create({
-    data: { redeId: rede.id, plano: 'ELITE', status: 'ATIVA', valor: 697, simulada: false },
+    data: {
+      redeId: rede.id, plano: 'ELITE', status: 'ATIVA', valor: 697, simulada: false,
+      cicloFimEm: new Date(new Date().setMonth(new Date().getMonth() + 1)),
+    },
   })
   await prisma.usuario.create({
     data: {

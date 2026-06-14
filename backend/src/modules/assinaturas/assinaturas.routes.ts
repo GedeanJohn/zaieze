@@ -6,6 +6,7 @@ import { env } from '../../env'
 import { redeIdDe } from '../../plugins/auth'
 import { PLANOS } from '../../plugins/planos'
 import { consultarPreapproval, criarPreapproval, mpConfigurado, valorDoPlano } from './mercadopago.service'
+import { confirmarCiclo, proximoCicloFim, reativarAssinatura, solicitarCancelamento } from './assinatura.service'
 
 const checkoutSchema = z.object({
   plano: z.enum(['START', 'PRO', 'ELITE']),
@@ -65,7 +66,12 @@ export async function assinaturasRoutes(app: FastifyInstance) {
         data: { redeId: r.id, nome: body.gestorNome, email, senhaHash, role: 'GESTOR' },
       })
       await tx.assinatura.create({
-        data: { redeId: r.id, plano: body.plano, valor, status: simulada ? 'ATIVA' : 'PENDENTE', simulada },
+        data: {
+          redeId: r.id, plano: body.plano, valor, simulada,
+          status: simulada ? 'ATIVA' : 'PENDENTE',
+          // simulado já entra com ciclo de 1 mês; no modo real o ciclo começa no webhook aprovado
+          cicloFimEm: simulada ? proximoCicloFim() : null,
+        },
       })
       return r
     })
@@ -115,15 +121,10 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     // NÃO confia na notificação: consulta o status real no Mercado Pago
     const status = await consultarPreapproval(id)
     if (status === 'authorized') {
-      await prisma.$transaction([
-        prisma.assinatura.update({ where: { id: assinatura.id }, data: { status: 'ATIVA' } }),
-        prisma.rede.update({ where: { id: assinatura.redeId }, data: { ativo: true } }),
-      ])
+      await confirmarCiclo(assinatura.redeId) // ativa/renova + estende o ciclo +1 mês
     } else if (status === 'cancelled' || status === 'paused') {
-      await prisma.$transaction([
-        prisma.assinatura.update({ where: { id: assinatura.id }, data: { status: 'CANCELADA' } }),
-        prisma.rede.update({ where: { id: assinatura.redeId }, data: { ativo: false } }),
-      ])
+      // mesmo vindo do MP: cancela por FIM DE CICLO (mantém acesso até o ciclo pago vencer)
+      await solicitarCancelamento(assinatura.redeId, 'MERCADO_PAGO')
     }
     return reply.code(200).send({ ok: true })
   })
@@ -148,18 +149,36 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     if (assinatura.plano === plano) return reply.code(422).send({ erro: 'A rede já está neste plano.' })
 
     await prisma.$transaction([
-      prisma.assinatura.update({ where: { redeId }, data: { plano, valor: valorDoPlano(plano), status: 'ATIVA' } }),
-      prisma.rede.update({ where: { id: redeId }, data: { plano } }),
+      prisma.assinatura.update({
+        where: { redeId },
+        data: {
+          plano, valor: valorDoPlano(plano), status: 'ATIVA',
+          // trocar de plano reengaja: cancela um cancelamento agendado e garante ciclo vigente
+          cancelamentoSolicitadoEm: null, cancelamentoOrigem: null,
+          cicloFimEm: assinatura.cicloFimEm ?? proximoCicloFim(),
+        },
+      }),
+      prisma.rede.update({ where: { id: redeId }, data: { plano, ativo: true } }),
     ])
     return { ok: true, plano, observacao: assinatura.simulada ? 'Plano alterado (modo simulado).' : 'Plano alterado. A próxima cobrança no Mercado Pago refletirá o novo valor.' }
   })
 
-  // Cancelar a assinatura (mantém o acesso até o fim do ciclo; aqui apenas marca CANCELADA)
+  // Cancelar a assinatura — política de FIM DE CICLO: mantém o acesso até cicloFimEm.
+  // Origem registrada: ADMIN (super admin) ou LOJISTA (gestor).
   app.post('/cancelar', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
     const redeId = redeIdDe(request)
     const assinatura = await prisma.assinatura.findUnique({ where: { redeId } })
     if (!assinatura) return reply.code(404).send({ erro: 'Rede sem assinatura' })
-    await prisma.assinatura.update({ where: { redeId }, data: { status: 'CANCELADA' } })
+    const origem = request.user.role === 'SUPER_ADMIN' ? 'ADMIN' : 'LOJISTA'
+    const { acessoAte } = await solicitarCancelamento(redeId, origem)
+    return { ok: true, acessoAte }
+  })
+
+  // Reativar (desfaz um cancelamento agendado enquanto o ciclo ainda não venceu)
+  app.post('/reativar', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
+    const redeId = redeIdDe(request)
+    const ok = await reativarAssinatura(redeId)
+    if (!ok) return reply.code(422).send({ erro: 'Assinatura já encerrada — faça uma nova assinatura.' })
     return { ok: true }
   })
 
@@ -171,10 +190,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     const { slug } = request.params as { slug: string }
     const rede = await prisma.rede.findUnique({ where: { slug }, include: { assinatura: true } })
     if (!rede?.assinatura) return reply.code(404).send({ erro: 'Assinatura não encontrada' })
-    await prisma.$transaction([
-      prisma.assinatura.update({ where: { id: rede.assinatura.id }, data: { status: 'ATIVA' } }),
-      prisma.rede.update({ where: { id: rede.id }, data: { ativo: true } }),
-    ])
+    await confirmarCiclo(rede.id)
     return { ok: true, redirect: `${urlTenant(slug)}/login` }
   })
 }

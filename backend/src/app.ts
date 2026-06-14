@@ -1,5 +1,6 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
+import rateLimit from '@fastify/rate-limit'
 import { ZodError } from 'zod'
 import { env } from './env'
 import { registrarAuth } from './plugins/auth'
@@ -28,9 +29,12 @@ import { assinaturasRoutes } from './modules/assinaturas/assinaturas.routes'
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes'
 
 export async function buildApp() {
-  const app = Fastify({ logger: true })
+  // trustProxy: lê o IP real do cliente via X-Forwarded-For (atrás do nginx) — necessário p/ rate limit por IP
+  const app = Fastify({ logger: true, trustProxy: true })
 
   await app.register(cors, { origin: env.CORS_ORIGIN.split(',') })
+  // Rate limit desligado por padrão (global:false); habilitado por rota (ex.: login) via config.rateLimit
+  await app.register(rateLimit, { global: false })
   await registrarAuth(app)
 
   app.setErrorHandler((error, _request, reply) => {

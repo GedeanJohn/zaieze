@@ -165,7 +165,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   display: flex; justify-content: space-between; align-items: center;
   padding: 26px 8vw; max-width: 1240px; margin: 0 auto;
 }
-.site-logo-img { height: 30px; display: block; }
+.site-logo-img { height: 44px; display: block; }
 .site-top nav { display: flex; gap: 30px; align-items: center; }
 .site-top nav a { color: #fff; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.85; }
 .site-top nav a:hover { opacity: 1; }

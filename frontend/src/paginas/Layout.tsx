@@ -1,9 +1,16 @@
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { rotuloPapel, temFeature, usuarioLogado } from '../api'
+import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
 
 export default function Layout() {
   const usuario = usuarioLogado()!
   const navigate = useNavigate()
+
+  // Aviso global de encerramento de acesso (cancelamento agendado) — todos os papéis, todas as telas
+  const [encerraEm, setEncerraEm] = useState<string | null>(null)
+  useEffect(() => {
+    api.get('/assinaturas/aviso').then(({ data }) => setEncerraEm(data.encerraEm)).catch(() => {})
+  }, [])
   const role = usuario.role
   const podeVendasClientes = role !== 'ESTOQUISTA' && role !== 'CLIENTE'
   const podeEstoque = role !== 'VENDEDORA' && role !== 'CLIENTE'
@@ -46,6 +53,17 @@ export default function Layout() {
         </div>
       </aside>
       <main className="conteudo">
+        {encerraEm && (
+          <div className="aviso-encerramento">
+            ⚠️ Seu acesso ao sistema será encerrado em{' '}
+            <strong>
+              {new Date(encerraEm).toLocaleString('pt-BR', {
+                day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+              })}
+            </strong>
+            . Após essa data não haverá nova cobrança e o acesso de todas as lojas será suspenso.
+          </div>
+        )}
         <Outlet />
       </main>
     </div>

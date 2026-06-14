@@ -131,6 +131,20 @@ export async function assinaturasRoutes(app: FastifyInstance) {
 
   // ── Gestão da assinatura pelo painel do tenant (GESTOR/SUPER_ADMIN) ──
 
+  // Aviso de encerramento — QUALQUER usuário logado da rede vê a data/hora do corte de acesso
+  app.get('/aviso', { preHandler: [app.authenticate] }, async (request) => {
+    const redeId = request.user.redeId
+    if (!redeId) return { encerraEm: null }
+    const a = await prisma.assinatura.findUnique({
+      where: { redeId },
+      select: { status: true, cancelamentoSolicitadoEm: true, cicloFimEm: true },
+    })
+    if (a && a.status !== 'CANCELADA' && a.cancelamentoSolicitadoEm && a.cicloFimEm) {
+      return { encerraEm: a.cicloFimEm }
+    }
+    return { encerraEm: null }
+  })
+
   // Assinatura da rede logada
   app.get('/minha', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request) => {
     const redeId = redeIdDe(request)

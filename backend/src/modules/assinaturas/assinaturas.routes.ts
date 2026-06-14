@@ -163,8 +163,11 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
-  // Aprovação simulada (dev) — equivale ao webhook quando não há Mercado Pago configurado
+  // Aprovação simulada (dev) — equivale ao webhook quando não há Mercado Pago configurado.
+  // SEGURANÇA: só existe em modo simulado; com o Mercado Pago configurado fica desabilitado,
+  // senão seria um bypass para ativar tenants sem pagar.
   app.post('/simular-aprovacao/:slug', async (request, reply) => {
+    if (mpConfigurado()) return reply.code(404).send({ erro: 'Recurso indisponível' })
     const { slug } = request.params as { slug: string }
     const rede = await prisma.rede.findUnique({ where: { slug }, include: { assinatura: true } })
     if (!rede?.assinatura) return reply.code(404).send({ erro: 'Assinatura não encontrada' })

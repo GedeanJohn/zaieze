@@ -5,7 +5,7 @@ import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
 import { redeIdDe } from '../../plugins/auth'
 import { PLANOS } from '../../plugins/planos'
-import { criarPreapproval, mpConfigurado, valorDoPlano } from './mercadopago.service'
+import { consultarPreapproval, criarPreapproval, mpConfigurado, valorDoPlano } from './mercadopago.service'
 
 const checkoutSchema = z.object({
   plano: z.enum(['START', 'PRO', 'ELITE']),
@@ -98,18 +98,32 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     }
   })
 
-  // Webhook do Mercado Pago — ativa a assinatura/tenant quando o pagamento é aprovado
+  // Webhook do Mercado Pago — sincroniza a assinatura/tenant consultando o STATUS REAL no MP.
+  // MP pode enviar o id no corpo (data.id) ou na querystring (?id=&topic=).
   app.post('/webhook', async (request, reply) => {
-    const body = request.body as { type?: string; action?: string; data?: { id?: string } }
-    if (body?.type === 'subscription_preapproval' && body.data?.id) {
-      const assinatura = await prisma.assinatura.findFirst({ where: { mpPreapprovalId: body.data.id } })
-      if (assinatura) {
-        // Em produção: consultar GET /preapproval/{id} e confirmar status === 'authorized'.
-        await prisma.$transaction([
-          prisma.assinatura.update({ where: { id: assinatura.id }, data: { status: 'ATIVA' } }),
-          prisma.rede.update({ where: { id: assinatura.redeId }, data: { ativo: true } }),
-        ])
-      }
+    const body = (request.body ?? {}) as { type?: string; topic?: string; action?: string; data?: { id?: string } }
+    const q = request.query as { id?: string; topic?: string; 'data.id'?: string }
+    const topico = body.type ?? body.topic ?? q.topic ?? ''
+    const id = body.data?.id ?? q['data.id'] ?? q.id
+
+    // só tratamos eventos de assinatura (preapproval)
+    if (!id || !/preapproval|subscription/i.test(topico)) return reply.code(200).send({ ok: true })
+
+    const assinatura = await prisma.assinatura.findFirst({ where: { mpPreapprovalId: id } })
+    if (!assinatura) return reply.code(200).send({ ok: true })
+
+    // NÃO confia na notificação: consulta o status real no Mercado Pago
+    const status = await consultarPreapproval(id)
+    if (status === 'authorized') {
+      await prisma.$transaction([
+        prisma.assinatura.update({ where: { id: assinatura.id }, data: { status: 'ATIVA' } }),
+        prisma.rede.update({ where: { id: assinatura.redeId }, data: { ativo: true } }),
+      ])
+    } else if (status === 'cancelled' || status === 'paused') {
+      await prisma.$transaction([
+        prisma.assinatura.update({ where: { id: assinatura.id }, data: { status: 'CANCELADA' } }),
+        prisma.rede.update({ where: { id: assinatura.redeId }, data: { ativo: false } }),
+      ])
     }
     return reply.code(200).send({ ok: true })
   })

@@ -57,3 +57,18 @@ export async function criarPreapproval(opts: {
   const data = (await resp.json()) as { id: string; init_point: string }
   return { id: data.id, initPoint: data.init_point }
 }
+
+/**
+ * Consulta o status de uma assinatura (preapproval) no Mercado Pago.
+ * Status possíveis: 'pending' | 'authorized' | 'paused' | 'cancelled'.
+ * Usado no webhook para NÃO confiar cegamente na notificação recebida.
+ */
+export async function consultarPreapproval(id: string): Promise<string | null> {
+  if (!env.MERCADOPAGO_ACCESS_TOKEN) return null
+  const resp = await fetch(`https://api.mercadopago.com/preapproval/${id}`, {
+    headers: { Authorization: `Bearer ${env.MERCADOPAGO_ACCESS_TOKEN}` },
+  })
+  if (!resp.ok) return null
+  const data = (await resp.json()) as { status?: string }
+  return data.status ?? null
+}

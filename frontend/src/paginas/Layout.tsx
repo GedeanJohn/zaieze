@@ -11,6 +11,17 @@ export default function Layout() {
   useEffect(() => {
     api.get('/assinaturas/aviso').then(({ data }) => setEncerraEm(data.encerraEm)).catch(() => {})
   }, [])
+
+  // Contagem regressiva amigável até o encerramento
+  function contagemRegressiva(iso: string): string {
+    const ms = new Date(iso).getTime() - Date.now()
+    if (ms <= 0) return 'hoje'
+    const dias = Math.floor(ms / 86_400_000)
+    if (dias >= 2) return `faltam ${dias} dias`
+    if (dias === 1) return 'falta 1 dia'
+    const horas = Math.ceil(ms / 3_600_000)
+    return horas <= 1 ? 'falta menos de 1 hora' : `faltam ${horas} horas`
+  }
   const role = usuario.role
   const podeVendasClientes = role !== 'ESTOQUISTA' && role !== 'CLIENTE'
   const podeEstoque = role !== 'VENDEDORA' && role !== 'CLIENTE'
@@ -55,13 +66,13 @@ export default function Layout() {
       <main className="conteudo">
         {encerraEm && (
           <div className="aviso-encerramento">
-            ⚠️ Seu acesso ao sistema será encerrado em{' '}
+            🗓️ Seu acesso vai até{' '}
             <strong>
               {new Date(encerraEm).toLocaleString('pt-BR', {
                 day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
               })}
             </strong>
-            . Após essa data não haverá nova cobrança e o acesso de todas as lojas será suspenso.
+            <span className="aviso-contagem"> · {contagemRegressiva(encerraEm)}</span>. Sem novas cobranças.
           </div>
         )}
         <Outlet />

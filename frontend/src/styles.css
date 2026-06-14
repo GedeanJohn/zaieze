@@ -86,9 +86,10 @@ label { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 
 
 .alerta { background: #fdecea; color: var(--danger); padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; }
 .aviso-encerramento {
-  background: #fff3e0; color: #9a4a00; border: 1px solid #f0c38a; border-left: 4px solid var(--warn);
-  padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 20px;
+  background: #fbf5ea; color: #7a5a2e; border: 1px solid #ecdcc0; border-left: 3px solid #d8a85a;
+  padding: 8px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 18px;
 }
+.aviso-encerramento .aviso-contagem { color: var(--ink-soft); }
 .sucesso { background: #e8f5e9; color: var(--ok); padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; }
 
 /* Login */

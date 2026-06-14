@@ -166,7 +166,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   display: flex; justify-content: space-between; align-items: center;
   padding: 26px 8vw; max-width: 1240px; margin: 0 auto;
 }
-.site-logo-img { height: calc(var(--lema-size) * 0.85); display: block; }
+.site-logo-img { height: 56px; display: block; }
 .site-top nav { display: flex; gap: 30px; align-items: center; }
 .site-top nav a { color: #fff; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.85; }
 .site-top nav a:hover { opacity: 1; }
@@ -253,6 +253,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 
 @media (max-width: 720px) {
   .site { --lema-size: 22px; }
+  .site-logo-img { height: 40px; }
   .hero h1 { letter-spacing: 0.16em; }
   .checkout-card { grid-template-columns: 1fr; }
 }

@@ -131,7 +131,9 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
    Estética da marca: preto/branco, minimalista, fonte NUSAR (fallback geométrico). */
 @font-face {
   font-family: 'NUSAR';
-  src: url('/fonts/nusar.woff2') format('woff2'), url('/fonts/nusar.woff') format('woff');
+  src: url('/fonts/nusar.woff2') format('woff2'),
+       url('/fonts/nusar.otf') format('opentype'),
+       url('/fonts/nusar.ttf') format('truetype');
   font-weight: 100 900;
   font-display: swap;
 }

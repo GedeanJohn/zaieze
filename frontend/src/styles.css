@@ -149,6 +149,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .site {
   min-height: 100vh; background: var(--zz-bg); color: #fff;
   font-family: var(--marca); letter-spacing: 0.02em;
+  --lema-size: 30px; /* tamanho da fonte do lema (hero h1); a logo deriva daqui */
 }
 .site h1, .site h2, .site h3 { font-family: var(--marca); font-weight: 600; letter-spacing: 0.06em; }
 
@@ -165,7 +166,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   display: flex; justify-content: space-between; align-items: center;
   padding: 26px 8vw; max-width: 1240px; margin: 0 auto;
 }
-.site-logo-img { height: 44px; display: block; }
+.site-logo-img { height: calc(var(--lema-size) * 0.85); display: block; }
 .site-top nav { display: flex; gap: 30px; align-items: center; }
 .site-top nav a { color: #fff; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.85; }
 .site-top nav a:hover { opacity: 1; }
@@ -173,7 +174,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .hero { text-align: center; padding: 90px 8vw 70px; max-width: 1000px; margin: 0 auto; }
 .hero-logo { width: min(560px, 82vw); margin: 0 auto 40px; display: block; }
 .hero h1 {
-  font-size: 30px; line-height: 1.3; margin: 0 0 22px; text-transform: uppercase;
+  font-size: var(--lema-size); line-height: 1.3; margin: 0 0 22px; text-transform: uppercase;
   letter-spacing: 0.22em; font-weight: 400; color: #fff;
 }
 .hero p { font-size: 17px; color: var(--zz-mut); max-width: 620px; margin: 0 auto 34px; line-height: 1.7; letter-spacing: 0.01em; }
@@ -251,7 +252,8 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 }
 
 @media (max-width: 720px) {
-  .hero h1 { font-size: 22px; letter-spacing: 0.16em; }
+  .site { --lema-size: 22px; }
+  .hero h1 { letter-spacing: 0.16em; }
   .checkout-card { grid-template-columns: 1fr; }
 }
 

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
+import { redeIdDe } from '../../plugins/auth'
 import { PLANOS } from '../../plugins/planos'
 import { criarPreapproval, mpConfigurado, valorDoPlano } from './mercadopago.service'
 
@@ -111,6 +112,41 @@ export async function assinaturasRoutes(app: FastifyInstance) {
       }
     }
     return reply.code(200).send({ ok: true })
+  })
+
+  // ── Gestão da assinatura pelo painel do tenant (GESTOR/SUPER_ADMIN) ──
+
+  // Assinatura da rede logada
+  app.get('/minha', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request) => {
+    const redeId = redeIdDe(request)
+    const assinatura = await prisma.assinatura.findUnique({ where: { redeId } })
+    return { assinatura, mpConfigurado: mpConfigurado() }
+  })
+
+  const trocarSchema = z.object({ plano: z.enum(['START', 'PRO', 'ELITE']) })
+
+  // Trocar de plano (aplica imediatamente; em produção real exige atualizar o preapproval no MP)
+  app.post('/trocar-plano', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
+    const redeId = redeIdDe(request)
+    const { plano } = trocarSchema.parse(request.body)
+    const assinatura = await prisma.assinatura.findUnique({ where: { redeId } })
+    if (!assinatura) return reply.code(404).send({ erro: 'Rede sem assinatura' })
+    if (assinatura.plano === plano) return reply.code(422).send({ erro: 'A rede já está neste plano.' })
+
+    await prisma.$transaction([
+      prisma.assinatura.update({ where: { redeId }, data: { plano, valor: valorDoPlano(plano), status: 'ATIVA' } }),
+      prisma.rede.update({ where: { id: redeId }, data: { plano } }),
+    ])
+    return { ok: true, plano, observacao: assinatura.simulada ? 'Plano alterado (modo simulado).' : 'Plano alterado. A próxima cobrança no Mercado Pago refletirá o novo valor.' }
+  })
+
+  // Cancelar a assinatura (mantém o acesso até o fim do ciclo; aqui apenas marca CANCELADA)
+  app.post('/cancelar', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
+    const redeId = redeIdDe(request)
+    const assinatura = await prisma.assinatura.findUnique({ where: { redeId } })
+    if (!assinatura) return reply.code(404).send({ erro: 'Rede sem assinatura' })
+    await prisma.assinatura.update({ where: { redeId }, data: { status: 'CANCELADA' } })
+    return { ok: true }
   })
 
   // Aprovação simulada (dev) — equivale ao webhook quando não há Mercado Pago configurado

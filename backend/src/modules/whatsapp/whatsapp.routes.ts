@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
+import { enviarWhatsapp } from './whatsapp.service'
 
 const instanciaSchema = z.object({
   vendedoraId: z.string().optional(), // gerente configura a instância de uma vendedora
@@ -36,6 +37,43 @@ export async function whatsappRoutes(app: FastifyInstance) {
     })
   })
 
+  // Caixa de entrada: conversas (clientes com mensagens), com a última mensagem de cada um.
+  // VENDEDORA vê só a própria carteira; gerente/gestor veem a loja.
+  app.get('/conversas', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request) => {
+    const lojaId = await lojaIdDe(request)
+    const where: Prisma.MensagemWhatsappWhereInput = { lojaId, clienteId: { not: null } }
+    if (request.user.role === 'VENDEDORA') where.vendedoraId = request.user.sub
+
+    // janela recente de mensagens; agrega por cliente em memória (1 conversa por cliente)
+    const msgs = await prisma.mensagemWhatsapp.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+      include: { cliente: { select: { id: true, nome: true, telefone: true, segmento: true, vendedoraId: true } } },
+    })
+
+    const porCliente = new Map<string, {
+      cliente: { id: string; nome: string; telefone: string; segmento: string; vendedoraId: string | null }
+      ultimaMensagem: string; ultimaDirecao: string; ultimaEm: Date; mensagens: number; naoLidas: number
+    }>()
+    for (const m of msgs) {
+      if (!m.cliente) continue
+      const atual = porCliente.get(m.cliente.id)
+      if (!atual) {
+        porCliente.set(m.cliente.id, {
+          cliente: m.cliente,
+          ultimaMensagem: m.texto, ultimaDirecao: m.direcao, ultimaEm: m.createdAt,
+          mensagens: 1, naoLidas: m.direcao === 'RECEBIDA' ? 1 : 0,
+        })
+      } else {
+        atual.mensagens += 1
+        if (m.direcao === 'RECEBIDA') atual.naoLidas += 1
+      }
+    }
+
+    return [...porCliente.values()].sort((a, b) => b.ultimaEm.getTime() - a.ultimaEm.getTime())
+  })
+
   // Histórico de conversa de um cliente (respeita o isolamento de carteira)
   app.get('/conversas/:clienteId', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
@@ -43,6 +81,34 @@ export async function whatsappRoutes(app: FastifyInstance) {
     const where: Prisma.MensagemWhatsappWhereInput = { clienteId, lojaId }
     if (request.user.role === 'VENDEDORA') where.vendedoraId = request.user.sub
     return prisma.mensagemWhatsapp.findMany({ where, orderBy: { createdAt: 'asc' }, take: 200 })
+  })
+
+  // Responder a um cliente pela caixa de entrada (envio individual via Evolution; SIMULADA sem config)
+  app.post('/conversas/:clienteId/responder', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
+    const lojaId = await lojaIdDe(request)
+    const { clienteId } = request.params as { clienteId: string }
+    const { texto } = z.object({ texto: z.string().min(1) }).parse(request.body)
+
+    const cliente = await prisma.cliente.findFirst({ where: { id: clienteId, lojaId } })
+    if (!cliente) return reply.code(404).send({ erro: 'Cliente não encontrado' })
+
+    // VENDEDORA só responde a clientes da própria carteira
+    if (request.user.role === 'VENDEDORA' && cliente.vendedoraId !== request.user.sub) {
+      return reply.code(403).send({ erro: 'Cliente não está na sua carteira' })
+    }
+
+    // roteia pela vendedora dona do cliente; gerente sem dono usa a própria identidade
+    const vendId = cliente.vendedoraId ?? (request.user.role === 'VENDEDORA' ? request.user.sub : null)
+    if (!vendId) return reply.code(422).send({ erro: 'Cliente sem vendedora responsável — defina a carteira primeiro.' })
+    const vend = await prisma.usuario.findUniqueOrThrow({ where: { id: vendId }, select: { waInstancia: true } })
+
+    const status = await enviarWhatsapp({ instancia: vend.waInstancia, telefone: cliente.telefone, texto })
+    return prisma.mensagemWhatsapp.create({
+      data: {
+        lojaId, clienteId, vendedoraId: vendId,
+        direcao: 'ENVIADA', status, origem: 'MANUAL', telefone: cliente.telefone, texto,
+      },
+    })
   })
 
   // Webhook da Evolution API — sem auth; roteia a mensagem para a vendedora dona do cliente

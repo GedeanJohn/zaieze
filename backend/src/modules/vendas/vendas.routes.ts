@@ -26,11 +26,12 @@ const criarVendaSchema = z.object({
 export async function vendasRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: [app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
-    const { de, ate } = request.query as { de?: string; ate?: string }
+    const { de, ate, canal } = request.query as { de?: string; ate?: string; canal?: string }
 
     const where: Prisma.VendaWhereInput = { lojaId }
     // Vendedora vê apenas as próprias vendas — hierarquia de visualização
     if (request.user.role === 'VENDEDORA') where.vendedoraId = request.user.sub
+    if (canal === 'ONLINE' || canal === 'BALCAO') where.canal = canal
     if (de || ate) {
       where.createdAt = {
         ...(de ? { gte: new Date(de) } : {}),

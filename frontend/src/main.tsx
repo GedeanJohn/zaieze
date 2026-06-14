@@ -12,6 +12,7 @@ import Estoque from './paginas/Estoque'
 import Transferencias from './paginas/Transferencias'
 import Clientes from './paginas/Clientes'
 import Campanhas from './paginas/Campanhas'
+import CaixaEntrada from './paginas/CaixaEntrada'
 import Radar from './paginas/Radar'
 import Ranking from './paginas/Ranking'
 import Mural from './paginas/Mural'
@@ -55,6 +56,7 @@ function CrmApp() {
         <Route path="transferencias" element={<Transferencias />} />
         <Route path="clientes" element={<Clientes />} />
         <Route path="campanhas" element={<Campanhas />} />
+        <Route path="caixa" element={<CaixaEntrada />} />
         <Route path="radar" element={<Radar />} />
         <Route path="ranking" element={<Ranking />} />
         <Route path="mural" element={<Mural />} />

@@ -25,6 +25,7 @@ export default function Layout() {
         <NavLink to="/" end className={cls}>📊 Dashboard</NavLink>
         {podeVendasClientes && <NavLink to="/vendas" className={cls}>🛒 Vendas</NavLink>}
         {podeVendasClientes && <NavLink to="/clientes" className={cls}>👗 Clientes</NavLink>}
+        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/caixa" className={cls}>📥 Caixa de entrada</NavLink>}
         {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/campanhas" className={cls}>📲 WhatsApp</NavLink>}
         {podeVendasClientes && temFeature('radar') && <NavLink to="/radar" className={cls}>🎯 Radar</NavLink>}
         {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/ranking" className={cls}>🏆 Ranking</NavLink>}

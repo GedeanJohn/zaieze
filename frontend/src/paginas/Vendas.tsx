@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api, formataReal, mensagemDeErro, usuarioLogado, FORMAS_RECEBIMENTO, rotuloForma, CANAIS_VENDA, rotuloCanal, type FormaRecebimento, type CanalVenda } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 
@@ -55,6 +56,7 @@ export default function Vendas() {
   const [vendas, setVendas] = useState<Venda[]>([])
   const [de, setDe] = useState('')
   const [ate, setAte] = useState('')
+  const [canalFiltro, setCanalFiltro] = useState('')
   const [form, setForm] = useState<FormVenda | null>(null)
   const [erro, setErro] = useState('')
 
@@ -68,13 +70,14 @@ export default function Vendas() {
     const params: Record<string, string> = { ...escopo.params }
     if (de) params.de = de
     if (ate) params.ate = ate
+    if (canalFiltro) params.canal = canalFiltro
     const { data } = await api.get('/vendas', { params })
     setVendas(data)
-  }, [de, ate, escopo.pronto, escopo.params])
+  }, [de, ate, canalFiltro, escopo.pronto, escopo.params])
 
   useEffect(() => { carregar() }, [carregar])
 
-  async function abrirNova() {
+  const abrirNova = useCallback(async (prefClienteId = '') => {
     setErro('')
     const [prod, cli] = await Promise.all([
       api.get('/produtos', { params: { ...escopo.params, ativo: 'true' } }),
@@ -86,8 +89,19 @@ export default function Vendas() {
       const { data } = await api.get('/usuarios', { params: escopo.params })
       setVendedoras(data.filter((u: Pessoa) => u.role === 'VENDEDORA'))
     }
-    setForm({ clienteId: '', vendedoraId: '', canal: 'ONLINE', atacado: false, formaRecebimento: 'DINHEIRO', desconto: '', observacao: '', itens: [{ ...LINHA_VAZIA }] })
-  }
+    // venda vinda da caixa de entrada já nasce Online, com o cliente preenchido
+    setForm({ clienteId: prefClienteId, vendedoraId: '', canal: 'ONLINE', atacado: false, formaRecebimento: 'DINHEIRO', desconto: '', observacao: '', itens: [{ ...LINHA_VAZIA }] })
+  }, [escopo.params, gerente])
+
+  // Atalho da caixa de entrada: /vendas?cliente=<id> abre o PDV pré-preenchido (venda online)
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const cli = searchParams.get('cliente')
+    if (cli && escopo.pronto && !form) {
+      abrirNova(cli)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, escopo.pronto, form, abrirNova, setSearchParams])
 
   function precoSugerido(produtoId: string, atacado: boolean): string {
     const p = produtos.find((x) => x.id === produtoId)
@@ -178,7 +192,7 @@ export default function Vendas() {
         <h1>Vendas</h1>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
           <SeletorLoja escopo={escopo} />
-          <button className="btn" onClick={abrirNova} disabled={!escopo.pronto}>+ Nova venda</button>
+          <button className="btn" onClick={() => abrirNova()} disabled={!escopo.pronto}>+ Nova venda</button>
         </div>
       </header>
 
@@ -191,6 +205,13 @@ export default function Vendas() {
           <div className="campo">
             <label>Até</label>
             <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} />
+          </div>
+          <div className="campo">
+            <label>Canal</label>
+            <select value={canalFiltro} onChange={(e) => setCanalFiltro(e.target.value)}>
+              <option value="">Todos os canais</option>
+              {CANAIS_VENDA.map((c) => <option key={c} value={c}>{rotuloCanal[c]}</option>)}
+            </select>
           </div>
         </div>
         <table>

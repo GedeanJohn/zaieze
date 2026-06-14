@@ -219,3 +219,32 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   .hero h1 { font-size: 32px; }
   .checkout-card { grid-template-columns: 1fr; }
 }
+
+/* ───────────────────────── Caixa de entrada (WhatsApp) ───────────────────────── */
+.inbox { display: grid; grid-template-columns: 320px 1fr; gap: 16px; align-items: start; }
+.inbox-lista { padding: 8px; max-height: 70vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.inbox-item {
+  text-align: left; background: none; border: none; border-radius: 8px; padding: 10px 12px; cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.inbox-item:hover { background: #fdfaf6; }
+.inbox-item.ativo { background: var(--accent-soft); }
+.inbox-item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.inbox-hora { font-size: 11px; color: var(--ink-soft); white-space: nowrap; }
+.inbox-previa { font-size: 13px; color: var(--ink-soft); margin: 2px 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-item-bottom { display: flex; justify-content: space-between; align-items: center; }
+.inbox-badge { background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 8px; }
+
+.inbox-conversa { display: flex; flex-direction: column; min-height: 70vh; max-height: 70vh; }
+.inbox-conversa-topo { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.inbox-bolhas { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 14px 2px; }
+.bolha { max-width: 70%; padding: 8px 12px; border-radius: 12px; font-size: 14px; }
+.bolha.entrada { background: #f1ece6; align-self: flex-start; border-bottom-left-radius: 2px; }
+.bolha.saida { background: var(--accent-soft); align-self: flex-end; border-bottom-right-radius: 2px; }
+.bolha-meta { font-size: 10px; color: var(--ink-soft); margin-top: 4px; text-align: right; }
+.inbox-responder { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+.inbox-responder input { flex: 1; }
+
+@media (max-width: 720px) {
+  .inbox { grid-template-columns: 1fr; }
+}

@@ -5,6 +5,7 @@ import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
 import { enviarWhatsapp } from './whatsapp.service'
+import { marcarLeadAtendido, garantirCicloAberto } from '../leads/leads.service'
 
 const instanciaSchema = z.object({
   vendedoraId: z.string().optional(), // gerente configura a instância de uma vendedora
@@ -103,22 +104,53 @@ export async function whatsappRoutes(app: FastifyInstance) {
     const vend = await prisma.usuario.findUniqueOrThrow({ where: { id: vendId }, select: { waInstancia: true } })
 
     const status = await enviarWhatsapp({ instancia: vend.waInstancia, telefone: cliente.telefone, texto })
-    return prisma.mensagemWhatsapp.create({
+    const msg = await prisma.mensagemWhatsapp.create({
       data: {
         lojaId, clienteId, vendedoraId: vendId,
         direcao: 'ENVIADA', status, origem: 'MANUAL', telefone: cliente.telefone, texto,
       },
     })
+    // A vendedora respondeu → fecha o SLA do lead aberto desse cliente ("atender = responder").
+    await marcarLeadAtendido({ lojaId, clienteId })
+    return msg
   })
 
-  // Webhook da Evolution API — sem auth; roteia a mensagem para a vendedora dona do cliente
+  // Webhook da Evolution API — sem auth; roteia a mensagem para a vendedora dona do cliente.
+  // Contato desconhecido que chega na instância de uma vendedora = novo lead (entrada pelo catálogo).
   app.post('/webhook', async (request, reply) => {
     const b = webhookSchema.parse(request.body)
     const numero = (b.telefone ?? b.numero ?? '').replace(/\D/g, '')
     if (!numero) return reply.code(400).send({ erro: 'telefone ausente' })
 
-    const cliente = await prisma.cliente.findFirst({ where: { telefone: numero }, select: { id: true, lojaId: true, vendedoraId: true } })
+    let cliente = await prisma.cliente.findFirst({
+      where: { telefone: numero },
+      select: { id: true, lojaId: true, vendedoraId: true, loja: { select: { redeId: true } } },
+    })
+
+    // Contato novo: resolve a vendedora pela instância que recebeu a mensagem e cria o cliente.
+    if (!cliente && b.instancia) {
+      const vend = await prisma.usuario.findFirst({
+        where: { waInstancia: b.instancia, role: 'VENDEDORA', ativo: true },
+        select: { id: true, lojaId: true, loja: { select: { redeId: true } } },
+      })
+      if (vend?.lojaId) {
+        cliente = await prisma.cliente.create({
+          data: {
+            lojaId: vend.lojaId, telefone: numero, nome: 'Cliente do catálogo',
+            vendedoraId: vend.id, consentimentoLgpd: true, observacoes: 'Entrou pelo WhatsApp do catálogo',
+          },
+          select: { id: true, lojaId: true, vendedoraId: true, loja: { select: { redeId: true } } },
+        })
+      }
+    }
+
     if (!cliente || !cliente.vendedoraId) return { roteado: false }
+
+    // Garante um ciclo aberto (reuso × novo). Reentrada após fechado = nova oportunidade.
+    const ciclo = await garantirCicloAberto({
+      lojaId: cliente.lojaId, vendedoraId: cliente.vendedoraId, redeId: cliente.loja.redeId,
+      clienteId: cliente.id, telefone: numero,
+    })
 
     const msg = await prisma.mensagemWhatsapp.create({
       data: {
@@ -126,6 +158,6 @@ export async function whatsappRoutes(app: FastifyInstance) {
         direcao: 'RECEBIDA', status: 'RECEBIDA', origem: 'ENTRADA', telefone: numero, texto: b.texto,
       },
     })
-    return { roteado: true, mensagemId: msg.id }
+    return { roteado: true, mensagemId: msg.id, novoLead: ciclo.novo }
   })
 }

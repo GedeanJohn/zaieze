@@ -169,7 +169,9 @@ async function main() {
   const catVestidos = await prisma.categoria.create({ data: { lojaId: loja.id, nome: 'Vestidos' } })
   const catFitness = await prisma.categoria.create({ data: { lojaId: loja.id, nome: 'Fitness' } })
   const marca = await prisma.marca.create({ data: { lojaId: loja.id, nome: 'Luna Brand' } })
-  const colecao = await prisma.colecao.create({ data: { lojaId: loja.id, nome: 'Verão 2026' } })
+  // Coleção liberada (aparece no catálogo/PDV) + uma em preparação (demo do fluxo da estoquista)
+  const colecao = await prisma.colecao.create({ data: { lojaId: loja.id, nome: 'Verão 2026', status: 'LIBERADA', liberadaEm: new Date() } })
+  const colecaoInverno = await prisma.colecao.create({ data: { lojaId: loja.id, nome: 'Inverno 2026', descricao: 'Em montagem pela estoquista — ainda não liberada.' } })
 
   const entrada = (qtd: number) => ({ create: { tipo: 'ENTRADA' as const, quantidade: qtd, motivo: 'Estoque inicial' } })
 
@@ -179,6 +181,7 @@ async function main() {
       descricao: 'Vestido midi em viscose, modelagem evasê.',
       composicao: '95% viscose, 5% elastano', modelagem: 'Evasê',
       categoriaId: catVestidos.id, marcaId: marca.id, colecaoId: colecao.id,
+      fotos: ['https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=800', 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=800'],
       precoVarejo: 189.9, precoAtacado: 129.9, custo: 78,
       variacoes: {
         create: [
@@ -198,6 +201,7 @@ async function main() {
       descricao: 'Legging cintura alta com compressão.',
       composicao: '88% poliamida, 12% elastano', modelagem: 'Cintura alta',
       categoriaId: catFitness.id, marcaId: marca.id, colecaoId: colecao.id,
+      fotos: ['https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=800'],
       precoVarejo: 119.9, precoAtacado: 79.9, custo: 42,
       variacoes: {
         create: [
@@ -215,6 +219,7 @@ async function main() {
       lojaId: loja.id, referencia: 'BLAZER', nome: 'Blazer Alfaiataria Slim', genero: 'FEMININO',
       descricao: 'Blazer estruturado com forro.', modelagem: 'Slim',
       categoriaId: catVestidos.id, marcaId: marca.id, colecaoId: colecao.id,
+      fotos: ['https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800'],
       precoVarejo: 299.9, precoAtacado: 209.9, custo: 130,
       variacoes: {
         create: [
@@ -224,6 +229,23 @@ async function main() {
       },
     },
     include: { variacoes: true },
+  })
+
+  // Peça da coleção EM PREPARAÇÃO (Inverno 2026): invisível para a vendedora até a estoquista liberar
+  await prisma.produto.create({
+    data: {
+      lojaId: loja.id, referencia: 'TRENCH', nome: 'Trench Coat Clássico', genero: 'FEMININO',
+      descricao: 'Trench coat impermeável com cinto.', modelagem: 'Reto',
+      categoriaId: catVestidos.id, marcaId: marca.id, colecaoId: colecaoInverno.id,
+      fotos: ['https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=800'],
+      precoVarejo: 389.9, precoAtacado: 279.9, custo: 170,
+      variacoes: {
+        create: [
+          { cor: 'Bege', tamanho: 'M', estoque: 12, sku: 'TRENCH-BEGE-M-0001', movimentos: entrada(12) },
+          { cor: 'Bege', tamanho: 'G', estoque: 6, sku: 'TRENCH-BEGE-G-0001', movimentos: entrada(6) },
+        ],
+      },
+    },
   })
 
   // Produto ENCALHADO (sem vendas) — alimenta o Radar de Oportunidades

@@ -1,6 +1,10 @@
+import path from 'node:path'
+import fs from 'node:fs'
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import rateLimit from '@fastify/rate-limit'
+import multipart from '@fastify/multipart'
+import fastifyStatic from '@fastify/static'
 import { ZodError } from 'zod'
 import { env } from './env'
 import { registrarAuth } from './plugins/auth'
@@ -27,6 +31,10 @@ import { atacadoRoutes } from './modules/atacado/atacado.routes'
 import { planosRoutes } from './modules/planos/planos.routes'
 import { assinaturasRoutes } from './modules/assinaturas/assinaturas.routes'
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes'
+import { colecoesRoutes } from './modules/colecoes/colecoes.routes'
+import { marcaRoutes } from './modules/marca/marca.routes'
+import { leadsRoutes } from './modules/leads/leads.routes'
+import { catalogoRoutes } from './modules/catalogo/catalogo.routes'
 
 export async function buildApp() {
   // trustProxy: lê o IP real do cliente via X-Forwarded-For (atrás do nginx) — necessário p/ rate limit por IP
@@ -35,6 +43,11 @@ export async function buildApp() {
   await app.register(cors, { origin: env.CORS_ORIGIN.split(',') })
   // Rate limit desligado por padrão (global:false); habilitado por rota (ex.: login) via config.rateLimit
   await app.register(rateLimit, { global: false })
+  // Upload (logo da marca) + arquivos estáticos servidos sob /api/uploads (já roteado pelos proxies)
+  await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } })
+  const uploadsDir = path.resolve(process.cwd(), env.UPLOAD_DIR)
+  fs.mkdirSync(uploadsDir, { recursive: true })
+  await app.register(fastifyStatic, { root: uploadsDir, prefix: '/api/uploads/' })
   await registrarAuth(app)
 
   app.setErrorHandler((error, _request, reply) => {
@@ -75,6 +88,10 @@ export async function buildApp() {
   await app.register(planosRoutes, { prefix: '/api/planos' })
   await app.register(assinaturasRoutes, { prefix: '/api/assinaturas' })
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' })
+  await app.register(colecoesRoutes, { prefix: '/api/colecoes' })
+  await app.register(marcaRoutes, { prefix: '/api/marca' })
+  await app.register(leadsRoutes, { prefix: '/api/leads' })
+  await app.register(catalogoRoutes, { prefix: '/api/catalogo' })
 
   return app
 }

@@ -41,3 +41,12 @@ export function urlTenantLogin(slug: string, dominioBase: string): string {
   if (ehDev()) return `${window.location.protocol}//${window.location.host}/login?tenant=${slug}`
   return `https://${slug}.${dominioBase}/login`
 }
+
+/**
+ * URL pública compartilhável do catálogo da vendedora: <marca>.zaieze.com/<vendedora>.
+ * Em dev (sem subdomínio real) cai para ?tenant=<marca> no host atual.
+ */
+export function urlCatalogo(redeSlug: string, path: string, dominioBase = 'zaieze.com'): string {
+  if (ehDev()) return `${window.location.protocol}//${window.location.host}${path}?tenant=${redeSlug}`
+  return `https://${redeSlug}.${dominioBase}${path}`
+}

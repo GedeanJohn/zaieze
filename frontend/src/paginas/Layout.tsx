@@ -45,16 +45,20 @@ export default function Layout() {
         {podeVendasClientes && <NavLink to="/clientes" className={cls}>👗 Clientes</NavLink>}
         {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/caixa" className={cls}>📥 Caixa de entrada</NavLink>}
         {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/campanhas" className={cls}>📲 WhatsApp</NavLink>}
+        {podeVendasClientes && temFeature('portal_cliente') && <NavLink to="/funil" className={cls}>🔗 Funil de vendas</NavLink>}
         {podeVendasClientes && temFeature('radar') && <NavLink to="/radar" className={cls}>🎯 Radar</NavLink>}
         {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/ranking" className={cls}>🏆 Ranking</NavLink>}
         {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/mural" className={cls}>📣 Mural</NavLink>}
         {podeVendasClientes && temFeature('provador') && <NavLink to="/provador" className={cls}>🪞 Provador</NavLink>}
         {podeVendasClientes && temFeature('atacado') && <NavLink to="/atacado" className={cls}>📦 Atacado</NavLink>}
         <NavLink to="/produtos" className={cls}>🏷️ Produtos</NavLink>
+        {podeEstoque && <NavLink to="/colecoes" className={cls}>🗂️ Coleções</NavLink>}
         {podeEstoque && <NavLink to="/estoque" className={cls}>📦 Estoque</NavLink>}
         {podeEstoque && temFeature('multi_loja') && <NavLink to="/transferencias" className={cls}>🔄 Transferências</NavLink>}
         {podeEquipe && <NavLink to="/equipe" className={cls}>👥 Equipe</NavLink>}
         {podeEstoquistas && temFeature('multi_loja') && <NavLink to="/estoquistas" className={cls}>👷 Estoquistas</NavLink>}
+        {ehDonoRede && temFeature('portal_cliente') && <NavLink to="/marca" className={cls}>🎨 Marca</NavLink>}
+        {ehDonoRede && <NavLink to="/manual" className={cls}>📖 Manual</NavLink>}
         {ehDonoRede && <NavLink to="/planos" className={cls}>💳 Planos</NavLink>}
         <div className="rodape">
           <div>{usuario.nome}</div>

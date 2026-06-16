@@ -111,6 +111,27 @@ enum TipoMovimentoEstoque {
   TRANSFERENCIA_ENTRADA // entrada por transferência recebida
 }
 
+// Ciclo de vida da coleção: a estoquista monta em preparação e LIBERA para todas
+// as vendedoras ao mesmo tempo (competição justa pelo estoque compartilhado).
+enum StatusColecao {
+  EM_PREPARACAO // estoquista ainda cadastrando — invisível para vendedoras e catálogo
+  LIBERADA // liberada simultaneamente; aparece no PDV e no catálogo público
+}
+
+// Etapas do funil de uma OPORTUNIDADE (ciclo de contato). Um mesmo cliente pode ter
+// vários ciclos ao longo do tempo: perdeu hoje, reentra depois = novo ciclo (novo Lead).
+enum StatusLead {
+  ENTROU // entrou pelo catálogo; aguardando a 1ª resposta (SLA de entrada correndo)
+  ATENDIDO // a vendedora respondeu (fechou o SLA de entrada)
+  NEGOCIANDO // atendimento ativo / negociação em andamento
+  CONVERTIDO // virou venda (automático pela venda ou manual)
+  PERDIDO // ciclo encerrado sem compra (cliente pode reentrar = novo ciclo)
+}
+
+enum OrigemLead {
+  CATALOGO // entrou pelo link do catálogo da vendedora
+}
+
 // ─────────────────────────── Rede (marca) — tenant raiz ───────────────────────────
 
 model Rede {
@@ -119,6 +140,15 @@ model Rede {
   slug      String   @unique
   plano     Plano    @default(START)
   ativo     Boolean  @default(true)
+  // Identidade visual da marca (usada no catálogo público / Portal do Cliente)
+  logoUrl       String? // caminho do arquivo enviado pelo gestor (servido em /uploads)
+  corPrimaria   String  @default("#111111") // cor de destaque (botões/CTA)
+  corSecundaria String  @default("#ffffff") // cor de fundo
+  // SLA por etapa do funil (minutos): tempo máximo do ciclo em cada etapa antes de "atrasar".
+  slaEntrouMin     Int     @default(30) // 1ª resposta; estourou + auto = redistribui
+  slaAtendidoMin   Int     @default(1440) // avançar do "atendido" (1 dia)
+  slaNegociandoMin Int     @default(4320) // fechar a negociação (3 dias)
+  slaAutoRedistribuir Boolean @default(false) // redistribui sozinho quando ENTROU estoura o prazo
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -182,6 +212,7 @@ model Loja {
   reguas    ReguaInatividade[]
   regrasComissao RegraComissao[]
   postsMural     PostMural[]
+  leads          Lead[]
 
   @@index([redeId])
   @@map("lojas")
@@ -234,6 +265,7 @@ model Usuario {
   mensagens MensagemWhatsapp[] @relation("MensagensVendedora")
   campanhas Campanha[]
   postsMural PostMural[]
+  leads     Lead[]             @relation("LeadsVendedora")
 
   @@unique([lojaId, slugCatalogo])
   @@index([lojaId, role])
@@ -269,11 +301,49 @@ model Cliente {
   vendedora Usuario? @relation("CarteiraVendedora", fields: [vendedoraId], references: [id], onDelete: SetNull)
   vendas    Venda[]
   mensagens MensagemWhatsapp[]
+  leads     Lead[]
 
   @@unique([lojaId, telefone])
   @@index([lojaId, vendedoraId])
   @@index([lojaId, segmento])
   @@map("clientes")
+}
+
+// ─────────────────────────── Leads (entrada pelo catálogo) ───────────────────────────
+// O cliente acessa o link do catálogo da vendedora → é direcionado ao WhatsApp dela.
+// Esse contato vira um Lead atribuído à vendedora. "Atender" = a vendedora responder.
+// Se estourar o SLA (regra do gestor), o lead é redistribuído a outra vendedora.
+
+model Lead {
+  id           String     @id @default(cuid())
+  lojaId       String
+  vendedoraId  String // dona atual do ciclo
+  clienteId    String? // vinculado quando o telefone do cliente é identificado
+  nome         String?
+  telefone     String?
+  origem       OrigemLead @default(CATALOGO)
+  status       StatusLead @default(ENTROU)
+  slugCatalogo String? // slug da vendedora que originou o ciclo (auditoria)
+  produtoId    String? // peça que despertou o interesse (opcional)
+  etapaDesde      DateTime @default(now()) // quando entrou na etapa atual (tempo em etapa)
+  prazoEm         DateTime // limite do SLA da etapa atual (etapaDesde + limite da etapa)
+  atendidoEm      DateTime? // 1ª resposta da vendedora
+  fechadoEm       DateTime? // quando foi CONVERTIDO ou PERDIDO
+  motivoPerda     String?
+  vendaId         String? // venda que converteu o ciclo
+  redistribuidoEm DateTime?
+  redistribuicoes Int      @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  loja      Loja     @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  vendedora Usuario  @relation("LeadsVendedora", fields: [vendedoraId], references: [id], onDelete: Cascade)
+  cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  venda     Venda?   @relation(fields: [vendaId], references: [id], onDelete: SetNull)
+
+  @@index([lojaId, status])
+  @@index([vendedoraId, status])
+  @@map("leads")
 }
 
 // ─────────────────────────── Catálogo ───────────────────────────
@@ -303,14 +373,20 @@ model Marca {
 }
 
 model Colecao {
-  id     String @id @default(cuid())
-  lojaId String
-  nome   String
+  id         String        @id @default(cuid())
+  lojaId     String
+  nome       String
+  descricao  String?
+  status     StatusColecao @default(EM_PREPARACAO)
+  liberadaEm DateTime? // quando foi liberada para as vendedoras
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
 
   loja     Loja      @relation(fields: [lojaId], references: [id], onDelete: Cascade)
   produtos Produto[]
 
   @@unique([lojaId, nome])
+  @@index([lojaId, status])
   @@map("colecoes")
 }
 
@@ -394,6 +470,7 @@ model Venda {
   cliente   Cliente?    @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   vendedora Usuario     @relation(fields: [vendedoraId], references: [id])
   itens     ItemVenda[]
+  leadsConvertidos Lead[]
 
   @@index([lojaId, createdAt])
   @@index([lojaId, vendedoraId])

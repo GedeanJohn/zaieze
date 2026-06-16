@@ -128,14 +128,13 @@ export async function produtosRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: [app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     const { busca, ativo } = request.query as { busca?: string; ativo?: string }
+    const and: import('@prisma/client').Prisma.ProdutoWhereInput[] = []
+    if (ativo !== undefined) and.push({ ativo: ativo === 'true' })
+    if (busca) and.push({ OR: [{ nome: { contains: busca, mode: 'insensitive' } }, { referencia: { contains: busca, mode: 'insensitive' } }] })
+    // Vendedora só enxerga peças avulsas ou de coleção LIBERADA (coleção em preparação fica oculta).
+    if (request.user.role === 'VENDEDORA') and.push({ OR: [{ colecaoId: null }, { colecao: { status: 'LIBERADA' } }] })
     return prisma.produto.findMany({
-      where: {
-        lojaId,
-        ...(ativo !== undefined ? { ativo: ativo === 'true' } : {}),
-        ...(busca
-          ? { OR: [{ nome: { contains: busca, mode: 'insensitive' } }, { referencia: { contains: busca, mode: 'insensitive' } }] }
-          : {}),
-      },
+      where: { lojaId, ...(and.length ? { AND: and } : {}) },
       orderBy: { nome: 'asc' },
       include: includeProduto,
     })

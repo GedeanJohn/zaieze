@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
+import { converterCicloPorVenda } from '../leads/leads.service'
 
 const itemSchema = z.object({
   variacaoId: z.string(),
@@ -73,13 +74,17 @@ export async function vendasRoutes(app: FastifyInstance) {
     const ids = body.itens.map((i) => i.variacaoId)
     const variacoes = await prisma.variacaoProduto.findMany({
       where: { id: { in: ids }, produto: { lojaId } },
-      include: { produto: true },
+      include: { produto: { include: { colecao: { select: { status: true, nome: true } } } } },
     })
     const porId = new Map(variacoes.map((v) => [v.id, v]))
 
     for (const item of body.itens) {
       const v = porId.get(item.variacaoId)
       if (!v) return reply.code(422).send({ erro: `Variação ${item.variacaoId} inválida para esta loja` })
+      // Coleção em preparação ainda não está disponível para venda (liberação simultânea).
+      if (request.user.role === 'VENDEDORA' && v.produto.colecao && v.produto.colecao.status !== 'LIBERADA') {
+        return reply.code(422).send({ erro: `A coleção "${v.produto.colecao.nome}" ainda não foi liberada` })
+      }
       if (v.estoque < item.quantidade) {
         return reply.code(422).send({
           erro: `Estoque insuficiente: ${v.produto.nome} ${v.cor}/${v.tamanho} tem ${v.estoque} un (pedido: ${item.quantidade})`,
@@ -170,6 +175,11 @@ export async function vendasRoutes(app: FastifyInstance) {
         },
       })
     })
+
+    // Conversão do funil: fecha como CONVERTIDO o ciclo aberto daquele cliente (se houver).
+    if (body.clienteId) {
+      await converterCicloPorVenda({ lojaId, clienteId: body.clienteId, vendedoraId, vendaId: venda.id })
+    }
 
     return reply.code(201).send(venda)
   })

@@ -27,6 +27,9 @@ services:
         condition: service_healthy
     expose:
       - "3050"
+    # Persiste os uploads (ex.: logo da marca) entre redeploys/rebuilds.
+    volumes:
+      - uploads:/app/uploads
 
   web:
     build: ./frontend
@@ -41,3 +44,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:

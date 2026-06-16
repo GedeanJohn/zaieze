@@ -19,6 +19,8 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   // Mercado Pago (Assinaturas/preapproval) — sem token o checkout opera em modo simulado
   MERCADOPAGO_ACCESS_TOKEN: z.string().optional(),
+  // Pasta onde os uploads (ex.: logo da marca) são gravados; servidos em /api/uploads
+  UPLOAD_DIR: z.string().default('uploads'),
   // Domínio base do SaaS multi-tenant (wildcard): cada rede vive em <slug>.DOMINIO_BASE
   DOMINIO_BASE: z.string().default('zaieze.com'),
   // Esquema usado para montar as URLs de tenant (http em dev, https em prod)

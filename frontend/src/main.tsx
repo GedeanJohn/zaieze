@@ -22,10 +22,15 @@ import Produtos from './paginas/Produtos'
 import Equipe from './paginas/Equipe'
 import Estoquistas from './paginas/Estoquistas'
 import Planos from './paginas/Planos'
+import Colecoes from './paginas/Colecoes'
+import Marca from './paginas/Marca'
+import Pipeline from './paginas/Pipeline'
+import Manual from './paginas/Manual'
 import Landing from './paginas/site/Landing'
 import Checkout from './paginas/site/Checkout'
 import Sucesso from './paginas/site/Sucesso'
 import Entrar from './paginas/site/Entrar'
+import Catalogo from './paginas/site/Catalogo'
 
 function Protegida({ children }: { children: React.ReactElement }) {
   return usuarioLogado() ? children : <Navigate to="/login" replace />
@@ -63,10 +68,16 @@ function CrmApp() {
         <Route path="provador" element={<Provador />} />
         <Route path="atacado" element={<Atacado />} />
         <Route path="produtos" element={<Produtos />} />
+        <Route path="colecoes" element={<Colecoes />} />
         <Route path="equipe" element={<Equipe />} />
         <Route path="estoquistas" element={<Estoquistas />} />
+        <Route path="marca" element={<Marca />} />
+        <Route path="funil" element={<Pipeline />} />
+        <Route path="manual" element={<Manual />} />
         <Route path="planos" element={<Planos />} />
       </Route>
+      {/* Catálogo público da vendedora: <marca>.zaieze.com/<vendedora> (sem login) */}
+      <Route path="/:vendSlug" element={<Catalogo />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

@@ -39,6 +39,9 @@ export async function criarPreapproval(opts: {
       external_reference: opts.redeSlug,
       payer_email: opts.email,
       back_url: opts.backUrl,
+      // URL de notificação embutida na assinatura: o MP avisa este endpoint nos eventos
+      // do preapproval, sem depender de webhook configurado no painel da aplicação.
+      notification_url: `${env.TENANT_SCHEME}://${env.DOMINIO_BASE}/api/assinaturas/webhook`,
       auto_recurring: {
         frequency: 1,
         frequency_type: 'months',

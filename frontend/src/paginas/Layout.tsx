@@ -5,6 +5,7 @@ import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
 export default function Layout() {
   const usuario = usuarioLogado()!
   const navigate = useNavigate()
+  const [menuAberto, setMenuAberto] = useState(false)
 
   // Aviso global de encerramento de acesso (cancelamento agendado) — todos os papéis, todas as telas
   const [encerraEm, setEncerraEm] = useState<string | null>(null)
@@ -38,7 +39,15 @@ export default function Layout() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <header className="topbar-mobile">
+        <button className="menu-toggle" onClick={() => setMenuAberto(true)} aria-label="Abrir menu">☰</button>
+        <div className="logo">Moda<em>CRM</em> AI</div>
+      </header>
+      {menuAberto && <div className="menu-overlay" onClick={() => setMenuAberto(false)} />}
+      <aside
+        className={`sidebar ${menuAberto ? 'aberta' : ''}`}
+        onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setMenuAberto(false) }}
+      >
         <div className="logo">Moda<em>CRM</em> AI</div>
         <NavLink to="/" end className={cls}>📊 Dashboard</NavLink>
         {podeVendasClientes && <NavLink to="/vendas" className={cls}>🛒 Vendas</NavLink>}

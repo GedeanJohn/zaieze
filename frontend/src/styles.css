@@ -92,15 +92,20 @@ label { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 
 .aviso-encerramento .aviso-contagem { color: var(--ink-soft); }
 .sucesso { background: #e8f5e9; color: var(--ok); padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; }
 
-/* Login */
-.login-wrap { min-height: 100vh; display: grid; place-items: center; background: var(--ink); }
+/* Login do usuário — paleta ZAIEZE (preto/branco minimalista) */
+.login-wrap { min-height: 100vh; display: grid; place-items: center; background: var(--zz-bg); font-family: var(--leitura); }
 .login-card {
-  background: var(--surface); border-radius: 16px; padding: 40px; width: 380px;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+  background: var(--zz-surface); border: 1px solid var(--zz-line); border-radius: 16px; padding: 40px; width: 380px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55); color: #fff;
 }
-.login-card h1 { margin: 0 0 4px; font-size: 26px; }
-.login-card h1 em { color: var(--accent); font-style: italic; }
-.login-card p { color: var(--ink-soft); font-size: 14px; margin: 0 0 24px; }
+.login-card h1 { margin: 0 0 4px; font-size: 26px; font-family: var(--marca); letter-spacing: 0.04em; color: #fff; }
+.login-card h1 em { color: #fff; font-style: normal; opacity: 0.6; }
+.login-card p { color: var(--zz-mut); font-size: 14px; margin: 0 0 24px; }
+.login-card label { color: var(--zz-mut); }
+.login-card input { background: #111; color: #fff; border-color: var(--zz-line); }
+.login-card input:focus { outline: none; border-color: #fff; }
+.login-card .btn { background: #fff; color: #000; }
+.login-card .btn:hover { filter: none; background: #e6e6e6; }
 
 .modal-fundo {
   position: fixed; inset: 0; background: rgba(30, 20, 15, 0.45);
@@ -148,18 +153,21 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   --zz-surface: #0c0c0d;
   --zz-line: rgba(255, 255, 255, 0.14);
   --zz-mut: #8a8a8a;
+  /* Fonte da marca: usada APENAS no lema do hero e na logo-texto. */
   --marca: 'NUSAR', 'Century Gothic', 'Futura', 'Questrial', 'Segoe UI', system-ui, sans-serif;
+  /* Fonte de leitura: corpo de texto, planos, botões — mais amigável para ler. */
+  --leitura: 'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif;
 }
 
 .site {
   min-height: 100vh; background: var(--zz-bg); color: #fff;
-  font-family: var(--marca); letter-spacing: 0.02em;
+  font-family: var(--leitura); letter-spacing: 0.01em;
   --lema-size: 30px; /* tamanho da fonte do lema (hero h1); a logo deriva daqui */
 }
-.site h1, .site h2, .site h3 { font-family: var(--marca); font-weight: 600; letter-spacing: 0.06em; }
+.site h1, .site h2, .site h3 { font-family: var(--leitura); font-weight: 600; letter-spacing: 0.02em; }
 
 /* botões invertidos para o tema escuro */
-.site .btn { background: #fff; color: #000; border: 1px solid #fff; border-radius: 6px; font-family: var(--marca); letter-spacing: 0.08em; text-transform: uppercase; font-size: 13px; }
+.site .btn { background: #fff; color: #000; border: 1px solid #fff; border-radius: 6px; font-family: var(--leitura); letter-spacing: 0.06em; text-transform: uppercase; font-size: 13px; }
 .site .btn:hover { background: #e6e6e6; filter: none; }
 .site .btn.secundario { background: transparent; color: #fff; border-color: var(--zz-line); }
 .site .btn.secundario:hover { background: rgba(255, 255, 255, 0.06); }
@@ -179,6 +187,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .hero { text-align: center; padding: 90px 8vw 70px; max-width: 1000px; margin: 0 auto; }
 .hero-logo { width: min(460px, 80vw); margin: 0 auto 34px; display: block; }
 .hero h1 {
+  font-family: var(--marca); /* lema da marca — única fonte NUSAR na página */
   font-size: var(--lema-size); line-height: 1.3; margin: 0 0 22px; text-transform: uppercase;
   letter-spacing: 0.22em; font-weight: 400; color: #fff;
 }
@@ -195,7 +204,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .faixa span { color: var(--zz-mut); font-size: 14px; }
 
 .planos-site { padding: 80px 8vw; max-width: 1180px; margin: 0 auto; text-align: center; }
-.planos-site h2 { font-size: 26px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.14em; }
+.planos-site h2 { font-size: 26px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.06em; }
 .planos-site .sub { color: var(--zz-mut); margin: 0 0 44px; letter-spacing: 0.02em; }
 .planos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; text-align: left; }
 .plano-card {
@@ -207,7 +216,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   position: absolute; top: -11px; left: 30px; background: #fff; color: #000;
   font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 999px; letter-spacing: 0.08em; text-transform: uppercase;
 }
-.plano-card h3 { font-size: 20px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.12em; }
+.plano-card h3 { font-size: 20px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.04em; }
 .plano-card .preco { font-size: 34px; font-weight: 700; }
 .plano-card .preco span { font-size: 13px; font-weight: 400; color: var(--zz-mut); letter-spacing: 0.04em; }
 .plano-card .limite { color: var(--zz-mut); font-size: 12px; margin: 6px 0 18px; letter-spacing: 0.04em; text-transform: uppercase; }

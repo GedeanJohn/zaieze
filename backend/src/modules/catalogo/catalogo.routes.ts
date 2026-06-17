@@ -118,7 +118,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
           where: { ativo: true },
           orderBy: { nome: 'asc' },
           select: {
-            id: true, nome: true, descricao: true, precoVarejo: true, fotos: true,
+            id: true, nome: true, descricao: true, precoVarejo: true, fotos: true, videos: true,
             categoria: { select: { nome: true } },
             variacoes: { select: { cor: true, tamanho: true, estoque: true } },
           },

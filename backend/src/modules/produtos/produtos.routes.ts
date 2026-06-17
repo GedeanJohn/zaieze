@@ -32,6 +32,7 @@ const criarProdutoSchema = z.object({
   pesoGramas: z.coerce.number().int().nonnegative().optional(),
   faixaEtaria: z.string().optional(),
   fotos: z.array(z.string().url()).default([]),
+  videos: z.array(z.string().url()).default([]),
   variacoes: z.array(variacaoSchema).min(1, 'Informe ao menos uma variação (cor × tamanho)'),
 })
 
@@ -188,6 +189,7 @@ export async function produtosRoutes(app: FastifyInstance) {
           precoAtacado: body.precoAtacado,
           custo: body.custo,
           fotos: body.fotos,
+          videos: body.videos,
           variacoes: { create: variacoesData },
         },
         include: includeProduto,

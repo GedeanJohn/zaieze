@@ -30,6 +30,8 @@ interface Produto {
   categoria?: { nome: string } | null
   marca?: { nome: string } | null
   colecao?: { nome: string } | null
+  fotos?: string[]
+  videos?: string[]
   ativo: boolean
   variacoes: Variacao[]
 }
@@ -52,6 +54,8 @@ interface FormProduto {
   fornecedor?: string
   pesoGramas?: string
   faixaEtaria?: string
+  fotos: string[]
+  videos: string[]
   variacoes: Variacao[]
 }
 
@@ -77,6 +81,7 @@ export default function Produtos() {
   const [busca, setBusca] = useState('')
   const [form, setForm] = useState<FormProduto | null>(null)
   const [erro, setErro] = useState('')
+  const [enviandoFoto, setEnviandoFoto] = useState(false)
 
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
@@ -96,7 +101,7 @@ export default function Produtos() {
 
   function abrirNovo() {
     setErro('')
-    setForm({ nome: '', genero: 'FEMININO', referencia: '', precoVarejo: '', variacoes: [{ ...VARIACAO_VAZIA }] })
+    setForm({ nome: '', genero: 'FEMININO', referencia: '', precoVarejo: '', fotos: [], videos: [], variacoes: [{ ...VARIACAO_VAZIA }] })
   }
 
   function abrirEdicao(p: Produto) {
@@ -119,6 +124,8 @@ export default function Produtos() {
       fornecedor: p.fornecedor ?? '',
       pesoGramas: p.pesoGramas != null ? String(p.pesoGramas) : '',
       faixaEtaria: p.faixaEtaria ?? '',
+      fotos: p.fotos ?? [],
+      videos: p.videos ?? [],
       variacoes: p.variacoes.map((v) => ({ ...v, codigoBarras: v.codigoBarras ?? '' })),
     })
   }
@@ -154,6 +161,8 @@ export default function Produtos() {
       fornecedor: limpa(form.fornecedor),
       pesoGramas: form.pesoGramas ? Number(form.pesoGramas) : undefined,
       faixaEtaria: limpa(form.faixaEtaria),
+      fotos: form.fotos,
+      videos: form.videos,
       variacoes: form.variacoes.map((v) => ({
         cor: v.cor,
         tamanho: v.tamanho,
@@ -169,6 +178,28 @@ export default function Produtos() {
       carregar()
     } catch (err) {
       setErro(mensagemDeErro(err))
+    }
+  }
+
+  async function enviarFotos(e: React.ChangeEvent<HTMLInputElement>) {
+    const arquivos = e.target.files
+    if (!arquivos || !arquivos.length || !form) return
+    setEnviandoFoto(true)
+    setErro('')
+    try {
+      const novas: string[] = []
+      for (const arquivo of Array.from(arquivos)) {
+        const fd = new FormData()
+        fd.append('file', arquivo)
+        const { data } = await api.post('/midia/imagem', fd, { params: escopo.params })
+        novas.push(data.url)
+      }
+      setForm((f) => (f ? { ...f, fotos: [...f.fotos, ...novas] } : f))
+    } catch (err) {
+      setErro(mensagemDeErro(err))
+    } finally {
+      setEnviandoFoto(false)
+      e.target.value = ''
     }
   }
 
@@ -266,6 +297,27 @@ export default function Produtos() {
                 <input type="number" step="0.01" min="0.01" value={form.precoVarejo} onChange={(e) => setForm({ ...form, precoVarejo: e.target.value })} required />
               </div>
             </div>
+
+            {/* Fotos */}
+            <h3 style={{ marginBottom: 8 }}>Fotos da peça</h3>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+              {form.fotos.map((url, i) => (
+                <div key={i} style={{ position: 'relative', width: 72, height: 96 }}>
+                  <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6, border: '1px solid #00000022' }} />
+                  <button
+                    type="button" className="remover" title="Remover foto"
+                    style={{ position: 'absolute', top: -8, right: -8 }}
+                    onClick={() => setForm({ ...form, fotos: form.fotos.filter((_, idx) => idx !== i) })}
+                  >×</button>
+                </div>
+              ))}
+              {form.fotos.length === 0 && <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Nenhuma foto ainda.</span>}
+            </div>
+            <label className="btn secundario" style={{ cursor: 'pointer', display: 'inline-block' }}>
+              {enviandoFoto ? 'Enviando…' : '+ Adicionar fotos'}
+              <input type="file" accept="image/*" multiple onChange={enviarFotos} disabled={enviandoFoto} style={{ display: 'none' }} />
+            </label>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '4px 0 14px' }}>As fotos são otimizadas e hospedadas no CDN automaticamente.</div>
 
             {/* Grade */}
             <h3 style={{ marginBottom: 8 }}>Grade (cor × tamanho)</h3>

@@ -35,6 +35,7 @@ import { colecoesRoutes } from './modules/colecoes/colecoes.routes'
 import { marcaRoutes } from './modules/marca/marca.routes'
 import { leadsRoutes } from './modules/leads/leads.routes'
 import { catalogoRoutes } from './modules/catalogo/catalogo.routes'
+import { midiaRoutes } from './modules/midia/midia.routes'
 
 export async function buildApp() {
   // trustProxy: lê o IP real do cliente via X-Forwarded-For (atrás do nginx) — necessário p/ rate limit por IP
@@ -44,7 +45,7 @@ export async function buildApp() {
   // Rate limit desligado por padrão (global:false); habilitado por rota (ex.: login) via config.rateLimit
   await app.register(rateLimit, { global: false })
   // Upload (logo da marca) + arquivos estáticos servidos sob /api/uploads (já roteado pelos proxies)
-  await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } })
+  await app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } })
   const uploadsDir = path.resolve(process.cwd(), env.UPLOAD_DIR)
   fs.mkdirSync(uploadsDir, { recursive: true })
   await app.register(fastifyStatic, { root: uploadsDir, prefix: '/api/uploads/' })
@@ -92,6 +93,7 @@ export async function buildApp() {
   await app.register(marcaRoutes, { prefix: '/api/marca' })
   await app.register(leadsRoutes, { prefix: '/api/leads' })
   await app.register(catalogoRoutes, { prefix: '/api/catalogo' })
+  await app.register(midiaRoutes, { prefix: '/api/midia' })
 
   return app
 }

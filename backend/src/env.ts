@@ -21,6 +21,12 @@ const envSchema = z.object({
   MERCADOPAGO_ACCESS_TOKEN: z.string().optional(),
   // Pasta onde os uploads (ex.: logo da marca) são gravados; servidos em /api/uploads
   UPLOAD_DIR: z.string().default('uploads'),
+  // Cloudflare R2 (mídia do catálogo: fotos/vídeos). Ausentes → upload de mídia em modo simulado.
+  R2_ACCOUNT_ID: z.string().optional(),
+  R2_BUCKET: z.string().optional(),
+  R2_PUBLIC_URL: z.string().url().optional(), // ex.: https://cdn.zaieze.com
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
   // Domínio base do SaaS multi-tenant (wildcard): cada rede vive em <slug>.DOMINIO_BASE
   DOMINIO_BASE: z.string().default('zaieze.com'),
   // Esquema usado para montar as URLs de tenant (http em dev, https em prod)

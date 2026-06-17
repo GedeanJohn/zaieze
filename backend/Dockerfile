@@ -13,6 +13,8 @@ RUN npm run build
 FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+# ffmpeg: transcodificação de vídeo do catálogo (MP4 H.264) antes de subir ao R2
+RUN apk add --no-cache ffmpeg
 # node_modules do build já trazem o Prisma Client gerado + o CLI (para migrate deploy)
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist

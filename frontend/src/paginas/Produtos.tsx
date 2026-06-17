@@ -82,6 +82,7 @@ export default function Produtos() {
   const [form, setForm] = useState<FormProduto | null>(null)
   const [erro, setErro] = useState('')
   const [enviandoFoto, setEnviandoFoto] = useState(false)
+  const [enviandoVideo, setEnviandoVideo] = useState(false)
 
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
@@ -203,6 +204,28 @@ export default function Produtos() {
     }
   }
 
+  async function enviarVideos(e: React.ChangeEvent<HTMLInputElement>) {
+    const arquivos = e.target.files
+    if (!arquivos || !arquivos.length || !form) return
+    setEnviandoVideo(true)
+    setErro('')
+    try {
+      const novas: string[] = []
+      for (const arquivo of Array.from(arquivos)) {
+        const fd = new FormData()
+        fd.append('file', arquivo)
+        const { data } = await api.post('/midia/video', fd, { params: escopo.params })
+        novas.push(data.url)
+      }
+      setForm((f) => (f ? { ...f, videos: [...f.videos, ...novas] } : f))
+    } catch (err) {
+      setErro(mensagemDeErro(err))
+    } finally {
+      setEnviandoVideo(false)
+      e.target.value = ''
+    }
+  }
+
   function mudarVariacao(i: number, campo: keyof Variacao, valor: string) {
     if (!form) return
     const numerico = campo === 'estoque' || campo === 'estoqueMinimo'
@@ -318,6 +341,27 @@ export default function Produtos() {
               <input type="file" accept="image/*" multiple onChange={enviarFotos} disabled={enviandoFoto} style={{ display: 'none' }} />
             </label>
             <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '4px 0 14px' }}>As fotos são otimizadas e hospedadas no CDN automaticamente.</div>
+
+            {/* Vídeos */}
+            <h3 style={{ marginBottom: 8 }}>Vídeos da peça</h3>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+              {form.videos.map((url, i) => (
+                <div key={i} style={{ position: 'relative', width: 120 }}>
+                  <video src={url} style={{ width: '100%', borderRadius: 6, border: '1px solid #00000022' }} controls preload="metadata" />
+                  <button
+                    type="button" className="remover" title="Remover vídeo"
+                    style={{ position: 'absolute', top: -8, right: -8 }}
+                    onClick={() => setForm({ ...form, videos: form.videos.filter((_, idx) => idx !== i) })}
+                  >×</button>
+                </div>
+              ))}
+              {form.videos.length === 0 && <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Nenhum vídeo ainda.</span>}
+            </div>
+            <label className="btn secundario" style={{ cursor: 'pointer', display: 'inline-block' }}>
+              {enviandoVideo ? 'Enviando e convertendo…' : '+ Adicionar vídeo'}
+              <input type="file" accept="video/*" multiple onChange={enviarVideos} disabled={enviandoVideo} style={{ display: 'none' }} />
+            </label>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '4px 0 14px' }}>O vídeo é convertido para MP4 e hospedado no CDN. Pode levar alguns segundos. Máx 60&nbsp;MB.</div>
 
             {/* Grade */}
             <h3 style={{ marginBottom: 8 }}>Grade (cor × tamanho)</h3>

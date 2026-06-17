@@ -5,7 +5,7 @@ import { HOST } from '../../host'
 
 interface Produto {
   id: string; nome: string; descricao?: string | null; preco: number
-  fotos: string[]; categoria: string | null; cores: string[]; tamanhos: string[]; disponivel: boolean
+  fotos: string[]; videos: string[]; categoria: string | null; cores: string[]; tamanhos: string[]; disponivel: boolean
 }
 interface Colecao { id: string; nome: string; descricao?: string | null; produtos: Produto[] }
 interface Catalogo {
@@ -78,6 +78,7 @@ export default function Catalogo() {
                   {p.fotos[0]
                     ? <img src={p.fotos[0]} alt={p.nome} loading="lazy" />
                     : <div className="cat-foto-vazia">{p.nome}</div>}
+                  {p.videos.length > 0 && <span className="cat-video-badge">▶ vídeo</span>}
                   {!p.disponivel && <span className="cat-esgotado">esgotado</span>}
                 </div>
                 <div className="cat-info">
@@ -100,6 +101,9 @@ export default function Catalogo() {
           <form className="cat-modal" onClick={(e) => e.stopPropagation()} onSubmit={falarComVendedora}>
             <h3>Falar com {cat.vendedora.primeiroNome}</h3>
             {modal !== 'geral' && <p className="cat-modal-item">Sobre: <strong>{modal.nome}</strong> · {real(modal.preco)}</p>}
+            {modal !== 'geral' && modal.videos.length > 0 && (
+              <video src={modal.videos[0]} controls playsInline preload="metadata" poster={modal.fotos[0]} style={{ width: '100%', borderRadius: 8, maxHeight: '45vh', background: '#000' }} />
+            )}
             <p className="cat-modal-txt">Deixe seu nome e WhatsApp — a vendedora continua o atendimento por lá.</p>
             <input placeholder="Seu nome" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
             <input placeholder="Seu WhatsApp (com DDD)" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} inputMode="tel" />
@@ -136,6 +140,7 @@ function CatalogoEstilos() {
       .cat-card:hover .cat-foto img { transform: scale(1.04); }
       .cat-foto-vazia { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 13px; padding: 8px; text-align: center; }
       .cat-esgotado { position: absolute; top: 8px; left: 8px; background: #00000099; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 99px; text-transform: uppercase; letter-spacing: .5px; }
+      .cat-video-badge { position: absolute; top: 8px; right: 8px; background: #000000aa; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 99px; letter-spacing: .3px; }
       .cat-info { padding: 8px 2px 4px; }
       .cat-nome { font-size: 13px; color: #222; line-height: 1.3; }
       .cat-preco { font-size: 14px; font-weight: 700; margin-top: 2px; }

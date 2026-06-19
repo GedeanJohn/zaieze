@@ -8,12 +8,17 @@ interface Cliente {
   telefone: string
   email?: string | null
   instagram?: string | null
+  cep?: string | null
+  cidade?: string | null
+  uf?: string | null
   segmento: string
   totalGasto: string
   ultimaCompraEm?: string | null
   consentimentoLgpd: boolean
   vendedora?: { id: string; nome: string } | null
 }
+
+interface Locais { cidades: string[]; ufs: string[]; ddds: string[]; regioes: string[] }
 
 interface ItemHist {
   id: string
@@ -60,24 +65,39 @@ export default function Clientes() {
   const [vendedoras, setVendedoras] = useState<Vendedora[]>([])
   const [busca, setBusca] = useState('')
   const [segmento, setSegmento] = useState('')
+  const [cidade, setCidade] = useState('')
+  const [uf, setUf] = useState('')
+  const [regiao, setRegiao] = useState('')
+  const [ddd, setDdd] = useState('')
+  const [locais, setLocais] = useState<Locais>({ cidades: [], ufs: [], ddds: [], regioes: [] })
+  const [selecao, setSelecao] = useState<Set<string>>(new Set())
+  const [enviando, setEnviando] = useState(false)
   const [editando, setEditando] = useState<Partial<Cliente> | null>(null)
   const [detalhe, setDetalhe] = useState<ClienteDetalhe | null>(null)
   const [erro, setErro] = useState('')
   const [aviso, setAviso] = useState('')
   const [segmentando, setSegmentando] = useState(false)
+  const [cepBuscando, setCepBuscando] = useState(false)
 
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
     const params: Record<string, string> = { ...escopo.params }
     if (busca) params.busca = busca
     if (segmento) params.segmento = segmento
-    const [lista, resumo] = await Promise.all([
+    if (cidade) params.cidade = cidade
+    if (uf) params.uf = uf
+    else if (regiao) params.regiao = regiao
+    if (ddd) params.ddd = ddd
+    const [lista, resumo, locs] = await Promise.all([
       api.get('/clientes', { params }),
       api.get('/clientes/resumo/segmentos', { params: escopo.params }),
+      api.get('/clientes/resumo/locais', { params: escopo.params }),
     ])
     setClientes(lista.data)
     setDistribuicao(resumo.data.distribuicao)
-  }, [busca, segmento, escopo.pronto, escopo.params])
+    setLocais(locs.data)
+    setSelecao(new Set()) // limpa seleção a cada novo filtro/recarga
+  }, [busca, segmento, cidade, uf, regiao, ddd, escopo.pronto, escopo.params])
 
   useEffect(() => { carregar() }, [carregar])
 
@@ -126,6 +146,9 @@ export default function Clientes() {
       telefone: editando.telefone,
       email: editando.email || undefined,
       instagram: editando.instagram || undefined,
+      cep: editando.cep || undefined,
+      cidade: editando.cidade || undefined,
+      uf: editando.uf || undefined,
       vendedoraId: (editando as { vendedoraId?: string }).vendedoraId || editando.vendedora?.id || undefined,
       consentimentoLgpd: editando.consentimentoLgpd ?? false,
     }
@@ -137,6 +160,44 @@ export default function Clientes() {
     } catch (err) {
       setErro(mensagemDeErro(err))
     }
+  }
+
+  // Autopreenche cidade/UF a partir do CEP (ViaCEP) — padroniza os dados para os filtros.
+  async function buscarCep(cepRaw: string) {
+    const cepNum = cepRaw.replace(/\D/g, '')
+    if (cepNum.length !== 8 || !editando) return
+    setCepBuscando(true)
+    try {
+      const r = await fetch(`https://viacep.com.br/ws/${cepNum}/json/`)
+      const d = await r.json()
+      if (!d.erro) setEditando((atual) => atual && ({ ...atual, cep: cepNum, cidade: d.localidade ?? atual.cidade, uf: d.uf ?? atual.uf }))
+    } catch { /* offline/cep inválido — mantém o que o usuário digitou */ }
+    finally { setCepBuscando(false) }
+  }
+
+  function alternarSelecao(id: string) {
+    setSelecao((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+  function alternarTodos() {
+    setSelecao((s) => s.size === clientes.length ? new Set() : new Set(clientes.map((c) => c.id)))
+  }
+
+  async function enviarCatalogo() {
+    const ids = [...selecao]
+    if (ids.length === 0) return
+    if (!confirm(`Enviar o link do catálogo para ${ids.length} cliente(s) selecionado(s)?`)) return
+    setEnviando(true); setErro(''); setAviso('')
+    try {
+      const { data } = await api.post('/clientes/enviar-catalogo', { clienteIds: ids }, { params: escopo.params })
+      const partes = [`${data.enviados} enviado(s)`]
+      if (data.simulados) partes.push(`${data.simulados} simulado(s) (WhatsApp não conectado)`)
+      if (data.falhas) partes.push(`${data.falhas} falha(s)`)
+      if (data.semConsentimento) partes.push(`${data.semConsentimento} sem consentimento LGPD`)
+      if (data.semVendedora) partes.push(`${data.semVendedora} sem vendedora/instância`)
+      setAviso(`Disparo concluído: ${partes.join(' · ')}.`)
+      setSelecao(new Set())
+    } catch (err) { setErro(mensagemDeErro(err)) }
+    finally { setEnviando(false) }
   }
 
   const detalheDias = diasDesde(detalhe?.ultimaCompraEm)
@@ -191,11 +252,54 @@ export default function Clientes() {
               {FILTRO_SEGMENTOS.map((s) => <option key={s} value={s}>{s || 'Todos'}</option>)}
             </select>
           </div>
+          <div className="campo">
+            <label>DDD</label>
+            <select value={ddd} onChange={(e) => setDdd(e.target.value)}>
+              <option value="">Todos</option>
+              {locais.ddds.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div className="campo">
+            <label>Cidade</label>
+            <select value={cidade} onChange={(e) => setCidade(e.target.value)}>
+              <option value="">Todas</option>
+              {locais.cidades.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="campo">
+            <label>UF</label>
+            <select value={uf} onChange={(e) => { setUf(e.target.value); if (e.target.value) setRegiao('') }}>
+              <option value="">Todas</option>
+              {locais.ufs.map((u) => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </div>
+          <div className="campo">
+            <label>Região</label>
+            <select value={regiao} onChange={(e) => setRegiao(e.target.value)} disabled={!!uf}>
+              <option value="">Todas</option>
+              {locais.regioes.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Toolbar de seleção + envio do link do catálogo (R1) */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
+          <button className="btn secundario" type="button" onClick={alternarTodos} disabled={clientes.length === 0}>
+            {selecao.size === clientes.length && clientes.length > 0 ? 'Limpar seleção' : 'Selecionar todos'}
+          </button>
+          <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{selecao.size} selecionado(s)</span>
+          <button className="btn" type="button" onClick={enviarCatalogo} disabled={selecao.size === 0 || enviando}>
+            {enviando ? 'Enviando…' : `📲 Enviar link do catálogo${selecao.size ? ` (${selecao.size})` : ''}`}
+          </button>
+          <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Só vai para quem tem consentimento LGPD.</span>
         </div>
         <table>
           <thead>
             <tr>
-              <th>Nome</th><th>WhatsApp</th><th>Segmento</th><th>Total gasto</th><th>Última compra</th>
+              <th style={{ width: 28 }}>
+                <input type="checkbox" checked={selecao.size === clientes.length && clientes.length > 0} onChange={alternarTodos} />
+              </th>
+              <th>Nome</th><th>WhatsApp</th><th>Local</th><th>Segmento</th><th>Total gasto</th><th>Última compra</th>
               {gerente && <th>Vendedora</th>}
               <th>LGPD</th><th></th>
             </tr>
@@ -204,9 +308,11 @@ export default function Clientes() {
             {clientes.map((c) => {
               const dias = diasDesde(c.ultimaCompraEm)
               return (
-                <tr key={c.id}>
+                <tr key={c.id} style={{ background: selecao.has(c.id) ? 'var(--accent-suave, #ffffff10)' : undefined }}>
+                  <td><input type="checkbox" checked={selecao.has(c.id)} onChange={() => alternarSelecao(c.id)} /></td>
                   <td><a href="#" onClick={(e) => { e.preventDefault(); abrirDetalhe(c.id) }}>{c.nome}</a></td>
                   <td>{c.telefone}</td>
+                  <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{c.cidade ? `${c.cidade}${c.uf ? `/${c.uf}` : ''}` : '—'}</td>
                   <td><span className={`selo ${c.segmento}`}>{c.segmento}</span></td>
                   <td>{formataReal(c.totalGasto)}</td>
                   <td style={{ fontSize: 13, color: dias != null && dias > 90 ? 'var(--danger)' : 'var(--ink-soft)' }}>
@@ -219,7 +325,7 @@ export default function Clientes() {
               )
             })}
             {clientes.length === 0 && (
-              <tr><td colSpan={8} style={{ color: 'var(--ink-soft)' }}>Nenhum cliente encontrado.</td></tr>
+              <tr><td colSpan={gerente ? 10 : 9} style={{ color: 'var(--ink-soft)' }}>Nenhum cliente encontrado.</td></tr>
             )}
           </tbody>
         </table>
@@ -308,6 +414,23 @@ export default function Clientes() {
               <div className="campo">
                 <label>Instagram</label>
                 <input value={editando.instagram ?? ''} onChange={(e) => setEditando({ ...editando, instagram: e.target.value })} placeholder="@cliente" />
+              </div>
+            </div>
+            <div className="linha-campos">
+              <div className="campo">
+                <label>CEP {cepBuscando && <span style={{ color: 'var(--ink-soft)' }}>· buscando…</span>}</label>
+                <input value={editando.cep ?? ''} inputMode="numeric"
+                  onChange={(e) => setEditando({ ...editando, cep: e.target.value })}
+                  onBlur={(e) => buscarCep(e.target.value)} placeholder="74000-000" />
+              </div>
+              <div className="campo">
+                <label>Cidade</label>
+                <input value={editando.cidade ?? ''} onChange={(e) => setEditando({ ...editando, cidade: e.target.value })} placeholder="Preenche pelo CEP" />
+              </div>
+              <div className="campo" style={{ maxWidth: 90 }}>
+                <label>UF</label>
+                <input value={editando.uf ?? ''} maxLength={2}
+                  onChange={(e) => setEditando({ ...editando, uf: e.target.value.toUpperCase() })} placeholder="GO" />
               </div>
             </div>
             {gerente && (

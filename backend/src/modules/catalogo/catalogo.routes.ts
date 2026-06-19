@@ -1,9 +1,15 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
+import { env } from '../../env'
 import { lojaIdDe } from '../../plugins/auth'
 import { requireFeature, planoInclui } from '../../plugins/planos'
 import { garantirCicloAberto } from '../leads/leads.service'
+
+/** URL pública do catálogo da vendedora: <scheme>://<rede>.<dominio>/<slug>. */
+export function urlCatalogoPublica(redeSlug: string, vendSlug: string): string {
+  return `${env.TENANT_SCHEME}://${redeSlug}.${env.DOMINIO_BASE}/${vendSlug}`
+}
 
 /**
  * Catálogo público (Portal do Cliente) + link por vendedora.
@@ -28,7 +34,7 @@ function slugify(s: string): string {
 }
 
 /** Garante slug de catálogo único na MARCA (rede) para a vendedora; gera na primeira vez. */
-async function garantirSlugCatalogo(
+export async function garantirSlugCatalogo(
   vend: { id: string; nome: string; slugCatalogo: string | null },
   redeId: string,
 ): Promise<string> {

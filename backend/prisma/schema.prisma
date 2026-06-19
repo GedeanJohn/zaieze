@@ -283,6 +283,11 @@ model Cliente {
   email       String?
   cpf         String?
   instagram   String?
+  // Endereço (para filtros de segmentação geográfica em campanhas/seleção — R1).
+  // Preenchidos via CEP (ViaCEP) no cadastro; DDD é derivado do telefone.
+  cep         String?
+  cidade      String?
+  uf          String? // sigla do estado (ex.: GO); região é derivada da UF
   segmento    SegmentoCliente @default(NOVO)
   // agregados mantidos pelo módulo de vendas e job de segmentação (fase 3)
   totalGasto     Decimal   @default(0) @db.Decimal(12, 2)

@@ -10,6 +10,7 @@ interface Marca {
   slaAtendidoMin: number
   slaNegociandoMin: number
   slaAutoRedistribuir: boolean
+  pedidoMinimoAtacado: number
 }
 
 export default function Marca() {
@@ -34,6 +35,7 @@ export default function Marca() {
         slaAtendidoMin: marca.slaAtendidoMin,
         slaNegociandoMin: marca.slaNegociandoMin,
         slaAutoRedistribuir: marca.slaAutoRedistribuir,
+        pedidoMinimoAtacado: marca.pedidoMinimoAtacado,
       })
       setMarca(data)
       aviso('Identidade da marca salva.')
@@ -121,6 +123,16 @@ export default function Marca() {
             <input type="checkbox" checked={marca.slaAutoRedistribuir} onChange={(e) => setMarca({ ...marca, slaAutoRedistribuir: e.target.checked })} style={{ width: 'auto' }} />
             Redistribuir automaticamente quando “Entrou” estourar o prazo
           </label>
+        </div>
+        <h3 style={{ margin: '8px 0 4px' }}>Atacado × varejo</h3>
+        <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 0 }}>
+          Pedido com este número de peças (ou mais) é tratado como <strong>atacado</strong> e usa o <strong>preço de atacado</strong> das peças. Abaixo disso, é varejo.
+        </p>
+        <div className="linha-campos">
+          <div className="campo" style={{ maxWidth: 220 }}>
+            <label>Pedido mínimo de atacado (peças)</label>
+            <input type="number" min={2} value={marca.pedidoMinimoAtacado} onChange={(e) => setMarca({ ...marca, pedidoMinimoAtacado: Number(e.target.value) })} />
+          </div>
         </div>
         <div className="acoes">
           <button className="btn">Salvar</button>

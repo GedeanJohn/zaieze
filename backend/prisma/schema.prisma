@@ -149,6 +149,9 @@ model Rede {
   slaAtendidoMin   Int     @default(1440) // avançar do "atendido" (1 dia)
   slaNegociandoMin Int     @default(4320) // fechar a negociação (3 dias)
   slaAutoRedistribuir Boolean @default(false) // redistribui sozinho quando ENTROU estoura o prazo
+  // Canal varejo×atacado por QUANTIDADE de peças no pedido/carrinho: pedido com nº de peças
+  // >= este mínimo é ATACADO (aplica preço de atacado); abaixo é VAREJO. Definido pelo gestor.
+  pedidoMinimoAtacado Int @default(6)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

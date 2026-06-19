@@ -92,12 +92,19 @@ export async function vendasRoutes(app: FastifyInstance) {
       }
     }
 
+    // Canal por QUANTIDADE de peças no carrinho: nº de peças >= mínimo da rede ⇒ ATACADO.
+    // O gestor também pode forçar atacado manualmente (body.atacado).
+    const totalPecas = body.itens.reduce((s, i) => s + i.quantidade, 0)
+    const lojaRede = await prisma.loja.findUnique({ where: { id: lojaId }, select: { rede: { select: { pedidoMinimoAtacado: true } } } })
+    const minimoAtacado = lojaRede?.rede?.pedidoMinimoAtacado ?? 6
+    const atacado = body.atacado || totalPecas >= minimoAtacado
+
     // Preço: informado > atacado (se venda atacado e produto tem) > varejo
     const itensCalculados = body.itens.map((item) => {
       const v = porId.get(item.variacaoId)!
       const preco =
         item.precoUnitario ??
-        (body.atacado && v.produto.precoAtacado ? Number(v.produto.precoAtacado) : Number(v.produto.precoVarejo))
+        (atacado && v.produto.precoAtacado ? Number(v.produto.precoAtacado) : Number(v.produto.precoVarejo))
       return { ...item, precoUnitario: preco }
     })
     const bruto = itensCalculados.reduce((s, i) => s + i.precoUnitario * i.quantidade, 0)
@@ -110,7 +117,7 @@ export async function vendasRoutes(app: FastifyInstance) {
           clienteId: body.clienteId,
           vendedoraId,
           canal: body.canal,
-          atacado: body.atacado,
+          atacado,
           formaRecebimento: body.formaRecebimento,
           desconto: body.desconto,
           observacao: body.observacao,
@@ -156,7 +163,7 @@ export async function vendasRoutes(app: FastifyInstance) {
         const cliente = await tx.cliente.findUniqueOrThrow({ where: { id: body.clienteId }, include: { loja: true } })
         const novoTotal = Number(cliente.totalGasto) + total
         let segmento = cliente.segmento
-        if (body.atacado || novoTotal >= Number(cliente.loja.limiteAtacado)) segmento = 'ATACADO'
+        if (atacado || novoTotal >= Number(cliente.loja.limiteAtacado)) segmento = 'ATACADO'
         else if (novoTotal > 3000) segmento = 'VIP'
         else if (cliente.segmento === 'INATIVO') segmento = 'FREQUENTE'
 

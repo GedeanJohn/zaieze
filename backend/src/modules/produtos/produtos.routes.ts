@@ -128,9 +128,10 @@ function escalaresProduto(body: z.infer<typeof atualizarProdutoSchema>) {
 export async function produtosRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: [app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
-    const { busca, ativo } = request.query as { busca?: string; ativo?: string }
+    const { busca, ativo, colecaoId } = request.query as { busca?: string; ativo?: string; colecaoId?: string }
     const and: import('@prisma/client').Prisma.ProdutoWhereInput[] = []
     if (ativo !== undefined) and.push({ ativo: ativo === 'true' })
+    if (colecaoId) and.push({ colecaoId })
     if (busca) and.push({ OR: [{ nome: { contains: busca, mode: 'insensitive' } }, { referencia: { contains: busca, mode: 'insensitive' } }] })
     // Vendedora só enxerga peças avulsas ou de coleção LIBERADA (coleção em preparação fica oculta).
     if (request.user.role === 'VENDEDORA') and.push({ OR: [{ colecaoId: null }, { colecao: { status: 'LIBERADA' } }] })

@@ -5,9 +5,10 @@ import { HOST } from '../../host'
 
 interface Produto {
   id: string; nome: string; descricao?: string | null; preco: number
+  outlet?: boolean; descontoPct?: number | null; precoOriginal?: number | null
   fotos: string[]; videos: string[]; categoria: string | null; cores: string[]; tamanhos: string[]; disponivel: boolean
 }
-interface Colecao { id: string; nome: string; descricao?: string | null; produtos: Produto[] }
+interface Colecao { id: string; nome: string; descricao?: string | null; outlet?: boolean; produtos: Produto[] }
 interface Catalogo {
   marca: { nome: string; logoUrl: string | null; corPrimaria: string; corSecundaria: string }
   loja: { nome: string }
@@ -69,7 +70,7 @@ export default function Catalogo() {
 
       {cat.colecoes.map((c) => (
         <section key={c.id} className="cat-secao">
-          <h2 className="cat-secao-titulo">{c.nome}</h2>
+          <h2 className="cat-secao-titulo">{c.nome}{c.outlet && <span className="cat-outlet-tag">Outlet</span>}</h2>
           {c.descricao && <p className="cat-secao-desc">{c.descricao}</p>}
           <div className="cat-grid">
             {c.produtos.map((p) => (
@@ -80,10 +81,14 @@ export default function Catalogo() {
                     : <div className="cat-foto-vazia">{p.nome}</div>}
                   {p.videos.length > 0 && <span className="cat-video-badge">▶ vídeo</span>}
                   {!p.disponivel && <span className="cat-esgotado">esgotado</span>}
+                  {p.descontoPct ? <span className="cat-desconto">−{p.descontoPct}%</span> : null}
                 </div>
                 <div className="cat-info">
                   <div className="cat-nome">{p.nome}</div>
-                  <div className="cat-preco">{real(p.preco)}</div>
+                  <div className="cat-preco">
+                    {p.precoOriginal ? <span className="cat-preco-antigo">{real(p.precoOriginal)}</span> : null}
+                    <span className={p.descontoPct ? 'cat-preco-promo' : ''}>{real(p.preco)}</span>
+                  </div>
                 </div>
               </button>
             ))}
@@ -100,7 +105,7 @@ export default function Catalogo() {
         <div className="cat-modal-fundo" onClick={() => setModal(null)}>
           <form className="cat-modal" onClick={(e) => e.stopPropagation()} onSubmit={falarComVendedora}>
             <h3>Falar com {cat.vendedora.primeiroNome}</h3>
-            {modal !== 'geral' && <p className="cat-modal-item">Sobre: <strong>{modal.nome}</strong> · {real(modal.preco)}</p>}
+            {modal !== 'geral' && <p className="cat-modal-item">Sobre: <strong>{modal.nome}</strong> · {modal.precoOriginal ? <><span className="cat-preco-antigo">{real(modal.precoOriginal)}</span> </> : null}{real(modal.preco)}{modal.descontoPct ? ` (−${modal.descontoPct}%)` : ''}</p>}
             {modal !== 'geral' && modal.videos.length > 0 && (
               <video src={modal.videos[0]} controls playsInline preload="metadata" poster={modal.fotos[0]} style={{ width: '100%', borderRadius: 8, maxHeight: '45vh', background: '#000' }} />
             )}
@@ -143,7 +148,11 @@ function CatalogoEstilos() {
       .cat-video-badge { position: absolute; top: 8px; right: 8px; background: #000000aa; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 99px; letter-spacing: .3px; }
       .cat-info { padding: 8px 2px 4px; }
       .cat-nome { font-size: 13px; color: #222; line-height: 1.3; }
-      .cat-preco { font-size: 14px; font-weight: 700; margin-top: 2px; }
+      .cat-preco { font-size: 14px; font-weight: 700; margin-top: 2px; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+      .cat-preco-antigo { color: #999; font-weight: 500; text-decoration: line-through; font-size: 12px; }
+      .cat-preco-promo { color: #d12c2c; }
+      .cat-desconto { position: absolute; bottom: 8px; left: 8px; background: #d12c2c; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; letter-spacing: .3px; }
+      .cat-outlet-tag { display: inline-block; margin-left: 8px; vertical-align: middle; background: #f59e0b; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 99px; letter-spacing: .5px; text-transform: uppercase; }
       .cat-cta-fixo { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--cat-primaria); color: #fff; border: none; padding: 14px 26px; border-radius: 99px; font-size: 15px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 24px #00000033; z-index: 20; }
       .cat-modal-fundo { position: fixed; inset: 0; background: #00000066; display: flex; align-items: flex-end; justify-content: center; z-index: 30; }
       @media (min-width: 640px) { .cat-modal-fundo { align-items: center; } }

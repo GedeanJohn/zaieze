@@ -379,6 +379,10 @@ model Colecao {
   descricao  String?
   status     StatusColecao @default(EM_PREPARACAO)
   liberadaEm DateTime? // quando foi liberada para as vendedoras
+  // Outlet: marcado MANUALMENTE pelo gestor (ortogonal ao status — coleção Outlet continua LIBERADA/vendável).
+  outlet            Boolean   @default(false)
+  outletDesde       DateTime?
+  descontoOutletPct Int? // desconto % aplicado à COLEÇÃO inteira em Outlet (null = sem desconto de coleção; peça pode ter o seu)
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
@@ -404,6 +408,7 @@ model Produto {
   precoVarejo  Decimal  @db.Decimal(12, 2)
   precoAtacado Decimal? @db.Decimal(12, 2)
   custo        Decimal? @db.Decimal(12, 2)
+  descontoOutletPct Int? // desconto % específico desta peça em Outlet (override do desconto da coleção)
   // Opcionais de moda (usa quem quiser)
   composicao  String? // tecido/composição (ex.: "95% viscose, 5% elastano")
   modelagem   String? // caimento/fit (ex.: "evasê", "slim")

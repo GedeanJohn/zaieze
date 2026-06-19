@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, mensagemDeErro } from '../api'
+import { api, mensagemDeErro, usuarioLogado } from '../api'
 import { useLojaAtiva, SeletorLoja } from '../componentes/SeletorLoja'
 
 interface Colecao {
@@ -8,15 +8,32 @@ interface Colecao {
   descricao?: string | null
   status: 'EM_PREPARACAO' | 'LIBERADA'
   liberadaEm?: string | null
+  outlet: boolean
+  outletDesde?: string | null
+  descontoOutletPct?: number | null
   pecas: number
 }
 
 interface FormC { id?: string; nome: string; descricao?: string }
 
+// Peça da coleção, para configurar desconto por peça no Outlet.
+interface PecaOutlet { id: string; nome: string; referencia?: string | null; precoVarejo: number; descontoOutletPct: number | null }
+type EscopoDesconto = 'NENHUM' | 'COLECAO' | 'PECAS'
+interface OutletForm {
+  colecao: Colecao
+  outlet: boolean
+  escopo: EscopoDesconto
+  pctColecao: string
+  pecas: PecaOutlet[]
+}
+
 export default function Colecoes() {
   const escopo = useLojaAtiva()
+  const usuario = usuarioLogado()!
+  const podeOutlet = usuario.role === 'GESTOR' || usuario.role === 'GERENTE' || usuario.role === 'SUPER_ADMIN'
   const [lista, setLista] = useState<Colecao[]>([])
   const [form, setForm] = useState<FormC | null>(null)
+  const [outlet, setOutlet] = useState<OutletForm | null>(null)
   const [erro, setErro] = useState('')
 
   const carregar = useCallback(async () => {
@@ -52,6 +69,58 @@ export default function Colecoes() {
     catch (err) { alert(mensagemDeErro(err)) }
   }
 
+  // Abre a modal de Outlet: carrega as peças da coleção e infere o escopo de desconto atual.
+  async function abrirOutlet(c: Colecao) {
+    setErro('')
+    try {
+      const { data } = await api.get('/produtos', { params: { ...escopo.params, colecaoId: c.id } })
+      const pecas: PecaOutlet[] = data.map((p: { id: string; nome: string; referencia?: string | null; precoVarejo: string; descontoOutletPct: number | null }) => ({
+        id: p.id, nome: p.nome, referencia: p.referencia, precoVarejo: Number(p.precoVarejo), descontoOutletPct: p.descontoOutletPct,
+      }))
+      const temPctPeca = pecas.some((p) => p.descontoOutletPct != null)
+      const escopoAtual: EscopoDesconto = !c.outlet
+        ? 'NENHUM'
+        : c.descontoOutletPct != null ? 'COLECAO' : temPctPeca ? 'PECAS' : 'NENHUM'
+      setOutlet({
+        colecao: c,
+        outlet: c.outlet,
+        escopo: escopoAtual,
+        pctColecao: c.descontoOutletPct != null ? String(c.descontoOutletPct) : '',
+        pecas,
+      })
+    } catch (err) { alert(mensagemDeErro(err)) }
+  }
+
+  async function salvarOutlet(e: React.FormEvent) {
+    e.preventDefault()
+    if (!outlet) return
+    setErro('')
+    const corpo: { outlet: boolean; descontoOutletPct?: number | null; descontosPorPeca?: { produtoId: string; pct: number | null }[] } = {
+      outlet: outlet.outlet,
+    }
+    if (outlet.outlet && outlet.escopo === 'COLECAO') {
+      const pct = parseInt(outlet.pctColecao, 10)
+      if (!pct || pct < 1 || pct > 90) { setErro('Informe um desconto de coleção entre 1% e 90%.'); return }
+      corpo.descontoOutletPct = pct
+    } else {
+      corpo.descontoOutletPct = null
+    }
+    if (outlet.outlet && outlet.escopo === 'PECAS') {
+      corpo.descontosPorPeca = outlet.pecas.map((p) => ({ produtoId: p.id, pct: p.descontoOutletPct }))
+    }
+    try {
+      await api.post(`/colecoes/${outlet.colecao.id}/outlet`, corpo, { params: escopo.params })
+      setOutlet(null)
+      carregar()
+    } catch (err) { setErro(mensagemDeErro(err)) }
+  }
+
+  function setPctPeca(id: string, valor: string) {
+    if (!outlet) return
+    const n = valor === '' ? null : Math.max(0, Math.min(90, parseInt(valor, 10) || 0))
+    setOutlet({ ...outlet, pecas: outlet.pecas.map((p) => (p.id === id ? { ...p, descontoOutletPct: n } : p)) })
+  }
+
   return (
     <>
       <header>
@@ -65,6 +134,7 @@ export default function Colecoes() {
       <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
         A estoquista monta a coleção <strong>em preparação</strong> (cadastrando as peças) e só então <strong>libera</strong> —
         aí ela aparece para todas as vendedoras simultaneamente, garantindo competição justa pelo estoque.
+        {podeOutlet && <> Coleções antigas podem virar <strong>Outlet</strong> (selo no catálogo), com desconto opcional na coleção inteira ou em peças específicas.</>}
       </div>
 
       <div className="cartao">
@@ -77,6 +147,11 @@ export default function Colecoes() {
               <tr key={c.id}>
                 <td>
                   <strong>{c.nome}</strong>
+                  {c.outlet && (
+                    <span className="selo" style={{ marginLeft: 8, background: '#f59e0b22', color: '#f59e0b', border: '1px solid #f59e0b55' }}>
+                      🏷️ Outlet{c.descontoOutletPct ? ` −${c.descontoOutletPct}%` : ''}
+                    </span>
+                  )}
                   {c.descricao && <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{c.descricao}</div>}
                 </td>
                 <td>
@@ -92,6 +167,10 @@ export default function Colecoes() {
                     : <a href="#" onClick={(e) => { e.preventDefault(); recolher(c) }}>recolher</a>}
                   {' · '}
                   <a href="#" onClick={(e) => { e.preventDefault(); setForm({ id: c.id, nome: c.nome, descricao: c.descricao ?? '' }) }}>editar</a>
+                  {podeOutlet && <>
+                    {' · '}
+                    <a href="#" onClick={(e) => { e.preventDefault(); abrirOutlet(c) }}>🏷️ outlet</a>
+                  </>}
                 </td>
               </tr>
             ))}
@@ -115,6 +194,65 @@ export default function Colecoes() {
             </div>
             <div className="acoes">
               <button type="button" className="btn secundario" onClick={() => setForm(null)}>Cancelar</button>
+              <button className="btn">Salvar</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {outlet && (
+        <div className="modal-fundo" onClick={() => setOutlet(null)}>
+          <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvarOutlet} style={{ width: 'min(640px, 94vw)' }}>
+            <h2>Outlet — {outlet.colecao.nome}</h2>
+            {erro && <div className="alerta">{erro}</div>}
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '6px 0' }}>
+              <input type="checkbox" checked={outlet.outlet} onChange={(e) => setOutlet({ ...outlet, outlet: e.target.checked, escopo: e.target.checked ? outlet.escopo : 'NENHUM' })} />
+              <span>Marcar esta coleção como <strong>Outlet</strong> (selo no catálogo)</span>
+            </label>
+
+            {outlet.outlet && (
+              <>
+                <div className="campo">
+                  <label>Desconto</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14 }}>
+                    <label style={{ display: 'flex', gap: 8 }}>
+                      <input type="radio" name="esc" checked={outlet.escopo === 'NENHUM'} onChange={() => setOutlet({ ...outlet, escopo: 'NENHUM' })} />
+                      Sem desconto (só o selo de Outlet)
+                    </label>
+                    <label style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <input type="radio" name="esc" checked={outlet.escopo === 'COLECAO'} onChange={() => setOutlet({ ...outlet, escopo: 'COLECAO' })} />
+                      Desconto na coleção inteira:
+                      <input type="number" min={1} max={90} value={outlet.pctColecao} disabled={outlet.escopo !== 'COLECAO'}
+                        onChange={(e) => setOutlet({ ...outlet, pctColecao: e.target.value })}
+                        style={{ width: 80 }} placeholder="%" /> %
+                    </label>
+                    <label style={{ display: 'flex', gap: 8 }}>
+                      <input type="radio" name="esc" checked={outlet.escopo === 'PECAS'} onChange={() => setOutlet({ ...outlet, escopo: 'PECAS' })} />
+                      Desconto em peças específicas
+                    </label>
+                  </div>
+                </div>
+
+                {outlet.escopo === 'PECAS' && (
+                  <div className="cartao" style={{ maxHeight: 280, overflowY: 'auto', padding: 8 }}>
+                    {outlet.pecas.length === 0 && <div style={{ color: 'var(--ink-soft)', fontSize: 13 }}>Coleção sem peças.</div>}
+                    {outlet.pecas.map((p) => (
+                      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid #ffffff14' }}>
+                        <div style={{ flex: 1, fontSize: 13 }}>
+                          {p.nome} <span style={{ color: 'var(--ink-soft)' }}>· R$ {p.precoVarejo.toFixed(2)}</span>
+                        </div>
+                        <input type="number" min={0} max={90} value={p.descontoOutletPct ?? ''} onChange={(e) => setPctPeca(p.id, e.target.value)}
+                          style={{ width: 70 }} placeholder="%" /> <span style={{ fontSize: 13 }}>%</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            <div className="acoes">
+              <button type="button" className="btn secundario" onClick={() => setOutlet(null)}>Cancelar</button>
               <button className="btn">Salvar</button>
             </div>
           </form>

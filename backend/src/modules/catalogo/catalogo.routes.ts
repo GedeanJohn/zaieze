@@ -118,7 +118,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
           where: { ativo: true },
           orderBy: { nome: 'asc' },
           select: {
-            id: true, nome: true, descricao: true, precoVarejo: true, fotos: true, videos: true,
+            id: true, nome: true, descricao: true, precoVarejo: true, descontoOutletPct: true, fotos: true, videos: true,
             categoria: { select: { nome: true } },
             variacoes: { select: { cor: true, tamanho: true, estoque: true } },
           },
@@ -129,13 +129,23 @@ export async function catalogoRoutes(app: FastifyInstance) {
     const colecoesOut = colecoes
       .map((c) => ({
         id: c.id, nome: c.nome, descricao: c.descricao,
-        produtos: c.produtos.map((p) => ({
-          id: p.id, nome: p.nome, descricao: p.descricao, preco: Number(p.precoVarejo), fotos: p.fotos,
-          categoria: p.categoria?.nome ?? null,
-          cores: [...new Set(p.variacoes.map((v) => v.cor))],
-          tamanhos: [...new Set(p.variacoes.map((v) => v.tamanho))],
-          disponivel: p.variacoes.some((v) => v.estoque > 0),
-        })),
+        outlet: c.outlet,
+        produtos: c.produtos.map((p) => {
+          const base = Number(p.precoVarejo)
+          // Desconto de outlet: peça tem prioridade sobre o da coleção; só vale se a coleção é Outlet.
+          const pct = c.outlet ? (p.descontoOutletPct ?? c.descontoOutletPct ?? 0) : 0
+          const preco = pct > 0 ? Math.round(base * (1 - pct / 100) * 100) / 100 : base
+          return {
+            id: p.id, nome: p.nome, descricao: p.descricao, preco, fotos: p.fotos,
+            outlet: c.outlet,
+            descontoPct: pct > 0 ? pct : null,
+            precoOriginal: pct > 0 ? base : null,
+            categoria: p.categoria?.nome ?? null,
+            cores: [...new Set(p.variacoes.map((v) => v.cor))],
+            tamanhos: [...new Set(p.variacoes.map((v) => v.tamanho))],
+            disponivel: p.variacoes.some((v) => v.estoque > 0),
+          }
+        }),
       }))
       .filter((c) => c.produtos.length > 0)
 

@@ -38,6 +38,9 @@ export async function colecoesRoutes(app: FastifyInstance) {
       descricao: c.descricao,
       status: c.status,
       liberadaEm: c.liberadaEm,
+      outlet: c.outlet,
+      outletDesde: c.outletDesde,
+      descontoOutletPct: c.descontoOutletPct,
       pecas: c._count.produtos,
     }))
   })
@@ -73,6 +76,42 @@ export async function colecoesRoutes(app: FastifyInstance) {
     if (colecao._count.produtos === 0) return reply.code(422).send({ erro: 'Cadastre ao menos uma peça antes de liberar a coleção' })
     if (colecao.status === 'LIBERADA') return reply.code(409).send({ erro: 'Coleção já está liberada' })
     return prisma.colecao.update({ where: { id }, data: { status: 'LIBERADA', liberadaEm: new Date() } })
+  })
+
+  // Marca/desmarca a coleção como OUTLET (decisão do gestor). Outlet é ortogonal ao status:
+  // a coleção continua LIBERADA/vendável, só ganha selo e desconto opcional.
+  // - descontoOutletPct: desconto % da COLEÇÃO inteira (null = sem desconto de coleção)
+  // - descontosPorPeca: desconto % de PEÇAS específicas (override do desconto da coleção)
+  // Ao desmarcar (outlet=false), limpa todos os descontos de outlet (coleção e peças).
+  app.post('/:id/outlet', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async (request, reply) => {
+    const lojaId = await lojaIdDe(request)
+    const { id } = request.params as { id: string }
+    const body = z.object({
+      outlet: z.boolean(),
+      descontoOutletPct: z.number().int().min(1).max(90).nullish(),
+      descontosPorPeca: z.array(z.object({ produtoId: z.string(), pct: z.number().int().min(1).max(90).nullable() })).optional(),
+    }).parse(request.body)
+
+    const colecao = await prisma.colecao.findFirst({ where: { id, lojaId } })
+    if (!colecao) return reply.code(404).send({ erro: 'Coleção não encontrada' })
+
+    return prisma.$transaction(async (tx) => {
+      const atualizada = await tx.colecao.update({
+        where: { id },
+        data: body.outlet
+          ? { outlet: true, outletDesde: colecao.outlet ? colecao.outletDesde : new Date(), descontoOutletPct: body.descontoOutletPct ?? null }
+          : { outlet: false, outletDesde: null, descontoOutletPct: null },
+      })
+      if (!body.outlet) {
+        // Saiu do Outlet: zera descontos de peça desta coleção.
+        await tx.produto.updateMany({ where: { colecaoId: id, lojaId }, data: { descontoOutletPct: null } })
+      } else if (body.descontosPorPeca?.length) {
+        for (const d of body.descontosPorPeca) {
+          await tx.produto.updateMany({ where: { id: d.produtoId, colecaoId: id, lojaId }, data: { descontoOutletPct: d.pct } })
+        }
+      }
+      return { id: atualizada.id, outlet: atualizada.outlet, outletDesde: atualizada.outletDesde, descontoOutletPct: atualizada.descontoOutletPct }
+    })
   })
 
   // Recolhe a coleção (volta a esconder das vendedoras) — correção/ajuste pelo gestor/estoquista.

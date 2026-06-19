@@ -42,6 +42,39 @@ services:
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
 
+  # WhatsApp não-oficial (Evolution API v2) — instância por vendedora via QR.
+  # INTERNO: acessível só na rede do compose (http://evolution:8080); NÃO exposto na internet.
+  # Reusa o Postgres (banco "evolution") e cache local (sem Redis). A API do ZAIEZE fala com
+  # ela por dentro (EVOLUTION_API_URL=http://evolution:8080) e recebe webhooks dela.
+  evolution:
+    image: atendai/evolution-api:v2.1.1
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SERVER_URL: http://evolution:8080
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/evolution?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: evolution_zaieze
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_MESSAGE_UPDATE: "true"
+      DATABASE_SAVE_DATA_CONTACTS: "true"
+      DATABASE_SAVE_DATA_CHATS: "true"
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_LOCAL_ENABLED: "true"
+      DEL_INSTANCE: "false"
+      QRCODE_LIMIT: "60"
+      LOG_LEVEL: "ERROR"
+    expose:
+      - "8080"
+    volumes:
+      - evolution_instances:/evolution/instances
+
 volumes:
   pgdata:
   uploads:
+  evolution_instances:

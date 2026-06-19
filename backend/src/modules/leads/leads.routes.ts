@@ -5,7 +5,7 @@ import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
 import {
-  ETAPAS_ABERTAS, escolherVendedoraDisponivel, redistribuirLead, redistribuirAtrasados, moverEtapa,
+  ETAPAS_ABERTAS, escolherVendedoraDisponivel, redistribuirLead, redistribuirAtrasados, moverEtapa, situacaoLead,
 } from './leads.service'
 
 /**
@@ -21,8 +21,12 @@ const incluiLead = {
   cliente: { select: { id: true, nome: true, telefone: true } },
 }
 
-function decorar<T extends { status: StatusLead; prazoEm: Date }>(l: T, agora: number) {
-  return { ...l, atrasado: ETAPAS_ABERTAS.includes(l.status) && l.prazoEm.getTime() < agora }
+function decorar<T extends { status: StatusLead; prazoEm: Date; etapaDesde: Date; redistribuidoEm: Date | null }>(l: T, agora: number) {
+  return {
+    ...l,
+    atrasado: ETAPAS_ABERTAS.includes(l.status) && l.prazoEm.getTime() < agora,
+    situacao: situacaoLead(l, agora),
+  }
 }
 
 export async function leadsRoutes(app: FastifyInstance) {
@@ -49,9 +53,12 @@ export async function leadsRoutes(app: FastifyInstance) {
     const agora = Date.now()
 
     const colunas: Record<string, ReturnType<typeof decorar>[]> = { ENTROU: [], ATENDIDO: [], NEGOCIANDO: [], CONVERTIDO: [], PERDIDO: [] }
+    const porSituacao: Record<string, number> = {}
     let convertidos = 0, perdidos = 0, somaResposta = 0, comResposta = 0
     for (const l of leads) {
-      colunas[l.status].push(decorar(l, agora))
+      const card = decorar(l, agora)
+      colunas[l.status].push(card)
+      porSituacao[card.situacao.chave] = (porSituacao[card.situacao.chave] ?? 0) + 1
       if (l.status === 'CONVERTIDO') convertidos += 1
       if (l.status === 'PERDIDO') perdidos += 1
       if (l.atendidoEm) { somaResposta += l.atendidoEm.getTime() - l.createdAt.getTime(); comResposta += 1 }
@@ -64,6 +71,7 @@ export async function leadsRoutes(app: FastifyInstance) {
       convertidos, perdidos,
       taxaConversao: fechados > 0 ? Math.round((convertidos / fechados) * 100) : 0,
       tempoMedioRespostaMin: comResposta > 0 ? Math.round(somaResposta / comResposta / 60_000) : null,
+      porSituacao,
     }
     return { colunas, metricas }
   })

@@ -5,6 +5,52 @@ import { prisma } from '../../lib/prisma'
 export const ETAPAS_ABERTAS: StatusLead[] = ['ENTROU', 'ATENDIDO', 'NEGOCIANDO']
 export const ETAPAS_FECHADAS: StatusLead[] = ['CONVERTIDO', 'PERDIDO']
 
+// ── Escala de cores do funil (situação derivada de status + SLA, sem campo novo) ──
+// Cruzamento de `status` + `prazoEm`/`etapaDesde` (+ `redistribuidoEm`). Visível para
+// vendedora e gestor (mesma fonte de verdade). Sempre acompanhar de ícone+texto no front.
+export type SituacaoChave =
+  | 'ESPERA_NO_PRAZO' | 'ESPERA_APERTADO' | 'ESPERA_ATRASADO'
+  | 'ATENDIMENTO_NO_PRAZO' | 'ATENDIMENTO_ATRASADO'
+  | 'REDISTRIBUIDO' | 'CONVERTIDO' | 'PERDIDO'
+
+export interface Situacao { chave: SituacaoChave; label: string; cor: string }
+
+/** % do prazo ainda restante para considerar a etapa "apertada" (perto de estourar). */
+const APERTADO_PCT = 0.2
+/** Janela em que um ciclo recém-redistribuído ainda é sinalizado como tal. */
+const REDIST_RECENTE_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Situação visual do ciclo (label + cor). Derivada, não persistida.
+ * Reaproveitada pela API do funil (vendedora e gestor).
+ */
+export function situacaoLead(
+  l: { status: StatusLead; prazoEm: Date; etapaDesde: Date; redistribuidoEm: Date | null },
+  agora: number = Date.now(),
+): Situacao {
+  if (l.status === 'CONVERTIDO') return { chave: 'CONVERTIDO', label: 'Convertido', cor: '#059669' }
+  if (l.status === 'PERDIDO') return { chave: 'PERDIDO', label: 'Perdido', cor: '#9CA3AF' }
+
+  const atrasado = l.prazoEm.getTime() < agora
+
+  if (l.status === 'ENTROU') {
+    if (l.redistribuidoEm && agora - l.redistribuidoEm.getTime() < REDIST_RECENTE_MS) {
+      return { chave: 'REDISTRIBUIDO', label: 'Redistribuído', cor: '#8B5CF6' }
+    }
+    if (atrasado) return { chave: 'ESPERA_ATRASADO', label: 'Em espera — atrasado', cor: '#EF4444' }
+    const total = l.prazoEm.getTime() - l.etapaDesde.getTime()
+    const restante = l.prazoEm.getTime() - agora
+    if (total > 0 && restante / total <= APERTADO_PCT) {
+      return { chave: 'ESPERA_APERTADO', label: 'Em espera — apertado', cor: '#F59E0B' }
+    }
+    return { chave: 'ESPERA_NO_PRAZO', label: 'Em espera — no prazo', cor: '#38BDF8' }
+  }
+
+  // ATENDIDO ou NEGOCIANDO
+  if (atrasado) return { chave: 'ATENDIMENTO_ATRASADO', label: 'Em atendimento — atrasado', cor: '#F97316' }
+  return { chave: 'ATENDIMENTO_NO_PRAZO', label: 'Em atendimento', cor: '#22C55E' }
+}
+
 const SLA_PADRAO = { ENTROU: 30, ATENDIDO: 1440, NEGOCIANDO: 4320 }
 
 /** Limites de SLA (min) por etapa, conforme a regra da rede. */

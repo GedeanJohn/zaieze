@@ -4,20 +4,60 @@ import { urlCatalogo } from '../host'
 import { useLojaAtiva, SeletorLoja } from '../componentes/SeletorLoja'
 
 type Etapa = 'ENTROU' | 'ATENDIDO' | 'NEGOCIANDO' | 'CONVERTIDO' | 'PERDIDO'
+type SituacaoChave =
+  | 'ESPERA_NO_PRAZO' | 'ESPERA_APERTADO' | 'ESPERA_ATRASADO'
+  | 'ATENDIMENTO_NO_PRAZO' | 'ATENDIMENTO_ATRASADO'
+  | 'REDISTRIBUIDO' | 'CONVERTIDO' | 'PERDIDO'
+interface Situacao { chave: SituacaoChave; label: string; cor: string }
 
 interface Card {
   id: string; nome?: string | null; telefone?: string | null; status: Etapa; atrasado: boolean
+  situacao: Situacao
   redistribuicoes: number; etapaDesde: string; createdAt: string
   vendedora: { id: string; nome: string }
   cliente?: { id: string; nome: string; telefone: string } | null
 }
-interface Metricas { total: number; abertos: number; atrasados: number; convertidos: number; perdidos: number; taxaConversao: number; tempoMedioRespostaMin: number | null }
+interface Metricas { total: number; abertos: number; atrasados: number; convertidos: number; perdidos: number; taxaConversao: number; tempoMedioRespostaMin: number | null; porSituacao: Partial<Record<SituacaoChave, number>> }
 interface Pipeline { colunas: Record<Etapa, Card[]>; metricas: Metricas }
 interface LinkVend { id: string; nome: string; slug: string; redeSlug: string; path: string; temWhatsapp: boolean }
 
 const ETAPAS: Etapa[] = ['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'CONVERTIDO', 'PERDIDO']
 const rotuloEtapa: Record<Etapa, string> = { ENTROU: 'Entrou', ATENDIDO: 'Atendido', NEGOCIANDO: 'Negociando', CONVERTIDO: 'Convertido', PERDIDO: 'Perdido' }
 const corEtapa: Record<Etapa, string> = { ENTROU: '#e8a87c', ATENDIDO: '#7cc4e8', NEGOCIANDO: '#c9a0ff', CONVERTIDO: '#7ce8a0', PERDIDO: '#888' }
+
+// Escala de cores da SITUAÇÃO (cor + ícone vêm do back; ícone só no front p/ acessibilidade).
+const ordemSituacao: SituacaoChave[] = [
+  'ESPERA_NO_PRAZO', 'ESPERA_APERTADO', 'ESPERA_ATRASADO',
+  'ATENDIMENTO_NO_PRAZO', 'ATENDIMENTO_ATRASADO', 'REDISTRIBUIDO', 'CONVERTIDO', 'PERDIDO',
+]
+const labelSituacao: Record<SituacaoChave, string> = {
+  ESPERA_NO_PRAZO: 'Em espera — no prazo', ESPERA_APERTADO: 'Em espera — apertado', ESPERA_ATRASADO: 'Em espera — atrasado',
+  ATENDIMENTO_NO_PRAZO: 'Em atendimento', ATENDIMENTO_ATRASADO: 'Em atendimento — atrasado',
+  REDISTRIBUIDO: 'Redistribuído', CONVERTIDO: 'Convertido', PERDIDO: 'Perdido',
+}
+const corSituacao: Record<SituacaoChave, string> = {
+  ESPERA_NO_PRAZO: '#38BDF8', ESPERA_APERTADO: '#F59E0B', ESPERA_ATRASADO: '#EF4444',
+  ATENDIMENTO_NO_PRAZO: '#22C55E', ATENDIMENTO_ATRASADO: '#F97316',
+  REDISTRIBUIDO: '#8B5CF6', CONVERTIDO: '#059669', PERDIDO: '#9CA3AF',
+}
+// Ícone por situação — nunca depender só da cor (acessibilidade / daltonismo).
+const iconeSituacao: Record<SituacaoChave, string> = {
+  ESPERA_NO_PRAZO: '⏳', ESPERA_APERTADO: '⚠️', ESPERA_ATRASADO: '⏰',
+  ATENDIMENTO_NO_PRAZO: '💬', ATENDIMENTO_ATRASADO: '🔥',
+  REDISTRIBUIDO: '↪', CONVERTIDO: '✅', PERDIDO: '✖️',
+}
+
+function BadgeSituacao({ s }: { s: Situacao }) {
+  return (
+    <span title={s.label} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600,
+      padding: '1px 7px', borderRadius: 999, color: s.cor,
+      background: `${s.cor}22`, border: `1px solid ${s.cor}55`, whiteSpace: 'nowrap',
+    }}>
+      <span aria-hidden>{iconeSituacao[s.chave]}</span>{s.label}
+    </span>
+  )
+}
 
 function tempoNaEtapa(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime()
@@ -129,6 +169,22 @@ export default function Pipeline() {
         </div>
       )}
 
+      {/* Legenda + contadores por situação (mapa de gargalos — vendedora e gestor) */}
+      {m && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', margin: '0 0 12px' }}>
+          {ordemSituacao.filter((ch) => (m.porSituacao[ch] ?? 0) > 0).map((ch) => (
+            <span key={ch} title={labelSituacao[ch]} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600,
+              padding: '3px 9px', borderRadius: 999, color: corSituacao[ch],
+              background: `${corSituacao[ch]}22`, border: `1px solid ${corSituacao[ch]}55`,
+            }}>
+              <span aria-hidden>{iconeSituacao[ch]}</span>{labelSituacao[ch]}
+              <strong style={{ marginLeft: 2 }}>{m.porSituacao[ch]}</strong>
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Kanban */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(180px, 1fr))', gap: 10, overflowX: 'auto' }}>
         {ETAPAS.map((etapa) => {
@@ -140,9 +196,10 @@ export default function Pipeline() {
                 <span style={{ color: 'var(--ink-soft)', fontSize: 12 }}>{cards.length}</span>
               </div>
               {cards.map((c) => (
-                <div key={c.id} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${c.atrasado ? '#ff6b6b' : corEtapa[etapa]}` }}>
+                <div key={c.id} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${c.situacao.cor}` }}>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{c.cliente?.nome ?? c.nome ?? '—'}</div>
                   <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{c.cliente?.telefone ?? c.telefone ?? ''}</div>
+                  <div style={{ marginTop: 6 }}><BadgeSituacao s={c.situacao} /></div>
                   <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginTop: 4 }}>
                     👤 {c.vendedora.nome}{c.redistribuicoes > 0 && ` · ${c.redistribuicoes}× redistr.`}
                   </div>

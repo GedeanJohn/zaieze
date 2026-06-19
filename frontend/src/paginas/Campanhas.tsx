@@ -33,6 +33,15 @@ export default function Campanhas() {
   const [enviando, setEnviando] = useState(false)
   const [sugerindo, setSugerindo] = useState(false)
   const [processando, setProcessando] = useState(false)
+  const [disparoTravado, setDisparoTravado] = useState(false)
+
+  // Texto padrão do disparo definido pelo gestor (marca). Trava a vendedora quando não pode editar.
+  useEffect(() => {
+    api.get('/marca').then(({ data }) => {
+      if (data?.textoDisparoPadrao) setTemplate(data.textoDisparoPadrao)
+      setDisparoTravado(!gerente && data?.disparoVendedoraEditavel === false)
+    }).catch(() => { /* sem marca/permite editar */ })
+  }, [gerente])
 
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
@@ -115,14 +124,22 @@ export default function Campanhas() {
           <div className="campo">
             <label>
               Mensagem{' '}
-              <button type="button" className="btn-link" onClick={sugerir} disabled={sugerindo || !escopo.pronto}>
-                {sugerindo ? 'gerando…' : '✨ sugerir com IA'}
-              </button>
+              {!disparoTravado && (
+                <button type="button" className="btn-link" onClick={sugerir} disabled={sugerindo || !escopo.pronto}>
+                  {sugerindo ? 'gerando…' : '✨ sugerir com IA'}
+                </button>
+              )}
             </label>
-            <textarea rows={4} value={template} onChange={(e) => setTemplate(e.target.value)} />
-            <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>
-              Variáveis: {'{primeiroNome}'} {'{nome}'} {'{loja}'} {'{vendedora}'} {'{diasSemCompra}'} {'{totalGasto}'}
-            </div>
+            <textarea rows={4} value={template} onChange={(e) => setTemplate(e.target.value)} disabled={disparoTravado} />
+            {disparoTravado ? (
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>
+                🔒 Texto definido pelo gestor — não editável.
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>
+                Variáveis: {'{primeiroNome}'} {'{nome}'} {'{loja}'} {'{vendedora}'} {'{diasSemCompra}'} {'{totalGasto}'}
+              </div>
+            )}
           </div>
           <button className="btn" onClick={enviar} disabled={enviando || !escopo.pronto}>
             {enviando ? 'Disparando…' : '📲 Enviar campanha'}

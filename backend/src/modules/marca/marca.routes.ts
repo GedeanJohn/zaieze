@@ -23,12 +23,15 @@ const atualizarSchema = z.object({
   slaNegociandoMin: z.coerce.number().int().min(1).max(43200).optional(),
   slaAutoRedistribuir: z.boolean().optional(),
   pedidoMinimoAtacado: z.coerce.number().int().min(2).max(1000).optional(),
+  textoDisparoPadrao: z.string().max(1000).optional(),
+  disparoVendedoraEditavel: z.boolean().optional(),
 })
 
 const selectMarca = {
   id: true, nome: true, slug: true, logoUrl: true, corPrimaria: true, corSecundaria: true,
   slaEntrouMin: true, slaAtendidoMin: true, slaNegociandoMin: true, slaAutoRedistribuir: true,
   pedidoMinimoAtacado: true,
+  textoDisparoPadrao: true, disparoVendedoraEditavel: true,
 }
 
 export async function marcaRoutes(app: FastifyInstance) {

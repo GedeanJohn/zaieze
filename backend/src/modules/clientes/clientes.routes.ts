@@ -104,8 +104,12 @@ export async function clientesRoutes(app: FastifyInstance) {
       mensagem: z.string().max(800).optional(),
     }).parse(request.body)
 
-    const loja = await prisma.loja.findUnique({ where: { id: lojaId }, select: { nome: true, redeId: true, rede: { select: { slug: true } } } })
+    const loja = await prisma.loja.findUnique({ where: { id: lojaId }, select: { nome: true, redeId: true, rede: { select: { slug: true, textoDisparoPadrao: true, disparoVendedoraEditavel: true } } } })
     if (!loja?.rede) return reply.code(422).send({ erro: 'Loja sem marca vinculada' })
+
+    // Texto: gestor define um padrão; se a vendedora não pode editar, força o padrão.
+    const travada = request.user.role === 'VENDEDORA' && !loja.rede.disparoVendedoraEditavel
+    const textoBase = (travada ? loja.rede.textoDisparoPadrao : (body.mensagem?.trim() || loja.rede.textoDisparoPadrao))?.trim() || null
 
     // Só envia para clientes da carteira visível ao usuário (vendedora = própria carteira).
     const clientes = await prisma.cliente.findMany({
@@ -134,7 +138,9 @@ export async function clientesRoutes(app: FastifyInstance) {
       const dados = cache.get(c.vendedoraId)
       if (!dados) { res.semVendedora += 1; continue }
 
-      const saud = body.mensagem?.trim() || `Oi ${c.nome.split(/\s+/)[0]}! Dá uma olhada no nosso catálogo 💛`
+      const saud = textoBase
+        ? textoBase.replaceAll('{primeiroNome}', c.nome.split(/\s+/)[0]).replaceAll('{nome}', c.nome)
+        : `Oi ${c.nome.split(/\s+/)[0]}! Dá uma olhada no nosso catálogo 💛`
       const status = await enviarWhatsapp({ instancia: dados.instancia, telefone: c.telefone, texto: `${saud}\n\n${dados.link}` })
       if (status === 'ENVIADA') res.enviados += 1
       else if (status === 'SIMULADA') res.simulados += 1

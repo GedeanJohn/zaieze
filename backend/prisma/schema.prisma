@@ -152,6 +152,10 @@ model Rede {
   // Canal varejo×atacado por QUANTIDADE de peças no pedido/carrinho: pedido com nº de peças
   // >= este mínimo é ATACADO (aplica preço de atacado); abaixo é VAREJO. Definido pelo gestor.
   pedidoMinimoAtacado Int @default(6)
+  // Texto padrão de disparo/campanha definido pelo GESTOR para as vendedoras.
+  // disparoVendedoraEditavel = a vendedora pode personalizar o texto (true) ou fica travada (false).
+  textoDisparoPadrao       String?
+  disparoVendedoraEditavel Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -11,6 +11,8 @@ interface Marca {
   slaNegociandoMin: number
   slaAutoRedistribuir: boolean
   pedidoMinimoAtacado: number
+  textoDisparoPadrao: string | null
+  disparoVendedoraEditavel: boolean
 }
 
 export default function Marca() {
@@ -36,6 +38,8 @@ export default function Marca() {
         slaNegociandoMin: marca.slaNegociandoMin,
         slaAutoRedistribuir: marca.slaAutoRedistribuir,
         pedidoMinimoAtacado: marca.pedidoMinimoAtacado,
+        textoDisparoPadrao: marca.textoDisparoPadrao ?? '',
+        disparoVendedoraEditavel: marca.disparoVendedoraEditavel,
       })
       setMarca(data)
       aviso('Identidade da marca salva.')
@@ -133,6 +137,21 @@ export default function Marca() {
             <label>Pedido mínimo de atacado (peças)</label>
             <input type="number" min={2} value={marca.pedidoMinimoAtacado} onChange={(e) => setMarca({ ...marca, pedidoMinimoAtacado: Number(e.target.value) })} />
           </div>
+        </div>
+        <h3 style={{ margin: '8px 0 4px' }}>Texto padrão de disparo (WhatsApp)</h3>
+        <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 0 }}>
+          Mensagem padrão que as vendedoras usam nas campanhas e ao enviar o link do catálogo.
+          Variáveis: {'{primeiroNome}'} {'{nome}'} {'{loja}'} {'{vendedora}'}.
+        </p>
+        <div className="campo">
+          <textarea rows={3} value={marca.textoDisparoPadrao ?? ''} placeholder="Ex.: Oi {primeiroNome}! 😍 Chegaram novidades na {loja}. Dá uma olhada no catálogo:"
+            onChange={(e) => setMarca({ ...marca, textoDisparoPadrao: e.target.value })} />
+        </div>
+        <div className="campo">
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+            <input type="checkbox" checked={marca.disparoVendedoraEditavel} onChange={(e) => setMarca({ ...marca, disparoVendedoraEditavel: e.target.checked })} style={{ width: 'auto' }} />
+            Permitir que a vendedora edite/personalize o texto do disparo
+          </label>
         </div>
         <div className="acoes">
           <button className="btn">Salvar</button>

@@ -61,12 +61,20 @@ export async function campanhasRoutes(app: FastifyInstance) {
     const clientes = await prisma.cliente.findMany({ where, select: selCliente })
     if (clientes.length === 0) return reply.code(422).send({ erro: 'Nenhum cliente no público-alvo selecionado' })
 
+    // Regra do gestor: se a vendedora não pode editar o disparo, força o texto padrão da marca.
+    const rede = await prisma.loja.findUnique({
+      where: { id: lojaId },
+      select: { rede: { select: { textoDisparoPadrao: true, disparoVendedoraEditavel: true } } },
+    })
+    const travada = request.user.role === 'VENDEDORA' && rede?.rede && !rede.rede.disparoVendedoraEditavel
+    const template = travada && rede?.rede?.textoDisparoPadrao ? rede.rede.textoDisparoPadrao : body.mensagemTemplate
+
     const campanha = await prisma.campanha.create({
-      data: { lojaId, criadaPorId: request.user.sub, nome: body.nome, segmentoAlvo: body.segmento ?? null, mensagemTemplate: body.mensagemTemplate },
+      data: { lojaId, criadaPorId: request.user.sub, nome: body.nome, segmentoAlvo: body.segmento ?? null, mensagemTemplate: template },
     })
 
     const res = await dispararParaClientes({
-      lojaId, template: body.mensagemTemplate, origem: 'CAMPANHA',
+      lojaId, template, origem: 'CAMPANHA',
       campanhaId: campanha.id, clientes, vendedoraFallbackId: request.user.sub,
     })
 

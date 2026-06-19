@@ -391,6 +391,9 @@ model Colecao {
   outlet            Boolean   @default(false)
   outletDesde       DateTime?
   descontoOutletPct Int? // desconto % aplicado à COLEÇÃO inteira em Outlet (null = sem desconto de coleção; peça pode ter o seu)
+  // Limpeza de mídia por plano: a mídia do catálogo expira em liberadaEm + retenção(plano)
+  // (START 6m / PRO 12m / ELITE perpétuo). Quando apagada do R2, registra a data aqui.
+  midiaExpiradaEm   DateTime?
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 

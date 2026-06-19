@@ -12,6 +12,9 @@ interface Colecao {
   outletDesde?: string | null
   descontoOutletPct?: number | null
   pecas: number
+  midiaExpiraEm?: string | null
+  diasParaExpirarMidia?: number | null
+  midiaExpiradaEm?: string | null
 }
 
 interface FormC { id?: string; nome: string; descricao?: string }
@@ -153,6 +156,14 @@ export default function Colecoes() {
                     </span>
                   )}
                   {c.descricao && <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{c.descricao}</div>}
+                  {c.midiaExpiradaEm ? (
+                    <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>🗑️ mídia removida do catálogo ({new Date(c.midiaExpiradaEm).toLocaleDateString('pt-BR')})</div>
+                  ) : c.diasParaExpirarMidia != null && c.diasParaExpirarMidia <= 30 && (
+                    <div style={{ fontSize: 12, marginTop: 2, color: c.diasParaExpirarMidia <= 7 ? '#ef4444' : '#f59e0b', fontWeight: 600 }}>
+                      ⚠️ mídia expira em {c.diasParaExpirarMidia <= 0 ? 'breve' : `${c.diasParaExpirarMidia} dia(s)`}
+                      {c.midiaExpiraEm ? ` (${new Date(c.midiaExpiraEm).toLocaleDateString('pt-BR')})` : ''} — marque Outlet ou promova as vendas
+                    </div>
+                  )}
                 </td>
                 <td>
                   <span className={`selo ${c.status === 'LIBERADA' ? 'ok' : 'baixo'}`}>

@@ -2,6 +2,9 @@ import { buildApp } from './app'
 import { env } from './env'
 import { segmentarTodasAsLojas } from './modules/clientes/segmentacao'
 import { redistribuirAtrasados } from './modules/leads/leads.service'
+import { limparMidiaExpirada } from './modules/midia/limpeza.service'
+
+const UM_DIA_MS = 24 * 60 * 60 * 1000
 
 async function main() {
   const app = await buildApp()
@@ -14,6 +17,15 @@ async function main() {
         .then((n) => { if (n > 0) app.log.info(`Leads redistribuídos por SLA: ${n}`) })
         .catch((err) => app.log.error({ err }, 'Falha na redistribuição automática de leads'))
     }, 60_000).unref()
+
+    // Limpeza de mídia por plano (R2): roda no boot e a cada 24h. Apaga a mídia das
+    // coleções cuja retenção (START 6m / PRO 12m) venceu desde a liberação. ELITE nunca.
+    const limpar = () => limparMidiaExpirada()
+      .then((n) => { if (n > 0) app.log.info(`Coleções com mídia expirada limpas no R2: ${n}`) })
+      .catch((err) => app.log.error({ err }, 'Falha na limpeza de mídia expirada'))
+    limpar()
+    setInterval(limpar, UM_DIA_MS).unref()
+
     // Segmentação automática: em produção roda via agendamento diário (cron).
     // No boot só roda se SEGMENTAR_BOOT=true — assim, em dev/demo, o recálculo
     // fica a cargo do botão "Recalcular segmentação" (efeito visível na carteira).

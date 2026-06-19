@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
+import { midiaExpiraEm } from '../midia/limpeza.service'
 
 /**
  * Coleções com ciclo de vida.
@@ -30,19 +31,29 @@ export async function colecoesRoutes(app: FastifyInstance) {
     const colecoes = await prisma.colecao.findMany({
       where,
       orderBy: [{ status: 'asc' }, { nome: 'asc' }],
-      include: { _count: { select: { produtos: true } } },
+      include: { _count: { select: { produtos: true } }, loja: { select: { rede: { select: { plano: true } } } } },
     })
-    return colecoes.map((c) => ({
-      id: c.id,
-      nome: c.nome,
-      descricao: c.descricao,
-      status: c.status,
-      liberadaEm: c.liberadaEm,
-      outlet: c.outlet,
-      outletDesde: c.outletDesde,
-      descontoOutletPct: c.descontoOutletPct,
-      pecas: c._count.produtos,
-    }))
+    const agora = Date.now()
+    return colecoes.map((c) => {
+      const plano = c.loja.rede?.plano
+      const expira = c.status === 'LIBERADA' && plano ? midiaExpiraEm(c.liberadaEm, plano) : null
+      const diasParaExpirarMidia = expira ? Math.ceil((expira.getTime() - agora) / 86_400_000) : null
+      return {
+        id: c.id,
+        nome: c.nome,
+        descricao: c.descricao,
+        status: c.status,
+        liberadaEm: c.liberadaEm,
+        outlet: c.outlet,
+        outletDesde: c.outletDesde,
+        descontoOutletPct: c.descontoOutletPct,
+        pecas: c._count.produtos,
+        // Limpeza de mídia por plano: aviso ao gestor (data + contagem regressiva).
+        midiaExpiraEm: expira,
+        diasParaExpirarMidia,
+        midiaExpiradaEm: c.midiaExpiradaEm,
+      }
+    })
   })
 
   // Cria uma coleção vazia (em preparação) para a estoquista ir cadastrando as peças.

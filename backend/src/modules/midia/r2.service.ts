@@ -1,5 +1,5 @@
 import crypto from 'node:crypto'
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3'
 import { env } from '../../env'
 
 /**
@@ -46,4 +46,29 @@ export async function enviarParaR2(opts: {
     }),
   )
   return `${env.R2_PUBLIC_URL!.replace(/\/$/, '')}/${chave}`
+}
+
+/** Converte uma URL pública (cdn.zaieze.com/chave) na chave do objeto no bucket. */
+function chaveDaUrl(url: string): string | null {
+  if (!env.R2_PUBLIC_URL) return null
+  const base = env.R2_PUBLIC_URL.replace(/\/$/, '')
+  if (!url.startsWith(base)) return null // mídia local/externa (dev) — ignora
+  return url.slice(base.length + 1)
+}
+
+/**
+ * Apaga objetos do R2 a partir das URLs públicas (até 1000 por chamada).
+ * URLs que não são do bucket (uploads locais em dev) são ignoradas.
+ * @returns quantidade de objetos efetivamente solicitados para exclusão.
+ */
+export async function excluirDoR2(urls: string[]): Promise<number> {
+  if (!r2Configurado() || urls.length === 0) return 0
+  const chaves = urls.map(chaveDaUrl).filter((k): k is string => !!k)
+  if (chaves.length === 0) return 0
+  // DeleteObjects aceita no máx. 1000 chaves por requisição.
+  for (let i = 0; i < chaves.length; i += 1000) {
+    const lote = chaves.slice(i, i + 1000)
+    await r2().send(new DeleteObjectsCommand({ Bucket: env.R2_BUCKET!, Delete: { Objects: lote.map((Key) => ({ Key })) } }))
+  }
+  return chaves.length
 }

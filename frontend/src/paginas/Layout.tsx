@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
   Megaphone, Package, Tag, Layers, Boxes, ArrowLeftRight, UsersRound,
-  HardHat, Palette, BookOpen, CreditCard, Menu, LogOut,
+  HardHat, Palette, BookOpen, CreditCard, Menu, LogOut, UserCog,
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
 
@@ -76,6 +76,7 @@ export default function Layout() {
         {ehDonoRede && temFeature('portal_cliente') && <NavLink to="/marca" className={cls}><Palette {...ICON} /><span>Marca</span></NavLink>}
         {ehDonoRede && <NavLink to="/manual" className={cls}><BookOpen {...ICON} /><span>Manual</span></NavLink>}
         {ehDonoRede && <NavLink to="/planos" className={cls}><CreditCard {...ICON} /><span>Planos</span></NavLink>}
+        <NavLink to="/conta" className={cls}><UserCog {...ICON} /><span>Minha conta</span></NavLink>
         </nav>
         <div className="rodape">
           <div className="rodape-nome">{usuario.nome}</div>

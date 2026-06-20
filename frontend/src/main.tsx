@@ -25,6 +25,7 @@ import Colecoes from './paginas/Colecoes'
 import Marca from './paginas/Marca'
 import Pipeline from './paginas/Pipeline'
 import Manual from './paginas/Manual'
+import Conta from './paginas/Conta'
 import Convite from './paginas/Convite'
 import Landing from './paginas/site/Landing'
 import Checkout from './paginas/site/Checkout'
@@ -75,6 +76,7 @@ function CrmApp() {
         <Route path="funil" element={<Pipeline />} />
         <Route path="manual" element={<Manual />} />
         <Route path="planos" element={<Planos />} />
+        <Route path="conta" element={<Conta />} />
       </Route>
       {/* Catálogo público da vendedora: <marca>.zaieze.com/<vendedora> (sem login) */}
       <Route path="/:vendSlug" element={<Catalogo />} />

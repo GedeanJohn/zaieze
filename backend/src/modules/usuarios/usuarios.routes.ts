@@ -40,6 +40,28 @@ export async function usuariosRoutes(app: FastifyInstance) {
     })
   })
 
+  // Minha conta: QUALQUER papel (inclusive GESTOR/super-admin) edita os próprios dados.
+  // É o que permite transferir a titularidade quando a marca é vendida (troca nome+email+senha).
+  app.patch('/me', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const meId = request.user.sub
+    const body = z.object({ nome: z.string().min(2).optional(), email: z.string().email().optional(), senha: z.string().min(6).optional() }).parse(request.body)
+    if (body.email) {
+      const email = body.email.toLowerCase()
+      if (await prisma.usuario.findFirst({ where: { email, id: { not: meId } }, select: { id: true } })) {
+        return reply.code(409).send({ erro: 'E-mail já usado por outro usuário' })
+      }
+    }
+    return prisma.usuario.update({
+      where: { id: meId },
+      data: {
+        ...(body.nome ? { nome: body.nome } : {}),
+        ...(body.email ? { email: body.email.toLowerCase() } : {}),
+        ...(body.senha ? { senhaHash: await bcrypt.hash(body.senha, 10) } : {}),
+      },
+      select: { id: true, nome: true, email: true, role: true },
+    })
+  })
+
   app.post('/', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const body = criarUsuarioSchema.parse(request.body)

@@ -301,6 +301,18 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   max-width: 1240px; margin: 0 auto; letter-spacing: 0.06em; text-transform: uppercase;
 }
 
+/* Fale Conosco (WhatsApp) — estilo ZAIEZE (branco/preto, minimalista) */
+.fale-conosco { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 44px; text-align: center; }
+.fale-conosco > span { color: var(--zz-mut); font-size: 15px; letter-spacing: 0.02em; }
+.zap-btn { display: inline-flex; align-items: center; gap: 10px; }
+.zap-flutuante {
+  position: fixed; bottom: 22px; right: 22px; width: 58px; height: 58px; border-radius: 50%;
+  background: #fff; color: #000; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); border: 1px solid rgba(0, 0, 0, 0.08);
+  z-index: 60; transition: transform 0.15s ease;
+}
+.zap-flutuante:hover { transform: scale(1.07); }
+
 /* Checkout / Entrar / Sucesso (tema escuro) */
 .checkout-wrap, .entrar-wrap, .sucesso-wrap { display: flex; flex-direction: column; }
 .site .campo label { color: var(--zz-mut); letter-spacing: 0.06em; text-transform: uppercase; font-size: 12px; }

@@ -19,6 +19,7 @@ interface FormMembro {
   id?: string
   nome: string
   email: string
+  role?: 'GERENTE' | 'VENDEDORA'
   senha?: string
   telefone?: string
   slugCatalogo?: string
@@ -61,6 +62,7 @@ export default function Equipe() {
     }
     if (form.senha) corpo.senha = form.senha
     if (!form.id) corpo.role = 'VENDEDORA'
+    else if (ehGestor && form.role) corpo.role = form.role // gestor pode mudar a função
     try {
       if (form.id) await api.patch(`/usuarios/${form.id}`, corpo)
       else await api.post('/usuarios', corpo)
@@ -144,6 +146,16 @@ export default function Equipe() {
                 <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
               </div>
             </div>
+            {form.id && ehGestor && (
+              <div className="campo">
+                <label>Função</label>
+                <select value={form.role ?? 'VENDEDORA'} onChange={(e) => setForm({ ...form, role: e.target.value as 'GERENTE' | 'VENDEDORA' })}>
+                  <option value="VENDEDORA">Vendedora</option>
+                  <option value="GERENTE">Gerente</option>
+                </select>
+                <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>Mudou de função? Troque aqui (a carteira e o histórico são mantidos).</div>
+              </div>
+            )}
             <div className="linha-campos">
               <div className="campo">
                 <label>{form.id ? 'Nova senha (opcional)' : 'Senha* (mín. 6)'}</label>

@@ -34,16 +34,25 @@ a { color: var(--accent); text-decoration: none; }
 }
 .sidebar .logo { font-family: Georgia, serif; font-size: 22px; margin-bottom: 24px; }
 .sidebar .logo em { color: #e8a87c; font-style: italic; }
+.sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
 .sidebar a {
-  color: #d8cfc8; padding: 10px 12px; border-radius: 8px; font-size: 14px; display: block;
+  display: flex; align-items: center; gap: 11px;
+  color: #cbc2bb; padding: 9px 12px; border-radius: 9px; font-size: 14px; letter-spacing: 0.01em;
+  transition: background 0.15s ease, color 0.15s ease;
 }
-.sidebar a:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
-.sidebar a.ativo { background: var(--accent); color: #fff; }
-.sidebar .rodape { margin-top: auto; font-size: 12px; color: #a89d96; }
+.sidebar a svg { flex-shrink: 0; opacity: 0.8; transition: opacity 0.15s ease; }
+.sidebar a:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.sidebar a:hover svg { opacity: 1; }
+.sidebar a.ativo { background: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 4px 14px rgba(194, 85, 43, 0.35); }
+.sidebar a.ativo svg { opacity: 1; }
+.sidebar .rodape { margin-top: auto; padding-top: 14px; font-size: 12px; color: #a89d96; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.sidebar .rodape .rodape-nome { color: #f0e9e3; font-weight: 600; font-size: 13px; }
 .sidebar .rodape button {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
   background: none; border: 1px solid #5a4f49; color: #d8cfc8; border-radius: 8px;
-  padding: 6px 12px; cursor: pointer; margin-top: 8px; width: 100%;
+  padding: 7px 12px; cursor: pointer; margin-top: 10px; width: 100%; transition: background 0.15s ease;
 }
+.sidebar .rodape button:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
 
 .conteudo { flex: 1; padding: 32px 40px; max-width: 1200px; }
 .conteudo header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }

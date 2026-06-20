@@ -51,6 +51,8 @@ function formataData(iso: string): string {
 export default function Vendas() {
   const usuario = usuarioLogado()!
   const gerente = usuario.role !== 'VENDEDORA'
+  // Quem efetivamente registra venda: vendedora e gerente de loja. Gestor (rede) e admin supervisionam.
+  const podeVender = usuario.role === 'VENDEDORA' || usuario.role === 'GERENTE'
   const escopo = useLojaAtiva()
 
   const [vendas, setVendas] = useState<Venda[]>([])
@@ -192,7 +194,7 @@ export default function Vendas() {
         <h1>Vendas</h1>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
           <SeletorLoja escopo={escopo} />
-          <button className="btn" onClick={() => abrirNova()} disabled={!escopo.pronto}>+ Nova venda</button>
+          {podeVender && <button className="btn" onClick={() => abrirNova()} disabled={!escopo.pronto}>+ Nova venda</button>}
         </div>
       </header>
 

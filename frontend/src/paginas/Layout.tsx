@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import {
+  LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
+  Megaphone, Sparkles, Package, Tag, Layers, Boxes, ArrowLeftRight, UsersRound,
+  HardHat, Palette, BookOpen, CreditCard, Menu, LogOut,
+} from 'lucide-react'
 import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
+
+const ICON = { size: 18, strokeWidth: 1.75 } as const
 
 export default function Layout() {
   const usuario = usuarioLogado()!
@@ -40,7 +47,7 @@ export default function Layout() {
   return (
     <div className="app-shell">
       <header className="topbar-mobile">
-        <button className="menu-toggle" onClick={() => setMenuAberto(true)} aria-label="Abrir menu">☰</button>
+        <button className="menu-toggle" onClick={() => setMenuAberto(true)} aria-label="Abrir menu"><Menu size={24} strokeWidth={2} /></button>
         <div className="logo">Moda<em>CRM</em> AI</div>
       </header>
       {menuAberto && <div className="menu-overlay" onClick={() => setMenuAberto(false)} />}
@@ -49,31 +56,33 @@ export default function Layout() {
         onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setMenuAberto(false) }}
       >
         <div className="logo">Moda<em>CRM</em> AI</div>
-        <NavLink to="/" end className={cls}>📊 Dashboard</NavLink>
-        {podeVendasClientes && <NavLink to="/vendas" className={cls}>🛒 Vendas</NavLink>}
-        {podeVendasClientes && <NavLink to="/clientes" className={cls}>👗 Clientes</NavLink>}
-        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/caixa" className={cls}>📥 Caixa de entrada</NavLink>}
-        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/campanhas" className={cls}>📲 WhatsApp</NavLink>}
-        {podeVendasClientes && temFeature('portal_cliente') && <NavLink to="/funil" className={cls}>🔗 Funil de vendas</NavLink>}
-        {podeVendasClientes && temFeature('radar') && <NavLink to="/radar" className={cls}>🎯 Radar</NavLink>}
-        {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/ranking" className={cls}>🏆 Ranking</NavLink>}
-        {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/mural" className={cls}>📣 Mural</NavLink>}
-        {podeVendasClientes && temFeature('provador') && <NavLink to="/provador" className={cls}>🪞 Provador</NavLink>}
-        {podeVendasClientes && temFeature('atacado') && <NavLink to="/atacado" className={cls}>📦 Atacado</NavLink>}
-        <NavLink to="/produtos" className={cls}>🏷️ Produtos</NavLink>
-        {podeEstoque && <NavLink to="/colecoes" className={cls}>🗂️ Coleções</NavLink>}
-        {podeEstoque && <NavLink to="/estoque" className={cls}>📦 Estoque</NavLink>}
-        {podeEstoque && temFeature('multi_loja') && <NavLink to="/transferencias" className={cls}>🔄 Transferências</NavLink>}
-        {podeEquipe && <NavLink to="/equipe" className={cls}>👥 Equipe</NavLink>}
-        {podeEstoquistas && temFeature('multi_loja') && <NavLink to="/estoquistas" className={cls}>👷 Estoquistas</NavLink>}
-        {ehDonoRede && temFeature('portal_cliente') && <NavLink to="/marca" className={cls}>🎨 Marca</NavLink>}
-        {ehDonoRede && <NavLink to="/manual" className={cls}>📖 Manual</NavLink>}
-        {ehDonoRede && <NavLink to="/planos" className={cls}>💳 Planos</NavLink>}
+        <nav className="sidebar-nav">
+        <NavLink to="/" end className={cls}><LayoutDashboard {...ICON} /><span>Dashboard</span></NavLink>
+        {podeVendasClientes && <NavLink to="/vendas" className={cls}><ShoppingBag {...ICON} /><span>Vendas</span></NavLink>}
+        {podeVendasClientes && <NavLink to="/clientes" className={cls}><Users {...ICON} /><span>Clientes</span></NavLink>}
+        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/caixa" className={cls}><Inbox {...ICON} /><span>Caixa de entrada</span></NavLink>}
+        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/campanhas" className={cls}><MessageCircle {...ICON} /><span>WhatsApp</span></NavLink>}
+        {podeVendasClientes && temFeature('portal_cliente') && <NavLink to="/funil" className={cls}><Filter {...ICON} /><span>Funil de vendas</span></NavLink>}
+        {podeVendasClientes && temFeature('radar') && <NavLink to="/radar" className={cls}><Radar {...ICON} /><span>Radar</span></NavLink>}
+        {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/ranking" className={cls}><Trophy {...ICON} /><span>Ranking</span></NavLink>}
+        {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/mural" className={cls}><Megaphone {...ICON} /><span>Mural</span></NavLink>}
+        {podeVendasClientes && temFeature('provador') && <NavLink to="/provador" className={cls}><Sparkles {...ICON} /><span>Provador</span></NavLink>}
+        {podeVendasClientes && temFeature('atacado') && <NavLink to="/atacado" className={cls}><Package {...ICON} /><span>Atacado</span></NavLink>}
+        <NavLink to="/produtos" className={cls}><Tag {...ICON} /><span>Produtos</span></NavLink>
+        {podeEstoque && <NavLink to="/colecoes" className={cls}><Layers {...ICON} /><span>Coleções</span></NavLink>}
+        {podeEstoque && <NavLink to="/estoque" className={cls}><Boxes {...ICON} /><span>Estoque</span></NavLink>}
+        {podeEstoque && temFeature('multi_loja') && <NavLink to="/transferencias" className={cls}><ArrowLeftRight {...ICON} /><span>Transferências</span></NavLink>}
+        {podeEquipe && <NavLink to="/equipe" className={cls}><UsersRound {...ICON} /><span>Equipe</span></NavLink>}
+        {podeEstoquistas && temFeature('multi_loja') && <NavLink to="/estoquistas" className={cls}><HardHat {...ICON} /><span>Estoquistas</span></NavLink>}
+        {ehDonoRede && temFeature('portal_cliente') && <NavLink to="/marca" className={cls}><Palette {...ICON} /><span>Marca</span></NavLink>}
+        {ehDonoRede && <NavLink to="/manual" className={cls}><BookOpen {...ICON} /><span>Manual</span></NavLink>}
+        {ehDonoRede && <NavLink to="/planos" className={cls}><CreditCard {...ICON} /><span>Planos</span></NavLink>}
+        </nav>
         <div className="rodape">
-          <div>{usuario.nome}</div>
+          <div className="rodape-nome">{usuario.nome}</div>
           <div>{usuario.loja?.nome ?? usuario.rede?.nome ?? 'SaaS Admin'} · {rotuloPapel[usuario.role]}</div>
           {usuario.rede && <div style={{ marginTop: 4 }}>Plano <strong style={{ color: '#e8a87c' }}>{usuario.rede.plano}</strong></div>}
-          <button onClick={sair}>Sair</button>
+          <button onClick={sair}><LogOut size={15} strokeWidth={1.75} /> Sair</button>
         </div>
       </aside>
       <main className="conteudo">

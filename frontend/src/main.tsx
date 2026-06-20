@@ -26,6 +26,7 @@ import Colecoes from './paginas/Colecoes'
 import Marca from './paginas/Marca'
 import Pipeline from './paginas/Pipeline'
 import Manual from './paginas/Manual'
+import Convite from './paginas/Convite'
 import Landing from './paginas/site/Landing'
 import Checkout from './paginas/site/Checkout'
 import Sucesso from './paginas/site/Sucesso'
@@ -54,6 +55,7 @@ function CrmApp() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/convite/:token" element={<Convite />} />
       <Route path="/" element={<Protegida><Layout /></Protegida>}>
         <Route index element={<Dashboard />} />
         <Route path="vendas" element={<Vendas />} />

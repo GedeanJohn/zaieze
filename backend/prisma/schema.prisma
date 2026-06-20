@@ -280,6 +280,27 @@ model Usuario {
   @@map("usuarios")
 }
 
+// Convite por link: o gestor/gerente (ou super admin) convida uma pessoa; ela abre o link e
+// CRIA A PRÓPRIA SENHA — só então o Usuario é criado (escopo capturado no convite). Token expira.
+model Convite {
+  id          String   @id @default(cuid())
+  token       String   @unique
+  nome        String
+  email       String
+  telefone    String?
+  role        Role
+  redeId      String?
+  lojaId      String?
+  equipeId    String?
+  criadoPorId String?
+  usado       Boolean  @default(false)
+  expiraEm    DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([redeId, usado])
+  @@map("convites")
+}
+
 // ─────────────────────────── Clientes (CRM) ───────────────────────────
 
 model Cliente {

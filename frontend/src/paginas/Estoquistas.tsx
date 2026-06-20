@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, mensagemDeErro } from '../api'
+import ConvidarModal from '../componentes/ConvidarModal'
 
 interface Estoquista {
   id: string
@@ -20,6 +21,7 @@ interface FormE {
 export default function Estoquistas() {
   const [lista, setLista] = useState<Estoquista[]>([])
   const [form, setForm] = useState<FormE | null>(null)
+  const [convidar, setConvidar] = useState(false)
   const [erro, setErro] = useState('')
 
   const carregar = useCallback(async () => {
@@ -58,7 +60,10 @@ export default function Estoquistas() {
     <>
       <header>
         <h1>Estoquistas</h1>
-        <button className="btn" onClick={() => setForm({ nome: '', email: '', senha: '' })}>+ Novo estoquista</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn" onClick={() => setConvidar(true)}>✉️ Convidar por link</button>
+          <button className="btn secundario" onClick={() => setForm({ nome: '', email: '', senha: '' })}>+ Novo (com senha)</button>
+        </div>
       </header>
 
       <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
@@ -90,6 +95,10 @@ export default function Estoquistas() {
           </tbody>
         </table>
       </div>
+
+      {convidar && (
+        <ConvidarModal papeis={[{ valor: 'ESTOQUISTA', rotulo: 'Estoquista' }]} onClose={() => setConvidar(false)} />
+      )}
 
       {form && (
         <div className="modal-fundo" onClick={() => setForm(null)}>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, mensagemDeErro, usuarioLogado } from '../api'
+import ConvidarModal from '../componentes/ConvidarModal'
 
 interface Membro {
   id: string
@@ -27,8 +28,11 @@ interface FormMembro {
 
 export default function Equipe() {
   const usuario = usuarioLogado()!
+  const ehGestor = usuario.role === 'GESTOR' || usuario.role === 'SUPER_ADMIN'
   const [equipe, setEquipe] = useState<Membro[]>([])
   const [form, setForm] = useState<FormMembro | null>(null)
+  const [convidar, setConvidar] = useState(false)
+  const [lojas, setLojas] = useState<{ id: string; nome: string }[]>([])
   const [erro, setErro] = useState('')
 
   const carregar = useCallback(async () => {
@@ -37,6 +41,11 @@ export default function Equipe() {
   }, [])
 
   useEffect(() => { carregar() }, [carregar])
+
+  // Gestor precisa escolher a loja do convidado → carrega as lojas da rede.
+  useEffect(() => {
+    if (ehGestor) api.get('/lojas').then(({ data }) => setLojas(data.map((l: { id: string; nome: string }) => ({ id: l.id, nome: l.nome })))).catch(() => {})
+  }, [ehGestor])
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault()
@@ -71,7 +80,10 @@ export default function Equipe() {
     <>
       <header>
         <h1>Equipe</h1>
-        <button className="btn" onClick={() => setForm({ nome: '', email: '' })}>+ Nova vendedora</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn" onClick={() => setConvidar(true)}>✉️ Convidar por link</button>
+          <button className="btn secundario" onClick={() => setForm({ nome: '', email: '' })}>+ Nova (com senha)</button>
+        </div>
       </header>
 
       <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
@@ -108,6 +120,14 @@ export default function Equipe() {
           </tbody>
         </table>
       </div>
+
+      {convidar && (
+        <ConvidarModal
+          papeis={ehGestor ? [{ valor: 'VENDEDORA', rotulo: 'Vendedora' }, { valor: 'GERENTE', rotulo: 'Gerente' }] : [{ valor: 'VENDEDORA', rotulo: 'Vendedora' }]}
+          lojas={ehGestor ? lojas : undefined}
+          onClose={() => setConvidar(false)}
+        />
+      )}
 
       {form && (
         <div className="modal-fundo" onClick={() => setForm(null)}>

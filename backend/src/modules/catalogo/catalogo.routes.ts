@@ -22,7 +22,7 @@ export function urlCatalogoPublica(redeSlug: string, vendSlug: string): string {
 const RESERVADOS = new Set([
   'login', 'vendas', 'estoque', 'transferencias', 'clientes', 'campanhas', 'caixa', 'radar',
   'ranking', 'mural', 'provador', 'atacado', 'produtos', 'equipe', 'estoquistas', 'planos',
-  'colecoes', 'marca', 'leads', 'catalogo', 'cat', 'api', 'assets', 'uploads', 'checkout', 'sucesso', 'entrar',
+  'colecoes', 'marca', 'leads', 'catalogo', 'cat', 'api', 'assets', 'uploads', 'checkout', 'sucesso', 'entrar', 'convite',
 ])
 
 /** Gera um slug a partir do nome (sem acento, kebab-case). */

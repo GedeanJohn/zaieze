@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { useParams } from 'react-router-dom'
 import { api } from '../../api'
 import { HOST } from '../../host'
+import AgenteLoja from './AgenteLoja'
 
 interface Produto {
   id: string; nome: string; descricao?: string | null; preco: number
@@ -13,6 +14,7 @@ interface Catalogo {
   marca: { nome: string; logoUrl: string | null; corPrimaria: string; corSecundaria: string }
   loja: { nome: string }
   vendedora: { nome: string; primeiroNome: string; temWhatsapp: boolean }
+  pedidoMinimoAtacado?: number
   colecoes: Colecao[]
 }
 
@@ -23,9 +25,7 @@ export default function Catalogo() {
   const redeSlug = HOST.slug
   const [cat, setCat] = useState<Catalogo | null>(null)
   const [erro, setErro] = useState('')
-  const [modal, setModal] = useState<Produto | 'geral' | null>(null)
-  const [form, setForm] = useState({ nome: '', telefone: '' })
-  const [enviando, setEnviando] = useState(false)
+  const [agente, setAgente] = useState<{ produtoId?: string; produtoNome?: string } | null>(null)
 
   useEffect(() => {
     if (!redeSlug || !vendSlug) { setErro('Catálogo não encontrado.'); return }
@@ -33,21 +33,6 @@ export default function Catalogo() {
       .then(({ data }) => setCat(data))
       .catch(() => setErro('Este catálogo não está disponível.'))
   }, [redeSlug, vendSlug])
-
-  async function falarComVendedora(e: React.FormEvent) {
-    e.preventDefault()
-    setEnviando(true)
-    try {
-      const produtoId = modal && modal !== 'geral' ? modal.id : undefined
-      const { data } = await api.post(`/catalogo/publico/${redeSlug}/${vendSlug}/lead`, {
-        nome: form.nome || undefined, telefone: form.telefone || undefined, produtoId,
-      })
-      if (data.whatsappUrl) window.location.href = data.whatsappUrl
-      else alert('Recebemos seu contato! A vendedora falará com você em breve. 💛')
-      setModal(null)
-    } catch { alert('Não foi possível abrir o WhatsApp agora. Tente novamente.') }
-    finally { setEnviando(false) }
-  }
 
   if (erro) return <div className="cat-vazio">{erro}</div>
   if (!cat) return <div className="cat-vazio">Carregando…</div>
@@ -74,7 +59,7 @@ export default function Catalogo() {
           {c.descricao && <p className="cat-secao-desc">{c.descricao}</p>}
           <div className="cat-grid">
             {c.produtos.map((p) => (
-              <button key={p.id} className="cat-card" onClick={() => setModal(p)}>
+              <button key={p.id} className="cat-card" onClick={() => setAgente({ produtoId: p.id, produtoNome: p.nome })}>
                 <div className="cat-foto">
                   {p.fotos[0]
                     ? <img src={p.fotos[0]} alt={p.nome} loading="lazy" />
@@ -96,26 +81,22 @@ export default function Catalogo() {
         </section>
       ))}
 
-      {/* CTA fixo */}
-      <button className="cat-cta-fixo" onClick={() => setModal('geral')}>
+      {/* CTA fixo — abre a Vendedora Online (Agente 2) */}
+      <button className="cat-cta-fixo" onClick={() => setAgente({})}>
         💬 Falar com {cat.vendedora.primeiroNome}
       </button>
 
-      {modal && (
-        <div className="cat-modal-fundo" onClick={() => setModal(null)}>
-          <form className="cat-modal" onClick={(e) => e.stopPropagation()} onSubmit={falarComVendedora}>
-            <h3>Falar com {cat.vendedora.primeiroNome}</h3>
-            {modal !== 'geral' && <p className="cat-modal-item">Sobre: <strong>{modal.nome}</strong> · {modal.precoOriginal ? <><span className="cat-preco-antigo">{real(modal.precoOriginal)}</span> </> : null}{real(modal.preco)}{modal.descontoPct ? ` (−${modal.descontoPct}%)` : ''}</p>}
-            {modal !== 'geral' && modal.videos.length > 0 && (
-              <video src={modal.videos[0]} controls playsInline preload="metadata" poster={modal.fotos[0]} style={{ width: '100%', borderRadius: 8, maxHeight: '45vh', background: '#000' }} />
-            )}
-            <p className="cat-modal-txt">Deixe seu nome e WhatsApp — a vendedora continua o atendimento por lá.</p>
-            <input placeholder="Seu nome" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
-            <input placeholder="Seu WhatsApp (com DDD)" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} inputMode="tel" />
-            <button className="cat-cta" disabled={enviando}>{enviando ? 'Abrindo…' : 'Abrir conversa no WhatsApp'}</button>
-            <button type="button" className="cat-fechar" onClick={() => setModal(null)}>cancelar</button>
-          </form>
-        </div>
+      {agente && (
+        <AgenteLoja
+          redeSlug={redeSlug!}
+          vendSlug={vendSlug!}
+          marcaNome={cat.marca.nome}
+          vendedora={cat.vendedora.primeiroNome}
+          pedidoMinimoAtacado={cat.pedidoMinimoAtacado}
+          produtoId={agente.produtoId}
+          produtoNome={agente.produtoNome}
+          onClose={() => setAgente(null)}
+        />
       )}
 
       <footer className="cat-rodape">{cat.marca.nome} · powered by ZAIEZE</footer>

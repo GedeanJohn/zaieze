@@ -61,7 +61,7 @@ function whatsappUrl(numero: string | null, texto: string): string | null {
 async function resolverVendedoraPublica(redeSlug: string, vendSlug: string) {
   const rede = await prisma.rede.findUnique({
     where: { slug: redeSlug },
-    select: { id: true, nome: true, plano: true, ativo: true, logoUrl: true, corPrimaria: true, corSecundaria: true },
+    select: { id: true, nome: true, plano: true, ativo: true, logoUrl: true, corPrimaria: true, corSecundaria: true, pedidoMinimoAtacado: true },
   })
   if (!rede || !rede.ativo || !planoInclui(rede.plano, 'portal_cliente')) return null
   const vend = await prisma.usuario.findFirst({
@@ -76,6 +76,7 @@ const leadSchema = z.object({
   nome: z.string().min(1).optional(),
   telefone: z.string().min(8).optional(),
   produtoId: z.string().optional(),
+  resumo: z.string().max(1000).optional(), // 1ª mensagem montada pelo agente (qualificação)
 })
 
 export async function catalogoRoutes(app: FastifyInstance) {
@@ -159,6 +160,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
       marca: { nome: rede.nome, logoUrl: rede.logoUrl, corPrimaria: rede.corPrimaria, corSecundaria: rede.corSecundaria },
       loja: { nome: vend.loja!.nome },
       vendedora: { nome: vend.nome, primeiroNome: vend.nome.trim().split(/\s+/)[0], temWhatsapp: !!vend.waNumero },
+      pedidoMinimoAtacado: rede.pedidoMinimoAtacado,
       colecoes: colecoesOut,
     }
   })
@@ -171,7 +173,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
     if (!ctx) return reply.code(404).send({ erro: 'Catálogo indisponível' })
     const { rede, vend } = ctx
 
-    const texto = `Olá ${vend.nome.split(/\s+/)[0]}! Vim pelo catálogo e quero saber mais. 😊`
+    const texto = body.resumo?.trim() || `Olá ${vend.nome.split(/\s+/)[0]}! Vim pelo catálogo e quero saber mais. 😊`
     const url = whatsappUrl(vend.waNumero, texto)
 
     // Sem telefone não dá para materializar o cliente; ainda assim devolve o WhatsApp

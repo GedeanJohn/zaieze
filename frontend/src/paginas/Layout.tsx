@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
-  Megaphone, Sparkles, Package, Tag, Layers, Boxes, ArrowLeftRight, UsersRound,
+  Megaphone, Package, Tag, Layers, Boxes, ArrowLeftRight, UsersRound,
   HardHat, Palette, BookOpen, CreditCard, Menu, LogOut,
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
@@ -66,7 +66,6 @@ export default function Layout() {
         {podeVendasClientes && temFeature('radar') && <NavLink to="/radar" className={cls}><Radar {...ICON} /><span>Radar</span></NavLink>}
         {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/ranking" className={cls}><Trophy {...ICON} /><span>Ranking</span></NavLink>}
         {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/mural" className={cls}><Megaphone {...ICON} /><span>Mural</span></NavLink>}
-        {podeVendasClientes && temFeature('provador') && <NavLink to="/provador" className={cls}><Sparkles {...ICON} /><span>Provador</span></NavLink>}
         {podeVendasClientes && temFeature('atacado') && <NavLink to="/atacado" className={cls}><Package {...ICON} /><span>Atacado</span></NavLink>}
         <NavLink to="/produtos" className={cls}><Tag {...ICON} /><span>Produtos</span></NavLink>
         {podeEstoque && <NavLink to="/colecoes" className={cls}><Layers {...ICON} /><span>Coleções</span></NavLink>}

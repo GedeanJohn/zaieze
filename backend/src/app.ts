@@ -27,7 +27,6 @@ import { radarRoutes } from './modules/radar/radar.routes'
 import { comissoesRoutes } from './modules/comissao/comissoes.routes'
 import { rankingRoutes } from './modules/comissao/ranking.routes'
 import { muralRoutes } from './modules/mural/mural.routes'
-import { provadorRoutes } from './modules/provador/provador.routes'
 import { atacadoRoutes } from './modules/atacado/atacado.routes'
 import { planosRoutes } from './modules/planos/planos.routes'
 import { assinaturasRoutes } from './modules/assinaturas/assinaturas.routes'
@@ -86,7 +85,6 @@ export async function buildApp() {
   await app.register(comissoesRoutes, { prefix: '/api/comissoes' })
   await app.register(rankingRoutes, { prefix: '/api/ranking' })
   await app.register(muralRoutes, { prefix: '/api/mural' })
-  await app.register(provadorRoutes, { prefix: '/api/provador' })
   await app.register(atacadoRoutes, { prefix: '/api/atacado' })
   await app.register(planosRoutes, { prefix: '/api/planos' })
   await app.register(assinaturasRoutes, { prefix: '/api/assinaturas' })

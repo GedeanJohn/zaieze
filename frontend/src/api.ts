@@ -82,7 +82,7 @@ const ORDEM_PLANO: Record<Plano, number> = { START: 0, PRO: 1, ELITE: 2 }
 export const FEATURE_MIN: Record<string, Plano> = {
   vendas: 'START', produtos: 'START', estoque: 'START', clientes: 'START', dashboard: 'START', forma_recebimento: 'START', whatsapp: 'START', multi_loja: 'START',
   crm_segmentacao: 'PRO', gamificacao: 'PRO', estoque_inteligente: 'PRO',
-  radar: 'ELITE', provador: 'ELITE', atacado: 'ELITE', ia_avancada: 'ELITE', portal_cliente: 'ELITE',
+  radar: 'ELITE', atacado: 'ELITE', ia_avancada: 'ELITE', portal_cliente: 'ELITE',
 }
 
 // Rótulos amigáveis das funcionalidades (tela de Planos/Upgrade)
@@ -93,7 +93,7 @@ export const rotuloFeature: Record<string, string> = {
   crm_segmentacao: 'Carteira inteligente (segmentação)', gamificacao: 'Comissão, ranking e mural',
   estoque_inteligente: 'Estoque inteligente (encalhados/ruptura)',
   multi_loja: 'Operação em rede (transferências entre lojas + estoquista central)', radar: 'Radar de Oportunidades',
-  provador: 'Provador virtual / montador de looks', atacado: 'Sistema de atacado',
+  atacado: 'Sistema de atacado',
   ia_avancada: 'IA avançada', portal_cliente: 'Portal do Cliente',
 }
 

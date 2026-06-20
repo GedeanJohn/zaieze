@@ -25,7 +25,7 @@ export async function sugerirLook(base: string, complementos: string[]): Promise
     const { default: Anthropic } = await import('@anthropic-ai/sdk')
     const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
     const resp = await client.messages.create({
-      model: 'claude-opus-4-8',
+      model: 'claude-sonnet-4-6',
       max_tokens: 400,
       system: 'Você é um(a) consultor(a) de moda. Monte um look combinando a peça base com os complementos informados, em português do Brasil, 2 a 3 frases, tom animado, 1 emoji. Responda só a sugestão.',
       messages: [{ role: 'user', content: `Peça base: ${base}. Complementos disponíveis: ${lista || 'nenhum'}. Monte o look.` }],
@@ -40,7 +40,7 @@ export async function sugerirLook(base: string, complementos: string[]): Promise
 }
 
 /**
- * Sugere uma mensagem de campanha. Usa Claude (claude-opus-4-8) quando há
+ * Sugere uma mensagem de campanha. Usa Claude (claude-sonnet-4-6) quando há
  * ANTHROPIC_API_KEY; caso contrário, devolve a mensagem-modelo do segmento.
  */
 export async function sugerirMensagem(opts: { segmento?: string | null; contexto?: string }): Promise<{ texto: string; viaIa: boolean }> {
@@ -52,7 +52,7 @@ export async function sugerirMensagem(opts: { segmento?: string | null; contexto
     const { default: Anthropic } = await import('@anthropic-ai/sdk')
     const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
     const resp = await client.messages.create({
-      model: 'claude-opus-4-8',
+      model: 'claude-sonnet-4-6',
       max_tokens: 400,
       system:
         'Você escreve mensagens curtas e calorosas de WhatsApp para clientes de uma loja de moda, em português do Brasil. ' +

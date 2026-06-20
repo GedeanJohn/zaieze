@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, formataReal, rotuloFeature, FEATURE_MIN, type Plano } from '../../api'
+import AgenteZaieze from './AgenteZaieze'
 
 interface PlanoCatalogo {
   plano: Plano
@@ -11,11 +12,6 @@ interface PlanoCatalogo {
 }
 
 const ORDEM: Record<Plano, number> = { START: 0, PRO: 1, ELITE: 2 }
-
-// Contato comercial (WhatsApp).
-const WHATSAPP_COMERCIAL = '5562982196505'
-const MSG_COMERCIAL = 'Olá! Tenho interesse no ZAIEZE e gostaria de saber mais sobre os planos.'
-const WHATSAPP_URL = `https://wa.me/${WHATSAPP_COMERCIAL}?text=${encodeURIComponent(MSG_COMERCIAL)}`
 
 /** Glifo oficial do WhatsApp (herda a cor via currentColor — fica no estilo da marca). */
 function IconeWhatsApp({ size = 22 }: { size?: number }) {
@@ -34,6 +30,7 @@ function featuresAte(plano: Plano): string[] {
 
 export default function Landing() {
   const [planos, setPlanos] = useState<PlanoCatalogo[]>([])
+  const [chatAberto, setChatAberto] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -93,16 +90,18 @@ export default function Landing() {
 
         <div className="fale-conosco">
           <span>Ficou com alguma dúvida sobre os planos?</span>
-          <a className="btn grande zap-btn" href={WHATSAPP_URL} target="_blank" rel="noreferrer">
+          <button className="btn grande zap-btn" onClick={() => setChatAberto(true)}>
             <IconeWhatsApp size={20} /> Fale Conosco!
-          </a>
+          </button>
         </div>
       </section>
 
-      {/* Botão flutuante de WhatsApp — estilo ZAIEZE (branco/preto) */}
-      <a className="zap-flutuante" href={WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="Fale conosco no WhatsApp">
+      {/* Botão flutuante — abre o atendimento da ZAIEZE (estilo da marca) */}
+      <button className="zap-flutuante" onClick={() => setChatAberto(true)} aria-label="Fale conosco">
         <IconeWhatsApp size={28} />
-      </a>
+      </button>
+
+      {chatAberto && <AgenteZaieze onClose={() => setChatAberto(false)} />}
 
       <footer className="site-rodape">
         <div>CNPJ: 43.391.734/0001-51 · ZAIEZE · Sistemas Inteligentes para a Moda © {new Date().getFullYear()}</div>

@@ -16,7 +16,6 @@ import CaixaEntrada from './paginas/CaixaEntrada'
 import Radar from './paginas/Radar'
 import Ranking from './paginas/Ranking'
 import Mural from './paginas/Mural'
-import Provador from './paginas/Provador'
 import Atacado from './paginas/Atacado'
 import Produtos from './paginas/Produtos'
 import Equipe from './paginas/Equipe'
@@ -67,7 +66,6 @@ function CrmApp() {
         <Route path="radar" element={<Radar />} />
         <Route path="ranking" element={<Ranking />} />
         <Route path="mural" element={<Mural />} />
-        <Route path="provador" element={<Provador />} />
         <Route path="atacado" element={<Atacado />} />
         <Route path="produtos" element={<Produtos />} />
         <Route path="colecoes" element={<Colecoes />} />

@@ -29,6 +29,32 @@ export function midiaExpiraEm(liberadaEm: Date | null, plano: Plano): Date | nul
 }
 
 /**
+ * Apaga TODA a mídia de uma rede no R2 — usado quando a marca ENCERRA a assinatura/sai do
+ * sistema (libera o storage). Zera as URLs dos produtos e marca as coleções como expiradas.
+ * @returns nº de objetos apagados.
+ */
+export async function limparMidiaDaRede(redeId: string): Promise<number> {
+  const lojas = await prisma.loja.findMany({ where: { redeId }, select: { id: true } })
+  const lojaIds = lojas.map((l) => l.id)
+  if (lojaIds.length === 0) return 0
+
+  const produtos = await prisma.produto.findMany({ where: { lojaId: { in: lojaIds } }, select: { fotos: true, videos: true } })
+  const urls = produtos.flatMap((p) => [...p.fotos, ...p.videos])
+  if (urls.length === 0) return 0
+
+  try {
+    await excluirDoR2(urls)
+  } catch {
+    return 0 // falhou no R2 → não zera o banco (tenta de novo depois)
+  }
+  await prisma.$transaction([
+    prisma.produto.updateMany({ where: { lojaId: { in: lojaIds } }, data: { fotos: [], videos: [] } }),
+    prisma.colecao.updateMany({ where: { lojaId: { in: lojaIds }, midiaExpiradaEm: null }, data: { midiaExpiradaEm: new Date() } }),
+  ])
+  return urls.length
+}
+
+/**
  * Apaga do R2 a mídia das coleções cuja retenção do plano já venceu, limpa as URLs dos
  * produtos e marca `midiaExpiradaEm`. Roda diariamente (cron no server). Idempotente.
  * @returns nº de coleções processadas.

@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma'
+import { limparMidiaDaRede } from '../midia/limpeza.service'
 
 export type OrigemCancelamento = 'LOJISTA' | 'ADMIN' | 'MERCADO_PAGO'
 
@@ -64,6 +65,9 @@ export async function aplicarFimDeCiclo(redeId: string): Promise<void> {
       prisma.assinatura.update({ where: { redeId }, data: { status: 'CANCELADA' } }),
       prisma.rede.update({ where: { id: redeId }, data: { ativo: false } }),
     ])
+    // Marca encerrou a assinatura (cancelou + ciclo vencido) → libera o R2 apagando a mídia dela.
+    // Fire-and-forget: roda uma única vez (próximas chamadas saem cedo por status CANCELADA).
+    void limparMidiaDaRede(redeId).catch(() => { /* tenta de novo num próximo gatilho */ })
   }
 }
 

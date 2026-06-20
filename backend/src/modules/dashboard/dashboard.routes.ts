@@ -256,4 +256,102 @@ export async function dashboardRoutes(app: FastifyInstance) {
     const loja = await prisma.loja.findUniqueOrThrow({ where: { id: lojaId }, select: { nome: true } })
     return { papel: 'LOJA', loja: loja.nome, ...(await dashboardDaLoja(lojaId)) }
   })
+
+  // ── Dashboard de ESTOQUE (estoquista/gestor) — KPIs + giro + ruptura, com filtro de loja e período ──
+  app.get('/estoque', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'ESTOQUISTA', 'GERENTE')] }, async (request, reply) => {
+    const user = request.user
+    const q = request.query as { lojaId?: string; de?: string; ate?: string }
+
+    // Resolve as lojas do escopo: uma loja (?lojaId), ou todas as da rede, ou a loja do gerente.
+    let lojaIds: string[] = []
+    let escopoNome = 'Todas as lojas'
+    if (q.lojaId) {
+      const loja = await prisma.loja.findFirst({ where: { id: q.lojaId, ...(user.redeId ? { redeId: user.redeId } : {}) }, select: { id: true, nome: true } })
+      if (!loja) return reply.code(403).send({ erro: 'Loja fora do seu escopo' })
+      lojaIds = [loja.id]; escopoNome = loja.nome
+    } else if (user.redeId) {
+      const lojas = await prisma.loja.findMany({ where: { redeId: user.redeId }, select: { id: true } })
+      lojaIds = lojas.map((l) => l.id)
+    } else if (user.lojaId) {
+      lojaIds = [user.lojaId]
+    }
+    if (lojaIds.length === 0) return { escopo: escopoNome, vazio: true }
+
+    // Período (para giro/movimentos): default últimos 6 meses.
+    const ate = q.ate ? new Date(`${q.ate}T23:59:59.999`) : new Date()
+    const de = q.de ? new Date(q.de) : new Date(ate.getFullYear(), ate.getMonth() - 5, 1)
+
+    // Buckets de mês entre de..ate.
+    const meses: { chave: string; rotulo: string }[] = []
+    const cur = new Date(de.getFullYear(), de.getMonth(), 1)
+    while (cur <= ate && meses.length < 24) {
+      meses.push({ chave: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`, rotulo: cur.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }) })
+      cur.setMonth(cur.getMonth() + 1)
+    }
+    const mesDe = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+
+    // Estoque atual (variações de produtos ativos das lojas do escopo).
+    const variacoes = await prisma.variacaoProduto.findMany({
+      where: { produto: { lojaId: { in: lojaIds }, ativo: true } },
+      select: { estoque: true, estoqueMinimo: true, produto: { select: { custo: true, precoVarejo: true, categoria: { select: { nome: true } } } } },
+    })
+    const totalUn = variacoes.reduce((s, v) => s + v.estoque, 0)
+    const valorEstoque = variacoes.reduce((s, v) => s + v.estoque * Number(v.produto.custo ?? v.produto.precoVarejo), 0)
+    const skus = variacoes.length
+    const oos = variacoes.filter((v) => v.estoque === 0).length
+    const abaixoMin = variacoes.filter((v) => v.estoque > 0 && v.estoque < v.estoqueMinimo).length
+    const oosPct = skus ? Math.round((oos / skus) * 1000) / 10 : 0
+    const disponibilidadePct = skus ? Math.round(((skus - oos) / skus) * 1000) / 10 : 100
+
+    // Ruptura por categoria.
+    const porCat = new Map<string, { total: number; oos: number }>()
+    for (const v of variacoes) {
+      const cat = v.produto.categoria?.nome ?? 'Sem categoria'
+      const a = porCat.get(cat) ?? { total: 0, oos: 0 }
+      a.total += 1; if (v.estoque === 0) a.oos += 1
+      porCat.set(cat, a)
+    }
+    const rupturaPorCategoria = [...porCat.entries()]
+      .map(([categoria, a]) => ({ categoria, pct: a.total ? Math.round((a.oos / a.total) * 1000) / 10 : 0, total: a.total }))
+      .sort((x, y) => y.pct - x.pct).slice(0, 8)
+
+    // Vendas (peças) no período → giro mensal + giro do período.
+    const itens = await prisma.itemVenda.findMany({
+      where: { venda: { lojaId: { in: lojaIds }, status: 'CONCLUIDA', createdAt: { gte: de, lte: ate } } },
+      select: { quantidade: true, venda: { select: { createdAt: true } } },
+    })
+    const pecasVendidas = itens.reduce((s, i) => s + i.quantidade, 0)
+    const giro = totalUn > 0 ? Math.round((pecasVendidas / totalUn) * 100) / 100 : 0
+    const vendasMes = new Map(meses.map((m) => [m.chave, 0]))
+    for (const i of itens) { const k = mesDe(i.venda.createdAt); if (vendasMes.has(k)) vendasMes.set(k, vendasMes.get(k)! + i.quantidade) }
+
+    // Movimentos: entradas × saídas por mês.
+    const movs = await prisma.movimentoEstoque.findMany({
+      where: { variacao: { produto: { lojaId: { in: lojaIds } } }, createdAt: { gte: de, lte: ate } },
+      select: { quantidade: true, createdAt: true },
+    })
+    const entradasMes = new Map(meses.map((m) => [m.chave, 0]))
+    const saidasMes = new Map(meses.map((m) => [m.chave, 0]))
+    for (const m of movs) {
+      const k = mesDe(m.createdAt); if (!entradasMes.has(k)) continue
+      if (m.quantidade >= 0) entradasMes.set(k, entradasMes.get(k)! + m.quantidade)
+      else saidasMes.set(k, saidasMes.get(k)! + Math.abs(m.quantidade))
+    }
+
+    const serieMensal = meses.map((m) => ({ mes: m.rotulo, vendas: vendasMes.get(m.chave) ?? 0, entradas: entradasMes.get(m.chave) ?? 0, saidas: saidasMes.get(m.chave) ?? 0 }))
+
+    // Estoque crítico (lista) — variações no/abaixo do mínimo.
+    const criticoRaw = await prisma.variacaoProduto.findMany({
+      where: { produto: { lojaId: { in: lojaIds }, ativo: true }, estoque: { lte: prisma.variacaoProduto.fields.estoqueMinimo } },
+      orderBy: { estoque: 'asc' }, take: 15,
+      select: { estoque: true, estoqueMinimo: true, cor: true, tamanho: true, produto: { select: { nome: true } } },
+    })
+    const estoqueCritico = criticoRaw.map((v) => ({ produto: v.produto.nome, cor: v.cor, tamanho: v.tamanho, estoque: v.estoque, estoqueMinimo: v.estoqueMinimo }))
+
+    return {
+      escopo: escopoNome,
+      kpis: { totalUn, valorEstoque, skus, oos, oosPct, abaixoMin, disponibilidadePct, giro, pecasVendidas },
+      serieMensal, rupturaPorCategoria, estoqueCritico,
+    }
+  })
 }

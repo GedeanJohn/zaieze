@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, formataReal, rotuloForma } from '../api'
+import { api, formataReal, rotuloForma, usuarioLogado } from '../api'
+import DashboardEstoque from './DashboardEstoque'
 
 // ─── Tipos das três visões devolvidas por /api/dashboard ───
 interface FormaResumo { forma: string; total: number; qtd: number }
@@ -72,6 +73,12 @@ function BarraMeta({ pct }: { pct: number }) {
 }
 
 export default function Dashboard() {
+  // O estoquista tem um dashboard próprio, focado em indicadores de estoque.
+  if (usuarioLogado()?.role === 'ESTOQUISTA') return <DashboardEstoque />
+  return <DashboardGeral />
+}
+
+function DashboardGeral() {
   const [dados, setDados] = useState<Dados | null>(null)
   const [erro, setErro] = useState('')
   // Drill-down do gestor: '' = rede consolidada; id = loja específica

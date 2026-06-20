@@ -260,6 +260,7 @@ model Usuario {
   waInstancia String?
   waNumero    String?
   waConectado Boolean @default(false)
+  waQrcode    String? // QR (base64) recebido do Evolution via webhook QRCODE_UPDATED; limpo ao conectar
   ativo     Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

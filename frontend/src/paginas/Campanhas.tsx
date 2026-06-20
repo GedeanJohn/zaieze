@@ -43,6 +43,37 @@ export default function Campanhas() {
     }).catch(() => { /* sem marca/permite editar */ })
   }, [gerente])
 
+  // ── Conexão do WhatsApp (Evolution / QR) ──
+  const [waStatus, setWaStatus] = useState<{ conectado: boolean; qrcode: string | null; estado: string; numero?: string | null } | null>(null)
+  const [conectandoWa, setConectandoWa] = useState(false)
+
+  const carregarWaStatus = useCallback(async () => {
+    if (!escopo.pronto) return null
+    try { const { data } = await api.get('/whatsapp/instancia/status', { params: escopo.params }); setWaStatus(data); return data }
+    catch { return null }
+  }, [escopo.pronto, escopo.params])
+
+  useEffect(() => { carregarWaStatus() }, [carregarWaStatus])
+
+  // Enquanto conecta, faz polling do status (QR + conexão).
+  useEffect(() => {
+    if (!conectandoWa) return
+    const id = setInterval(async () => {
+      const s = await carregarWaStatus()
+      if (s?.conectado) setConectandoWa(false)
+    }, 2500)
+    return () => clearInterval(id)
+  }, [conectandoWa, carregarWaStatus])
+
+  async function conectarWhatsapp() {
+    setErro('')
+    try {
+      await api.post('/whatsapp/instancia/conectar', {}, { params: escopo.params })
+      setConectandoWa(true)
+      carregarWaStatus()
+    } catch (e) { setErro(mensagemDeErro(e)) }
+  }
+
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
     const reqs: Promise<unknown>[] = [api.get('/campanhas', { params: escopo.params }).then(({ data }) => setCampanhas(data))]
@@ -104,6 +135,45 @@ export default function Campanhas() {
 
       {aviso && <div className="sucesso">{aviso}</div>}
       {erro && <div className="alerta">{erro}</div>}
+
+      {/* Conexão do WhatsApp (QR via Evolution) */}
+      <div className="cartao">
+        <h2 className="painel-titulo">Meu WhatsApp</h2>
+        {waStatus?.conectado ? (
+          <div style={{ color: 'var(--ok)', fontWeight: 600 }}>
+            ✅ WhatsApp conectado{waStatus.numero ? ` · ${waStatus.numero}` : ''}
+          </div>
+        ) : (
+          <>
+            <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
+              Conecte seu WhatsApp para enviar campanhas/links e receber as mensagens dos clientes na sua carteira.
+            </p>
+            {!conectandoWa && (
+              <button className="btn" onClick={conectarWhatsapp} disabled={!escopo.pronto}>📱 Conectar meu WhatsApp</button>
+            )}
+            {conectandoWa && (
+              <div style={{ marginTop: 8 }}>
+                {waStatus?.qrcode ? (
+                  <>
+                    <p style={{ fontSize: 13, margin: '0 0 10px' }}>
+                      No celular: WhatsApp → <strong>Aparelhos conectados</strong> → <strong>Conectar um aparelho</strong> e escaneie:
+                    </p>
+                    <img
+                      src={waStatus.qrcode.startsWith('data:') ? waStatus.qrcode : `data:image/png;base64,${waStatus.qrcode}`}
+                      alt="QR Code do WhatsApp"
+                      style={{ width: 240, height: 240, maxWidth: '100%', background: '#fff', padding: 8, borderRadius: 8, border: '1px solid var(--border)' }}
+                    />
+                    <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 8 }}>Aguardando leitura… o status atualiza sozinho.</p>
+                  </>
+                ) : (
+                  <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Gerando QR Code… aguarde alguns segundos.</p>
+                )}
+                <button className="btn secundario" style={{ marginTop: 8 }} onClick={() => setConectandoWa(false)}>Cancelar</button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       <div className="grade-paineis">
         {/* Disparo de campanha */}

@@ -16,6 +16,8 @@ const envSchema = z.object({
   // Integrações opcionais — quando ausentes, o sistema opera em modo simulado
   EVOLUTION_API_URL: z.string().url().optional(),
   EVOLUTION_API_KEY: z.string().optional(),
+  // URL que o Evolution chama de volta (webhook). Default: serviço interno da rede Docker.
+  EVOLUTION_WEBHOOK_URL: z.string().url().default('http://api:3050/api/whatsapp/webhook/evolution'),
   ANTHROPIC_API_KEY: z.string().optional(),
   // Mercado Pago (Assinaturas/preapproval) — sem token o checkout opera em modo simulado
   MERCADOPAGO_ACCESS_TOKEN: z.string().optional(),

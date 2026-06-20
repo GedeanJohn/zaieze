@@ -21,6 +21,8 @@ const SEGMENTOS = ['', 'NOVO', 'FREQUENTE', 'VIP', 'INATIVO', 'ATACADO']
 export default function Campanhas() {
   const usuario = usuarioLogado()!
   const gerente = usuario.role !== 'VENDEDORA'
+  // Só quem tem carteira/WhatsApp próprio conecta um número. Gestor/admin não têm WhatsApp pessoal.
+  const podeConectarWa = usuario.role === 'VENDEDORA' || usuario.role === 'GERENTE'
   const escopo = useLojaAtiva()
 
   const [campanhas, setCampanhas] = useState<Campanha[]>([])
@@ -48,10 +50,10 @@ export default function Campanhas() {
   const [conectandoWa, setConectandoWa] = useState(false)
 
   const carregarWaStatus = useCallback(async () => {
-    if (!escopo.pronto) return null
+    if (!escopo.pronto || !podeConectarWa) return null
     try { const { data } = await api.get('/whatsapp/instancia/status', { params: escopo.params }); setWaStatus(data); return data }
     catch { return null }
-  }, [escopo.pronto, escopo.params])
+  }, [escopo.pronto, escopo.params, podeConectarWa])
 
   useEffect(() => { carregarWaStatus() }, [carregarWaStatus])
 
@@ -136,7 +138,12 @@ export default function Campanhas() {
       {aviso && <div className="sucesso">{aviso}</div>}
       {erro && <div className="alerta">{erro}</div>}
 
-      {/* Conexão do WhatsApp (QR via Evolution) */}
+      {/* Conexão do WhatsApp (QR via Evolution) — só para quem tem carteira/WhatsApp próprio */}
+      {!podeConectarWa ? (
+        <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+          📱 <strong>WhatsApp:</strong> cada vendedora conecta o próprio número no login dela (em WhatsApp → “Meu WhatsApp”). O <strong>número oficial da marca</strong> está no roadmap.
+        </div>
+      ) : (
       <div className="cartao">
         <h2 className="painel-titulo">Meu WhatsApp</h2>
         {waStatus?.conectado ? (
@@ -174,6 +181,7 @@ export default function Campanhas() {
           </>
         )}
       </div>
+      )}
 
       <div className="grade-paineis">
         {/* Disparo de campanha */}

@@ -34,6 +34,10 @@ export default function Equipe() {
   const [form, setForm] = useState<FormMembro | null>(null)
   const [convidar, setConvidar] = useState(false)
   const [lojas, setLojas] = useState<{ id: string; nome: string }[]>([])
+  const [gerenciar, setGerenciar] = useState<Membro | null>(null)
+  const [gModo, setGModo] = useState<'substituir' | 'desligar'>('substituir')
+  const [gForm, setGForm] = useState({ nome: '', email: '', senha: '' })
+  const [gDestino, setGDestino] = useState('')
   const [erro, setErro] = useState('')
 
   const carregar = useCallback(async () => {
@@ -78,6 +82,29 @@ export default function Equipe() {
     carregar()
   }
 
+  function abrirGerenciar(m: Membro) {
+    setGerenciar(m); setGModo('substituir'); setGForm({ nome: '', email: '', senha: '' }); setGDestino(''); setErro('')
+  }
+  async function substituir(e: React.FormEvent) {
+    e.preventDefault()
+    if (!gerenciar) return
+    setErro('')
+    try {
+      await api.post(`/usuarios/${gerenciar.id}/substituir`, gForm)
+      setGerenciar(null); carregar()
+    } catch (err) { setErro(mensagemDeErro(err)) }
+  }
+  async function desligar() {
+    if (!gerenciar) return
+    if (!confirm(`Desligar ${gerenciar.nome}?${gDestino ? ' A carteira será transferida.' : ' (sem transferir a carteira)'}`)) return
+    setErro('')
+    try {
+      const { data } = await api.post(`/usuarios/${gerenciar.id}/desligar`, { paraVendedoraId: gDestino || undefined })
+      setGerenciar(null); carregar()
+      alert(`${gerenciar.nome} desligada.` + (gDestino ? ` ${data.clientesTransferidos} cliente(s) e ${data.leadsTransferidos} lead(s) transferidos.` : ''))
+    } catch (err) { setErro(mensagemDeErro(err)) }
+  }
+
   return (
     <>
       <header>
@@ -114,6 +141,8 @@ export default function Equipe() {
                     <>
                       {' · '}
                       <a href="#" onClick={(e) => { e.preventDefault(); alternarAtivo(m) }}>{m.ativo ? 'desativar' : 'reativar'}</a>
+                      {' · '}
+                      <a href="#" onClick={(e) => { e.preventDefault(); abrirGerenciar(m) }}>substituir/desligar</a>
                     </>
                   )}
                 </td>
@@ -129,6 +158,55 @@ export default function Equipe() {
           lojas={ehGestor ? lojas : undefined}
           onClose={() => setConvidar(false)}
         />
+      )}
+
+      {gerenciar && (
+        <div className="modal-fundo" onClick={() => setGerenciar(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(520px, 94vw)' }}>
+            <h2>Substituir ou desligar — {gerenciar.nome}</h2>
+            {erro && <div className="alerta">{erro}</div>}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              <button type="button" className={`btn ${gModo === 'substituir' ? '' : 'secundario'}`} onClick={() => setGModo('substituir')}>Substituir pessoa</button>
+              <button type="button" className={`btn ${gModo === 'desligar' ? '' : 'secundario'}`} onClick={() => setGModo('desligar')}>Desligar</button>
+            </div>
+
+            {gModo === 'substituir' ? (
+              <form onSubmit={substituir}>
+                <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
+                  Coloca <strong>outra pessoa</strong> nesta posição <strong>mantendo a carteira</strong>, clientes, leads e histórico. O WhatsApp é desconectado (o novo titular conecta o dele).
+                </p>
+                <div className="campo"><label>Nome do novo titular*</label><input value={gForm.nome} onChange={(e) => setGForm({ ...gForm, nome: e.target.value })} required /></div>
+                <div className="linha-campos">
+                  <div className="campo"><label>E-mail (novo login)*</label><input type="email" value={gForm.email} onChange={(e) => setGForm({ ...gForm, email: e.target.value })} required /></div>
+                  <div className="campo"><label>Senha* (mín. 6)</label><input type="password" value={gForm.senha} onChange={(e) => setGForm({ ...gForm, senha: e.target.value })} minLength={6} required /></div>
+                </div>
+                <div className="acoes">
+                  <button type="button" className="btn secundario" onClick={() => setGerenciar(null)}>Cancelar</button>
+                  <button className="btn">Substituir</button>
+                </div>
+              </form>
+            ) : (
+              <div>
+                <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
+                  Desativa a vendedora e <strong>transfere a carteira</strong> (clientes + leads abertos) para outra vendedora. O histórico de vendas dela é preservado.
+                </p>
+                <div className="campo">
+                  <label>Transferir carteira para</label>
+                  <select value={gDestino} onChange={(e) => setGDestino(e.target.value)}>
+                    <option value="">— Não transferir (só desativar) —</option>
+                    {equipe.filter((v) => v.role === 'VENDEDORA' && v.ativo && v.id !== gerenciar.id).map((v) => (
+                      <option key={v.id} value={v.id}>{v.nome}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="acoes">
+                  <button type="button" className="btn secundario" onClick={() => setGerenciar(null)}>Cancelar</button>
+                  <button type="button" className="btn" onClick={desligar}>Desligar</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {form && (

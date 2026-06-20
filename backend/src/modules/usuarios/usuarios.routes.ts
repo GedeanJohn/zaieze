@@ -3,6 +3,7 @@ import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
+import { ETAPAS_ABERTAS } from '../leads/leads.service'
 
 const criarUsuarioSchema = z.object({
   nome: z.string().min(2),
@@ -102,5 +103,52 @@ export async function usuariosRoutes(app: FastifyInstance) {
       },
       select: selecaoPublica,
     })
+  })
+
+  // CENÁRIO 1 — Substituir a pessoa MANTENDO a carteira: reusa o mesmo registro
+  // (carteira/leads/vendas/slug continuam), troca nome+email+senha e zera o WhatsApp
+  // (o novo titular conecta o número dele).
+  app.post('/:id/substituir', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async (request, reply) => {
+    const lojaId = await lojaIdDe(request)
+    const { id } = request.params as { id: string }
+    const body = z.object({ nome: z.string().min(2), email: z.string().email(), senha: z.string().min(6) }).parse(request.body)
+
+    const existente = await prisma.usuario.findFirst({ where: { id, lojaId } })
+    if (!existente) return reply.code(404).send({ erro: 'Usuário não encontrado nesta loja' })
+    const email = body.email.toLowerCase()
+    if (await prisma.usuario.findFirst({ where: { email, id: { not: id } }, select: { id: true } })) {
+      return reply.code(409).send({ erro: 'E-mail já usado por outro usuário' })
+    }
+    return prisma.usuario.update({
+      where: { id },
+      data: {
+        nome: body.nome, email, senhaHash: await bcrypt.hash(body.senha, 10),
+        waInstancia: null, waConectado: false, waQrcode: null, ativo: true,
+      },
+      select: selecaoPublica,
+    })
+  })
+
+  // CENÁRIO 2 — Desligar: transfere a carteira (clientes + leads abertos) para outra
+  // vendedora e desativa a pessoa. Sem destino → só desativa.
+  app.post('/:id/desligar', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async (request, reply) => {
+    const lojaId = await lojaIdDe(request)
+    const { id } = request.params as { id: string }
+    const body = z.object({ paraVendedoraId: z.string().optional() }).parse(request.body ?? {})
+
+    const existente = await prisma.usuario.findFirst({ where: { id, lojaId } })
+    if (!existente) return reply.code(404).send({ erro: 'Usuário não encontrado nesta loja' })
+
+    let clientes = 0, leads = 0
+    if (body.paraVendedoraId) {
+      if (body.paraVendedoraId === id) return reply.code(422).send({ erro: 'Escolha outra vendedora para receber a carteira' })
+      const destino = await prisma.usuario.findFirst({ where: { id: body.paraVendedoraId, lojaId, role: 'VENDEDORA', ativo: true } })
+      if (!destino) return reply.code(422).send({ erro: 'Vendedora de destino inválida' })
+      const c = await prisma.cliente.updateMany({ where: { lojaId, vendedoraId: id }, data: { vendedoraId: body.paraVendedoraId } })
+      const l = await prisma.lead.updateMany({ where: { lojaId, vendedoraId: id, status: { in: ETAPAS_ABERTAS } }, data: { vendedoraId: body.paraVendedoraId } })
+      clientes = c.count; leads = l.count
+    }
+    await prisma.usuario.update({ where: { id }, data: { ativo: false } })
+    return { ok: true, clientesTransferidos: clientes, leadsTransferidos: leads }
   })
 }

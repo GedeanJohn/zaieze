@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
+import { excluirDoR2 } from '../midia/r2.service'
 
 const variacaoSchema = z.object({
   cor: z.string().min(1),
@@ -269,6 +270,28 @@ export async function produtosRoutes(app: FastifyInstance) {
         if (alvo.includes('codigoBarras')) return reply.code(409).send({ erro: 'Código de barras já cadastrado em outra peça' })
       }
       throw e
+    }
+  })
+
+  // Exclui o produto. Apaga a mídia do R2 (fotos+vídeos) sempre. Se NÃO houver vendas,
+  // exclui de verdade (cascata em variações/movimentos); se houver vendas (FK), desativa
+  // (preserva o histórico) já com a mídia removida.
+  app.delete('/:id', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'ESTOQUISTA', 'GERENTE')] }, async (request, reply) => {
+    const lojaId = await lojaIdDe(request)
+    const { id } = request.params as { id: string }
+    const produto = await prisma.produto.findFirst({ where: { id, lojaId }, select: { id: true, fotos: true, videos: true } })
+    if (!produto) return reply.code(404).send({ erro: 'Produto não encontrado' })
+
+    const urls = [...produto.fotos, ...produto.videos]
+    if (urls.length) { try { await excluirDoR2(urls) } catch { /* segue mesmo se o R2 falhar */ } }
+
+    try {
+      await prisma.produto.delete({ where: { id } }) // cascata: variações + movimentos
+      return { removido: true }
+    } catch {
+      // tem venda/transferência vinculada → não dá pra apagar; desativa e limpa a mídia
+      await prisma.produto.update({ where: { id }, data: { ativo: false, fotos: [], videos: [] } })
+      return { removido: false, desativado: true }
     }
   })
 

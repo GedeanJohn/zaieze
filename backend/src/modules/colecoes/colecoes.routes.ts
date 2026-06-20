@@ -94,7 +94,7 @@ export async function colecoesRoutes(app: FastifyInstance) {
   // - descontoOutletPct: desconto % da COLEÇÃO inteira (null = sem desconto de coleção)
   // - descontosPorPeca: desconto % de PEÇAS específicas (override do desconto da coleção)
   // Ao desmarcar (outlet=false), limpa todos os descontos de outlet (coleção e peças).
-  app.post('/:id/outlet', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async (request, reply) => {
+  app.post('/:id/outlet', { preHandler: [app.authorize(...MUTACAO)] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { id } = request.params as { id: string }
     const body = z.object({
@@ -123,6 +123,16 @@ export async function colecoesRoutes(app: FastifyInstance) {
       }
       return { id: atualizada.id, outlet: atualizada.outlet, outletDesde: atualizada.outletDesde, descontoOutletPct: atualizada.descontoOutletPct }
     })
+  })
+
+  // Exclui a coleção. As peças NÃO são apagadas — Produto.colecaoId vira null (SetNull no schema).
+  app.delete('/:id', { preHandler: [app.authorize(...MUTACAO)] }, async (request, reply) => {
+    const lojaId = await lojaIdDe(request)
+    const { id } = request.params as { id: string }
+    const colecao = await prisma.colecao.findFirst({ where: { id, lojaId } })
+    if (!colecao) return reply.code(404).send({ erro: 'Coleção não encontrada' })
+    await prisma.colecao.delete({ where: { id } })
+    return { ok: true }
   })
 
   // Recolhe a coleção (volta a esconder das vendedoras) — correção/ajuste pelo gestor/estoquista.

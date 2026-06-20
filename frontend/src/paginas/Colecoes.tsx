@@ -66,6 +66,18 @@ export default function Colecoes() {
     catch (err) { alert(mensagemDeErro(err)) }
   }
 
+  // Chave rápida: liga/desliga o Outlet (o desconto fica na modal 🏷️ outlet, decisão do gestor).
+  async function alternarOutlet(c: Colecao) {
+    try { await api.post(`/colecoes/${c.id}/outlet`, { outlet: !c.outlet }, { params: escopo.params }); carregar() }
+    catch (err) { alert(mensagemDeErro(err)) }
+  }
+
+  async function excluir(c: Colecao) {
+    if (!confirm(`Excluir a coleção "${c.nome}"? As peças dela NÃO são apagadas — apenas ficam sem coleção.`)) return
+    try { await api.delete(`/colecoes/${c.id}`, { params: escopo.params }); carregar() }
+    catch (err) { alert(mensagemDeErro(err)) }
+  }
+
   async function recolher(c: Colecao) {
     if (!confirm(`Recolher "${c.nome}"? Ela some do catálogo e do PDV das vendedoras.`)) return
     try { await api.post(`/colecoes/${c.id}/recolher`, {}, { params: escopo.params }); carregar() }
@@ -178,10 +190,16 @@ export default function Colecoes() {
                     : <a href="#" onClick={(e) => { e.preventDefault(); recolher(c) }}>recolher</a>}
                   {' · '}
                   <a href="#" onClick={(e) => { e.preventDefault(); setForm({ id: c.id, nome: c.nome, descricao: c.descricao ?? '' }) }}>editar</a>
-                  {podeOutlet && <>
+                  {' · '}
+                  <label title="Enviar/retirar do Outlet" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={c.outlet} onChange={() => alternarOutlet(c)} style={{ width: 'auto' }} /> Outlet
+                  </label>
+                  {podeOutlet && c.outlet && <>
                     {' · '}
-                    <a href="#" onClick={(e) => { e.preventDefault(); abrirOutlet(c) }}>🏷️ outlet</a>
+                    <a href="#" onClick={(e) => { e.preventDefault(); abrirOutlet(c) }}>desconto</a>
                   </>}
+                  {' · '}
+                  <a href="#" style={{ color: 'var(--danger)' }} onClick={(e) => { e.preventDefault(); excluir(c) }}>excluir</a>
                 </td>
               </tr>
             ))}

@@ -86,10 +86,19 @@ export default function Produtos() {
 
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
-    const params = { ...escopo.params, ...(busca ? { busca } : {}) }
+    const params = { ...escopo.params, ativo: 'true', ...(busca ? { busca } : {}) }
     const { data } = await api.get('/produtos', { params })
     setProdutos(data)
   }, [busca, escopo.pronto, escopo.params])
+
+  async function excluir(p: Produto) {
+    if (!confirm(`Excluir o produto "${p.nome}"? A mídia (fotos/vídeos) também será apagada. Esta ação não pode ser desfeita.`)) return
+    try {
+      const { data } = await api.delete(`/produtos/${p.id}`, { params: escopo.params })
+      if (data?.desativado) alert('O produto tem vendas registradas, então foi desativado (some da lista) e a mídia foi apagada — o histórico de vendas é preservado.')
+      carregar()
+    } catch (e) { alert(mensagemDeErro(e)) }
+  }
 
   useEffect(() => { carregar() }, [carregar])
 
@@ -270,7 +279,11 @@ export default function Produtos() {
                     {estoqueTotal(p)} un{temEstoqueBaixo(p) ? ' ⚠' : ''}
                   </span>
                 </td>
-                <td>{gerente && <a href="#" onClick={(e) => { e.preventDefault(); abrirEdicao(p) }}>editar</a>}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{gerente && <>
+                  <a href="#" onClick={(e) => { e.preventDefault(); abrirEdicao(p) }}>editar</a>
+                  {' · '}
+                  <a href="#" style={{ color: 'var(--danger)' }} onClick={(e) => { e.preventDefault(); excluir(p) }}>excluir</a>
+                </>}</td>
               </tr>
             ))}
             {produtos.length === 0 && (

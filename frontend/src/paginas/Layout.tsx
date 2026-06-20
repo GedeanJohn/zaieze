@@ -67,8 +67,8 @@ export default function Layout() {
         {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/ranking" className={cls}><Trophy {...ICON} /><span>Ranking</span></NavLink>}
         {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/mural" className={cls}><Megaphone {...ICON} /><span>Mural</span></NavLink>}
         {podeVendasClientes && temFeature('atacado') && <NavLink to="/atacado" className={cls}><Package {...ICON} /><span>Atacado</span></NavLink>}
-        <NavLink to="/produtos" className={cls}><Tag {...ICON} /><span>Produtos</span></NavLink>
         {podeEstoque && <NavLink to="/colecoes" className={cls}><Layers {...ICON} /><span>Coleções</span></NavLink>}
+        <NavLink to="/produtos" className={cls}><Tag {...ICON} /><span>Produtos</span></NavLink>
         {podeEstoque && <NavLink to="/estoque" className={cls}><Boxes {...ICON} /><span>Estoque</span></NavLink>}
         {podeEstoque && temFeature('multi_loja') && <NavLink to="/transferencias" className={cls}><ArrowLeftRight {...ICON} /><span>Transferências</span></NavLink>}
         {podeEquipe && <NavLink to="/equipe" className={cls}><UsersRound {...ICON} /><span>Equipe</span></NavLink>}

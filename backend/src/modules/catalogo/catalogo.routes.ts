@@ -110,6 +110,15 @@ export async function catalogoRoutes(app: FastifyInstance) {
 
   // ─────────── Endpoints PÚBLICOS (sem auth) ───────────
 
+  // Verifica se a loja/marca (slug) existe e está ativa — usado na tela "Acessar meu painel"
+  // para avisar antes de redirecionar a um endereço inexistente.
+  app.get('/rede-existe/:slug', async (request, reply) => {
+    const { slug } = request.params as { slug: string }
+    const rede = await prisma.rede.findUnique({ where: { slug: slug.toLowerCase() }, select: { nome: true, ativo: true } })
+    if (!rede || !rede.ativo) return reply.code(404).send({ existe: false })
+    return { existe: true, nome: rede.nome }
+  })
+
   // Dados do catálogo da vendedora (coleções liberadas + branding da marca).
   app.get('/publico/:redeSlug/:vendSlug', async (request, reply) => {
     const { redeSlug, vendSlug } = request.params as { redeSlug: string; vendSlug: string }

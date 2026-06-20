@@ -6,14 +6,27 @@ import { urlTenantLogin } from '../../host'
 export default function Entrar() {
   const [slug, setSlug] = useState('')
   const [dominio, setDominio] = useState('zaieze.com')
+  const [erro, setErro] = useState('')
+  const [verificando, setVerificando] = useState(false)
 
   useEffect(() => {
     api.get('/assinaturas/planos').then(({ data }) => setDominio(data.dominioBase)).catch(() => {})
   }, [])
 
-  function ir(e: React.FormEvent) {
+  async function ir(e: React.FormEvent) {
     e.preventDefault()
-    if (slug) window.location.href = urlTenantLogin(slug.toLowerCase(), dominio)
+    const s = slug.toLowerCase()
+    if (!s) return
+    setErro(''); setVerificando(true)
+    try {
+      const { data } = await api.get(`/catalogo/rede-existe/${s}`)
+      if (data?.existe) window.location.href = urlTenantLogin(s, dominio)
+      else setErro('Loja não encontrada. Confira o endereço e tente novamente.')
+    } catch {
+      setErro('Loja não encontrada. Confira o endereço e tente novamente.')
+    } finally {
+      setVerificando(false)
+    }
   }
 
   return (
@@ -23,10 +36,11 @@ export default function Entrar() {
         <h2>Acessar meu painel</h2>
         <p>Informe o endereço da sua loja para entrar.</p>
         <div className="slug-input">
-          <input value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} placeholder="sualoja" autoFocus />
+          <input value={slug} onChange={(e) => { setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); setErro('') }} placeholder="sualoja" autoFocus />
           <span>.{dominio}</span>
         </div>
-        <button className="btn grande" style={{ width: '100%', marginTop: 16 }} disabled={!slug}>Entrar</button>
+        {erro && <div className="alerta" style={{ marginTop: 12 }}>{erro}</div>}
+        <button className="btn grande" style={{ width: '100%', marginTop: 16 }} disabled={!slug || verificando}>{verificando ? 'Verificando…' : 'Entrar'}</button>
         <small className="dica" style={{ marginTop: 12, display: 'block', textAlign: 'center' }}>
           Ainda não tem conta? <Link to="/">Ver planos</Link>
         </small>

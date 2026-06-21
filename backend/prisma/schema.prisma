@@ -154,6 +154,10 @@ model Rede {
   pedidoMinimoAtacado Int @default(6)
   // Lote mínimo de atacado para INFANTIL (costuma ser maior, ex.: 12). Demais gêneros usam pedidoMinimoAtacado.
   pedidoMinimoInfantil Int @default(12)
+  // Desconto no PDV: régua sugerida por total (JSON [{ate, pct}]) + limites de autorização.
+  descontoRegua        Json?            // null = usa a régua padrão do sistema
+  descontoAutoMaxPct   Int @default(10) // até este % a vendedora aplica sozinha
+  descontoSenhaMaxPct  Int @default(15) // acima de auto e até aqui pede senha da própria; acima pede gerente
   // Texto padrão de disparo/campanha definido pelo GESTOR para as vendedoras.
   // disparoVendedoraEditavel = a vendedora pode personalizar o texto (true) ou fica travada (false).
   textoDisparoPadrao       String?
@@ -509,6 +513,7 @@ model Venda {
   formaRecebimento FormaRecebimento @default(DINHEIRO)
   total       Decimal     @db.Decimal(12, 2)
   desconto    Decimal     @default(0) @db.Decimal(12, 2)
+  descontoPct Decimal     @default(0) @db.Decimal(5, 2)
   atacado     Boolean     @default(false)
   // cashback creditado ao cliente nesta venda (Portal do Cliente) — base do estorno no cancelamento
   cashbackGerado Decimal  @default(0) @db.Decimal(12, 2)
@@ -524,6 +529,24 @@ model Venda {
   @@index([lojaId, createdAt])
   @@index([lojaId, vendedoraId])
   @@map("vendas")
+}
+
+// Histórico de auditoria de descontos aplicados no PDV (quem, quando, %, valor, quem autorizou).
+model AuditoriaDesconto {
+  id                String   @id @default(cuid())
+  lojaId            String
+  vendaId           String?
+  usuarioId         String   // quem aplicou o desconto
+  usuarioNome       String
+  pct               Decimal  @db.Decimal(5, 2)
+  valorBruto        Decimal  @db.Decimal(12, 2)
+  valorDesconto     Decimal  @db.Decimal(12, 2)
+  autorizadoPorId   String?  // gerente/gestor que autorizou (quando exigido)
+  autorizadoPorNome String?
+  createdAt         DateTime @default(now())
+
+  @@index([lojaId, createdAt])
+  @@map("auditoria_desconto")
 }
 
 model ItemVenda {

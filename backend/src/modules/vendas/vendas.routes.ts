@@ -1,9 +1,16 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import type { Prisma } from '@prisma/client'
+import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
 import { converterCicloPorVenda } from '../leads/leads.service'
+
+// Régua de desconto padrão (sugestão por total do pedido). Editável por rede em descontoRegua.
+const REGUA_PADRAO = [
+  { ate: 1000, pct: 5 }, { ate: 3000, pct: 8 }, { ate: 5000, pct: 10 },
+  { ate: 10000, pct: 15 }, { ate: null as number | null, pct: 20 },
+]
 
 const itemSchema = z.object({
   variacaoId: z.string(),
@@ -19,6 +26,13 @@ const criarVendaSchema = z.object({
   atacado: z.boolean().default(false),
   formaRecebimento: z.enum(['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO', 'OUTRO']).default('DINHEIRO'),
   desconto: z.coerce.number().nonnegative().default(0),
+  descontoPct: z.coerce.number().min(0).max(90).optional(), // % de desconto (tem prioridade sobre o valor)
+  // Autorização do desconto acima dos limites: senha da própria vendedora e/ou credenciais do gerente.
+  autorizacao: z.object({
+    senha: z.string().optional(),
+    gerenteEmail: z.string().optional(),
+    gerenteSenha: z.string().optional(),
+  }).optional(),
   observacao: z.string().optional(),
   itens: z.array(itemSchema).min(1, 'Venda precisa de ao menos um item'),
 })
@@ -95,8 +109,14 @@ export async function vendasRoutes(app: FastifyInstance) {
     // Canal por QUANTIDADE de peças no carrinho: nº de peças >= mínimo da rede ⇒ ATACADO.
     // O gestor também pode forçar atacado manualmente (body.atacado).
     const totalPecas = body.itens.reduce((s, i) => s + i.quantidade, 0)
-    const lojaRede = await prisma.loja.findUnique({ where: { id: lojaId }, select: { rede: { select: { pedidoMinimoAtacado: true } } } })
+    const lojaRede = await prisma.loja.findUnique({
+      where: { id: lojaId },
+      select: { rede: { select: { id: true, pedidoMinimoAtacado: true, descontoAutoMaxPct: true, descontoSenhaMaxPct: true } } },
+    })
     const minimoAtacado = lojaRede?.rede?.pedidoMinimoAtacado ?? 6
+    const autoMax = lojaRede?.rede?.descontoAutoMaxPct ?? 10
+    const senhaMax = lojaRede?.rede?.descontoSenhaMaxPct ?? 15
+    const redeId = lojaRede?.rede?.id ?? request.user.redeId
     const atacado = body.atacado || totalPecas >= minimoAtacado
 
     // Preço: informado > atacado (se venda atacado e produto tem) > varejo
@@ -108,7 +128,44 @@ export async function vendasRoutes(app: FastifyInstance) {
       return { ...item, precoUnitario: preco }
     })
     const bruto = itensCalculados.reduce((s, i) => s + i.precoUnitario * i.quantidade, 0)
-    const total = Math.max(0, bruto - body.desconto)
+
+    // Desconto: % tem prioridade; senão usa o valor (e deriva o %).
+    const pct = body.descontoPct != null
+      ? body.descontoPct
+      : (bruto > 0 ? Math.round((body.desconto / bruto) * 10000) / 100 : 0)
+    const descontoValor = Math.round(bruto * (pct / 100) * 100) / 100
+    const total = Math.max(0, bruto - descontoValor)
+
+    // ── Autorização do desconto por nível ──
+    // ≤ autoMax: livre · (autoMax, senhaMax]: senha da própria · > senhaMax: gerente/gestor
+    let autorizadoPorId: string | null = null
+    let autorizadoPorNome: string | null = null
+    if (pct > autoMax) {
+      const ehGestor = ['SUPER_ADMIN', 'GESTOR', 'GERENTE'].includes(request.user.role)
+      if (pct <= senhaMax || ehGestor) {
+        // Confirma a identidade de quem está aplicando (vendedora ou o próprio gerente).
+        const eu = await prisma.usuario.findUnique({ where: { id: request.user.sub }, select: { senhaHash: true, nome: true } })
+        const senha = body.autorizacao?.senha ?? ''
+        if (!eu || !(await bcrypt.compare(senha, eu.senhaHash))) {
+          return reply.code(403).send({ erro: 'SENHA_NECESSARIA', detalhe: 'Confirme sua senha para aplicar este desconto.' })
+        }
+        if (ehGestor) { autorizadoPorId = request.user.sub; autorizadoPorNome = eu.nome }
+      } else {
+        // Vendedora aplicando acima do limite: precisa de um gerente/gestor para autorizar.
+        const email = (body.autorizacao?.gerenteEmail ?? '').toLowerCase()
+        const gerente = email
+          ? await prisma.usuario.findFirst({
+              where: { email, ativo: true, role: { in: ['GESTOR', 'GERENTE'] } },
+              select: { id: true, nome: true, senhaHash: true, redeId: true, loja: { select: { redeId: true } } },
+            })
+          : null
+        const mesmaRede = gerente && (gerente.redeId === redeId || gerente.loja?.redeId === redeId)
+        if (!gerente || !mesmaRede || !(await bcrypt.compare(body.autorizacao?.gerenteSenha ?? '', gerente.senhaHash))) {
+          return reply.code(403).send({ erro: 'GERENTE_NECESSARIO', detalhe: 'Desconto acima do limite: precisa da autorização de um gerente.' })
+        }
+        autorizadoPorId = gerente.id; autorizadoPorNome = gerente.nome
+      }
+    }
 
     const venda = await prisma.$transaction(async (tx) => {
       const criada = await tx.venda.create({
@@ -119,7 +176,8 @@ export async function vendasRoutes(app: FastifyInstance) {
           canal: body.canal,
           atacado,
           formaRecebimento: body.formaRecebimento,
-          desconto: body.desconto,
+          desconto: descontoValor,
+          descontoPct: pct,
           observacao: body.observacao,
           total,
           itens: {
@@ -131,6 +189,17 @@ export async function vendasRoutes(app: FastifyInstance) {
           },
         },
       })
+
+      // Auditoria de desconto (quem aplicou, quanto, quem autorizou).
+      if (pct > 0) {
+        const aplicador = await tx.usuario.findUnique({ where: { id: request.user.sub }, select: { nome: true } })
+        await tx.auditoriaDesconto.create({
+          data: {
+            lojaId, vendaId: criada.id, usuarioId: request.user.sub, usuarioNome: aplicador?.nome ?? '—',
+            pct, valorBruto: bruto, valorDesconto: descontoValor, autorizadoPorId, autorizadoPorNome,
+          },
+        })
+      }
 
       // Baixa automática de estoque + movimento por SKU
       for (const item of itensCalculados) {
@@ -226,5 +295,44 @@ export async function vendasRoutes(app: FastifyInstance) {
     })
 
     return { ok: true }
+  })
+
+  // Config de desconto (régua + limites) que o PDV consome.
+  app.get('/config-desconto', { preHandler: [app.authenticate] }, async (request) => {
+    const redeId = request.user.redeId
+    const rede = redeId
+      ? await prisma.rede.findUnique({ where: { id: redeId }, select: { descontoRegua: true, descontoAutoMaxPct: true, descontoSenhaMaxPct: true } })
+      : null
+    return {
+      regua: (rede?.descontoRegua as { ate: number | null; pct: number }[] | null) ?? REGUA_PADRAO,
+      autoMaxPct: rede?.descontoAutoMaxPct ?? 10,
+      senhaMaxPct: rede?.descontoSenhaMaxPct ?? 15,
+    }
+  })
+
+  // Gestor edita a régua/limites (UI de config vem depois; endpoint já disponível).
+  app.patch('/config-desconto', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
+    const redeId = request.user.redeId
+    if (!redeId) return reply.code(400).send({ erro: 'Sem rede no contexto' })
+    const body = z.object({
+      regua: z.array(z.object({ ate: z.number().nullable(), pct: z.number().min(0).max(90) })).optional(),
+      autoMaxPct: z.number().int().min(0).max(90).optional(),
+      senhaMaxPct: z.number().int().min(0).max(90).optional(),
+    }).parse(request.body)
+    return prisma.rede.update({
+      where: { id: redeId },
+      data: {
+        ...(body.regua ? { descontoRegua: body.regua } : {}),
+        ...(body.autoMaxPct != null ? { descontoAutoMaxPct: body.autoMaxPct } : {}),
+        ...(body.senhaMaxPct != null ? { descontoSenhaMaxPct: body.senhaMaxPct } : {}),
+      },
+      select: { descontoRegua: true, descontoAutoMaxPct: true, descontoSenhaMaxPct: true },
+    })
+  })
+
+  // Histórico de auditoria de descontos (gestor/gerente).
+  app.get('/auditoria-desconto', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async (request) => {
+    const lojaId = await lojaIdDe(request)
+    return prisma.auditoriaDesconto.findMany({ where: { lojaId }, orderBy: { createdAt: 'desc' }, take: 100 })
   })
 }

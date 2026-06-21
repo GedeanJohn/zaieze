@@ -37,10 +37,13 @@ interface FormVenda {
   canal: CanalVenda
   atacado: boolean
   formaRecebimento: FormaRecebimento
-  desconto: string
+  descontoPct: string
   observacao: string
   itens: LinhaItem[]
 }
+
+interface ConfigDesconto { regua: { ate: number | null; pct: number }[]; autoMaxPct: number; senhaMaxPct: number }
+interface AutorizDesc { tipo: 'senha' | 'gerente'; senha: string; gEmail: string; gSenha: string; erro?: string }
 
 const LINHA_VAZIA: LinhaItem = { produtoId: '', variacaoId: '', quantidade: 1, precoUnitario: '' }
 
@@ -66,6 +69,13 @@ export default function Vendas() {
   const [produtos, setProdutos] = useState<ProdutoP[]>([])
   const [clientes, setClientes] = useState<Pessoa[]>([])
   const [vendedoras, setVendedoras] = useState<Pessoa[]>([])
+  const [config, setConfig] = useState<ConfigDesconto>({ regua: [], autoMaxPct: 10, senhaMaxPct: 15 })
+  const [autoriz, setAutoriz] = useState<AutorizDesc | null>(null)
+
+  useEffect(() => {
+    if (!escopo.pronto) return
+    api.get('/vendas/config-desconto', { params: escopo.params }).then(({ data }) => setConfig(data)).catch(() => {})
+  }, [escopo.pronto, escopo.params])
 
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
@@ -92,7 +102,7 @@ export default function Vendas() {
       setVendedoras(data.filter((u: Pessoa) => u.role === 'VENDEDORA'))
     }
     // venda vinda da caixa de entrada já nasce Online, com o cliente preenchido
-    setForm({ clienteId: prefClienteId, vendedoraId: '', canal: 'ONLINE', atacado: false, formaRecebimento: 'DINHEIRO', desconto: '', observacao: '', itens: [{ ...LINHA_VAZIA }] })
+    setForm({ clienteId: prefClienteId, vendedoraId: '', canal: 'ONLINE', atacado: false, formaRecebimento: 'DINHEIRO', descontoPct: '', observacao: '', itens: [{ ...LINHA_VAZIA }] })
   }, [escopo.params, gerente])
 
   // Atalho da caixa de entrada: /vendas?cliente=<id> abre o PDV pré-preenchido (venda online)
@@ -137,17 +147,25 @@ export default function Vendas() {
     setForm({ ...form, atacado, itens })
   }
 
-  const totalPrevisto = useMemo(() => {
-    if (!form) return 0
-    const bruto = form.itens.reduce((s, l) => s + (Number(l.precoUnitario) || 0) * (Number(l.quantidade) || 0), 0)
-    return Math.max(0, bruto - (Number(form.desconto) || 0))
-  }, [form])
+  const bruto = useMemo(
+    () => form ? form.itens.reduce((s, l) => s + (Number(l.precoUnitario) || 0) * (Number(l.quantidade) || 0), 0) : 0,
+    [form])
+  const pct = Number(form?.descontoPct) || 0
+  const descontoValor = Math.round(bruto * (pct / 100) * 100) / 100
+  const totalPrevisto = Math.max(0, bruto - descontoValor)
+
+  // % sugerido pela régua conforme o total bruto do pedido.
+  const sugeridoPct = useMemo(() => {
+    for (const faixa of config.regua) if (faixa.ate == null || bruto <= faixa.ate) return faixa.pct
+    return config.regua.length ? config.regua[config.regua.length - 1].pct : 0
+  }, [config.regua, bruto])
+  const zonaDesconto = pct <= config.autoMaxPct ? 'ok' : pct <= config.senhaMaxPct ? 'senha' : 'gerente'
 
   function variacoesDe(produtoId: string): VariacaoP[] {
     return produtos.find((p) => p.id === produtoId)?.variacoes ?? []
   }
 
-  async function salvar(e: React.FormEvent) {
+  function salvar(e: React.FormEvent) {
     e.preventDefault()
     if (!form) return
     setErro('')
@@ -155,13 +173,19 @@ export default function Vendas() {
     if (form.itens.some((l) => !l.variacaoId || Number(l.quantidade) < 1)) {
       return setErro('Cada item precisa de uma variação e quantidade ≥ 1.')
     }
+    void enviar()
+  }
+
+  async function enviar(cred?: { senha?: string; gerenteEmail?: string; gerenteSenha?: string }) {
+    if (!form) return
     const corpo = {
       clienteId: form.clienteId || undefined,
       vendedoraId: gerente ? form.vendedoraId : undefined,
       canal: form.canal,
       atacado: form.atacado,
       formaRecebimento: form.formaRecebimento,
-      desconto: Number(form.desconto) || 0,
+      descontoPct: pct,
+      autorizacao: cred,
       observacao: form.observacao || undefined,
       itens: form.itens.map((l) => ({
         variacaoId: l.variacaoId,
@@ -171,10 +195,16 @@ export default function Vendas() {
     }
     try {
       await api.post('/vendas', corpo, { params: escopo.params })
-      setForm(null)
-      carregar()
+      setForm(null); setAutoriz(null); carregar()
     } catch (err) {
-      setErro(mensagemDeErro(err))
+      const code = (err as { response?: { data?: { erro?: string } } }).response?.data?.erro
+      if (code === 'SENHA_NECESSARIA') {
+        setAutoriz({ tipo: 'senha', senha: '', gEmail: '', gSenha: '', erro: cred ? 'Senha incorreta. Tente de novo.' : undefined })
+      } else if (code === 'GERENTE_NECESSARIO') {
+        setAutoriz((a) => ({ tipo: 'gerente', senha: '', gEmail: a?.gEmail ?? '', gSenha: '', erro: cred ? 'E-mail/senha do gerente inválidos.' : undefined }))
+      } else {
+        setErro(mensagemDeErro(err))
+      }
     }
   }
 
@@ -326,27 +356,94 @@ export default function Vendas() {
                   {FORMAS_RECEBIMENTO.map((f) => <option key={f} value={f}>{rotuloForma[f]}</option>)}
                 </select>
               </div>
-              <div className="campo">
-                <label>Desconto (R$)</label>
-                <input type="number" step="0.01" min="0" value={form.desconto} onChange={(e) => setForm({ ...form, desconto: e.target.value })} />
-              </div>
               <div className="campo" style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'end' }}>
                 <input type="checkbox" style={{ width: 'auto' }} id="atacado" checked={form.atacado} onChange={(e) => mudarAtacado(e.target.checked)} />
                 <label htmlFor="atacado" style={{ margin: 0 }}>Preço de atacado</label>
               </div>
             </div>
+
+            {/* Régua + slider de desconto */}
+            <div className="desc-box">
+              <div className="desc-cab">
+                <label style={{ margin: 0 }}>Desconto</label>
+                <div className="desc-regua">
+                  {config.regua.map((f, i) => (
+                    <span key={i} className={`desc-faixa ${f.pct === sugeridoPct ? 'sug' : ''}`}>
+                      {f.ate == null ? '+' : `≤${(f.ate / 1000).toLocaleString('pt-BR')}k`} · {f.pct}%
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="desc-slider">
+                <input type="range" min={0} max={30} step={1} value={pct}
+                  onChange={(e) => setForm({ ...form, descontoPct: e.target.value })} />
+                <span className={`desc-pct ${zonaDesconto}`}>{pct}%</span>
+                {sugeridoPct > 0 && pct !== sugeridoPct && (
+                  <button type="button" className="desc-sug-btn" onClick={() => setForm({ ...form, descontoPct: String(sugeridoPct) })}>
+                    usar sugerido ({sugeridoPct}%)
+                  </button>
+                )}
+              </div>
+              <div className={`desc-aviso ${zonaDesconto}`}>
+                {zonaDesconto === 'ok' && `Liberado (até ${config.autoMaxPct}%).`}
+                {zonaDesconto === 'senha' && `Acima de ${config.autoMaxPct}% — vai pedir sua senha ao registrar.`}
+                {zonaDesconto === 'gerente' && `Acima de ${config.senhaMaxPct}% — precisa de autorização do gerente.`}
+              </div>
+            </div>
+
             <div className="campo">
               <label>Observação</label>
               <input value={form.observacao} onChange={(e) => setForm({ ...form, observacao: e.target.value })} />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-              <strong style={{ fontSize: 18 }}>Total: {formataReal(totalPrevisto)}</strong>
+            <div className="desc-totais">
+              <div><span>Subtotal</span><span>{formataReal(bruto)}</span></div>
+              {pct > 0 && <div className="desc"><span>Desconto ({pct}%)</span><span>− {formataReal(descontoValor)}</span></div>}
+              <div className="tot"><span>Total</span><span>{formataReal(totalPrevisto)}</span></div>
             </div>
 
             <div className="acoes">
               <button type="button" className="btn secundario" onClick={() => setForm(null)}>Cancelar</button>
               <button className="btn">Registrar venda</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Autorização do desconto */}
+      {autoriz && (
+        <div className="modal-fundo" onClick={() => setAutoriz(null)}>
+          <form
+            className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => { e.preventDefault(); void enviar({ senha: autoriz.senha, gerenteEmail: autoriz.gEmail, gerenteSenha: autoriz.gSenha }) }}
+          >
+            <h2>{autoriz.tipo === 'senha' ? 'Confirmar desconto' : 'Autorização do gerente'}</h2>
+            <p style={{ color: 'var(--ink-soft)', fontSize: 14, marginTop: -4 }}>
+              {autoriz.tipo === 'senha'
+                ? `Desconto de ${pct}% (${formataReal(descontoValor)}). Confirme sua senha para aplicar.`
+                : `Desconto de ${pct}% acima do limite. Um gerente precisa autorizar.`}
+            </p>
+            {autoriz.erro && <div className="alerta">{autoriz.erro}</div>}
+            {autoriz.tipo === 'senha' ? (
+              <div className="campo">
+                <label>Sua senha</label>
+                <input type="password" autoFocus value={autoriz.senha} onChange={(e) => setAutoriz({ ...autoriz, senha: e.target.value })} required />
+              </div>
+            ) : (
+              <>
+                <div className="campo">
+                  <label>E-mail do gerente</label>
+                  <input type="email" autoFocus value={autoriz.gEmail} onChange={(e) => setAutoriz({ ...autoriz, gEmail: e.target.value })} required />
+                </div>
+                <div className="campo">
+                  <label>Senha do gerente</label>
+                  <input type="password" value={autoriz.gSenha} onChange={(e) => setAutoriz({ ...autoriz, gSenha: e.target.value })} required />
+                </div>
+              </>
+            )}
+            <div className="acoes">
+              <button type="button" className="btn secundario" onClick={() => setAutoriz(null)}>Cancelar</button>
+              <button className="btn">Autorizar e registrar</button>
             </div>
           </form>
         </div>

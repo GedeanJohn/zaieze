@@ -138,6 +138,28 @@ label { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 
 .grade-variacoes { display: grid; grid-template-columns: 1fr 0.9fr 0.8fr 1.3fr 80px 80px 36px; gap: 8px; align-items: end; margin-bottom: 8px; }
 .grade-variacoes .remover { background: none; border: none; color: var(--danger); font-size: 18px; cursor: pointer; }
 
+/* Desconto no PDV: régua + slider + totais */
+.desc-box { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-top: 14px; background: #00000005; }
+.desc-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.desc-regua { display: flex; gap: 6px; flex-wrap: wrap; }
+.desc-faixa { font-size: 11px; color: var(--ink-soft); background: #00000010; padding: 2px 7px; border-radius: 99px; }
+.desc-faixa.sug { background: var(--accent); color: #fff; font-weight: 700; }
+.desc-slider { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.desc-slider input[type=range] { flex: 1; accent-color: var(--accent); }
+.desc-pct { font-size: 18px; font-weight: 800; min-width: 48px; text-align: right; }
+.desc-pct.ok { color: #2e7d32; }
+.desc-pct.senha { color: #b26a00; }
+.desc-pct.gerente { color: #c62828; }
+.desc-sug-btn { background: none; border: 1px solid var(--accent); color: var(--accent); border-radius: 99px; font-size: 12px; padding: 4px 10px; cursor: pointer; white-space: nowrap; }
+.desc-aviso { font-size: 12px; margin-top: 8px; }
+.desc-aviso.ok { color: #2e7d32; }
+.desc-aviso.senha { color: #b26a00; }
+.desc-aviso.gerente { color: #c62828; font-weight: 600; }
+.desc-totais { margin-top: 12px; font-size: 14px; }
+.desc-totais > div { display: flex; justify-content: space-between; padding: 2px 0; }
+.desc-totais .desc { color: #c62828; }
+.desc-totais .tot { font-size: 18px; font-weight: 800; border-top: 1px solid var(--border); margin-top: 4px; padding-top: 6px; }
+
 details.mais-detalhes { margin: 6px 0 4px; border-top: 1px solid var(--border); padding-top: 12px; }
 details.mais-detalhes > summary { cursor: pointer; color: var(--accent); font-size: 14px; font-weight: 600; margin-bottom: 12px; list-style: none; }
 details.mais-detalhes > summary::-webkit-details-marker { display: none; }

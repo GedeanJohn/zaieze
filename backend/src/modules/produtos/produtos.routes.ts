@@ -6,6 +6,7 @@ import { excluirDoR2 } from '../midia/r2.service'
 
 const variacaoSchema = z.object({
   cor: z.string().min(1),
+  estampa: z.string().trim().optional().default(''), // opcional; vazio = sem estampa
   tamanho: z.string().min(1),
   codigoBarras: z.string().optional(), // EAN/GTIN — opcional
   estoque: z.coerce.number().int().nonnegative().default(0),
@@ -55,9 +56,14 @@ function limpaReferencia(referencia: string): string {
   return referencia.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9-]/g, '').slice(0, 24)
 }
 
-/** SKU legível = referência + cor + tamanho (ex.: VST-1042-PRETO-M). */
-function skuBase(referencia: string, cor: string, tamanho: string): string {
-  return [limpaReferencia(referencia), normCodigo(cor).slice(0, 8), normCodigo(tamanho).slice(0, 6)].join('-')
+/** SKU legível = referência + cor + (estampa) + tamanho (ex.: VST-1042-AZUL-PAISLEY-M). */
+function skuBase(referencia: string, cor: string, estampa: string, tamanho: string): string {
+  return [
+    limpaReferencia(referencia),
+    normCodigo(cor).slice(0, 8),
+    ...(estampa ? [normCodigo(estampa).slice(0, 8)] : []),
+    normCodigo(tamanho).slice(0, 6),
+  ].join('-')
 }
 
 /** Garante SKU único globalmente, sufixando -2, -3… apenas em colisão. */
@@ -160,9 +166,10 @@ export async function produtosRoutes(app: FastifyInstance) {
     // SKU por variação derivado da referência (cor × tamanho), com unicidade garantida
     const variacoesData = []
     for (const v of body.variacoes) {
-      const sku = await skuLivre(skuBase(referencia, v.cor, v.tamanho))
+      const sku = await skuLivre(skuBase(referencia, v.cor, v.estampa, v.tamanho))
       variacoesData.push({
         cor: v.cor,
+        estampa: v.estampa,
         tamanho: v.tamanho,
         estoque: v.estoque,
         estoqueMinimo: v.estoqueMinimo,
@@ -229,7 +236,7 @@ export async function produtosRoutes(app: FastifyInstance) {
         if (body.variacoes) {
           for (const v of body.variacoes) {
             const atual = await tx.variacaoProduto.findUnique({
-              where: { produtoId_cor_tamanho: { produtoId: id, cor: v.cor, tamanho: v.tamanho } },
+              where: { produtoId_cor_estampa_tamanho: { produtoId: id, cor: v.cor, estampa: v.estampa, tamanho: v.tamanho } },
             })
             if (atual) {
               const delta = v.estoque - atual.estoque
@@ -243,11 +250,12 @@ export async function produtosRoutes(app: FastifyInstance) {
                 },
               })
             } else {
-              const sku = await skuLivre(skuBase(referencia, v.cor, v.tamanho))
+              const sku = await skuLivre(skuBase(referencia, v.cor, v.estampa, v.tamanho))
               await tx.variacaoProduto.create({
                 data: {
                   produtoId: id,
                   cor: v.cor,
+                  estampa: v.estampa,
                   tamanho: v.tamanho,
                   estoque: v.estoque,
                   estoqueMinimo: v.estoqueMinimo,

@@ -475,6 +475,7 @@ model VariacaoProduto {
   id            String @id @default(cuid())
   produtoId     String
   cor           String
+  estampa       String  @default("") // estampa/padronagem (ex.: Paisley, Floral); vazio = liso/sem estampa
   tamanho       String
   sku           String  @unique
   codigoBarras  String? @unique // EAN/GTIN (opcional) — leitura no PDV
@@ -487,7 +488,7 @@ model VariacaoProduto {
   transfOrigem  TransferenciaItem[] @relation("ItensTransfOrigem")
   transfDestino TransferenciaItem[] @relation("ItensTransfDestino")
 
-  @@unique([produtoId, cor, tamanho])
+  @@unique([produtoId, cor, estampa, tamanho])
   @@map("variacoes_produto")
 }
 

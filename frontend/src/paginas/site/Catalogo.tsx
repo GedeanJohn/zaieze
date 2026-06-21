@@ -7,7 +7,7 @@ import AgenteLoja from './AgenteLoja'
 interface Produto {
   id: string; nome: string; descricao?: string | null; preco: number
   outlet?: boolean; descontoPct?: number | null; precoOriginal?: number | null
-  fotos: string[]; videos: string[]; categoria: string | null; cores: string[]; tamanhos: string[]; disponivel: boolean
+  fotos: string[]; videos: string[]; categoria: string | null; cores: string[]; estampas: string[]; tamanhos: string[]; disponivel: boolean
 }
 interface Colecao { id: string; nome: string; descricao?: string | null; outlet?: boolean; produtos: Produto[] }
 interface Catalogo {

@@ -23,7 +23,8 @@ type Tx = Prisma.TransactionClient
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
 const limpaRef = (r: string) => r.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9-]/g, '').slice(0, 24)
-const skuBase = (ref: string, cor: string, tam: string) => [limpaRef(ref), norm(cor).slice(0, 8), norm(tam).slice(0, 6)].join('-')
+const skuBase = (ref: string, cor: string, estampa: string, tam: string) =>
+  [limpaRef(ref), norm(cor).slice(0, 8), ...(estampa ? [norm(estampa).slice(0, 8)] : []), norm(tam).slice(0, 6)].join('-')
 
 async function skuLivreTx(tx: Tx, base: string): Promise<string> {
   let sku = base
@@ -81,14 +82,14 @@ async function variacaoDestino(tx: Tx, lojaDestinoId: string, origem: VarOrigem)
   }
 
   const existente = await tx.variacaoProduto.findUnique({
-    where: { produtoId_cor_tamanho: { produtoId: prodDest.id, cor: origem.cor, tamanho: origem.tamanho } },
+    where: { produtoId_cor_estampa_tamanho: { produtoId: prodDest.id, cor: origem.cor, estampa: origem.estampa, tamanho: origem.tamanho } },
     select: { id: true },
   })
   if (existente) return existente.id
 
-  const sku = await skuLivreTx(tx, skuBase(prodDest.referencia ?? prodDest.nome, origem.cor, origem.tamanho))
+  const sku = await skuLivreTx(tx, skuBase(prodDest.referencia ?? prodDest.nome, origem.cor, origem.estampa, origem.tamanho))
   const criada = await tx.variacaoProduto.create({
-    data: { produtoId: prodDest.id, cor: origem.cor, tamanho: origem.tamanho, estoque: 0, sku },
+    data: { produtoId: prodDest.id, cor: origem.cor, estampa: origem.estampa, tamanho: origem.tamanho, estoque: 0, sku },
     select: { id: true },
   })
   return criada.id

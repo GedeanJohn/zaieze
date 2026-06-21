@@ -136,7 +136,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
           select: {
             id: true, nome: true, descricao: true, precoVarejo: true, descontoOutletPct: true, fotos: true, videos: true,
             categoria: { select: { nome: true } },
-            variacoes: { select: { cor: true, tamanho: true, estoque: true } },
+            variacoes: { select: { cor: true, estampa: true, tamanho: true, estoque: true } },
           },
         },
       },
@@ -158,6 +158,8 @@ export async function catalogoRoutes(app: FastifyInstance) {
             precoOriginal: pct > 0 ? base : null,
             categoria: p.categoria?.nome ?? null,
             cores: [...new Set(p.variacoes.map((v) => v.cor))],
+            // estampas só entram se houver (campo vazio não aparece pro cliente/vendedora)
+            estampas: [...new Set(p.variacoes.map((v) => v.estampa).filter(Boolean))],
             tamanhos: [...new Set(p.variacoes.map((v) => v.tamanho))],
             disponivel: p.variacoes.some((v) => v.estoque > 0),
           }

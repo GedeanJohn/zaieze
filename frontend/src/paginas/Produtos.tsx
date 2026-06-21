@@ -5,6 +5,7 @@ import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 interface Variacao {
   id?: string
   cor: string
+  estampa: string
   tamanho: string
   sku?: string
   codigoBarras?: string | null
@@ -59,7 +60,7 @@ interface FormProduto {
   variacoes: Variacao[]
 }
 
-const VARIACAO_VAZIA: Variacao = { cor: '', tamanho: '', codigoBarras: '', estoque: 0, estoqueMinimo: 2 }
+const VARIACAO_VAZIA: Variacao = { cor: '', estampa: '', tamanho: '', codigoBarras: '', estoque: 0, estoqueMinimo: 2 }
 
 // Sugestões de tamanho (Brasil) — campo segue texto livre; isto é só autocomplete.
 // Letras (roupa) + numéricas (roupa/jeans 36–56) + calçado/infantil (16–46) + Único.
@@ -67,6 +68,12 @@ const TAMANHOS_SUGERIDOS = [
   'PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG', 'G1', 'G2', 'G3', 'Único',
   '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32',
   '33', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46', '48', '50', '52', '54', '56',
+]
+
+// Sugestões de estampa/padronagem — campo opcional e texto livre; só autocomplete.
+const ESTAMPAS_SUGERIDAS = [
+  'Liso', 'Floral', 'Paisley', 'Listrado', 'Xadrez', 'Poá', 'Animal Print',
+  'Geométrico', 'Étnico', 'Mandala', 'Tie-dye', 'Abstrato', 'Estampado',
 ]
 
 const GENEROS: [string, string][] = [
@@ -183,6 +190,7 @@ export default function Produtos() {
       videos: form.videos,
       variacoes: form.variacoes.map((v) => ({
         cor: v.cor,
+        estampa: (v.estampa ?? '').trim(),
         tamanho: v.tamanho,
         codigoBarras: limpa(v.codigoBarras ?? ''),
         estoque: Number(v.estoque),
@@ -280,7 +288,7 @@ export default function Produtos() {
                 <td>{p.categoria?.nome ?? '—'}</td>
                 <td>R$ {Number(p.precoVarejo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                 <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-                  {p.variacoes.map((v) => `${v.cor} ${v.tamanho} (${v.estoque})`).join(' · ')}
+                  {p.variacoes.map((v) => `${v.cor}${v.estampa ? ` ${v.estampa}` : ''} ${v.tamanho} (${v.estoque})`).join(' · ')}
                 </td>
                 <td>
                   <span className={`selo ${temEstoqueBaixo(p) ? 'baixo' : 'ok'}`}>
@@ -385,16 +393,20 @@ export default function Produtos() {
             <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '4px 0 14px' }}>O vídeo é convertido para MP4 e hospedado no CDN. Pode levar alguns segundos. Máx 60&nbsp;MB.</div>
 
             {/* Grade */}
-            <h3 style={{ marginBottom: 8 }}>Grade (cor × tamanho)</h3>
+            <h3 style={{ marginBottom: 8 }}>Grade (cor × estampa × tamanho)</h3>
             <div className="grade-variacoes" style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
-              <span>Cor</span><span>Tamanho</span><span>Cód. barras (EAN)</span><span>Estoque</span><span>Mínimo</span><span></span>
+              <span>Cor</span><span>Estampa</span><span>Tamanho</span><span>Cód. barras (EAN)</span><span>Estoque</span><span>Mínimo</span><span></span>
             </div>
             <datalist id="tamanhos-sugeridos">
               {TAMANHOS_SUGERIDOS.map((t) => <option key={t} value={t} />)}
             </datalist>
+            <datalist id="estampas-sugeridas">
+              {ESTAMPAS_SUGERIDAS.map((t) => <option key={t} value={t} />)}
+            </datalist>
             {form.variacoes.map((v, i) => (
               <div className="grade-variacoes" key={i}>
                 <input value={v.cor} onChange={(e) => mudarVariacao(i, 'cor', e.target.value)} placeholder="Preto" required />
+                <input value={v.estampa ?? ''} onChange={(e) => mudarVariacao(i, 'estampa', e.target.value)} placeholder="opcional (ex.: Paisley)" list="estampas-sugeridas" />
                 <input value={v.tamanho} onChange={(e) => mudarVariacao(i, 'tamanho', e.target.value)} placeholder="P ou 38" list="tamanhos-sugeridos" required />
                 <input value={v.codigoBarras ?? ''} onChange={(e) => mudarVariacao(i, 'codigoBarras', e.target.value)} placeholder="opcional" />
                 <input type="number" min="0" value={v.estoque} onChange={(e) => mudarVariacao(i, 'estoque', e.target.value)} />

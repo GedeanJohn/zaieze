@@ -135,7 +135,7 @@ label { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 
 .modal h2 { margin-top: 0; }
 .modal .acoes { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
 
-.grade-variacoes { display: grid; grid-template-columns: 1fr 0.8fr 1.3fr 80px 80px 36px; gap: 8px; align-items: end; margin-bottom: 8px; }
+.grade-variacoes { display: grid; grid-template-columns: 1fr 0.9fr 0.8fr 1.3fr 80px 80px 36px; gap: 8px; align-items: end; margin-bottom: 8px; }
 .grade-variacoes .remover { background: none; border: none; color: var(--danger); font-size: 18px; cursor: pointer; }
 
 details.mais-detalhes { margin: 6px 0 4px; border-top: 1px solid var(--border); padding-top: 12px; }

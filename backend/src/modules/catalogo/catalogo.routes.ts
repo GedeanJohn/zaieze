@@ -152,7 +152,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
           const pct = c.outlet ? (p.descontoOutletPct ?? c.descontoOutletPct ?? 0) : 0
           const preco = pct > 0 ? Math.round(base * (1 - pct / 100) * 100) / 100 : base
           return {
-            id: p.id, nome: p.nome, descricao: p.descricao, preco, fotos: p.fotos,
+            id: p.id, nome: p.nome, descricao: p.descricao, preco, fotos: p.fotos, videos: p.videos,
             outlet: c.outlet,
             descontoPct: pct > 0 ? pct : null,
             precoOriginal: pct > 0 ? base : null,

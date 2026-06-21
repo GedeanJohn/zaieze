@@ -61,10 +61,10 @@ export default function Catalogo() {
             {c.produtos.map((p) => (
               <button key={p.id} className="cat-card" onClick={() => setAgente({ produtoId: p.id, produtoNome: p.nome })}>
                 <div className="cat-foto">
-                  {p.fotos[0]
+                  {p.fotos?.[0]
                     ? <img src={p.fotos[0]} alt={p.nome} loading="lazy" />
                     : <div className="cat-foto-vazia">{p.nome}</div>}
-                  {p.videos.length > 0 && <span className="cat-video-badge">▶ vídeo</span>}
+                  {(p.videos?.length ?? 0) > 0 && <span className="cat-video-badge">▶ vídeo</span>}
                   {!p.disponivel && <span className="cat-esgotado">esgotado</span>}
                   {p.descontoPct ? <span className="cat-desconto">−{p.descontoPct}%</span> : null}
                 </div>

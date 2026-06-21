@@ -456,6 +456,9 @@ model Produto {
   pesoGramas  Int? // peso para frete/e-commerce
   faixaEtaria String? // infantil (ex.: "4-6 anos")
   fotos        String[] @default([])
+  // Cor de cada foto, alinhado por índice com `fotos` ('' = serve para todas as cores).
+  // Permite trocar a galeria ao escolher a cor no catálogo.
+  fotosCores   String[] @default([])
   videos       String[] @default([]) // URLs de vídeo (Cloudflare R2 / cdn.zaieze.com)
   ativo        Boolean  @default(true)
   createdAt    DateTime @default(now())

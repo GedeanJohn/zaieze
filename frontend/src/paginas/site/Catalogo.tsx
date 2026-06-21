@@ -10,7 +10,7 @@ interface Produto {
   genero: string; pesoGramas?: number | null; loteMinimo: number
   preco: number; precoVarejo: number; precoAtacado: number | null
   outlet?: boolean; descontoPct?: number | null; precoOriginal?: number | null
-  fotos: string[]; videos: string[]; categoria: string | null
+  fotos: string[]; fotosPorCor?: Record<string, string[]>; videos: string[]; categoria: string | null
   cores: string[]; estampas: string[]; tamanhos: string[]; variacoes: Variacao[]; disponivel: boolean
 }
 interface Colecao { id: string; nome: string; descricao?: string | null; outlet?: boolean; produtos: Produto[] }
@@ -193,7 +193,7 @@ function DetalheProduto({ produto, onFechar, onAdicionar }: { produto: Produto; 
   const [modo, setModo] = useState<Modo>(produto.precoAtacado != null ? 'ATACADO' : 'VAREJO')
   const [qtd, setQtd] = useState(produto.precoAtacado != null ? produto.loteMinimo : 1)
 
-  useEffect(() => { setEstampa(estampasDaCor[0] ?? ''); setTamanho('') }, [cor, estampasDaCor])
+  useEffect(() => { setEstampa(estampasDaCor[0] ?? ''); setTamanho(''); setFotoIdx(0) }, [cor, estampasDaCor])
   useEffect(() => { setQtd(modo === 'ATACADO' ? produto.loteMinimo : 1) }, [modo, produto.loteMinimo])
 
   // Tamanhos disponíveis para a cor/estampa escolhida, com estoque.
@@ -223,7 +223,8 @@ function DetalheProduto({ produto, onFechar, onAdicionar }: { produto: Produto; 
     })
   }
 
-  const fotos = produto.fotos?.length ? produto.fotos : []
+  // Galeria troca conforme a cor: se a cor tem fotos próprias, mostra elas; senão, a galeria geral.
+  const fotos = (produto.fotosPorCor?.[cor]?.length ? produto.fotosPorCor[cor] : produto.fotos) ?? []
 
   return (
     <div className="cat-modal-fundo" onClick={onFechar}>

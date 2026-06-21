@@ -34,6 +34,7 @@ const criarProdutoSchema = z.object({
   pesoGramas: z.coerce.number().int().nonnegative().optional(),
   faixaEtaria: z.string().optional(),
   fotos: z.array(z.string().url()).default([]),
+  fotosCores: z.array(z.string()).default([]), // cor de cada foto, alinhado a `fotos` ('' = todas)
   videos: z.array(z.string().url()).default([]),
   variacoes: z.array(variacaoSchema).min(1, 'Informe ao menos uma variação (cor × tamanho)'),
 })
@@ -129,6 +130,8 @@ const includeProduto = {
 function escalaresProduto(body: z.infer<typeof atualizarProdutoSchema>) {
   const { variacoes, categoria, marca, colecao, ...dados } = body
   void variacoes; void categoria; void marca; void colecao
+  // Mantém fotosCores alinhado por índice com fotos quando ambos vierem no update.
+  if (dados.fotos) dados.fotosCores = dados.fotos.map((_, i) => dados.fotosCores?.[i] ?? '')
   return dados
 }
 
@@ -198,6 +201,7 @@ export async function produtosRoutes(app: FastifyInstance) {
           precoAtacado: body.precoAtacado,
           custo: body.custo,
           fotos: body.fotos,
+          fotosCores: body.fotos.map((_, i) => body.fotosCores[i] ?? ''), // alinha por índice
           videos: body.videos,
           variacoes: { create: variacoesData },
         },

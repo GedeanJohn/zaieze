@@ -135,7 +135,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
           orderBy: { nome: 'asc' },
           select: {
             id: true, nome: true, descricao: true, referencia: true, genero: true, pesoGramas: true,
-            precoVarejo: true, precoAtacado: true, descontoOutletPct: true, fotos: true, videos: true,
+            precoVarejo: true, precoAtacado: true, descontoOutletPct: true, fotos: true, fotosCores: true, videos: true,
             categoria: { select: { nome: true } },
             variacoes: { select: { cor: true, estampa: true, tamanho: true, estoque: true } },
           },
@@ -153,13 +153,19 @@ export async function catalogoRoutes(app: FastifyInstance) {
           const pct = c.outlet ? (p.descontoOutletPct ?? c.descontoOutletPct ?? 0) : 0
           const preco = pct > 0 ? Math.round(base * (1 - pct / 100) * 100) / 100 : base
           const loteMinimo = p.genero === 'INFANTIL' ? rede.pedidoMinimoInfantil : rede.pedidoMinimoAtacado
+          // Galeria por cor: foto entra na cor marcada ('' = serve para todas, fica só na geral).
+          const fotosPorCor: Record<string, string[]> = {}
+          p.fotos.forEach((url, i) => {
+            const corFoto = p.fotosCores?.[i] ?? ''
+            if (corFoto) (fotosPorCor[corFoto] ??= []).push(url)
+          })
           return {
             id: p.id, nome: p.nome, descricao: p.descricao, referencia: p.referencia,
             genero: p.genero, pesoGramas: p.pesoGramas ?? null, loteMinimo,
             // preço = varejo já com desconto de outlet aplicado; atacado é o preço cheio de atacado da peça
             preco, precoVarejo: preco,
             precoAtacado: p.precoAtacado != null ? Number(p.precoAtacado) : null,
-            fotos: p.fotos, videos: p.videos,
+            fotos: p.fotos, fotosPorCor, videos: p.videos,
             outlet: c.outlet,
             descontoPct: pct > 0 ? pct : null,
             precoOriginal: pct > 0 ? base : null,

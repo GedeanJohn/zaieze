@@ -32,6 +32,7 @@ interface Produto {
   marca?: { nome: string } | null
   colecao?: { nome: string } | null
   fotos?: string[]
+  fotosCores?: string[]
   videos?: string[]
   ativo: boolean
   variacoes: Variacao[]
@@ -56,6 +57,7 @@ interface FormProduto {
   pesoGramas?: string
   faixaEtaria?: string
   fotos: string[]
+  fotosCores: string[]
   videos: string[]
   variacoes: Variacao[]
 }
@@ -126,7 +128,7 @@ export default function Produtos() {
 
   function abrirNovo() {
     setErro('')
-    setForm({ nome: '', genero: 'FEMININO', referencia: '', precoVarejo: '', fotos: [], videos: [], variacoes: [{ ...VARIACAO_VAZIA }] })
+    setForm({ nome: '', genero: 'FEMININO', referencia: '', precoVarejo: '', fotos: [], fotosCores: [], videos: [], variacoes: [{ ...VARIACAO_VAZIA }] })
   }
 
   function abrirEdicao(p: Produto) {
@@ -150,6 +152,7 @@ export default function Produtos() {
       pesoGramas: p.pesoGramas != null ? String(p.pesoGramas) : '',
       faixaEtaria: p.faixaEtaria ?? '',
       fotos: p.fotos ?? [],
+      fotosCores: (p.fotos ?? []).map((_, i) => p.fotosCores?.[i] ?? ''),
       videos: p.videos ?? [],
       variacoes: p.variacoes.map((v) => ({ ...v, codigoBarras: v.codigoBarras ?? '' })),
     })
@@ -187,6 +190,7 @@ export default function Produtos() {
       pesoGramas: form.pesoGramas ? Number(form.pesoGramas) : undefined,
       faixaEtaria: limpa(form.faixaEtaria),
       fotos: form.fotos,
+      fotosCores: form.fotos.map((_, i) => form.fotosCores[i] ?? ''),
       videos: form.videos,
       variacoes: form.variacoes.map((v) => ({
         cor: v.cor,
@@ -220,7 +224,7 @@ export default function Produtos() {
         const { data } = await api.post('/midia/imagem', fd, { params: escopo.params })
         novas.push(data.url)
       }
-      setForm((f) => (f ? { ...f, fotos: [...f.fotos, ...novas] } : f))
+      setForm((f) => (f ? { ...f, fotos: [...f.fotos, ...novas], fotosCores: [...f.fotosCores, ...novas.map(() => '')] } : f))
     } catch (err) {
       setErro(mensagemDeErro(err))
     } finally {
@@ -353,23 +357,37 @@ export default function Produtos() {
             {/* Fotos */}
             <h3 style={{ marginBottom: 8 }}>Fotos da peça</h3>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-              {form.fotos.map((url, i) => (
-                <div key={i} style={{ position: 'relative', width: 72, height: 96 }}>
-                  <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6, border: '1px solid #00000022' }} />
-                  <button
-                    type="button" className="remover" title="Remover foto"
-                    style={{ position: 'absolute', top: -8, right: -8 }}
-                    onClick={() => setForm({ ...form, fotos: form.fotos.filter((_, idx) => idx !== i) })}
-                  >×</button>
-                </div>
-              ))}
+              {form.fotos.map((url, i) => {
+                const cores = [...new Set(form.variacoes.map((v) => v.cor.trim()).filter(Boolean))]
+                return (
+                  <div key={i} style={{ width: 72 }}>
+                    <div style={{ position: 'relative', width: 72, height: 96 }}>
+                      <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6, border: '1px solid #00000022' }} />
+                      <button
+                        type="button" className="remover" title="Remover foto"
+                        style={{ position: 'absolute', top: -8, right: -8 }}
+                        onClick={() => setForm({ ...form, fotos: form.fotos.filter((_, idx) => idx !== i), fotosCores: form.fotosCores.filter((_, idx) => idx !== i) })}
+                      >×</button>
+                    </div>
+                    <select
+                      value={form.fotosCores[i] ?? ''}
+                      onChange={(e) => setForm({ ...form, fotosCores: form.fotos.map((_, idx) => idx === i ? e.target.value : (form.fotosCores[idx] ?? '')) })}
+                      style={{ width: 72, fontSize: 11, marginTop: 4, padding: '2px 4px' }}
+                      title="Cor desta foto (troca a galeria no catálogo)"
+                    >
+                      <option value="">Todas</option>
+                      {cores.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                )
+              })}
               {form.fotos.length === 0 && <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Nenhuma foto ainda.</span>}
             </div>
             <label className="btn secundario" style={{ cursor: 'pointer', display: 'inline-block' }}>
               {enviandoFoto ? 'Enviando…' : '+ Adicionar fotos'}
               <input type="file" accept="image/*" multiple onChange={enviarFotos} disabled={enviandoFoto} style={{ display: 'none' }} />
             </label>
-            <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '4px 0 14px' }}>As fotos são otimizadas e hospedadas no CDN automaticamente.</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '4px 0 14px' }}>As fotos são otimizadas e hospedadas no CDN automaticamente. Marque a <strong>cor</strong> de cada foto para a galeria trocar quando o cliente escolher a cor (deixe “Todas” se serve para qualquer cor).</div>
 
             {/* Vídeos */}
             <h3 style={{ marginBottom: 8 }}>Vídeos da peça</h3>

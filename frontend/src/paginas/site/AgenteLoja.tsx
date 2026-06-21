@@ -15,13 +15,14 @@ interface Props {
   pedidoMinimoAtacado?: number
   produtoId?: string
   produtoNome?: string
+  resumoInicial?: string // pedido já montado no carrinho — pula a qualificação e vai direto ao contato
   onClose: () => void
 }
 
 type Msg = { de: 'bot' | 'user'; texto: string }
 type R = Record<string, string>
 
-export default function AgenteLoja({ redeSlug, vendSlug, marcaNome, vendedora, pedidoMinimoAtacado, produtoId, produtoNome, onClose }: Props) {
+export default function AgenteLoja({ redeSlug, vendSlug, marcaNome, vendedora, pedidoMinimoAtacado, produtoId, produtoNome, resumoInicial, onClose }: Props) {
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [passo, setPasso] = useState('boasvindas')
   const [resp, setResp] = useState<R>({})
@@ -49,6 +50,8 @@ export default function AgenteLoja({ redeSlug, vendSlug, marcaNome, vendedora, p
         m.push('O que você está procurando hoje? (ex.: vestido de festa, conjunto fitness, blusa…)')
         return { modo: 'input', campo: 'procura', msgs: m, placeholder: 'Descreva o que procura' }
       }
+      case 'pedido':
+        return { modo: 'input', campo: 'nome', msgs: ['Vi o seu pedido! 🛒 Pra finalizar e te enviar o resumo, como é o seu nome?'], placeholder: 'Seu nome' }
       case 'tamanho':
         return { modo: 'input', campo: 'tamanho', msgs: ['Qual tamanho você costuma usar? (se não souber, escreva "não sei")'], placeholder: 'Ex.: M, 40, G…' }
       case 'nome':
@@ -60,9 +63,11 @@ export default function AgenteLoja({ redeSlug, vendSlug, marcaNome, vendedora, p
     }
   }
 
-  const proximo: Record<string, string> = { procura: 'tamanho', tamanho: 'nome', nome: 'telefone', telefone: 'fim' }
+  const proximo: Record<string, string> = { pedido: 'telefone', procura: 'tamanho', tamanho: 'nome', nome: 'telefone', telefone: 'fim' }
 
   function montarResumo(r: R): string {
+    // Pedido montado no carrinho: usa o resumo do pedido + o contato.
+    if (resumoInicial) return `${resumoInicial}\n\n— ${r.nome ? r.nome : 'Cliente'}`
     const perfil = r.perfil === 'Para revender (atacado)' ? 'Quero comprar no ATACADO' : 'Compra para mim (varejo)'
     return [
       `Oi ${vendedora}! Sou ${r.nome ?? ''}.`,
@@ -95,7 +100,7 @@ export default function AgenteLoja({ redeSlug, vendSlug, marcaNome, vendedora, p
     setPasso(id)
   }
 
-  useEffect(() => { irPara('boasvindas', {}) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { irPara(resumoInicial ? 'pedido' : 'boasvindas', {}) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { fimRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs])
 
   const p = montar(passo, resp)

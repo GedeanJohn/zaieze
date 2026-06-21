@@ -61,7 +61,7 @@ function whatsappUrl(numero: string | null, texto: string): string | null {
 async function resolverVendedoraPublica(redeSlug: string, vendSlug: string) {
   const rede = await prisma.rede.findUnique({
     where: { slug: redeSlug },
-    select: { id: true, nome: true, plano: true, ativo: true, logoUrl: true, corPrimaria: true, corSecundaria: true, pedidoMinimoAtacado: true },
+    select: { id: true, nome: true, plano: true, ativo: true, logoUrl: true, corPrimaria: true, corSecundaria: true, pedidoMinimoAtacado: true, pedidoMinimoInfantil: true },
   })
   if (!rede || !rede.ativo || !planoInclui(rede.plano, 'portal_cliente')) return null
   const vend = await prisma.usuario.findFirst({
@@ -134,7 +134,8 @@ export async function catalogoRoutes(app: FastifyInstance) {
           where: { ativo: true },
           orderBy: { nome: 'asc' },
           select: {
-            id: true, nome: true, descricao: true, precoVarejo: true, descontoOutletPct: true, fotos: true, videos: true,
+            id: true, nome: true, descricao: true, referencia: true, genero: true, pesoGramas: true,
+            precoVarejo: true, precoAtacado: true, descontoOutletPct: true, fotos: true, videos: true,
             categoria: { select: { nome: true } },
             variacoes: { select: { cor: true, estampa: true, tamanho: true, estoque: true } },
           },
@@ -151,8 +152,14 @@ export async function catalogoRoutes(app: FastifyInstance) {
           // Desconto de outlet: peça tem prioridade sobre o da coleção; só vale se a coleção é Outlet.
           const pct = c.outlet ? (p.descontoOutletPct ?? c.descontoOutletPct ?? 0) : 0
           const preco = pct > 0 ? Math.round(base * (1 - pct / 100) * 100) / 100 : base
+          const loteMinimo = p.genero === 'INFANTIL' ? rede.pedidoMinimoInfantil : rede.pedidoMinimoAtacado
           return {
-            id: p.id, nome: p.nome, descricao: p.descricao, preco, fotos: p.fotos, videos: p.videos,
+            id: p.id, nome: p.nome, descricao: p.descricao, referencia: p.referencia,
+            genero: p.genero, pesoGramas: p.pesoGramas ?? null, loteMinimo,
+            // preço = varejo já com desconto de outlet aplicado; atacado é o preço cheio de atacado da peça
+            preco, precoVarejo: preco,
+            precoAtacado: p.precoAtacado != null ? Number(p.precoAtacado) : null,
+            fotos: p.fotos, videos: p.videos,
             outlet: c.outlet,
             descontoPct: pct > 0 ? pct : null,
             precoOriginal: pct > 0 ? base : null,
@@ -161,6 +168,8 @@ export async function catalogoRoutes(app: FastifyInstance) {
             // estampas só entram se houver (campo vazio não aparece pro cliente/vendedora)
             estampas: [...new Set(p.variacoes.map((v) => v.estampa).filter(Boolean))],
             tamanhos: [...new Set(p.variacoes.map((v) => v.tamanho))],
+            // grade completa para estoque por (cor × tamanho) no carrinho
+            variacoes: p.variacoes.map((v) => ({ cor: v.cor, estampa: v.estampa, tamanho: v.tamanho, estoque: v.estoque })),
             disponivel: p.variacoes.some((v) => v.estoque > 0),
           }
         }),
@@ -172,6 +181,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
       loja: { nome: vend.loja!.nome },
       vendedora: { nome: vend.nome, primeiroNome: vend.nome.trim().split(/\s+/)[0], temWhatsapp: !!vend.waNumero },
       pedidoMinimoAtacado: rede.pedidoMinimoAtacado,
+      pedidoMinimoInfantil: rede.pedidoMinimoInfantil,
       colecoes: colecoesOut,
     }
   })

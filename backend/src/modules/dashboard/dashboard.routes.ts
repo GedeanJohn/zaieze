@@ -159,10 +159,32 @@ async function dashboardDaLoja(lojaId: string) {
     }))
     .sort((a, b) => b.total - a.total)
 
+  // Produtos parados: ativos, com estoque, sem nenhuma venda no mês (encalhados).
+  const vendidosIds = new Set(porProdutoMap.keys())
+  const produtosAtivos = await prisma.produto.findMany({
+    where: { lojaId, ativo: true },
+    select: { id: true, nome: true, variacoes: { select: { estoque: true } } },
+  })
+  const produtosParados = produtosAtivos
+    .filter((p) => !vendidosIds.has(p.id))
+    .map((p) => ({ nome: p.nome, estoque: p.variacoes.reduce((s, v) => s + v.estoque, 0) }))
+    .filter((p) => p.estoque > 0)
+    .sort((a, b) => b.estoque - a.estoque)
+    .slice(0, 8)
+
+  // Conversão de atendimento: leads do mês que viraram venda.
+  const [leadsTotal, leadsConv] = await Promise.all([
+    prisma.lead.count({ where: { lojaId, createdAt: { gte: inicioDoMes() } } }),
+    prisma.lead.count({ where: { lojaId, vendaId: { not: null }, createdAt: { gte: inicioDoMes() } } }),
+  ])
+  const conversao = leadsTotal > 0 ? { total: leadsTotal, convertidos: leadsConv, pct: Math.round((leadsConv / leadsTotal) * 100) } : null
+
   return {
     ...kpis,
     porVendedora,
     porFormaRecebimento,
+    conversao,
+    produtosParados,
     porEquipe: [...porEquipeMap.values()].sort((a, b) => b.total - a.total),
     topProdutos: [...porProdutoMap.values()].sort((a, b) => b.qtd - a.qtd).slice(0, 5),
     topClientes: topClientes.map((c) => ({ ...c, totalGasto: num(c.totalGasto) })),

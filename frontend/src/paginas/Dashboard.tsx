@@ -49,6 +49,8 @@ interface VisaoLoja extends KpisLoja {
   porFormaRecebimento: FormaLoja[]
   porEquipe: { nome: string; total: number; qtd: number; vendedoras: number }[]
   topProdutos: { nome: string; qtd: number; total: number }[]
+  produtosParados: { nome: string; estoque: number }[]
+  conversao: { total: number; convertidos: number; pct: number } | null
   topClientes: { id: string; nome: string; totalGasto: number; segmento: string }[]
   estoqueCritico: { produto: string; cor: string; tamanho: string; sku: string; estoque: number; estoqueMinimo: number }[]
 }
@@ -206,6 +208,7 @@ function DashboardGeral() {
         <Kpi rotulo="Ticket médio" valor={formataReal(dados.ticketMedioMes)} />
         <Kpi rotulo="Clientes" valor={String(dados.clientes)} />
         <Kpi rotulo="Inativos (90+ dias)" valor={String(dados.clientesInativos)} />
+        {dados.conversao && <Kpi rotulo={`Conversão (${dados.conversao.convertidos}/${dados.conversao.total})`} valor={`${dados.conversao.pct}%`} />}
       </div>
 
       <div className="grade-paineis" style={{ marginTop: 16 }}>
@@ -281,6 +284,21 @@ function DashboardGeral() {
               ))}
               {dados.topClientes.length === 0 && (
                 <tr><td colSpan={3} style={{ color: 'var(--ink-soft)' }}>Sem clientes com compras.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="cartao">
+          <h2 className="painel-titulo">Produtos parados (sem venda no mês)</h2>
+          <table>
+            <thead><tr><th>Produto</th><th>Em estoque</th></tr></thead>
+            <tbody>
+              {dados.produtosParados.map((p) => (
+                <tr key={p.nome}><td>{p.nome}</td><td><span className="selo baixo">{p.estoque} un</span></td></tr>
+              ))}
+              {dados.produtosParados.length === 0 && (
+                <tr><td colSpan={2} style={{ color: 'var(--ok)' }}>Tudo girando. 👍</td></tr>
               )}
             </tbody>
           </table>

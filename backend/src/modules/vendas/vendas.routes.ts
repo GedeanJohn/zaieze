@@ -66,6 +66,32 @@ export async function vendasRoutes(app: FastifyInstance) {
     })
   })
 
+  // Detalhe completo da venda (para o pedido em PDF/WhatsApp).
+  app.get('/:id', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const lojaId = await lojaIdDe(request)
+    const { id } = request.params as { id: string }
+    const venda = await prisma.venda.findFirst({
+      where: { id, lojaId, ...(request.user.role === 'VENDEDORA' ? { vendedoraId: request.user.sub } : {}) },
+      include: {
+        cliente: { select: { nome: true, telefone: true } },
+        vendedora: { select: { nome: true } },
+        loja: { select: { nome: true, rede: { select: { nome: true, logoUrl: true } } } },
+        itens: {
+          include: {
+            variacao: {
+              select: {
+                cor: true, estampa: true, tamanho: true,
+                produto: { select: { nome: true, referencia: true, fotos: true } },
+              },
+            },
+          },
+        },
+      },
+    })
+    if (!venda) return reply.code(404).send({ erro: 'Venda não encontrada' })
+    return venda
+  })
+
   app.post('/', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const body = criarVendaSchema.parse(request.body)

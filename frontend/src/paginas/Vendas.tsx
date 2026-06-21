@@ -273,9 +273,10 @@ export default function Vendas() {
                     {v.status === 'CONCLUIDA' ? 'Concluída' : 'Cancelada'}
                   </span>
                 </td>
-                <td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <a href={`/pedido/${v.id}`} target="_blank" rel="noreferrer">🧾 pedido</a>
                   {gerente && v.status === 'CONCLUIDA' && (
-                    <a href="#" onClick={(e) => { e.preventDefault(); cancelar(v) }}>cancelar</a>
+                    <>{' · '}<a href="#" style={{ color: 'var(--danger)' }} onClick={(e) => { e.preventDefault(); cancelar(v) }}>cancelar</a></>
                   )}
                 </td>
               </tr>

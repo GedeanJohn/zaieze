@@ -51,7 +51,7 @@ export default function AgenteLoja({ redeSlug, vendSlug, marcaNome, vendedora, p
         return { modo: 'input', campo: 'procura', msgs: m, placeholder: 'Descreva o que procura' }
       }
       case 'pedido':
-        return { modo: 'input', campo: 'nome', msgs: ['Vi o seu pedido! 🛒 Pra finalizar e te enviar o resumo, como é o seu nome?'], placeholder: 'Seu nome' }
+        return { modo: 'input', campo: 'nome', msgs: [`Vi o seu pedido! 🛒 Vou passar pra ${vendedora} confirmar os itens e fechar com você. Como é o seu nome?`], placeholder: 'Seu nome' }
       case 'tamanho':
         return { modo: 'input', campo: 'tamanho', msgs: ['Qual tamanho você costuma usar? (se não souber, escreva "não sei")'], placeholder: 'Ex.: M, 40, G…' }
       case 'nome':

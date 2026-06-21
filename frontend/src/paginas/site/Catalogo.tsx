@@ -156,7 +156,7 @@ export default function Catalogo() {
         </button>
       )}
       {verCarrinho && (
-        <Carrinho itens={carrinho} totais={totais} corPrimaria={primaria}
+        <Carrinho itens={carrinho} totais={totais} corPrimaria={primaria} vendedora={cat.vendedora.primeiroNome}
           onMudarQtd={mudarQtd} onRemover={remover} onFechar={() => setVerCarrinho(false)} onFinalizar={finalizar} />
       )}
 
@@ -337,10 +337,11 @@ function DetalheProduto({ produto, onFechar, onAdicionar }: { produto: Produto; 
 }
 
 // ─────────────────────────── Carrinho ───────────────────────────
-function Carrinho({ itens, totais, corPrimaria, onMudarQtd, onRemover, onFechar, onFinalizar }: {
+function Carrinho({ itens, totais, corPrimaria, vendedora, onMudarQtd, onRemover, onFechar, onFinalizar }: {
   itens: ItemCarrinho[]
   totais: { pecas: number; subtotal: number; economia: number; pesoKg: number; volumeL: number }
   corPrimaria: string
+  vendedora: string
   onMudarQtd: (chave: string, delta: number) => void
   onRemover: (chave: string) => void
   onFechar: () => void
@@ -381,7 +382,10 @@ function Carrinho({ itens, totais, corPrimaria, onMudarQtd, onRemover, onFechar,
           <div className="muted"><span>Volume estimado</span><span>~{totais.volumeL.toFixed(1)} L</span></div>
           <div className="total"><span>Total</span><span>{real(totais.subtotal)}</span></div>
         </div>
-        <button className="cat-add" onClick={onFinalizar}>Finalizar pelo WhatsApp</button>
+        <button className="cat-add" onClick={onFinalizar}>Enviar pedido para a {vendedora}</button>
+        <div style={{ textAlign: 'center', fontSize: 12, color: '#888', margin: '-4px 18px 14px' }}>
+          A {vendedora} confirma os itens e fecha o pedido com você. 💛
+        </div>
       </div>
     </div>
   )

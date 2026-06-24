@@ -43,7 +43,7 @@ npm run dev          # http://localhost:5184
 |---|---|---|
 | Super Admin (SaaS) | admin@modacrm.com.br | admin123 |
 | Gestor da rede Luna Brand (ELITE, multi-lojas) | gestor@lunabrand.com.br | gestor123 |
-| Estoquista da rede (entradas de produção) | estoquista@lunabrand.com.br | estoque123 |
+| Gestor de estoque da rede (entradas de produção) | estoquista@lunabrand.com.br | estoque123 |
 | Gerente — Loja Demo Moda | maria@lojademo.com.br | demo123 |
 | Gerente — Loja Shopping Flamboyant | paula@lojashopping.com.br | demo123 |
 | Vendedora — Demo Moda | camila@lojademo.com.br | demo123 |
@@ -57,11 +57,10 @@ npm run dev          # http://localhost:5184
 - [x] **Fase 3 — CRM**: carteira por vendedora (isolamento no backend), segmentação automática recalculável (VIP/Frequente/Inativo/Novo/Atacado a partir do histórico real, job no boot + botão na UI), distribuição da carteira por segmento e ficha do cliente com histórico de compras e gatilho de recuperação de inativos
 - [x] **Canal da venda (Balcão × Online/WhatsApp)**: cada venda é marcada como Balcão ou **Online** (= atendimento pelo WhatsApp, o que o lojista chama de "venda online"); o registro de venda já abre em Online. O dashboard recorta **venda online** em todas as visões — consolidado da rede, por loja, **por vendedora** (R$ e % online) e no painel da própria vendedora. É a métrica central do produto.
 - [x] **Forma de recebimento**: etiqueta na venda (Dinheiro/Pix/Débito/Crédito/Outro) — só categorização, sem liquidação financeira; análise por vendedora no dashboard. Baixa de estoque da venda tornada atômica (impede duas vendedoras venderem a mesma peça)
-- [x] **Produto (moda)**: referência do modelo (lançada pela estoquista, com sugestão automática) → SKU derivado (`referência-cor-tamanho`, preserva hífens); gênero; código de barras (EAN) por variação; campos opcionais (composição, modelagem, NCM, fornecedor, peso, faixa etária) em bloco recolhível
-- [x] **Estoquista + entradas**: papel `ESTOQUISTA` (rede), entrada de produção (confecção → loja), ajuste/contagem (físico = sistema) e extrato de movimentos; entradas/saídas/ajustes/devoluções por loja
-- [x] **Transferências entre lojas**: envio com baixa atômica na origem (clona o modelo na loja destino quando não existe), confirmação de recebimento com **divergência = radar de extravio**, e cancelamento com estorno à origem
-- [x] **Gestão de estoquistas**: o Gestor cria/edita/ativa estoquistas da rede pela UI (tela própria, papel de nível de rede)
-- [x] **Dashboard de estoque**: consolidado da rede e por loja — valor em estoque (custo e a varejo), peças, SKUs, estoque crítico, parados/encalhados (60 dias) e peças em trânsito; base para o Estoque Inteligente
+- [x] **Produto (moda)**: referência do modelo (lançada pelo gestor de estoque, com sugestão automática) → SKU derivado (`referência-cor-tamanho`, preserva hífens); gênero; código de barras (EAN) por variação; campos opcionais (composição, modelagem, NCM, fornecedor, peso, faixa etária) em bloco recolhível
+- [x] **Estoque CENTRAL da fábrica/marca**: coleções, produtos e taxonomias vivem no nível da **rede** (não por loja); o estoque é **único** por SKU. O gestor de estoque cadastra a coleção uma vez e **distribui** para as lojas (permissão de venda, M2M `ColecaoLoja`). Entrada de produção, ajuste/contagem e extrato de movimentos operam sobre o estoque central; **toda venda (de qualquer loja/vendedora) baixa do mesmo estoque**.
+- [x] **Gestão de gestores de estoque**: o Gestor cria/edita/ativa gestores de estoque da rede pela UI (tela própria, papel de nível de rede)
+- [x] **Dashboard de estoque**: estoque central da marca — valor em estoque (custo e a varejo), peças, SKUs, estoque crítico e parados/encalhados (60 dias); base para o Estoque Inteligente
 - [x] **Fase 4 — WhatsApp**: instância por vendedora (Evolution API), disparos personalizados por segmento com geração de mensagem por IA (Claude, com fallback de template), réguas de recuperação de inativos (30/60/90 dias), webhook de entrada roteando para a carteira, e log de conversa por cliente — tudo respeitando consentimento LGPD; **modo simulado** quando as integrações (Evolution/Anthropic) não estão configuradas
 - [x] **Fase 5 — IA / Estoque Inteligente / Radar**: campeões de venda (30d) e previsão de ruptura no estoque; **Radar de Oportunidades** (★) que cruza estoque encalhado (sem venda há 60 dias) com o perfil dos clientes (quem já comprou a categoria) e dispara a campanha em 1 clique — reaproveitando o motor de WhatsApp da Fase 4 (LGPD + roteamento por carteira)
 - [x] **Fase 6 — Comissão + Gamificação**: comissão automática com regras encadeadas (produto › categoria › marca › padrão) + bônus ao bater a meta; ranking gamificado das vendedoras (pódio + progresso de meta + comissão estimada); e mural de novidades (marca/gerência publica, equipe acompanha)
@@ -75,7 +74,7 @@ Lojas e vendedoras **ilimitadas em todos os planos**. Matriz central em `backend
 
 | Plano | Preço | Desbloqueia |
 |---|---|---|
-| **Start** | R$ 97/mês | Operação completa (vendas, produtos, estoque, clientes, dashboard), **WhatsApp** e **operação em rede** (transferências entre lojas + estoquista central) |
+| **Start** | R$ 97/mês | Operação completa (vendas, produtos, estoque, clientes, dashboard), **WhatsApp** e **operação em rede** (várias lojas vendendo do estoque central da marca) |
 | **Pro** | R$ 297/mês | + Carteira inteligente (segmentação), comissão/ranking/mural e estoque inteligente |
 | **Elite** | R$ 697/mês | + Radar de Oportunidades, Provador virtual, Atacado, IA avançada e Portal do Cliente |
 

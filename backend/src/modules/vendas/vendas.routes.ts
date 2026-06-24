@@ -110,17 +110,25 @@ export async function vendasRoutes(app: FastifyInstance) {
       if (!cliente) return reply.code(422).send({ erro: 'Cliente inválido para esta loja' })
     }
 
-    // Carrega variações com produto e valida loja
+    // Estoque central: a peça precisa ser da rede da loja E ter a coleção distribuída a ela.
+    const lojaRede = await prisma.loja.findUnique({
+      where: { id: lojaId },
+      select: { rede: { select: { id: true, pedidoMinimoAtacado: true, descontoAutoMaxPct: true, descontoSenhaMaxPct: true } } },
+    })
+    const redeId = lojaRede?.rede?.id
+    if (!redeId) return reply.code(422).send({ erro: 'Loja sem marca vinculada' })
+
+    // Carrega variações com produto e valida a distribuição à loja
     const ids = body.itens.map((i) => i.variacaoId)
     const variacoes = await prisma.variacaoProduto.findMany({
-      where: { id: { in: ids }, produto: { lojaId } },
+      where: { id: { in: ids }, produto: { redeId, colecao: { lojas: { some: { lojaId } } } } },
       include: { produto: { include: { colecao: { select: { status: true, nome: true } } } } },
     })
     const porId = new Map(variacoes.map((v) => [v.id, v]))
 
     for (const item of body.itens) {
       const v = porId.get(item.variacaoId)
-      if (!v) return reply.code(422).send({ erro: `Variação ${item.variacaoId} inválida para esta loja` })
+      if (!v) return reply.code(422).send({ erro: `Variação ${item.variacaoId} indisponível nesta loja (coleção não distribuída)` })
       // Coleção em preparação ainda não está disponível para venda (liberação simultânea).
       if (request.user.role === 'VENDEDORA' && v.produto.colecao && v.produto.colecao.status !== 'LIBERADA') {
         return reply.code(422).send({ erro: `A coleção "${v.produto.colecao.nome}" ainda não foi liberada` })
@@ -135,14 +143,9 @@ export async function vendasRoutes(app: FastifyInstance) {
     // Canal por QUANTIDADE de peças no carrinho: nº de peças >= mínimo da rede ⇒ ATACADO.
     // O gestor também pode forçar atacado manualmente (body.atacado).
     const totalPecas = body.itens.reduce((s, i) => s + i.quantidade, 0)
-    const lojaRede = await prisma.loja.findUnique({
-      where: { id: lojaId },
-      select: { rede: { select: { id: true, pedidoMinimoAtacado: true, descontoAutoMaxPct: true, descontoSenhaMaxPct: true } } },
-    })
     const minimoAtacado = lojaRede?.rede?.pedidoMinimoAtacado ?? 6
     const autoMax = lojaRede?.rede?.descontoAutoMaxPct ?? 10
     const senhaMax = lojaRede?.rede?.descontoSenhaMaxPct ?? 15
-    const redeId = lojaRede?.rede?.id ?? request.user.redeId
     const atacado = body.atacado || totalPecas >= minimoAtacado
 
     // Preço: informado > atacado (se venda atacado e produto tem) > varejo

@@ -7,7 +7,6 @@ import { api, formataReal } from '../api'
 
 interface Estoque {
   escopo: string
-  vazio?: boolean
   kpis: { totalUn: number; valorEstoque: number; skus: number; oos: number; oosPct: number; abaixoMin: number; disponibilidadePct: number; giro: number; pecasVendidas: number }
   serieMensal: { mes: string; vendas: number; entradas: number; saidas: number }[]
   rupturaPorCategoria: { categoria: string; pct: number; total: number }[]
@@ -18,26 +17,18 @@ const hoje = () => new Date().toISOString().slice(0, 10)
 function mesesAtras(n: number) { const d = new Date(); d.setMonth(d.getMonth() - n); d.setDate(1); return d.toISOString().slice(0, 10) }
 
 export default function DashboardEstoque() {
-  const [lojas, setLojas] = useState<{ id: string; nome: string }[]>([])
-  const [lojaId, setLojaId] = useState('')
   const [de, setDe] = useState(mesesAtras(5))
   const [ate, setAte] = useState(hoje())
   const [d, setD] = useState<Estoque | null>(null)
   const [carregando, setCarregando] = useState(false)
 
-  useEffect(() => {
-    api.get('/lojas').then(({ data }) => setLojas(data.map((l: { id: string; nome: string }) => ({ id: l.id, nome: l.nome })))).catch(() => {})
-  }, [])
-
   const carregar = useCallback(async () => {
     setCarregando(true)
     try {
-      const params: Record<string, string> = { de, ate }
-      if (lojaId) params.lojaId = lojaId
-      const { data } = await api.get('/dashboard/estoque', { params })
+      const { data } = await api.get('/dashboard/estoque', { params: { de, ate } })
       setD(data)
     } catch { setD(null) } finally { setCarregando(false) }
-  }, [lojaId, de, ate])
+  }, [de, ate])
   useEffect(() => { carregar() }, [carregar])
 
   const dispCor = (p: number) => (p >= 90 ? '#2e7d32' : p >= 75 ? '#b26a00' : '#c62828')
@@ -48,21 +39,14 @@ export default function DashboardEstoque() {
 
       <div className="cartao">
         <div className="linha-campos">
-          <div className="campo">
-            <label>Loja</label>
-            <select value={lojaId} onChange={(e) => setLojaId(e.target.value)}>
-              <option value="">Todas as lojas</option>
-              {lojas.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
-            </select>
-          </div>
           <div className="campo"><label>De</label><input type="date" value={de} onChange={(e) => setDe(e.target.value)} /></div>
           <div className="campo"><label>Até</label><input type="date" value={ate} onChange={(e) => setAte(e.target.value)} /></div>
         </div>
-        <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>O período afeta giro, vendas e movimentos. Estoque, ruptura e disponibilidade refletem o momento atual.</div>
+        <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Estoque central da marca. O período afeta giro, vendas e movimentos; estoque, ruptura e disponibilidade refletem o momento atual.</div>
       </div>
 
-      {!d || d.vazio ? (
-        <div className="cartao" style={{ color: 'var(--ink-soft)' }}>{carregando ? 'Carregando…' : 'Sem dados de estoque para o filtro.'}</div>
+      {!d ? (
+        <div className="cartao" style={{ color: 'var(--ink-soft)' }}>{carregando ? 'Carregando…' : 'Sem dados de estoque.'}</div>
       ) : (
         <>
           <div className="grade-cards">

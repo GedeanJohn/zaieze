@@ -59,7 +59,7 @@ export async function estoquistasRoutes(app: FastifyInstance) {
     const body = atualizarSchema.parse(request.body)
 
     const existente = await prisma.usuario.findFirst({ where: { id, redeId, role: 'ESTOQUISTA' } })
-    if (!existente) return reply.code(404).send({ erro: 'Estoquista não encontrado na sua rede' })
+    if (!existente) return reply.code(404).send({ erro: 'Gestor de estoque não encontrado na sua rede' })
 
     const { senha, email, ...resto } = body
     try {

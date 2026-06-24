@@ -19,11 +19,11 @@ export default function Manual() {
         <h2>1. Coleções e liberação</h2>
         <p>A coleção é a unidade onde as peças (modelo, estampa, tamanho) ficam agrupadas. Ela tem dois estados:</p>
         <ul>
-          <li><strong>Em preparação</strong> — a estoquista está cadastrando as peças. Ficam <strong>invisíveis</strong> para as vendedoras (não aparecem no PDV nem no catálogo).</li>
-          <li><strong>Liberada</strong> — a estoquista clica em <em>liberar</em> e a coleção passa a aparecer para <strong>todas as vendedoras ao mesmo tempo</strong>.</li>
+          <li><strong>Em preparação</strong> — o gestor de estoque está cadastrando as peças. Ficam <strong>invisíveis</strong> para as vendedoras (não aparecem no PDV nem no catálogo).</li>
+          <li><strong>Liberada</strong> — o gestor de estoque clica em <em>liberar</em> e a coleção passa a aparecer para <strong>todas as vendedoras ao mesmo tempo</strong>.</li>
         </ul>
         <p className="manual-nota">Por que simultâneo? As vendedoras disputam o mesmo estoque. Liberar para todas no mesmo instante garante competição justa — ninguém larga na frente.</p>
-        <p><strong>Onde:</strong> menu <em>Coleções</em>. A estoquista cria, cadastra as peças em <em>Produtos</em> e depois libera.</p>
+        <p><strong>Onde:</strong> menu <em>Coleções</em>. O gestor de estoque cria, cadastra as peças em <em>Produtos</em> e depois libera.</p>
       </section>
 
       <section className="manual-secao">

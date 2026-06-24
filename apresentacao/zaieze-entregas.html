@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<style>
+  @page { size: 1280px 720px; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .slide {
+    width: 1280px; height: 720px; padding: 72px 84px; background: #0b0b0c; color: #f5f1ec;
+    page-break-after: always; position: relative; overflow: hidden; display: flex; flex-direction: column;
+  }
+  .slide:last-child { page-break-after: auto; }
+  .kicker { font-size: 16px; letter-spacing: .28em; text-transform: uppercase; color: #e8a87c; font-weight: 700; }
+  h1 { font-size: 60px; line-height: 1.05; margin: 14px 0 0; font-weight: 800; letter-spacing: -.5px; }
+  h2 { font-size: 40px; line-height: 1.1; margin: 12px 0 28px; font-weight: 800; letter-spacing: -.3px; }
+  .sub { font-size: 20px; color: #b9b0a8; margin-top: 18px; line-height: 1.5; }
+  ul { list-style: none; display: flex; flex-direction: column; gap: 16px; margin-top: 6px; }
+  li { font-size: 22px; line-height: 1.35; display: flex; gap: 14px; align-items: flex-start; }
+  li b { color: #fff; font-weight: 700; }
+  li .c { color: #e8a87c; font-weight: 800; flex-shrink: 0; }
+  li .d { color: #b9b0a8; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 48px; margin-top: 6px; }
+  .foot { position: absolute; left: 84px; right: 84px; bottom: 34px; display: flex; justify-content: space-between; font-size: 14px; color: #6f6a64; letter-spacing: .08em; border-top: 1px solid #2a2825; padding-top: 14px; }
+  .foot .marca { color: #cabfb6; font-weight: 700; }
+  .logo { font-size: 40px; font-weight: 800; letter-spacing: 2px; }
+  .logo em { color: #e8a87c; font-style: normal; }
+  .center { justify-content: center; }
+  .pill { display: inline-block; background: #1a1816; border: 1px solid #2f2b27; color: #d8cfc8; font-size: 16px; padding: 8px 16px; border-radius: 999px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+  .big { font-size: 26px; }
+  .cap-tag { font-size: 18px; color: #b9b0a8; letter-spacing: .2em; text-transform: uppercase; margin-top: 30px; }
+</style>
+</head>
+<body>
+
+<!-- 1 — CAPA -->
+<section class="slide center">
+  <div class="logo">ZAIE<em>Z</em>E</div>
+  <h1 style="margin-top:26px;">Resumo de Entregas</h1>
+  <div class="sub" style="font-size:24px;">Plataforma de gestão de vendas, relacionamento e WhatsApp para a moda.</div>
+  <div class="cap-tag">Status do produto · Junho/2026</div>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>Sistemas Inteligentes para a Moda</span></div>
+</section>
+
+<!-- 2 — STATUS / STACK -->
+<section class="slide">
+  <div class="kicker">Em produção</div>
+  <h2>No ar e operando</h2>
+  <div class="sub" style="margin-top:0;">O sistema está publicado e funcional em <b style="color:#fff;">zaieze.com</b> (e nos endereços das marcas: <b style="color:#fff;">&lt;marca&gt;.zaieze.com</b>).</div>
+  <div class="pills">
+    <span class="pill">AWS Lightsail · Docker</span>
+    <span class="pill">PostgreSQL</span>
+    <span class="pill">Cloudflare R2 + CDN (mídia)</span>
+    <span class="pill">Mercado Pago (assinaturas)</span>
+    <span class="pill">Evolution API (WhatsApp)</span>
+    <span class="pill">TLS / multi-tenant por subdomínio</span>
+    <span class="pill">Backups diários + snapshots</span>
+  </div>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>02</span></div>
+</section>
+
+<!-- 3 — FUNIL & ATENDIMENTO -->
+<section class="slide">
+  <div class="kicker">Funil &amp; Atendimento</div>
+  <h2>Acompanhamento visual de cada cliente</h2>
+  <ul>
+    <li><span class="c">✓</span><span><b>Escala de cores do funil</b> <span class="d">— situação de cada lead por cor + ícone (no prazo, apertado, atrasado, em atendimento, convertido), para vendedora e gestor.</span></span></li>
+    <li><span class="c">✓</span><span><b>Contadores por situação</b> <span class="d">— mapa de gargalos no painel do gestor.</span></span></li>
+    <li><span class="c">✓</span><span><b>Caixa de entrada</b> <span class="d">— conversas por cliente, roteadas pela carteira da vendedora.</span></span></li>
+    <li><span class="c">✓</span><span><b>SLA e redistribuição</b> <span class="d">— prazos por etapa configuráveis pela marca.</span></span></li>
+  </ul>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>03</span></div>
+</section>
+
+<!-- 4 — CATÁLOGO & VENDAS -->
+<section class="slide">
+  <div class="kicker">Catálogo &amp; Vendas</div>
+  <h2>Varejo e atacado no mesmo catálogo</h2>
+  <ul>
+    <li><span class="c">✓</span><span><b>Outlet</b> <span class="d">— gestor marca coleções antigas como Outlet, com desconto opcional na coleção inteira ou por peça (selo + preço riscado no catálogo).</span></span></li>
+    <li><span class="c">✓</span><span><b>Atacado por quantidade</b> <span class="d">— pedido com nº de peças ≥ mínimo vira atacado e aplica o preço de atacado automaticamente.</span></span></li>
+    <li><span class="c">✓</span><span><b>Preço por perfil</b> <span class="d">— preço de varejo/atacado conforme o comprador.</span></span></li>
+  </ul>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>04</span></div>
+</section>
+
+<!-- 5 — CARTEIRA & DISPARO (R1) -->
+<section class="slide">
+  <div class="kicker">Carteira &amp; Disparo</div>
+  <h2>Seleção dirigida de clientes</h2>
+  <ul>
+    <li><span class="c">✓</span><span><b>Endereço por CEP</b> <span class="d">— autopreenche cidade/UF (ViaCEP) no cadastro do cliente.</span></span></li>
+    <li><span class="c">✓</span><span><b>Filtros</b> <span class="d">— DDD, cidade, UF, região e segmento.</span></span></li>
+    <li><span class="c">✓</span><span><b>Seleção múltipla + envio do link</b> <span class="d">— a vendedora escolhe quem recebe o catálogo (mitiga ban; respeita LGPD).</span></span></li>
+    <li><span class="c">✓</span><span><b>Texto de disparo pelo gestor</b> <span class="d">— padrão da marca + permissão de edição da vendedora.</span></span></li>
+  </ul>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>05</span></div>
+</section>
+
+<!-- 6 — WHATSAPP -->
+<section class="slide">
+  <div class="kicker">WhatsApp</div>
+  <h2>Integração real (Evolution)</h2>
+  <ul>
+    <li><span class="c">✓</span><span><b>Conexão por QR</b> <span class="d">— cada vendedora conecta o próprio número direto no painel.</span></span></li>
+    <li><span class="c">✓</span><span><b>Recebe e envia de verdade</b> <span class="d">— mensagens entram na carteira (vira lead no funil) e os disparos saem pelo número conectado.</span></span></li>
+    <li><span class="c">✓</span><span><b>Servidor próprio instalado</b> <span class="d">— Evolution rodando na infraestrutura, interno e seguro.</span></span></li>
+  </ul>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>06</span></div>
+</section>
+
+<!-- 7 — AGENTES DE IA -->
+<section class="slide">
+  <div class="kicker">Agentes de atendimento</div>
+  <h2>Dois agentes, custo zero</h2>
+  <div class="grid">
+    <div>
+      <div class="big" style="color:#e8a87c;font-weight:800;">Agente 1 · Vendedor de planos</div>
+      <div class="sub" style="margin-top:10px;">Na landing da ZAIEZE: qualifica o lojista interessado e encaminha só lead real ao WhatsApp comercial, com resumo.</div>
+    </div>
+    <div>
+      <div class="big" style="color:#e8a87c;font-weight:800;">Agente 2 · Vendedora Online</div>
+      <div class="sub" style="margin-top:10px;">No catálogo da loja: atende o comprador (varejo/atacado), qualifica e passa para a vendedora dona (cria o lead + abre o WhatsApp).</div>
+    </div>
+  </div>
+  <div class="sub">Ambos <b style="color:#fff;">roteirizados</b> (sem custo de IA) — evoluíveis para IA conversacional quando fizer sentido.</div>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>07</span></div>
+</section>
+
+<!-- 8 — ONBOARDING & EQUIPE -->
+<section class="slide">
+  <div class="kicker">Onboarding &amp; Equipe</div>
+  <h2>Contas e papéis sob controle</h2>
+  <ul>
+    <li><span class="c">✓</span><span><b>Convite por link</b> <span class="d">— gestor/gerente convidam gestor de estoque, gerente e vendedora; a pessoa cria a própria senha (envio por WhatsApp).</span></span></li>
+    <li><span class="c">✓</span><span><b>Papéis &amp; permissões</b> <span class="d">— gestor = acompanhamento; operação com gerente/vendedora/gestor de estoque.</span></span></li>
+    <li><span class="c">✓</span><span><b>Substituir / desligar vendedora</b> <span class="d">— troca a pessoa mantendo a carteira, ou desliga transferindo clientes e leads.</span></span></li>
+    <li><span class="c">✓</span><span><b>Minha conta</b> <span class="d">— cada papel edita os próprios dados; o gestor transfere a titularidade se a marca for vendida.</span></span></li>
+  </ul>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>08</span></div>
+</section>
+
+<!-- 9 — MÍDIA & CUSTO -->
+<section class="slide">
+  <div class="kicker">Mídia &amp; Custo</div>
+  <h2>Fotos e vídeos sem estourar conta</h2>
+  <ul>
+    <li><span class="c">✓</span><span><b>Cloudflare R2 + cdn.zaieze.com</b> <span class="d">— egress grátis: servir mídia não tem custo de banda, em qualquer volume.</span></span></li>
+    <li><span class="c">✓</span><span><b>Limpeza de mídia por plano</b> <span class="d">— START 6m / PRO 1 ano / ELITE perpétuo; aviso ao gestor antes (vira gancho de Outlet/promoção).</span></span></li>
+    <li><span class="c">✓</span><span><b>Sem Cloudflare Stream</b> <span class="d">— decisão de tratar/transcodar e servir do R2, evitando o custo do Stream.</span></span></li>
+  </ul>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>09</span></div>
+</section>
+
+<!-- 10 — BACKLOG -->
+<section class="slide">
+  <div class="kicker">Próximos passos</div>
+  <h2>Roadmap imediato</h2>
+  <ul>
+    <li><span class="c">→</span><span><b>Número oficial de atendimento</b> <span class="d">— modo escolhido pelo gestor (número único da marca roteando para a próxima vendedora).</span></span></li>
+    <li><span class="c">→</span><span><b>Reajuste anual por IGP-M</b> <span class="d">— cláusula + aplicação automática no aniversário; índice inserido no painel do admin.</span></span></li>
+    <li><span class="c">→</span><span><b>Upgrade de infraestrutura</b> <span class="d">— migração para 4GB conforme o uso cresce.</span></span></li>
+    <li><span class="c">→</span><span><b>IA conversacional</b> <span class="d">— evoluir os agentes (motor a definir) quando o volume justificar.</span></span></li>
+  </ul>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>10</span></div>
+</section>
+
+<!-- 11 — FECHAMENTO -->
+<section class="slide center">
+  <div class="logo">ZAIE<em>Z</em>E</div>
+  <h1 style="margin-top:24px;">Pronto para escalar.</h1>
+  <div class="sub" style="font-size:24px;">CRM + WhatsApp + catálogo + atendimento por IA, no ar e multi-tenant.</div>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>Sistemas Inteligentes para a Moda</span></div>
+</section>
+
+</body>
+</html>

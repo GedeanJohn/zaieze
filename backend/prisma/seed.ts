@@ -165,19 +165,29 @@ async function main() {
     data: { nome: 'Fernanda Dias', telefone: '5562988880010', lojaId: loja2.id, vendedoraId: julia.id, segmento: 'NOVO', consentimentoLgpd: true },
   })
 
-  // ── Produtos (Loja 1) ──
-  const catVestidos = await prisma.categoria.create({ data: { lojaId: loja.id, nome: 'Vestidos' } })
-  const catFitness = await prisma.categoria.create({ data: { lojaId: loja.id, nome: 'Fitness' } })
-  const marca = await prisma.marca.create({ data: { lojaId: loja.id, nome: 'Luna Brand' } })
-  // Coleção liberada (aparece no catálogo/PDV) + uma em preparação (demo do fluxo da estoquista)
-  const colecao = await prisma.colecao.create({ data: { lojaId: loja.id, nome: 'Verão 2026', status: 'LIBERADA', liberadaEm: new Date() } })
-  const colecaoInverno = await prisma.colecao.create({ data: { lojaId: loja.id, nome: 'Inverno 2026', descricao: 'Em montagem pela estoquista — ainda não liberada.' } })
+  // ── Catálogo central da marca (estoque único da fábrica) ──
+  const catVestidos = await prisma.categoria.create({ data: { redeId: rede.id, nome: 'Vestidos' } })
+  const catFitness = await prisma.categoria.create({ data: { redeId: rede.id, nome: 'Fitness' } })
+  const marca = await prisma.marca.create({ data: { redeId: rede.id, nome: 'Luna Brand' } })
+  // Coleção liberada (no catálogo/PDV) distribuída às DUAS lojas + uma em preparação (fluxo do gestor de estoque).
+  const colecao = await prisma.colecao.create({
+    data: {
+      redeId: rede.id, nome: 'Verão 2026', status: 'LIBERADA', liberadaEm: new Date(),
+      lojas: { create: [{ lojaId: loja.id }, { lojaId: loja2.id }] },
+    },
+  })
+  const colecaoInverno = await prisma.colecao.create({
+    data: {
+      redeId: rede.id, nome: 'Inverno 2026', descricao: 'Em montagem pelo gestor de estoque — ainda não liberada.',
+      lojas: { create: [{ lojaId: loja.id }] },
+    },
+  })
 
   const entrada = (qtd: number) => ({ create: { tipo: 'ENTRADA' as const, quantidade: qtd, motivo: 'Estoque inicial' } })
 
   const luna = await prisma.produto.create({
     data: {
-      lojaId: loja.id, referencia: 'LUNA', nome: 'Vestido Luna', genero: 'FEMININO',
+      redeId: rede.id, referencia: 'LUNA', nome: 'Vestido Luna', genero: 'FEMININO',
       descricao: 'Vestido midi em viscose, modelagem evasê.',
       composicao: '95% viscose, 5% elastano', modelagem: 'Evasê',
       categoriaId: catVestidos.id, marcaId: marca.id, colecaoId: colecao.id,
@@ -197,7 +207,7 @@ async function main() {
 
   const legging = await prisma.produto.create({
     data: {
-      lojaId: loja.id, referencia: 'POWER', nome: 'Legging Power Fit', genero: 'FEMININO',
+      redeId: rede.id, referencia: 'POWER', nome: 'Legging Power Fit', genero: 'FEMININO',
       descricao: 'Legging cintura alta com compressão.',
       composicao: '88% poliamida, 12% elastano', modelagem: 'Cintura alta',
       categoriaId: catFitness.id, marcaId: marca.id, colecaoId: colecao.id,
@@ -216,7 +226,7 @@ async function main() {
 
   const blazer = await prisma.produto.create({
     data: {
-      lojaId: loja.id, referencia: 'BLAZER', nome: 'Blazer Alfaiataria Slim', genero: 'FEMININO',
+      redeId: rede.id, referencia: 'BLAZER', nome: 'Blazer Alfaiataria Slim', genero: 'FEMININO',
       descricao: 'Blazer estruturado com forro.', modelagem: 'Slim',
       categoriaId: catVestidos.id, marcaId: marca.id, colecaoId: colecao.id,
       fotos: ['https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800'],
@@ -234,7 +244,7 @@ async function main() {
   // Peça da coleção EM PREPARAÇÃO (Inverno 2026): invisível para a vendedora até a estoquista liberar
   await prisma.produto.create({
     data: {
-      lojaId: loja.id, referencia: 'TRENCH', nome: 'Trench Coat Clássico', genero: 'FEMININO',
+      redeId: rede.id, referencia: 'TRENCH', nome: 'Trench Coat Clássico', genero: 'FEMININO',
       descricao: 'Trench coat impermeável com cinto.', modelagem: 'Reto',
       categoriaId: catVestidos.id, marcaId: marca.id, colecaoId: colecaoInverno.id,
       fotos: ['https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=800'],
@@ -251,7 +261,7 @@ async function main() {
   // Produto ENCALHADO (sem vendas) — alimenta o Radar de Oportunidades
   await prisma.produto.create({
     data: {
-      lojaId: loja.id, referencia: 'SAIA', nome: 'Saia Midi Plissada', genero: 'FEMININO',
+      redeId: rede.id, referencia: 'SAIA', nome: 'Saia Midi Plissada', genero: 'FEMININO',
       descricao: 'Saia midi plissada acetinada.', modelagem: 'Midi',
       categoriaId: catVestidos.id, marcaId: marca.id, colecaoId: colecao.id,
       precoVarejo: 159.9, precoAtacado: 109.9, custo: 62,
@@ -267,8 +277,9 @@ async function main() {
   // Produto na Loja 2
   const camisa2 = await prisma.produto.create({
     data: {
-      lojaId: loja2.id, referencia: 'LINHO', nome: 'Camisa Linho Premium', genero: 'MASCULINO',
+      redeId: rede.id, referencia: 'LINHO', nome: 'Camisa Linho Premium', genero: 'MASCULINO',
       descricao: 'Camisa de linho com caimento leve.', composicao: '100% linho',
+      colecaoId: colecao.id, // Verão 2026 (distribuída à Loja Shopping)
       precoVarejo: 159.9, custo: 65,
       variacoes: {
         create: [

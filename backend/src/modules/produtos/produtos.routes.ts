@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
-import { lojaIdDe } from '../../plugins/auth'
+import { lojaIdDe, redeIdDeQualquer } from '../../plugins/auth'
 import { excluirDoR2 } from '../midia/r2.service'
 
 const variacaoSchema = z.object({
@@ -19,7 +19,7 @@ const criarProdutoSchema = z.object({
   genero: z.enum(['FEMININO', 'MASCULINO', 'UNISSEX', 'INFANTIL']).default('FEMININO'),
   categoria: z.string().optional(), // tipo de peça (ex.: "Vestido Longo")
   precoVarejo: z.coerce.number().positive(),
-  // Referência do modelo (estoquista informa; gerada automaticamente quando vazia)
+  // Referência do modelo (gestor de estoque informa; gerada automaticamente quando vazia)
   referencia: z.string().optional(),
   // Opcionais
   descricao: z.string().optional(),
@@ -42,6 +42,9 @@ const criarProdutoSchema = z.object({
 const atualizarProdutoSchema = criarProdutoSchema.partial().extend({
   ativo: z.boolean().optional(),
 })
+
+// Papéis que cadastram/editam o estoque central (nível da marca/rede): o gestor de estoque.
+const MUTACAO = ['SUPER_ADMIN', 'GESTOR', 'ESTOQUISTA'] as const
 
 /** Normaliza um texto para compor códigos: sem acento, só A-Z0-9, maiúsculo. */
 function normCodigo(s: string): string {
@@ -78,11 +81,11 @@ async function skuLivre(base: string): Promise<string> {
   return sku
 }
 
-/** Garante referência única na loja. */
-async function referenciaLivre(lojaId: string, base: string): Promise<string> {
+/** Garante referência única na rede (estoque central). */
+async function referenciaLivre(redeId: string, base: string): Promise<string> {
   let ref = base || 'REF'
   let n = 1
-  while (await prisma.produto.findFirst({ where: { lojaId, referencia: ref }, select: { id: true } })) {
+  while (await prisma.produto.findFirst({ where: { redeId, referencia: ref }, select: { id: true } })) {
     n += 1
     ref = `${base}-${n}`
   }
@@ -91,29 +94,29 @@ async function referenciaLivre(lojaId: string, base: string): Promise<string> {
 
 /**
  * Referência efetiva do modelo:
- * - se a estoquista informou, respeita o que veio da confecção;
+ * - se o gestor de estoque informou, respeita o que veio da confecção;
  * - se veio vazia, sugere a partir de coleção + tipo + nome do modelo.
  */
 async function resolverReferencia(
-  lojaId: string,
+  redeId: string,
   body: { referencia?: string; colecao?: string; categoria?: string },
   nome: string,
 ): Promise<string> {
   if (body.referencia && body.referencia.trim()) return body.referencia.trim()
   const base = normCodigo([body.colecao, body.categoria, nome].filter(Boolean).join('-')).slice(0, 24) || normCodigo(nome)
-  return referenciaLivre(lojaId, base)
+  return referenciaLivre(redeId, base)
 }
 
-async function resolverTaxonomia(lojaId: string, body: { categoria?: string; marca?: string; colecao?: string }) {
+async function resolverTaxonomia(redeId: string, body: { categoria?: string; marca?: string; colecao?: string }) {
   const [categoria, marca, colecao] = await Promise.all([
     body.categoria
-      ? prisma.categoria.upsert({ where: { lojaId_nome: { lojaId, nome: body.categoria } }, create: { lojaId, nome: body.categoria }, update: {} })
+      ? prisma.categoria.upsert({ where: { redeId_nome: { redeId, nome: body.categoria } }, create: { redeId, nome: body.categoria }, update: {} })
       : null,
     body.marca
-      ? prisma.marca.upsert({ where: { lojaId_nome: { lojaId, nome: body.marca } }, create: { lojaId, nome: body.marca }, update: {} })
+      ? prisma.marca.upsert({ where: { redeId_nome: { redeId, nome: body.marca } }, create: { redeId, nome: body.marca }, update: {} })
       : null,
     body.colecao
-      ? prisma.colecao.upsert({ where: { lojaId_nome: { lojaId, nome: body.colecao } }, create: { lojaId, nome: body.colecao }, update: {} })
+      ? prisma.colecao.upsert({ where: { redeId_nome: { redeId, nome: body.colecao } }, create: { redeId, nome: body.colecao }, update: {} })
       : null,
   ])
   return { categoriaId: categoria?.id, marcaId: marca?.id, colecaoId: colecao?.id }
@@ -136,35 +139,43 @@ function escalaresProduto(body: z.infer<typeof atualizarProdutoSchema>) {
 }
 
 export async function produtosRoutes(app: FastifyInstance) {
+  // Lista produtos da REDE (estoque central). Papéis de loja só veem peças de coleções
+  // distribuídas à sua loja; a vendedora, apenas de coleções LIBERADAS.
   app.get('/', { preHandler: [app.authenticate] }, async (request) => {
-    const lojaId = await lojaIdDe(request)
+    const redeId = await redeIdDeQualquer(request)
     const { busca, ativo, colecaoId } = request.query as { busca?: string; ativo?: string; colecaoId?: string }
     const and: import('@prisma/client').Prisma.ProdutoWhereInput[] = []
     if (ativo !== undefined) and.push({ ativo: ativo === 'true' })
     if (colecaoId) and.push({ colecaoId })
     if (busca) and.push({ OR: [{ nome: { contains: busca, mode: 'insensitive' } }, { referencia: { contains: busca, mode: 'insensitive' } }] })
-    // Vendedora só enxerga peças avulsas ou de coleção LIBERADA (coleção em preparação fica oculta).
-    if (request.user.role === 'VENDEDORA') and.push({ OR: [{ colecaoId: null }, { colecao: { status: 'LIBERADA' } }] })
+    const role = request.user.role
+    if (role === 'GERENTE' || role === 'VENDEDORA') {
+      const lojaId = await lojaIdDe(request)
+      // Peça só aparece para a loja se a coleção dela estiver distribuída à loja.
+      and.push({ colecao: { lojas: { some: { lojaId } } } })
+      // Vendedora não vê coleção em preparação.
+      if (role === 'VENDEDORA') and.push({ colecao: { status: 'LIBERADA' } })
+    }
     return prisma.produto.findMany({
-      where: { lojaId, ...(and.length ? { AND: and } : {}) },
+      where: { redeId, ...(and.length ? { AND: and } : {}) },
       orderBy: { nome: 'asc' },
       include: includeProduto,
     })
   })
 
   app.get('/:id', { preHandler: [app.authenticate] }, async (request, reply) => {
-    const lojaId = await lojaIdDe(request)
+    const redeId = await redeIdDeQualquer(request)
     const { id } = request.params as { id: string }
-    const produto = await prisma.produto.findFirst({ where: { id, lojaId }, include: includeProduto })
+    const produto = await prisma.produto.findFirst({ where: { id, redeId }, include: includeProduto })
     if (!produto) return reply.code(404).send({ erro: 'Produto não encontrado' })
     return produto
   })
 
-  app.post('/', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'ESTOQUISTA', 'GERENTE')] }, async (request, reply) => {
-    const lojaId = await lojaIdDe(request)
+  app.post('/', { preHandler: [app.authorize(...MUTACAO)] }, async (request, reply) => {
+    const redeId = await redeIdDeQualquer(request)
     const body = criarProdutoSchema.parse(request.body)
-    const taxonomia = await resolverTaxonomia(lojaId, body)
-    const referencia = await resolverReferencia(lojaId, body, body.nome)
+    const taxonomia = await resolverTaxonomia(redeId, body)
+    const referencia = await resolverReferencia(redeId, body, body.nome)
 
     // SKU por variação derivado da referência (cor × tamanho), com unicidade garantida
     const variacoesData = []
@@ -185,7 +196,7 @@ export async function produtosRoutes(app: FastifyInstance) {
     try {
       const produto = await prisma.produto.create({
         data: {
-          lojaId,
+          redeId,
           referencia,
           nome: body.nome,
           genero: body.genero,
@@ -212,7 +223,7 @@ export async function produtosRoutes(app: FastifyInstance) {
       const err = e as { code?: string; meta?: { target?: string[] } }
       if (err.code === 'P2002') {
         const alvo = err.meta?.target?.join(', ') ?? ''
-        if (alvo.includes('referencia')) return reply.code(409).send({ erro: `Referência "${referencia}" já existe nesta loja` })
+        if (alvo.includes('referencia')) return reply.code(409).send({ erro: `Referência "${referencia}" já existe nesta marca` })
         if (alvo.includes('codigoBarras')) return reply.code(409).send({ erro: 'Código de barras já cadastrado em outra peça' })
         return reply.code(409).send({ erro: 'Registro duplicado' })
       }
@@ -220,15 +231,15 @@ export async function produtosRoutes(app: FastifyInstance) {
     }
   })
 
-  app.patch('/:id', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'ESTOQUISTA', 'GERENTE')] }, async (request, reply) => {
-    const lojaId = await lojaIdDe(request)
+  app.patch('/:id', { preHandler: [app.authorize(...MUTACAO)] }, async (request, reply) => {
+    const redeId = await redeIdDeQualquer(request)
     const { id } = request.params as { id: string }
     const body = atualizarProdutoSchema.parse(request.body)
 
-    const existente = await prisma.produto.findFirst({ where: { id, lojaId } })
+    const existente = await prisma.produto.findFirst({ where: { id, redeId } })
     if (!existente) return reply.code(404).send({ erro: 'Produto não encontrado' })
 
-    const taxonomia = await resolverTaxonomia(lojaId, body)
+    const taxonomia = await resolverTaxonomia(redeId, body)
     const dados = escalaresProduto(body)
     const referencia = body.referencia?.trim() || existente.referencia || existente.nome
 
@@ -278,7 +289,7 @@ export async function produtosRoutes(app: FastifyInstance) {
       const err = e as { code?: string; meta?: { target?: string[] } }
       if (err.code === 'P2002') {
         const alvo = err.meta?.target?.join(', ') ?? ''
-        if (alvo.includes('referencia')) return reply.code(409).send({ erro: 'Referência já usada em outro modelo desta loja' })
+        if (alvo.includes('referencia')) return reply.code(409).send({ erro: 'Referência já usada em outro modelo desta marca' })
         if (alvo.includes('codigoBarras')) return reply.code(409).send({ erro: 'Código de barras já cadastrado em outra peça' })
       }
       throw e
@@ -288,10 +299,10 @@ export async function produtosRoutes(app: FastifyInstance) {
   // Exclui o produto. Apaga a mídia do R2 (fotos+vídeos) sempre. Se NÃO houver vendas,
   // exclui de verdade (cascata em variações/movimentos); se houver vendas (FK), desativa
   // (preserva o histórico) já com a mídia removida.
-  app.delete('/:id', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'ESTOQUISTA', 'GERENTE')] }, async (request, reply) => {
-    const lojaId = await lojaIdDe(request)
+  app.delete('/:id', { preHandler: [app.authorize(...MUTACAO)] }, async (request, reply) => {
+    const redeId = await redeIdDeQualquer(request)
     const { id } = request.params as { id: string }
-    const produto = await prisma.produto.findFirst({ where: { id, lojaId }, select: { id: true, fotos: true, videos: true } })
+    const produto = await prisma.produto.findFirst({ where: { id, redeId }, select: { id: true, fotos: true, videos: true } })
     if (!produto) return reply.code(404).send({ erro: 'Produto não encontrado' })
 
     const urls = [...produto.fotos, ...produto.videos]
@@ -301,19 +312,19 @@ export async function produtosRoutes(app: FastifyInstance) {
       await prisma.produto.delete({ where: { id } }) // cascata: variações + movimentos
       return { removido: true }
     } catch {
-      // tem venda/transferência vinculada → não dá pra apagar; desativa e limpa a mídia
+      // tem venda vinculada → não dá pra apagar; desativa e limpa a mídia
       await prisma.produto.update({ where: { id }, data: { ativo: false, fotos: [], videos: [] } })
       return { removido: false, desativado: true }
     }
   })
 
-  // Taxonomias para selects do frontend
+  // Taxonomias para selects do frontend (nível da marca/rede)
   app.get('/taxonomias/listar', { preHandler: [app.authenticate] }, async (request) => {
-    const lojaId = await lojaIdDe(request)
+    const redeId = await redeIdDeQualquer(request)
     const [categorias, marcas, colecoes] = await Promise.all([
-      prisma.categoria.findMany({ where: { lojaId }, orderBy: { nome: 'asc' } }),
-      prisma.marca.findMany({ where: { lojaId }, orderBy: { nome: 'asc' } }),
-      prisma.colecao.findMany({ where: { lojaId }, orderBy: { nome: 'asc' } }),
+      prisma.categoria.findMany({ where: { redeId }, orderBy: { nome: 'asc' } }),
+      prisma.marca.findMany({ where: { redeId }, orderBy: { nome: 'asc' } }),
+      prisma.colecao.findMany({ where: { redeId }, orderBy: { nome: 'asc' } }),
     ])
     return { categorias, marcas, colecoes }
   })

@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
-import { lojaIdDe, redeIdDe } from '../../plugins/auth'
+import { redeIdDeQualquer } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
 
 const itemEntradaSchema = z.object({
@@ -22,29 +22,26 @@ const ajusteSchema = z.object({
   motivo: z.string().min(1, 'Informe o motivo do ajuste'),
 })
 
-const GESTAO = ['SUPER_ADMIN', 'GESTOR', 'ESTOQUISTA', 'GERENTE'] as const
+// Estoque central da fábrica: operado pelo gestor de estoque (papéis de rede).
+const GESTAO = ['SUPER_ADMIN', 'GESTOR', 'ESTOQUISTA'] as const
 
 const PARADO_DIAS = 60 // sem saída de venda há 60+ dias e com estoque = encalhado
 const num = (v: unknown) => Number(v ?? 0)
 
-/** KPIs de estoque de uma loja. comDetalhe inclui as listas de críticos e parados. */
-async function kpiEstoqueLoja(lojaId: string, comDetalhe: boolean) {
+/** KPIs do estoque central (rede). comDetalhe inclui as listas de críticos e parados. */
+async function kpiEstoqueRede(redeId: string, comDetalhe: boolean) {
   const desde = new Date(Date.now() - PARADO_DIAS * 86_400_000)
-  const [variacoes, vendidas, transito] = await Promise.all([
+  const [variacoes, vendidas] = await Promise.all([
     prisma.variacaoProduto.findMany({
-      where: { produto: { lojaId, ativo: true } },
+      where: { produto: { redeId, ativo: true } },
       select: {
         id: true, cor: true, tamanho: true, estoque: true, estoqueMinimo: true,
         produto: { select: { nome: true, referencia: true, custo: true, precoVarejo: true } },
       },
     }),
     prisma.movimentoEstoque.findMany({
-      where: { tipo: 'SAIDA_VENDA', createdAt: { gte: desde }, variacao: { produto: { lojaId } } },
+      where: { tipo: 'SAIDA_VENDA', createdAt: { gte: desde }, variacao: { produto: { redeId } } },
       select: { variacaoId: true }, distinct: ['variacaoId'],
-    }),
-    prisma.transferenciaItem.aggregate({
-      where: { transferencia: { status: 'EM_TRANSITO', lojaOrigemId: lojaId } },
-      _sum: { quantidadeEnviada: true },
     }),
   ])
 
@@ -67,7 +64,7 @@ async function kpiEstoqueLoja(lojaId: string, comDetalhe: boolean) {
     }
   }
 
-  const base = { totalPecas, valorCusto, valorVenda, skus: variacoes.length, criticosCount, paradosCount, emTransito: num(transito._sum.quantidadeEnviada) }
+  const base = { totalPecas, valorCusto, valorVenda, skus: variacoes.length, criticosCount, paradosCount }
   if (!comDetalhe) return base
   return {
     ...base,
@@ -77,21 +74,21 @@ async function kpiEstoqueLoja(lojaId: string, comDetalhe: boolean) {
 }
 
 /**
- * Estoque — operações da estoquista (rede) e do gerente (loja):
- * entrada de produção (confecção → loja), ajuste/contagem (físico = sistema)
- * e extrato de movimentos. Saídas entram aqui automaticamente pelas vendas.
+ * Estoque CENTRAL (fábrica/marca) — operado pelo gestor de estoque:
+ * entrada de produção, ajuste/contagem (físico = sistema) e extrato de movimentos.
+ * As saídas entram aqui automaticamente pelas vendas (de qualquer loja/vendedora).
  */
 export async function estoqueRoutes(app: FastifyInstance) {
-  // Entrada de produção: confecção entrega na loja
+  // Entrada de produção da confecção no estoque central.
   app.post('/entrada', { preHandler: [app.authorize(...GESTAO)] }, async (request, reply) => {
-    const lojaId = await lojaIdDe(request)
+    const redeId = await redeIdDeQualquer(request)
     const body = entradaSchema.parse(request.body)
 
     const ids = body.itens.map((i) => i.variacaoId)
-    const variacoes = await prisma.variacaoProduto.findMany({ where: { id: { in: ids }, produto: { lojaId } }, select: { id: true } })
+    const variacoes = await prisma.variacaoProduto.findMany({ where: { id: { in: ids }, produto: { redeId } }, select: { id: true } })
     const validos = new Set(variacoes.map((v) => v.id))
     for (const item of body.itens) {
-      if (!validos.has(item.variacaoId)) return reply.code(422).send({ erro: `Variação ${item.variacaoId} inválida para esta loja` })
+      if (!validos.has(item.variacaoId)) return reply.code(422).send({ erro: `Variação ${item.variacaoId} inválida para esta marca` })
     }
 
     const base = body.nota ? `Entrada · nota ${body.nota}` : 'Entrada de produção'
@@ -110,11 +107,11 @@ export async function estoqueRoutes(app: FastifyInstance) {
 
   // Ajuste/contagem: define a quantidade física real (físico = sistema)
   app.post('/ajuste', { preHandler: [app.authorize(...GESTAO)] }, async (request, reply) => {
-    const lojaId = await lojaIdDe(request)
+    const redeId = await redeIdDeQualquer(request)
     const body = ajusteSchema.parse(request.body)
 
-    const v = await prisma.variacaoProduto.findFirst({ where: { id: body.variacaoId, produto: { lojaId } }, select: { id: true, estoque: true } })
-    if (!v) return reply.code(422).send({ erro: 'Variação inválida para esta loja' })
+    const v = await prisma.variacaoProduto.findFirst({ where: { id: body.variacaoId, produto: { redeId } }, select: { id: true, estoque: true } })
+    if (!v) return reply.code(422).send({ erro: 'Variação inválida para esta marca' })
 
     const delta = body.novaQuantidade - v.estoque
     if (delta === 0) return { ok: true, delta: 0 }
@@ -126,12 +123,12 @@ export async function estoqueRoutes(app: FastifyInstance) {
     return { ok: true, delta }
   })
 
-  // Extrato de movimentos da loja (entradas, saídas de venda, ajustes, devoluções)
+  // Extrato de movimentos do estoque central (entradas, saídas de venda, ajustes, devoluções)
   app.get('/movimentos', { preHandler: [app.authorize(...GESTAO)] }, async (request) => {
-    const lojaId = await lojaIdDe(request)
+    const redeId = await redeIdDeQualquer(request)
     const { tipo } = request.query as { tipo?: string }
 
-    const where: Prisma.MovimentoEstoqueWhereInput = { variacao: { produto: { lojaId } } }
+    const where: Prisma.MovimentoEstoqueWhereInput = { variacao: { produto: { redeId } } }
     if (tipo) where.tipo = tipo as never
 
     return prisma.movimentoEstoque.findMany({
@@ -142,48 +139,24 @@ export async function estoqueRoutes(app: FastifyInstance) {
     })
   })
 
-  // Dashboard de estoque: consolidado da rede (gestor/estoquista) ou de uma loja
+  // Dashboard do estoque central da marca.
   app.get('/dashboard', { preHandler: [app.authorize(...GESTAO)] }, async (request) => {
-    const { role } = request.user
-    const q = request.query as { lojaId?: string }
-
-    if ((role === 'GESTOR' || role === 'ESTOQUISTA' || role === 'SUPER_ADMIN') && !q.lojaId) {
-      const redeId = redeIdDe(request)
-      const [rede, lojas] = await Promise.all([
-        prisma.rede.findUniqueOrThrow({ where: { id: redeId }, select: { nome: true } }),
-        prisma.loja.findMany({ where: { redeId }, orderBy: { createdAt: 'asc' }, select: { id: true, nome: true, ativo: true } }),
-      ])
-      const porLoja = await Promise.all(lojas.map(async (l) => ({ id: l.id, nome: l.nome, ativo: l.ativo, ...(await kpiEstoqueLoja(l.id, false)) })))
-      const consolidado = porLoja.reduce(
-        (a, l) => ({
-          totalPecas: a.totalPecas + l.totalPecas,
-          valorCusto: a.valorCusto + l.valorCusto,
-          valorVenda: a.valorVenda + l.valorVenda,
-          criticosCount: a.criticosCount + l.criticosCount,
-          paradosCount: a.paradosCount + l.paradosCount,
-          emTransito: a.emTransito + l.emTransito,
-        }),
-        { totalPecas: 0, valorCusto: 0, valorVenda: 0, criticosCount: 0, paradosCount: 0, emTransito: 0 },
-      )
-      return { papel: 'REDE', rede, consolidado, porLoja }
-    }
-
-    const lojaId = await lojaIdDe(request)
-    const loja = await prisma.loja.findUniqueOrThrow({ where: { id: lojaId }, select: { nome: true } })
-    return { papel: 'LOJA', loja: loja.nome, ...(await kpiEstoqueLoja(lojaId, true)) }
+    const redeId = await redeIdDeQualquer(request)
+    const rede = await prisma.rede.findUniqueOrThrow({ where: { id: redeId }, select: { nome: true } })
+    return { papel: 'REDE', rede, ...(await kpiEstoqueRede(redeId, true)) }
   })
 
-  // Estoque inteligente: campeões de venda (30d) e previsão de ruptura
+  // Estoque inteligente: campeões de venda (30d) e previsão de ruptura (estoque central)
   app.get('/inteligencia', { preHandler: [requireFeature('estoque_inteligente'), app.authorize(...GESTAO)] }, async (request) => {
-    const lojaId = await lojaIdDe(request)
+    const redeId = await redeIdDeQualquer(request)
     const desde = new Date(Date.now() - 30 * 86_400_000)
     const [variacoes, saidas] = await Promise.all([
       prisma.variacaoProduto.findMany({
-        where: { produto: { lojaId, ativo: true } },
+        where: { produto: { redeId, ativo: true } },
         select: { id: true, cor: true, tamanho: true, estoque: true, produto: { select: { id: true, nome: true, referencia: true } } },
       }),
       prisma.movimentoEstoque.findMany({
-        where: { tipo: 'SAIDA_VENDA', createdAt: { gte: desde }, variacao: { produto: { lojaId } } },
+        where: { tipo: 'SAIDA_VENDA', createdAt: { gte: desde }, variacao: { produto: { redeId } } },
         select: { variacaoId: true, quantidade: true },
       }),
     ])

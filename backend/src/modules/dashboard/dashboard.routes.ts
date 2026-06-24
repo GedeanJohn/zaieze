@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { prisma } from '../../lib/prisma'
-import { lojaIdDe, redeIdDe } from '../../plugins/auth'
+import { lojaIdDe, redeIdDe, redeIdDeQualquer } from '../../plugins/auth'
 
 function inicioDoDia(): Date {
   const d = new Date()
@@ -56,6 +56,8 @@ async function kpisDaLoja(lojaId: string) {
 
 /** Visão completa da loja: por vendedora, por equipe, top produtos/clientes, estoque crítico. */
 async function dashboardDaLoja(lojaId: string) {
+  const loja = await prisma.loja.findUniqueOrThrow({ where: { id: lojaId }, select: { redeId: true } })
+  const redeId = loja.redeId
   const kpis = await kpisDaLoja(lojaId)
 
   const [vendedoras, vendasMes, estoqueCritico, topClientes] = await Promise.all([
@@ -72,7 +74,7 @@ async function dashboardDaLoja(lojaId: string) {
       include: { itens: { include: { variacao: { include: { produto: { select: { id: true, nome: true } } } } } } },
     }),
     prisma.variacaoProduto.findMany({
-      where: { produto: { lojaId, ativo: true }, estoque: { lte: prisma.variacaoProduto.fields.estoqueMinimo } },
+      where: { produto: { redeId, ativo: true, colecao: { lojas: { some: { lojaId } } } }, estoque: { lte: prisma.variacaoProduto.fields.estoqueMinimo } },
       include: { produto: { select: { nome: true } } },
       orderBy: { estoque: 'asc' },
       take: 20,
@@ -162,7 +164,7 @@ async function dashboardDaLoja(lojaId: string) {
   // Produtos parados: ativos, com estoque, sem nenhuma venda no mês (encalhados).
   const vendidosIds = new Set(porProdutoMap.keys())
   const produtosAtivos = await prisma.produto.findMany({
-    where: { lojaId, ativo: true },
+    where: { redeId, ativo: true, colecao: { lojas: { some: { lojaId } } } },
     select: { id: true, nome: true, variacoes: { select: { estoque: true } } },
   })
   const produtosParados = produtosAtivos
@@ -279,25 +281,12 @@ export async function dashboardRoutes(app: FastifyInstance) {
     return { papel: 'LOJA', loja: loja.nome, ...(await dashboardDaLoja(lojaId)) }
   })
 
-  // ── Dashboard de ESTOQUE (estoquista/gestor) — KPIs + giro + ruptura, com filtro de loja e período ──
-  app.get('/estoque', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'ESTOQUISTA', 'GERENTE')] }, async (request, reply) => {
-    const user = request.user
-    const q = request.query as { lojaId?: string; de?: string; ate?: string }
-
-    // Resolve as lojas do escopo: uma loja (?lojaId), ou todas as da rede, ou a loja do gerente.
-    let lojaIds: string[] = []
-    let escopoNome = 'Todas as lojas'
-    if (q.lojaId) {
-      const loja = await prisma.loja.findFirst({ where: { id: q.lojaId, ...(user.redeId ? { redeId: user.redeId } : {}) }, select: { id: true, nome: true } })
-      if (!loja) return reply.code(403).send({ erro: 'Loja fora do seu escopo' })
-      lojaIds = [loja.id]; escopoNome = loja.nome
-    } else if (user.redeId) {
-      const lojas = await prisma.loja.findMany({ where: { redeId: user.redeId }, select: { id: true } })
-      lojaIds = lojas.map((l) => l.id)
-    } else if (user.lojaId) {
-      lojaIds = [user.lojaId]
-    }
-    if (lojaIds.length === 0) return { escopo: escopoNome, vazio: true }
+  // ── Dashboard do ESTOQUE CENTRAL (gestor de estoque) — KPIs + giro + ruptura, por período ──
+  app.get('/estoque', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'ESTOQUISTA', 'GERENTE')] }, async (request) => {
+    const redeId = await redeIdDeQualquer(request)
+    const q = request.query as { de?: string; ate?: string }
+    const rede = await prisma.rede.findUniqueOrThrow({ where: { id: redeId }, select: { nome: true } })
+    const escopoNome = rede.nome
 
     // Período (para giro/movimentos): default últimos 6 meses.
     const ate = q.ate ? new Date(`${q.ate}T23:59:59.999`) : new Date()
@@ -312,9 +301,9 @@ export async function dashboardRoutes(app: FastifyInstance) {
     }
     const mesDe = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 
-    // Estoque atual (variações de produtos ativos das lojas do escopo).
+    // Estoque central atual (variações de produtos ativos da marca).
     const variacoes = await prisma.variacaoProduto.findMany({
-      where: { produto: { lojaId: { in: lojaIds }, ativo: true } },
+      where: { produto: { redeId, ativo: true } },
       select: { estoque: true, estoqueMinimo: true, produto: { select: { custo: true, precoVarejo: true, categoria: { select: { nome: true } } } } },
     })
     const totalUn = variacoes.reduce((s, v) => s + v.estoque, 0)
@@ -339,7 +328,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
     // Vendas (peças) no período → giro mensal + giro do período.
     const itens = await prisma.itemVenda.findMany({
-      where: { venda: { lojaId: { in: lojaIds }, status: 'CONCLUIDA', createdAt: { gte: de, lte: ate } } },
+      where: { venda: { loja: { redeId }, status: 'CONCLUIDA', createdAt: { gte: de, lte: ate } } },
       select: { quantidade: true, venda: { select: { createdAt: true } } },
     })
     const pecasVendidas = itens.reduce((s, i) => s + i.quantidade, 0)
@@ -349,7 +338,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
     // Movimentos: entradas × saídas por mês.
     const movs = await prisma.movimentoEstoque.findMany({
-      where: { variacao: { produto: { lojaId: { in: lojaIds } } }, createdAt: { gte: de, lte: ate } },
+      where: { variacao: { produto: { redeId } }, createdAt: { gte: de, lte: ate } },
       select: { quantidade: true, createdAt: true },
     })
     const entradasMes = new Map(meses.map((m) => [m.chave, 0]))
@@ -364,7 +353,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
     // Estoque crítico (lista) — variações no/abaixo do mínimo.
     const criticoRaw = await prisma.variacaoProduto.findMany({
-      where: { produto: { lojaId: { in: lojaIds }, ativo: true }, estoque: { lte: prisma.variacaoProduto.fields.estoqueMinimo } },
+      where: { produto: { redeId, ativo: true }, estoque: { lte: prisma.variacaoProduto.fields.estoqueMinimo } },
       orderBy: { estoque: 'asc' }, take: 15,
       select: { estoque: true, estoqueMinimo: true, cor: true, tamanho: true, produto: { select: { nome: true } } },
     })

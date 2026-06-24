@@ -70,12 +70,6 @@ enum Genero {
   INFANTIL
 }
 
-enum StatusTransferencia {
-  EM_TRANSITO // enviada pela origem, aguardando recebimento
-  RECEBIDA // confirmada pelo destino (com ou sem divergência)
-  CANCELADA // estorno do envio (estoque volta à origem)
-}
-
 enum DirecaoMensagem {
   ENVIADA // loja → cliente
   RECEBIDA // cliente → loja (webhook Evolution)
@@ -168,6 +162,12 @@ model Rede {
   lojas      Loja[]
   usuarios   Usuario[] // gestores da rede
   assinatura Assinatura?
+  // Estoque central da fábrica/marca: coleções, produtos e taxonomias vivem no nível da REDE
+  // (não por loja). As lojas apenas recebem permissão de venda via ColecaoLoja (distribuição).
+  colecoes   Colecao[]
+  produtos   Produto[]
+  categorias Categoria[]
+  marcas     Marca[]
 
   @@map("redes")
 }
@@ -214,13 +214,9 @@ model Loja {
   usuarios   Usuario[]
   equipes    Equipe[]
   clientes   Cliente[]
-  categorias Categoria[]
-  marcas     Marca[]
-  colecoes   Colecao[]
-  produtos   Produto[]
   vendas     Venda[]
-  transferenciasEnviadas  Transferencia[] @relation("TransferenciasEnviadas")
-  transferenciasRecebidas Transferencia[] @relation("TransferenciasRecebidas")
+  // Distribuição: coleções (da rede) que esta loja pode vender. Estoque é central (não por loja).
+  colecoesDistribuidas ColecaoLoja[]
   campanhas Campanha[]
   reguas    ReguaInatividade[]
   regrasComissao RegraComissao[]
@@ -390,31 +386,31 @@ model Lead {
 
 model Categoria {
   id     String @id @default(cuid())
-  lojaId String
+  redeId String
   nome   String
 
-  loja     Loja      @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  rede     Rede      @relation(fields: [redeId], references: [id], onDelete: Cascade)
   produtos Produto[]
 
-  @@unique([lojaId, nome])
+  @@unique([redeId, nome])
   @@map("categorias")
 }
 
 model Marca {
   id     String @id @default(cuid())
-  lojaId String
+  redeId String
   nome   String
 
-  loja     Loja      @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  rede     Rede      @relation(fields: [redeId], references: [id], onDelete: Cascade)
   produtos Produto[]
 
-  @@unique([lojaId, nome])
+  @@unique([redeId, nome])
   @@map("marcas")
 }
 
 model Colecao {
   id         String        @id @default(cuid())
-  lojaId     String
+  redeId     String
   nome       String
   descricao  String?
   status     StatusColecao @default(EM_PREPARACAO)
@@ -429,18 +425,35 @@ model Colecao {
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
-  loja     Loja      @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  rede     Rede      @relation(fields: [redeId], references: [id], onDelete: Cascade)
   produtos Produto[]
+  lojas    ColecaoLoja[] // distribuição: lojas que podem vender esta coleção
 
-  @@unique([lojaId, nome])
-  @@index([lojaId, status])
+  @@unique([redeId, nome])
+  @@index([redeId, status])
   @@map("colecoes")
+}
+
+// Distribuição da coleção (estoque central): liga uma Coleção (da rede) às Lojas que podem vendê-la.
+// É só permissão de venda — não há estoque por loja. Liberação/Outlet seguem na Coleção (únicos).
+model ColecaoLoja {
+  id        String   @id @default(cuid())
+  colecaoId String
+  lojaId    String
+  createdAt DateTime @default(now())
+
+  colecao Colecao @relation(fields: [colecaoId], references: [id], onDelete: Cascade)
+  loja    Loja    @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+
+  @@unique([colecaoId, lojaId])
+  @@index([lojaId])
+  @@map("colecao_loja")
 }
 
 model Produto {
   id          String  @id @default(cuid())
-  lojaId      String
-  // Referência do modelo (lançada pela estoquista, vinda da confecção) — base do SKU
+  redeId      String
+  // Referência do modelo (lançada pelo gestor de estoque, vinda da confecção) — base do SKU
   referencia  String?
   nome        String // nome do modelo (ex.: "Júlia")
   descricao   String?
@@ -468,14 +481,14 @@ model Produto {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  loja      Loja              @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  rede      Rede              @relation(fields: [redeId], references: [id], onDelete: Cascade)
   categoria Categoria?        @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   marca     Marca?            @relation(fields: [marcaId], references: [id], onDelete: SetNull)
   colecao   Colecao?          @relation(fields: [colecaoId], references: [id], onDelete: SetNull)
   variacoes VariacaoProduto[]
 
-  @@unique([lojaId, referencia])
-  @@index([lojaId, ativo])
+  @@unique([redeId, referencia])
+  @@index([redeId, ativo])
   @@map("produtos")
 }
 
@@ -494,8 +507,6 @@ model VariacaoProduto {
   produto    Produto            @relation(fields: [produtoId], references: [id], onDelete: Cascade)
   itensVenda ItemVenda[]
   movimentos MovimentoEstoque[]
-  transfOrigem  TransferenciaItem[] @relation("ItensTransfOrigem")
-  transfDestino TransferenciaItem[] @relation("ItensTransfDestino")
 
   @@unique([produtoId, cor, estampa, tamanho])
   @@map("variacoes_produto")
@@ -575,43 +586,6 @@ model MovimentoEstoque {
 
   @@index([variacaoId, createdAt])
   @@map("movimentos_estoque")
-}
-
-// ─────────────────────────── Transferências entre lojas ───────────────────────────
-// Confecção → loja, ou loja ↔ loja. O destino confirma o recebimento; a divergência
-// entre enviado e recebido é o radar de extravio/roubo em trânsito.
-
-model Transferencia {
-  id            String              @id @default(cuid())
-  lojaOrigemId  String
-  lojaDestinoId String
-  status        StatusTransferencia @default(EM_TRANSITO)
-  observacao    String?
-  createdAt     DateTime            @default(now())
-  recebidaEm    DateTime?
-
-  lojaOrigem  Loja                @relation("TransferenciasEnviadas", fields: [lojaOrigemId], references: [id], onDelete: Cascade)
-  lojaDestino Loja                @relation("TransferenciasRecebidas", fields: [lojaDestinoId], references: [id], onDelete: Cascade)
-  itens       TransferenciaItem[]
-
-  @@index([lojaOrigemId])
-  @@index([lojaDestinoId])
-  @@map("transferencias")
-}
-
-model TransferenciaItem {
-  id                 String @id @default(cuid())
-  transferenciaId    String
-  origemVariacaoId   String
-  destinoVariacaoId  String
-  quantidadeEnviada  Int
-  quantidadeRecebida Int? // null até o destino confirmar
-
-  transferencia   Transferencia   @relation(fields: [transferenciaId], references: [id], onDelete: Cascade)
-  origemVariacao  VariacaoProduto @relation("ItensTransfOrigem", fields: [origemVariacaoId], references: [id])
-  destinoVariacao VariacaoProduto @relation("ItensTransfDestino", fields: [destinoVariacaoId], references: [id])
-
-  @@map("transferencia_itens")
 }
 
 // ─────────────────────────── WhatsApp / Campanhas / Réguas ───────────────────────────

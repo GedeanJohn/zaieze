@@ -17,7 +17,6 @@ import { clientesRoutes } from './modules/clientes/clientes.routes'
 import { produtosRoutes } from './modules/produtos/produtos.routes'
 import { vendasRoutes } from './modules/vendas/vendas.routes'
 import { estoqueRoutes } from './modules/estoque/estoque.routes'
-import { transferenciasRoutes } from './modules/transferencias/transferencias.routes'
 import { estoquistasRoutes } from './modules/estoquistas/estoquistas.routes'
 import { convitesRoutes } from './modules/convites/convites.routes'
 import { whatsappRoutes } from './modules/whatsapp/whatsapp.routes'
@@ -75,7 +74,6 @@ export async function buildApp() {
   await app.register(produtosRoutes, { prefix: '/api/produtos' })
   await app.register(vendasRoutes, { prefix: '/api/vendas' })
   await app.register(estoqueRoutes, { prefix: '/api/estoque' })
-  await app.register(transferenciasRoutes, { prefix: '/api/transferencias' })
   await app.register(estoquistasRoutes, { prefix: '/api/estoquistas' })
   await app.register(convitesRoutes, { prefix: '/api/convites' })
   await app.register(whatsappRoutes, { prefix: '/api/whatsapp' })

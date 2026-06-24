@@ -1,5 +1,5 @@
 /**
- * Gera os manuais em PDF no formato 16:9 (slide), um por papel (gestor, vendedora, estoquista),
+ * Gera os manuais em PDF no formato 16:9 (slide), um por papel (gestor, vendedora, gestor de estoque),
  * com a marca d'água ZAIEZE em todas as páginas. Rode com: npx tsx scripts/gerar-manuais-pdf.ts
  */
 import fs from 'node:fs'
@@ -23,7 +23,7 @@ const decks: Deck[] = [
       { capa: true, titulo: 'Manual do Gestor', subtitulo: 'Portal do Cliente · catálogo, funil de vendas e identidade da marca' },
       { titulo: '1. Coleções e liberação', bullets: [
         'A coleção agrupa as peças (modelo, estampa, tamanho).',
-        'Em preparação: a estoquista ainda cadastra — invisível para as vendedoras.',
+        'Em preparação: o gestor de estoque ainda cadastra — invisível para as vendedoras.',
         'Liberada: aparece para TODAS as vendedoras ao mesmo tempo (catálogo + PDV).',
       ], nota: 'Liberação simultânea = competição justa pelo estoque compartilhado.' },
       { titulo: '2. Catálogo e link da vendedora', bullets: [
@@ -76,16 +76,16 @@ const decks: Deck[] = [
         'Perdeu? Sem problema — se ela voltar, abre um novo ciclo.',
       ] },
       { titulo: '5. Vender da coleção', bullets: [
-        'Só aparecem as coleções já liberadas pela estoquista.',
+        'Só aparecem as coleções já liberadas pelo gestor de estoque.',
         'O estoque é compartilhado: quem fecha primeiro leva a peça.',
         'Registre a venda como Online (WhatsApp) para contar no seu resultado.',
       ] },
     ],
   },
   {
-    arquivo: 'Manual-Estoquista-ZAIEZE.pdf', papel: 'Estoquista',
+    arquivo: 'Manual-Gestor-de-Estoque-ZAIEZE.pdf', papel: 'Gestor de Estoque',
     slides: [
-      { capa: true, titulo: 'Manual do Estoquista', subtitulo: 'Coleções: do cadastro à liberação' },
+      { capa: true, titulo: 'Manual do Gestor de Estoque', subtitulo: 'Coleções: do cadastro à liberação' },
       { titulo: '1. Crie a coleção', bullets: [
         'Vá em Coleções → Nova coleção (ex.: "Verão 2026").',
         'Ela nasce "Em preparação".',

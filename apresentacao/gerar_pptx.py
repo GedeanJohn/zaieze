@@ -203,7 +203,7 @@ for t, d in done:
     y += 0.74
 text(box(s, 0.9, y + 0.04, 11.5, 0.5),
      [("+ extras: ", {"bold": True, "color": ACCENT}),
-      ("forma de recebimento · produto/moda · estoquista+entradas · transferências (radar de extravio) · gestão de estoquistas.", {"color": INK_SOFT})],
+      ("forma de recebimento · produto/moda · gestor de estoque+entradas · transferências (radar de extravio) · gestão de gestores de estoque.", {"color": INK_SOFT})],
      size=12.5, first=True)
 
 # ───────────────────────── Divisória DEMO ─────────────────────────
@@ -221,7 +221,7 @@ title(s, "Acessos de teste")
 acessos = [
     ("Super Admin · SaaS", "admin@modacrm.com.br", "admin123", False),
     ("Gestor · rede Luna Brand (ELITE)", "gestor@lunabrand.com.br", "gestor123", True),
-    ("Estoquista · rede", "estoquista@lunabrand.com.br", "estoque123", False),
+    ("Gestor de Estoque · rede", "estoquista@lunabrand.com.br", "estoque123", False),
     ("Gerente · Loja Demo Moda", "maria@lojademo.com.br", "demo123", True),
     ("Gerente · Loja Shopping", "paula@lojashopping.com.br", "demo123", False),
     ("Vendedora · Demo Moda", "camila@lojademo.com.br", "demo123", True),

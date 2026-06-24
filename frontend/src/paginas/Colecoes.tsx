@@ -12,6 +12,7 @@ interface Colecao {
   outletDesde?: string | null
   descontoOutletPct?: number | null
   pecas: number
+  lojaIds: string[] // lojas que podem vender a coleção (distribuição)
   midiaExpiraEm?: string | null
   diasParaExpirarMidia?: number | null
   midiaExpiradaEm?: string | null
@@ -34,9 +35,11 @@ export default function Colecoes() {
   const escopo = useLojaAtiva()
   const usuario = usuarioLogado()!
   const podeOutlet = usuario.role === 'GESTOR' || usuario.role === 'GERENTE' || usuario.role === 'SUPER_ADMIN'
+  const podeDistribuir = escopo.ehGestor || usuario.role === 'SUPER_ADMIN'
   const [lista, setLista] = useState<Colecao[]>([])
   const [form, setForm] = useState<FormC | null>(null)
   const [outlet, setOutlet] = useState<OutletForm | null>(null)
+  const [distrib, setDistrib] = useState<{ colecao: Colecao; lojaIds: Set<string> } | null>(null)
   const [erro, setErro] = useState('')
 
   const carregar = useCallback(async () => {
@@ -82,6 +85,25 @@ export default function Colecoes() {
     if (!confirm(`Recolher "${c.nome}"? Ela some do catálogo e do PDV das vendedoras.`)) return
     try { await api.post(`/colecoes/${c.id}/recolher`, {}, { params: escopo.params }); carregar() }
     catch (err) { alert(mensagemDeErro(err)) }
+  }
+
+  // Distribuição (estoque central): define em quais lojas a coleção fica disponível para venda.
+  function alternarLojaDistrib(id: string) {
+    if (!distrib) return
+    const novo = new Set(distrib.lojaIds)
+    if (novo.has(id)) novo.delete(id); else novo.add(id)
+    setDistrib({ ...distrib, lojaIds: novo })
+  }
+
+  async function salvarDistribuicao(e: React.FormEvent) {
+    e.preventDefault()
+    if (!distrib) return
+    setErro('')
+    try {
+      await api.put(`/colecoes/${distrib.colecao.id}/distribuicao`, { lojaIds: [...distrib.lojaIds] }, { params: escopo.params })
+      setDistrib(null)
+      carregar()
+    } catch (err) { setErro(mensagemDeErro(err)) }
   }
 
   // Abre a modal de Outlet: carrega as peças da coleção e infere o escopo de desconto atual.
@@ -147,7 +169,7 @@ export default function Colecoes() {
       </header>
 
       <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-        A estoquista monta a coleção <strong>em preparação</strong> (cadastrando as peças) e só então <strong>libera</strong> —
+        O gestor de estoque monta a coleção <strong>em preparação</strong> (cadastrando as peças) e só então <strong>libera</strong> —
         aí ela aparece para todas as vendedoras simultaneamente, garantindo competição justa pelo estoque.
         {podeOutlet && <> Coleções antigas podem virar <strong>Outlet</strong> (selo no catálogo), com desconto opcional na coleção inteira ou em peças específicas.</>}
       </div>
@@ -155,7 +177,7 @@ export default function Colecoes() {
       <div className="cartao">
         <table>
           <thead>
-            <tr><th>Coleção</th><th>Status</th><th>Peças</th><th>Liberada em</th><th></th></tr>
+            <tr><th>Coleção</th><th>Status</th><th>Peças</th><th>Lojas</th><th>Liberada em</th><th></th></tr>
           </thead>
           <tbody>
             {lista.map((c) => (
@@ -183,6 +205,15 @@ export default function Colecoes() {
                   </span>
                 </td>
                 <td>{c.pecas}</td>
+                <td>
+                  {c.lojaIds.length === 0
+                    ? <span style={{ color: 'var(--danger)', fontSize: 12 }}>nenhuma</span>
+                    : <span style={{ fontSize: 13 }}>{c.lojaIds.length} loja{c.lojaIds.length > 1 ? 's' : ''}</span>}
+                  {podeDistribuir && <>
+                    {' '}
+                    <a href="#" style={{ fontSize: 12 }} onClick={(e) => { e.preventDefault(); setDistrib({ colecao: c, lojaIds: new Set(c.lojaIds) }) }}>distribuir</a>
+                  </>}
+                </td>
                 <td>{c.liberadaEm ? new Date(c.liberadaEm).toLocaleDateString('pt-BR') : '—'}</td>
                 <td>
                   {c.status === 'EM_PREPARACAO'
@@ -203,7 +234,7 @@ export default function Colecoes() {
                 </td>
               </tr>
             ))}
-            {lista.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--ink-soft)' }}>Nenhuma coleção. Crie uma e cadastre as peças em Produtos.</td></tr>}
+            {lista.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--ink-soft)' }}>Nenhuma coleção. Crie uma e cadastre as peças em Produtos.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -283,6 +314,34 @@ export default function Colecoes() {
             <div className="acoes">
               <button type="button" className="btn secundario" onClick={() => setOutlet(null)}>Cancelar</button>
               <button className="btn">Salvar</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {distrib && (
+        <div className="modal-fundo" onClick={() => setDistrib(null)}>
+          <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvarDistribuicao} style={{ width: 'min(520px, 92vw)' }}>
+            <h2>Distribuir — {distrib.colecao.nome}</h2>
+            {erro && <div className="alerta">{erro}</div>}
+            <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 10 }}>
+              Marque as lojas que podem <strong>vender</strong> esta coleção. O estoque é único (da fábrica) — isto é só permissão de venda.
+            </div>
+            {escopo.lojas.length === 0
+              ? <div style={{ color: 'var(--ink-soft)', fontSize: 13 }}>Nenhuma loja cadastrada na marca.</div>
+              : (
+                <div className="cartao" style={{ maxHeight: 320, overflowY: 'auto', padding: 8 }}>
+                  {escopo.lojas.map((l) => (
+                    <label key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 2px', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={distrib.lojaIds.has(l.id)} onChange={() => alternarLojaDistrib(l.id)} style={{ width: 'auto' }} />
+                      <span>{l.nome}{l.ativo ? '' : ' (inativa)'}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            <div className="acoes">
+              <button type="button" className="btn secundario" onClick={() => setDistrib(null)}>Cancelar</button>
+              <button className="btn">Salvar distribuição</button>
             </div>
           </form>
         </div>

@@ -126,8 +126,9 @@ export async function catalogoRoutes(app: FastifyInstance) {
     if (!ctx) return reply.code(404).send({ erro: 'Catálogo indisponível' })
     const { rede, vend } = ctx
 
+    // Estoque central: a vendedora vende as coleções LIBERADAS distribuídas à sua loja.
     const colecoes = await prisma.colecao.findMany({
-      where: { lojaId: vend.lojaId!, status: 'LIBERADA' },
+      where: { lojas: { some: { lojaId: vend.lojaId! } }, status: 'LIBERADA' },
       orderBy: { liberadaEm: 'desc' },
       include: {
         produtos: {

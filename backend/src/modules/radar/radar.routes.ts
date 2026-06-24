@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
-import { lojaIdDe } from '../../plugins/auth'
+import { lojaIdDe, redeIdDeQualquer } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
 
 const PARADO_DIAS = 60
@@ -23,12 +23,14 @@ export async function radarRoutes(app: FastifyInstance) {
 
   app.get('/', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request) => {
     const lojaId = await lojaIdDe(request)
+    const redeId = await redeIdDeQualquer(request)
     const loja = await prisma.loja.findUniqueOrThrow({ where: { id: lojaId }, select: { nome: true } })
     const desde = new Date(Date.now() - PARADO_DIAS * 86_400_000)
 
+    // Estoque central: encalhados da marca entre as coleções distribuídas a esta loja.
     const [produtos, vendidasRecentes] = await Promise.all([
       prisma.produto.findMany({
-        where: { lojaId, ativo: true },
+        where: { redeId, ativo: true, colecao: { lojas: { some: { lojaId } } } },
         select: {
           id: true, nome: true, referencia: true, categoriaId: true,
           categoria: { select: { nome: true } }, custo: true,
@@ -36,7 +38,7 @@ export async function radarRoutes(app: FastifyInstance) {
         },
       }),
       prisma.movimentoEstoque.findMany({
-        where: { tipo: 'SAIDA_VENDA', createdAt: { gte: desde }, variacao: { produto: { lojaId } } },
+        where: { tipo: 'SAIDA_VENDA', createdAt: { gte: desde }, variacao: { produto: { redeId } } },
         select: { variacaoId: true }, distinct: ['variacaoId'],
       }),
     ])

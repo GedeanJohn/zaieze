@@ -75,3 +75,25 @@ export function redeIdDe(request: FastifyRequest): string {
   if (!user.redeId) throw erroHttp(403, 'Usuário sem rede vinculada')
   return user.redeId
 }
+
+/**
+ * Resolve o redeId para QUALQUER papel — usado no estoque central (coleções/produtos/catálogo):
+ * - GESTOR/ESTOQUISTA: redeId do token.
+ * - GERENTE/VENDEDORA: derivado da própria loja.
+ * - SUPER_ADMIN: via ?redeId= (ou derivado de ?lojaId=).
+ */
+export async function redeIdDeQualquer(request: FastifyRequest): Promise<string> {
+  const user = request.user
+  if (user.redeId) return user.redeId
+  if (user.lojaId) {
+    const loja = await prisma.loja.findUnique({ where: { id: user.lojaId }, select: { redeId: true } })
+    if (loja) return loja.redeId
+  }
+  const q = request.query as { redeId?: string; lojaId?: string }
+  if (q?.redeId) return q.redeId
+  if (q?.lojaId) {
+    const loja = await prisma.loja.findUnique({ where: { id: q.lojaId }, select: { redeId: true } })
+    if (loja) return loja.redeId
+  }
+  throw erroHttp(400, 'Não foi possível resolver a rede da requisição')
+}

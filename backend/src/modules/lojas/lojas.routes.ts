@@ -26,7 +26,7 @@ const atualizarLojaSchema = z.object({
 })
 
 const incluirLoja = {
-  _count: { select: { usuarios: true, clientes: true, produtos: true, equipes: true } },
+  _count: { select: { usuarios: true, clientes: true, equipes: true } },
   usuarios: {
     where: { role: 'GERENTE' as const },
     select: { id: true, nome: true, email: true },
@@ -87,7 +87,7 @@ export async function lojasRoutes(app: FastifyInstance) {
       where: { id: request.user.lojaId! },
       include: {
         rede: { select: { nome: true, plano: true } },
-        _count: { select: { usuarios: true, clientes: true, produtos: true, equipes: true } },
+        _count: { select: { usuarios: true, clientes: true, equipes: true } },
       },
     })
   })

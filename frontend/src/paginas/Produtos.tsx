@@ -7,6 +7,7 @@ interface Variacao {
   cor: string
   estampa: string
   tamanho: string
+  livre?: boolean // transitório (UI): tamanho em modo "Outro" (texto livre); não é enviado ao backend
   sku?: string
   codigoBarras?: string | null
   estoque: number
@@ -64,7 +65,8 @@ interface FormProduto {
 
 const VARIACAO_VAZIA: Variacao = { cor: '', estampa: '', tamanho: '', codigoBarras: '', estoque: 0, estoqueMinimo: 2 }
 
-// Sugestões de tamanho (Brasil) — campo segue texto livre; isto é só autocomplete.
+// Tamanhos sugeridos (Brasil) — viram um menu de seleção (funciona no mobile, ao contrário do datalist);
+// a opção "Outro…" libera digitação para tamanhos fora desta lista.
 // Letras (roupa) + numéricas (roupa/jeans 36–56) + calçado/infantil (16–46) + Único.
 const TAMANHOS_SUGERIDOS = [
   'PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG', 'G1', 'G2', 'G3', 'Único',
@@ -415,9 +417,6 @@ export default function Produtos() {
             <div className="grade-variacoes" style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
               <span>Cor</span><span>Estampa</span><span>Tamanho</span><span>Cód. barras (EAN)</span><span>Estoque</span><span>Mínimo</span><span></span>
             </div>
-            <datalist id="tamanhos-sugeridos">
-              {TAMANHOS_SUGERIDOS.map((t) => <option key={t} value={t} />)}
-            </datalist>
             <datalist id="estampas-sugeridas">
               {ESTAMPAS_SUGERIDAS.map((t) => <option key={t} value={t} />)}
             </datalist>
@@ -425,7 +424,31 @@ export default function Produtos() {
               <div className="grade-variacoes" key={i}>
                 <input value={v.cor} onChange={(e) => mudarVariacao(i, 'cor', e.target.value)} placeholder="Preto" required />
                 <input value={v.estampa ?? ''} onChange={(e) => mudarVariacao(i, 'estampa', e.target.value)} placeholder="opcional (ex.: Paisley)" list="estampas-sugeridas" />
-                <input value={v.tamanho} onChange={(e) => mudarVariacao(i, 'tamanho', e.target.value)} placeholder="P ou 38" list="tamanhos-sugeridos" required />
+                {v.livre || (v.tamanho !== '' && !TAMANHOS_SUGERIDOS.includes(v.tamanho)) ? (
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <input
+                      value={v.tamanho} onChange={(e) => mudarVariacao(i, 'tamanho', e.target.value)}
+                      placeholder="Tamanho" required autoFocus style={{ flex: 1, minWidth: 0 }}
+                    />
+                    <button
+                      type="button" title="Escolher da lista" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--ink-soft)' }}
+                      onClick={() => setForm({ ...form, variacoes: form.variacoes.map((x, idx) => idx === i ? { ...x, tamanho: '', livre: false } : x) })}
+                    >↩</button>
+                  </div>
+                ) : (
+                  <select
+                    value={v.tamanho} required
+                    onChange={(e) => {
+                      const val = e.target.value
+                      if (val === '__outro__') setForm({ ...form, variacoes: form.variacoes.map((x, idx) => idx === i ? { ...x, tamanho: '', livre: true } : x) })
+                      else mudarVariacao(i, 'tamanho', val)
+                    }}
+                  >
+                    <option value="" disabled>Tamanho</option>
+                    {TAMANHOS_SUGERIDOS.map((t) => <option key={t} value={t}>{t}</option>)}
+                    <option value="__outro__">Outro…</option>
+                  </select>
+                )}
                 <input value={v.codigoBarras ?? ''} onChange={(e) => mudarVariacao(i, 'codigoBarras', e.target.value)} placeholder="opcional" />
                 <input type="number" min="0" value={v.estoque} onChange={(e) => mudarVariacao(i, 'estoque', e.target.value)} />
                 <input type="number" min="0" value={v.estoqueMinimo} onChange={(e) => mudarVariacao(i, 'estoqueMinimo', e.target.value)} />

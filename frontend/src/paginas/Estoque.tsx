@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, formataReal, mensagemDeErro, rotuloMovimento } from '../api'
-import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
+import { useLojaAtiva } from '../componentes/SeletorLoja'
 
-interface KpiEstoque {
+// Estoque central (único da fábrica/marca) — não há mais estoque por loja nem transferências.
+interface DashEstoque {
+  rede: { nome: string }
   totalPecas: number; valorCusto: number; valorVenda: number; skus: number
-  criticosCount: number; paradosCount: number; emTransito: number
-}
-interface DashLoja extends KpiEstoque {
-  papel: 'LOJA'; loja: string
+  criticosCount: number; paradosCount: number
   criticos: { produto: string; referencia: string | null; cor: string; tamanho: string; estoque: number; estoqueMinimo: number }[]
   parados: { produto: string; referencia: string | null; cor: string; tamanho: string; estoque: number; valorCusto: number }[]
-}
-interface DashRede {
-  papel: 'REDE'; rede: { nome: string }; consolidado: KpiEstoque
-  porLoja: (KpiEstoque & { id: string; nome: string; ativo: boolean })[]
 }
 interface Inteligencia {
   campeoes: { produto: string; referencia: string | null; qtd: number }[]
@@ -56,8 +51,7 @@ function Kpi({ rotulo, valor }: { rotulo: string; valor: string }) {
 export default function Estoque() {
   const escopo = useLojaAtiva()
   const [movimentos, setMovimentos] = useState<Movimento[]>([])
-  const [dash, setDash] = useState<DashLoja | null>(null)
-  const [rede, setRede] = useState<DashRede | null>(null)
+  const [dash, setDash] = useState<DashEstoque | null>(null)
   const [intel, setIntel] = useState<Inteligencia | null>(null)
   const [tipo, setTipo] = useState('')
   const [produtos, setProdutos] = useState<ProdutoP[]>([])
@@ -76,14 +70,10 @@ export default function Estoque() {
   const carregarDash = useCallback(async () => {
     if (!escopo.pronto) return
     const { data } = await api.get('/estoque/dashboard', { params: escopo.params })
-    setDash(data.papel === 'LOJA' ? data : null)
+    setDash(data)
     const { data: i } = await api.get('/estoque/inteligencia', { params: escopo.params })
     setIntel(i)
-    if (escopo.ehGestor) {
-      const { data: r } = await api.get('/estoque/dashboard')
-      setRede(r)
-    }
-  }, [escopo.pronto, escopo.params, escopo.ehGestor])
+  }, [escopo.pronto, escopo.params])
 
   useEffect(() => { carregar(); carregarDash() }, [carregar, carregarDash])
 
@@ -166,7 +156,6 @@ export default function Estoque() {
       <header>
         <h1>Estoque</h1>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-          <SeletorLoja escopo={escopo} />
           <button className="btn secundario" onClick={abrirAjuste} disabled={!escopo.pronto}>Ajuste / contagem</button>
           <button className="btn" onClick={abrirEntrada} disabled={!escopo.pronto}>+ Entrada de produção</button>
         </div>
@@ -175,87 +164,54 @@ export default function Estoque() {
       {aviso && <div className="sucesso">{aviso}</div>}
       {erro && !entrada && !ajuste && <div className="alerta">{erro}</div>}
 
-      {/* Painel de estoque consolidado (rede para gestor/estoquista; loja selecionada) */}
-      {(escopo.ehGestor ? rede : dash) && (
+      {/* Estoque central da fábrica/marca (único — sem split por loja) */}
+      {dash && (
         <>
-          <h2 className="painel-titulo" style={{ margin: '4px 0 10px' }}>
-            {escopo.ehGestor && rede ? `Estoque da rede — ${rede.rede.nome}` : `Estoque — ${dash?.loja ?? ''}`}
-          </h2>
-          {(() => {
-            const k = escopo.ehGestor ? rede?.consolidado : dash
-            if (!k) return null
-            return (
-              <div className="grade-cards">
-                <Kpi rotulo="Valor em estoque (custo)" valor={formataReal(k.valorCusto)} />
-                <Kpi rotulo="Valor a varejo" valor={formataReal(k.valorVenda)} />
-                <Kpi rotulo="Peças" valor={String(k.totalPecas)} />
-                <Kpi rotulo="SKUs" valor={String(k.skus)} />
-                <Kpi rotulo="Estoque crítico" valor={String(k.criticosCount)} />
-                <Kpi rotulo="Parados (60d)" valor={String(k.paradosCount)} />
-                <Kpi rotulo="Em trânsito" valor={String(k.emTransito)} />
-              </div>
-            )
-          })()}
+          <h2 className="painel-titulo" style={{ margin: '4px 0 10px' }}>Estoque central — {dash.rede.nome}</h2>
+          <div className="grade-cards">
+            <Kpi rotulo="Valor em estoque (custo)" valor={formataReal(dash.valorCusto)} />
+            <Kpi rotulo="Valor a varejo" valor={formataReal(dash.valorVenda)} />
+            <Kpi rotulo="Peças" valor={String(dash.totalPecas)} />
+            <Kpi rotulo="SKUs" valor={String(dash.skus)} />
+            <Kpi rotulo="Estoque crítico" valor={String(dash.criticosCount)} />
+            <Kpi rotulo="Parados (60d)" valor={String(dash.paradosCount)} />
+          </div>
 
-          {escopo.ehGestor && rede && (
-            <div className="cartao" style={{ marginTop: 16 }}>
-              <h2 className="painel-titulo">Por loja</h2>
+          <div className="grade-paineis" style={{ marginTop: 16 }}>
+            <div className="cartao">
+              <h2 className="painel-titulo">Parados / encalhados (60d)</h2>
               <table>
-                <thead><tr><th>Loja</th><th>Valor (custo)</th><th>Peças</th><th>SKUs</th><th>Crítico</th><th>Parados</th><th>Em trânsito</th></tr></thead>
+                <thead><tr><th>Produto</th><th>Grade</th><th>Estoque</th><th>Valor parado</th></tr></thead>
                 <tbody>
-                  {rede.porLoja.map((l) => (
-                    <tr key={l.id} style={{ opacity: l.ativo ? 1 : 0.5 }}>
-                      <td>{l.nome}</td>
-                      <td>{formataReal(l.valorCusto)}</td>
-                      <td>{l.totalPecas}</td>
-                      <td>{l.skus}</td>
-                      <td>{l.criticosCount > 0 ? <span className="selo baixo">{l.criticosCount}</span> : '0'}</td>
-                      <td>{l.paradosCount}</td>
-                      <td>{l.emTransito}</td>
+                  {dash.parados.map((p, i) => (
+                    <tr key={i}>
+                      <td>{p.produto}<div style={{ fontSize: 12, color: 'var(--ink-soft)', fontFamily: 'Consolas, monospace' }}>{p.referencia ?? ''}</div></td>
+                      <td style={{ color: 'var(--ink-soft)' }}>{p.cor}/{p.tamanho}</td>
+                      <td>{p.estoque}</td>
+                      <td>{formataReal(p.valorCusto)}</td>
                     </tr>
                   ))}
+                  {dash.parados.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--ok)' }}>Nada parado há 60 dias. 👍</td></tr>}
                 </tbody>
               </table>
             </div>
-          )}
-
-          {dash && (
-            <div className="grade-paineis" style={{ marginTop: 16 }}>
-              <div className="cartao">
-                <h2 className="painel-titulo">Parados / encalhados (60d){escopo.ehGestor ? ` · ${dash.loja}` : ''}</h2>
-                <table>
-                  <thead><tr><th>Produto</th><th>Grade</th><th>Estoque</th><th>Valor parado</th></tr></thead>
-                  <tbody>
-                    {dash.parados.map((p, i) => (
-                      <tr key={i}>
-                        <td>{p.produto}<div style={{ fontSize: 12, color: 'var(--ink-soft)', fontFamily: 'Consolas, monospace' }}>{p.referencia ?? ''}</div></td>
-                        <td style={{ color: 'var(--ink-soft)' }}>{p.cor}/{p.tamanho}</td>
-                        <td>{p.estoque}</td>
-                        <td>{formataReal(p.valorCusto)}</td>
-                      </tr>
-                    ))}
-                    {dash.parados.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--ok)' }}>Nada parado há 60 dias. 👍</td></tr>}
-                  </tbody>
-                </table>
-              </div>
-              <div className="cartao">
-                <h2 className="painel-titulo">Estoque crítico{escopo.ehGestor ? ` · ${dash.loja}` : ''}</h2>
-                <table>
-                  <thead><tr><th>Produto</th><th>Grade</th><th>Estoque</th></tr></thead>
-                  <tbody>
-                    {dash.criticos.map((c, i) => (
-                      <tr key={i}>
-                        <td>{c.produto}</td>
-                        <td style={{ color: 'var(--ink-soft)' }}>{c.cor}/{c.tamanho}</td>
-                        <td><span className="selo baixo">{c.estoque} (mín {c.estoqueMinimo})</span></td>
-                      </tr>
-                    ))}
-                    {dash.criticos.length === 0 && <tr><td colSpan={3} style={{ color: 'var(--ok)' }}>Tudo acima do mínimo. 👍</td></tr>}
-                  </tbody>
-                </table>
-              </div>
+            <div className="cartao">
+              <h2 className="painel-titulo">Estoque crítico</h2>
+              <table>
+                <thead><tr><th>Produto</th><th>Grade</th><th>Estoque</th></tr></thead>
+                <tbody>
+                  {dash.criticos.map((c, i) => (
+                    <tr key={i}>
+                      <td>{c.produto}</td>
+                      <td style={{ color: 'var(--ink-soft)' }}>{c.cor}/{c.tamanho}</td>
+                      <td><span className="selo baixo">{c.estoque} (mín {c.estoqueMinimo})</span></td>
+                    </tr>
+                  ))}
+                  {dash.criticos.length === 0 && <tr><td colSpan={3} style={{ color: 'var(--ok)' }}>Tudo acima do mínimo. 👍</td></tr>}
+                </tbody>
+              </table>
             </div>
-          )}
+          </div>
         </>
       )}
 

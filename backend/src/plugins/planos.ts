@@ -27,7 +27,7 @@ export function planoInclui(plano: Plano, feature: Feature): boolean {
  * Lojas e vendedoras são ILIMITADAS em todos os planos — a diferenciação é por funcionalidade.
  */
 export const PLANOS = [
-  { plano: 'START' as Plano, nome: 'Start', preco: 97, limite: 'Lojas e vendedoras ilimitadas', resumo: 'Operação completa + WhatsApp + operação em rede (transferências/estoquista)' },
+  { plano: 'START' as Plano, nome: 'Start', preco: 97, limite: 'Lojas e vendedoras ilimitadas', resumo: 'Operação completa + WhatsApp + operação em rede (transferências/gestor de estoque)' },
   { plano: 'PRO' as Plano, nome: 'Pro', preco: 297, limite: 'Lojas e vendedoras ilimitadas', resumo: 'Tudo do Start + carteira inteligente, comissão/ranking e estoque inteligente' },
   { plano: 'ELITE' as Plano, nome: 'Elite', preco: 697, limite: 'Lojas e vendedoras ilimitadas', resumo: 'Tudo do Pro + Radar, Atacado, IA avançada e Portal do Cliente' },
 ]

@@ -34,11 +34,7 @@ export function midiaExpiraEm(liberadaEm: Date | null, plano: Plano): Date | nul
  * @returns nº de objetos apagados.
  */
 export async function limparMidiaDaRede(redeId: string): Promise<number> {
-  const lojas = await prisma.loja.findMany({ where: { redeId }, select: { id: true } })
-  const lojaIds = lojas.map((l) => l.id)
-  if (lojaIds.length === 0) return 0
-
-  const produtos = await prisma.produto.findMany({ where: { lojaId: { in: lojaIds } }, select: { fotos: true, videos: true } })
+  const produtos = await prisma.produto.findMany({ where: { redeId }, select: { fotos: true, videos: true } })
   const urls = produtos.flatMap((p) => [...p.fotos, ...p.videos])
   if (urls.length === 0) return 0
 
@@ -48,8 +44,8 @@ export async function limparMidiaDaRede(redeId: string): Promise<number> {
     return 0 // falhou no R2 → não zera o banco (tenta de novo depois)
   }
   await prisma.$transaction([
-    prisma.produto.updateMany({ where: { lojaId: { in: lojaIds } }, data: { fotos: [], videos: [] } }),
-    prisma.colecao.updateMany({ where: { lojaId: { in: lojaIds }, midiaExpiradaEm: null }, data: { midiaExpiradaEm: new Date() } }),
+    prisma.produto.updateMany({ where: { redeId }, data: { fotos: [], videos: [] } }),
+    prisma.colecao.updateMany({ where: { redeId, midiaExpiradaEm: null }, data: { midiaExpiradaEm: new Date() } }),
   ])
   return urls.length
 }
@@ -67,14 +63,14 @@ export async function limparMidiaExpirada(): Promise<number> {
       status: 'LIBERADA',
       liberadaEm: { not: null },
       midiaExpiradaEm: null,
-      loja: { rede: { plano: { in: ['START', 'PRO'] } } },
+      rede: { plano: { in: ['START', 'PRO'] } },
     },
-    select: { id: true, liberadaEm: true, loja: { select: { rede: { select: { plano: true } } } } },
+    select: { id: true, liberadaEm: true, rede: { select: { plano: true } } },
   })
 
   let processadas = 0
   for (const c of colecoes) {
-    const plano = c.loja.rede?.plano
+    const plano = c.rede?.plano
     if (!plano) continue
     const expira = midiaExpiraEm(c.liberadaEm, plano)
     if (!expira || agora < expira) continue

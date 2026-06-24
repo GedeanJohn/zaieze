@@ -59,7 +59,7 @@ export default function Estoquistas() {
   return (
     <>
       <header>
-        <h1>Estoquistas</h1>
+        <h1>Gestores de Estoque</h1>
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn" onClick={() => setConvidar(true)}>✉️ Convidar por link</button>
           <button className="btn secundario" onClick={() => setForm({ nome: '', email: '', senha: '' })}>+ Novo (com senha)</button>
@@ -67,7 +67,7 @@ export default function Estoquistas() {
       </header>
 
       <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-        Estoquistas atuam no nível da <strong>rede</strong>: lançam entradas de produção, fazem transferências e ajustes de estoque nas lojas.
+        Gestores de estoque atuam no nível da <strong>rede</strong>: lançam entradas de produção, fazem transferências e ajustes de estoque nas lojas.
       </div>
 
       <div className="cartao">
@@ -90,20 +90,20 @@ export default function Estoquistas() {
               </tr>
             ))}
             {lista.length === 0 && (
-              <tr><td colSpan={5} style={{ color: 'var(--ink-soft)' }}>Nenhum estoquista cadastrado.</td></tr>
+              <tr><td colSpan={5} style={{ color: 'var(--ink-soft)' }}>Nenhum gestor de estoque cadastrado.</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
       {convidar && (
-        <ConvidarModal papeis={[{ valor: 'ESTOQUISTA', rotulo: 'Estoquista' }]} onClose={() => setConvidar(false)} />
+        <ConvidarModal papeis={[{ valor: 'ESTOQUISTA', rotulo: 'Gestor de Estoque' }]} onClose={() => setConvidar(false)} />
       )}
 
       {form && (
         <div className="modal-fundo" onClick={() => setForm(null)}>
           <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvar} style={{ width: 'min(520px, 92vw)' }}>
-            <h2>{form.id ? 'Editar estoquista' : 'Novo estoquista'}</h2>
+            <h2>{form.id ? 'Editar gestor de estoque' : 'Novo gestor de estoque'}</h2>
             {erro && <div className="alerta">{erro}</div>}
             <div className="campo">
               <label>Nome*</label>

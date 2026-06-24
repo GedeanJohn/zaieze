@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
-import { lojaIdDe } from '../../plugins/auth'
+import { lojaIdDe, redeIdDeQualquer } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
 
 const num = (v: unknown) => Number(v ?? 0)
@@ -105,11 +105,13 @@ export async function comissoesRoutes(app: FastifyInstance) {
   // Regras (gerente/gestor): com rótulo legível do alvo
   app.get('/regras', { preHandler: [app.authorize(...GESTAO)] }, async (request) => {
     const lojaId = await lojaIdDe(request)
+    const redeId = await redeIdDeQualquer(request)
+    // Regras de comissão são por loja; o catálogo de alvos (produto/categoria/marca) é da rede (central).
     const [regras, produtos, categorias, marcas] = await Promise.all([
       prisma.regraComissao.findMany({ where: { lojaId }, orderBy: { escopo: 'asc' } }),
-      prisma.produto.findMany({ where: { lojaId }, select: { id: true, nome: true } }),
-      prisma.categoria.findMany({ where: { lojaId }, select: { id: true, nome: true } }),
-      prisma.marca.findMany({ where: { lojaId }, select: { id: true, nome: true } }),
+      prisma.produto.findMany({ where: { redeId }, select: { id: true, nome: true } }),
+      prisma.categoria.findMany({ where: { redeId }, select: { id: true, nome: true } }),
+      prisma.marca.findMany({ where: { redeId }, select: { id: true, nome: true } }),
     ])
     const nome = (escopo: string, refId: string | null) => {
       if (escopo === 'PADRAO') return 'Padrão da loja'

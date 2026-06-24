@@ -39,7 +39,7 @@ export function usuarioLogado(): Usuario | null {
 export const rotuloPapel: Record<Papel, string> = {
   SUPER_ADMIN: 'Admin SaaS',
   GESTOR: 'Gestor da marca',
-  ESTOQUISTA: 'Estoquista',
+  ESTOQUISTA: 'Gestor de Estoque',
   GERENTE: 'Gerente',
   VENDEDORA: 'Vendedora',
   CLIENTE: 'Cliente',
@@ -92,7 +92,7 @@ export const rotuloFeature: Record<string, string> = {
   whatsapp: 'WhatsApp (disparos, réguas, caixa de entrada)',
   crm_segmentacao: 'Carteira inteligente (segmentação)', gamificacao: 'Comissão, ranking e mural',
   estoque_inteligente: 'Estoque inteligente (encalhados/ruptura)',
-  multi_loja: 'Operação em rede (transferências entre lojas + estoquista central)', radar: 'Radar de Oportunidades',
+  multi_loja: 'Operação em rede (várias lojas vendendo do estoque central da marca)', radar: 'Radar de Oportunidades',
   atacado: 'Sistema de atacado',
   ia_avancada: 'IA avançada', portal_cliente: 'Portal do Cliente',
 }

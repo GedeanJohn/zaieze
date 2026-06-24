@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
-  Megaphone, Package, Tag, Layers, Boxes, ArrowLeftRight, UsersRound,
+  Megaphone, Package, Tag, Layers, Boxes, UsersRound,
   HardHat, Palette, BookOpen, CreditCard, Menu, LogOut, UserCog,
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
@@ -70,9 +70,8 @@ export default function Layout() {
         {podeEstoque && <NavLink to="/colecoes" className={cls}><Layers {...ICON} /><span>Coleções</span></NavLink>}
         <NavLink to="/produtos" className={cls}><Tag {...ICON} /><span>Produtos</span></NavLink>
         {podeEstoque && <NavLink to="/estoque" className={cls}><Boxes {...ICON} /><span>Estoque</span></NavLink>}
-        {podeEstoque && temFeature('multi_loja') && <NavLink to="/transferencias" className={cls}><ArrowLeftRight {...ICON} /><span>Transferências</span></NavLink>}
         {podeEquipe && <NavLink to="/equipe" className={cls}><UsersRound {...ICON} /><span>Equipe</span></NavLink>}
-        {podeEstoquistas && temFeature('multi_loja') && <NavLink to="/estoquistas" className={cls}><HardHat {...ICON} /><span>Estoquistas</span></NavLink>}
+        {podeEstoquistas && temFeature('multi_loja') && <NavLink to="/estoquistas" className={cls}><HardHat {...ICON} /><span>Gestores de Estoque</span></NavLink>}
         {ehDonoRede && temFeature('portal_cliente') && <NavLink to="/marca" className={cls}><Palette {...ICON} /><span>Marca</span></NavLink>}
         {ehDonoRede && <NavLink to="/manual" className={cls}><BookOpen {...ICON} /><span>Manual</span></NavLink>}
         {ehDonoRede && <NavLink to="/planos" className={cls}><CreditCard {...ICON} /><span>Planos</span></NavLink>}

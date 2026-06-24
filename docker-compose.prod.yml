@@ -47,7 +47,7 @@ services:
   # Reusa o Postgres (banco "evolution") e cache local (sem Redis). A API do ZAIEZE fala com
   # ela por dentro (EVOLUTION_API_URL=http://evolution:8080) e recebe webhooks dela.
   evolution:
-    image: atendai/evolution-api:v2.1.1
+    image: atendai/evolution-api:v2.2.3
     restart: unless-stopped
     depends_on:
       db:

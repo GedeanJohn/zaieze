@@ -503,6 +503,10 @@ model VariacaoProduto {
   codigoBarras  String? @unique // EAN/GTIN (opcional) — leitura no PDV
   estoque       Int     @default(0)
   estoqueMinimo Int     @default(2)
+  // Reserva EXCLUSIVA de varejo (subconjunto de `estoque`, peças únicas). O atacado só pode
+  // usar o restante (estoque − estoqueVarejo). O gestor de estoque remaneja entre os baldes
+  // ajustando este valor (0 ≤ estoqueVarejo ≤ estoque).
+  estoqueVarejo Int     @default(0)
 
   produto    Produto            @relation(fields: [produtoId], references: [id], onDelete: Cascade)
   itensVenda ItemVenda[]

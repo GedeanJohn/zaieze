@@ -15,7 +15,7 @@ interface Inteligencia {
   ruptura: { produto: string; referencia: string | null; cor: string; tamanho: string; estoque: number; vendidos30: number; diasEstimados: number }[]
 }
 
-interface VariacaoP { id: string; cor: string; tamanho: string; estoque: number; sku: string }
+interface VariacaoP { id: string; cor: string; tamanho: string; estoque: number; estoqueVarejo: number; sku: string }
 interface ProdutoP { id: string; nome: string; referencia?: string | null; variacoes: VariacaoP[] }
 
 interface Movimento {
@@ -30,6 +30,7 @@ interface Movimento {
 interface LinhaEntrada { produtoId: string; variacaoId: string; quantidade: number }
 interface FormEntrada { nota: string; observacao: string; itens: LinhaEntrada[] }
 interface FormAjuste { produtoId: string; variacaoId: string; novaQuantidade: string; motivo: string }
+interface FormReserva { produtoId: string; variacaoId: string; quantidadeVarejo: string }
 
 const LINHA: LinhaEntrada = { produtoId: '', variacaoId: '', quantidade: 1 }
 const TIPOS = ['', 'ENTRADA', 'SAIDA_VENDA', 'AJUSTE', 'DEVOLUCAO']
@@ -57,6 +58,7 @@ export default function Estoque() {
   const [produtos, setProdutos] = useState<ProdutoP[]>([])
   const [entrada, setEntrada] = useState<FormEntrada | null>(null)
   const [ajuste, setAjuste] = useState<FormAjuste | null>(null)
+  const [reserva, setReserva] = useState<FormReserva | null>(null)
   const [erro, setErro] = useState('')
   const [aviso, setAviso] = useState('')
 
@@ -93,6 +95,27 @@ export default function Estoque() {
     setErro(''); setAviso('')
     await carregarProdutos()
     setAjuste({ produtoId: '', variacaoId: '', novaQuantidade: '', motivo: '' })
+  }
+
+  async function abrirReserva() {
+    setErro(''); setAviso('')
+    await carregarProdutos()
+    setReserva({ produtoId: '', variacaoId: '', quantidadeVarejo: '' })
+  }
+
+  async function salvarReserva(e: React.FormEvent) {
+    e.preventDefault()
+    if (!reserva) return
+    setErro('')
+    if (!reserva.variacaoId || reserva.quantidadeVarejo === '') {
+      return setErro('Escolha a variação e a quantidade para varejo.')
+    }
+    try {
+      const { data } = await api.post('/estoque/reserva-varejo', { variacaoId: reserva.variacaoId, quantidadeVarejo: Number(reserva.quantidadeVarejo) }, { params: escopo.params })
+      setReserva(null)
+      setAviso(`Reserva de varejo definida: ${data.estoqueVarejo} p/ varejo · ${data.estoqueAtacado} p/ atacado.`)
+      carregar(); carregarDash()
+    } catch (err) { setErro(mensagemDeErro(err)) }
   }
 
   function variacoesDe(produtoId: string): VariacaoP[] {
@@ -155,14 +178,15 @@ export default function Estoque() {
     <>
       <header>
         <h1>Estoque</h1>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <button className="btn secundario" onClick={abrirReserva} disabled={!escopo.pronto}>Reserva varejo</button>
           <button className="btn secundario" onClick={abrirAjuste} disabled={!escopo.pronto}>Ajuste / contagem</button>
           <button className="btn" onClick={abrirEntrada} disabled={!escopo.pronto}>+ Entrada de produção</button>
         </div>
       </header>
 
       {aviso && <div className="sucesso">{aviso}</div>}
-      {erro && !entrada && !ajuste && <div className="alerta">{erro}</div>}
+      {erro && !entrada && !ajuste && !reserva && <div className="alerta">{erro}</div>}
 
       {/* Estoque central da fábrica/marca (único — sem split por loja) */}
       {dash && (
@@ -364,6 +388,52 @@ export default function Estoque() {
           </form>
         </div>
       )}
+
+      {/* Reserva de varejo: remaneja varejo ↔ atacado (não altera o total) */}
+      {reserva && (() => {
+        const rv = variacoesDe(reserva.produtoId).find((v) => v.id === reserva.variacaoId)
+        return (
+          <div className="modal-fundo" onClick={() => setReserva(null)}>
+            <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvarReserva} style={{ width: 'min(520px, 92vw)' }}>
+              <h2>Reserva de varejo</h2>
+              <p style={{ color: 'var(--ink-soft)', fontSize: 13, marginTop: 0 }}>
+                Defina quantas peças desta variação ficam <strong>exclusivas do varejo</strong> (peças únicas). O restante fica para o atacado — não altera o total.
+              </p>
+              {erro && <div className="alerta">{erro}</div>}
+              <div className="campo">
+                <label>Produto</label>
+                <select value={reserva.produtoId} onChange={(e) => setReserva({ ...reserva, produtoId: e.target.value, variacaoId: '', quantidadeVarejo: '' })} required>
+                  <option value="">— Produto —</option>
+                  {produtos.map((p) => <option key={p.id} value={p.id}>{p.referencia ? `${p.referencia} · ` : ''}{p.nome}</option>)}
+                </select>
+              </div>
+              <div className="linha-campos">
+                <div className="campo">
+                  <label>Variação</label>
+                  <select value={reserva.variacaoId} disabled={!reserva.produtoId} required
+                    onChange={(e) => { const id = e.target.value; const vv = variacoesDe(reserva.produtoId).find((x) => x.id === id); setReserva({ ...reserva, variacaoId: id, quantidadeVarejo: vv ? String(vv.estoqueVarejo) : '' }) }}>
+                    <option value="">— Cor/Tam —</option>
+                    {variacoesDe(reserva.produtoId).map((v) => <option key={v.id} value={v.id}>{v.cor}/{v.tamanho} (estoque {v.estoque})</option>)}
+                  </select>
+                </div>
+                <div className="campo">
+                  <label>Qtd p/ varejo{rv ? ` (máx ${rv.estoque})` : ''}</label>
+                  <input type="number" min="0" max={rv?.estoque} value={reserva.quantidadeVarejo} onChange={(e) => setReserva({ ...reserva, quantidadeVarejo: e.target.value })} disabled={!reserva.variacaoId} required />
+                </div>
+              </div>
+              {rv && (
+                <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+                  Hoje: <strong>{rv.estoqueVarejo}</strong> p/ varejo · <strong>{rv.estoque - rv.estoqueVarejo}</strong> p/ atacado (total {rv.estoque}).
+                </div>
+              )}
+              <div className="acoes">
+                <button type="button" className="btn secundario" onClick={() => setReserva(null)}>Cancelar</button>
+                <button className="btn">Salvar reserva</button>
+              </div>
+            </form>
+          </div>
+        )
+      })()}
     </>
   )
 }

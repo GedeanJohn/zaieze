@@ -12,6 +12,7 @@ interface Variacao {
   codigoBarras?: string | null
   estoque: number
   estoqueMinimo: number
+  estoqueVarejo?: number // reserva exclusiva de varejo (≤ estoque)
 }
 
 interface Produto {
@@ -63,7 +64,7 @@ interface FormProduto {
   variacoes: Variacao[]
 }
 
-const VARIACAO_VAZIA: Variacao = { cor: '', estampa: '', tamanho: '', codigoBarras: '', estoque: 0, estoqueMinimo: 2 }
+const VARIACAO_VAZIA: Variacao = { cor: '', estampa: '', tamanho: '', codigoBarras: '', estoque: 0, estoqueMinimo: 2, estoqueVarejo: 0 }
 
 // Tamanhos sugeridos (Brasil) — viram um menu de seleção (funciona no mobile, ao contrário do datalist);
 // a opção "Outro…" libera digitação para tamanhos fora desta lista.
@@ -201,6 +202,7 @@ export default function Produtos() {
         codigoBarras: limpa(v.codigoBarras ?? ''),
         estoque: Number(v.estoque),
         estoqueMinimo: Number(v.estoqueMinimo),
+        estoqueVarejo: Math.min(Number(v.estoqueVarejo ?? 0), Number(v.estoque)),
       })),
     }
     try {
@@ -259,7 +261,7 @@ export default function Produtos() {
 
   function mudarVariacao(i: number, campo: keyof Variacao, valor: string) {
     if (!form) return
-    const numerico = campo === 'estoque' || campo === 'estoqueMinimo'
+    const numerico = campo === 'estoque' || campo === 'estoqueMinimo' || campo === 'estoqueVarejo'
     const variacoes = form.variacoes.map((v, idx) =>
       idx === i ? { ...v, [campo]: numerico ? Number(valor) : valor } : v,
     )
@@ -412,7 +414,7 @@ export default function Produtos() {
             {/* Grade */}
             <h3 style={{ marginBottom: 8 }}>Grade (cor × estampa × tamanho)</h3>
             <div className="grade-variacoes" style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
-              <span>Cor</span><span>Estampa</span><span>Tamanho</span><span>Cód. barras (EAN)</span><span>Estoque</span><span>Mínimo</span><span></span>
+              <span>Cor</span><span>Estampa</span><span>Tamanho</span><span>Cód. barras (EAN)</span><span>Estoque</span><span title="Reserva exclusiva p/ varejo (peças únicas)">Varejo</span><span>Mínimo</span><span></span>
             </div>
             <datalist id="estampas-sugeridas">
               {ESTAMPAS_SUGERIDAS.map((t) => <option key={t} value={t} />)}
@@ -448,6 +450,7 @@ export default function Produtos() {
                 )}
                 <input value={v.codigoBarras ?? ''} onChange={(e) => mudarVariacao(i, 'codigoBarras', e.target.value)} placeholder="opcional" />
                 <input type="number" min="0" value={v.estoque} onChange={(e) => mudarVariacao(i, 'estoque', e.target.value)} />
+                <input type="number" min="0" max={v.estoque} value={v.estoqueVarejo ?? 0} onChange={(e) => mudarVariacao(i, 'estoqueVarejo', e.target.value)} title="Reserva exclusiva p/ varejo (≤ estoque)" />
                 <input type="number" min="0" value={v.estoqueMinimo} onChange={(e) => mudarVariacao(i, 'estoqueMinimo', e.target.value)} />
                 <button
                   type="button" className="remover" title="Remover"

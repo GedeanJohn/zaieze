@@ -22,6 +22,12 @@ const ajusteSchema = z.object({
   motivo: z.string().min(1, 'Informe o motivo do ajuste'),
 })
 
+// Remaneja a reserva de varejo (transfere do atacado p/ varejo, ou estorna), sem mexer no total.
+const reservaSchema = z.object({
+  variacaoId: z.string(),
+  quantidadeVarejo: z.coerce.number().int().nonnegative(),
+})
+
 // Estoque central da fábrica: operado pelo gestor de estoque (papéis de rede).
 const GESTAO = ['SUPER_ADMIN', 'GESTOR', 'ESTOQUISTA'] as const
 
@@ -110,17 +116,32 @@ export async function estoqueRoutes(app: FastifyInstance) {
     const redeId = await redeIdDeQualquer(request)
     const body = ajusteSchema.parse(request.body)
 
-    const v = await prisma.variacaoProduto.findFirst({ where: { id: body.variacaoId, produto: { redeId } }, select: { id: true, estoque: true } })
+    const v = await prisma.variacaoProduto.findFirst({ where: { id: body.variacaoId, produto: { redeId } }, select: { id: true, estoque: true, estoqueVarejo: true } })
     if (!v) return reply.code(422).send({ erro: 'Variação inválida para esta marca' })
 
     const delta = body.novaQuantidade - v.estoque
     if (delta === 0) return { ok: true, delta: 0 }
 
     await prisma.$transaction(async (tx) => {
-      await tx.variacaoProduto.update({ where: { id: v.id }, data: { estoque: body.novaQuantidade } })
+      await tx.variacaoProduto.update({
+        where: { id: v.id },
+        // Se o novo total ficar abaixo da reserva de varejo, encolhe a reserva junto.
+        data: { estoque: body.novaQuantidade, ...(body.novaQuantidade < v.estoqueVarejo ? { estoqueVarejo: body.novaQuantidade } : {}) },
+      })
       await tx.movimentoEstoque.create({ data: { variacaoId: v.id, tipo: 'AJUSTE', quantidade: delta, motivo: body.motivo } })
     })
     return { ok: true, delta }
+  })
+
+  // Remaneja a reserva de varejo de uma variação (atacado ↔ varejo), sem alterar o total.
+  app.post('/reserva-varejo', { preHandler: [app.authorize(...GESTAO)] }, async (request, reply) => {
+    const redeId = await redeIdDeQualquer(request)
+    const body = reservaSchema.parse(request.body)
+    const v = await prisma.variacaoProduto.findFirst({ where: { id: body.variacaoId, produto: { redeId } }, select: { id: true, estoque: true } })
+    if (!v) return reply.code(422).send({ erro: 'Variação inválida para esta marca' })
+    const novaVarejo = Math.min(body.quantidadeVarejo, v.estoque) // a reserva nunca passa do total
+    await prisma.variacaoProduto.update({ where: { id: v.id }, data: { estoqueVarejo: novaVarejo } })
+    return { ok: true, estoqueVarejo: novaVarejo, estoqueAtacado: v.estoque - novaVarejo }
   })
 
   // Extrato de movimentos do estoque central (entradas, saídas de venda, ajustes, devoluções)

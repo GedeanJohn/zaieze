@@ -126,20 +126,6 @@ export async function vendasRoutes(app: FastifyInstance) {
     })
     const porId = new Map(variacoes.map((v) => [v.id, v]))
 
-    for (const item of body.itens) {
-      const v = porId.get(item.variacaoId)
-      if (!v) return reply.code(422).send({ erro: `Variação ${item.variacaoId} indisponível nesta loja (coleção não distribuída)` })
-      // Coleção em preparação ainda não está disponível para venda (liberação simultânea).
-      if (request.user.role === 'VENDEDORA' && v.produto.colecao && v.produto.colecao.status !== 'LIBERADA') {
-        return reply.code(422).send({ erro: `A coleção "${v.produto.colecao.nome}" ainda não foi liberada` })
-      }
-      if (v.estoque < item.quantidade) {
-        return reply.code(422).send({
-          erro: `Estoque insuficiente: ${v.produto.nome} ${v.cor}/${v.tamanho} tem ${v.estoque} un (pedido: ${item.quantidade})`,
-        })
-      }
-    }
-
     // Canal por QUANTIDADE de peças no carrinho: nº de peças >= mínimo da rede ⇒ ATACADO.
     // O gestor também pode forçar atacado manualmente (body.atacado).
     const totalPecas = body.itens.reduce((s, i) => s + i.quantidade, 0)
@@ -147,6 +133,25 @@ export async function vendasRoutes(app: FastifyInstance) {
     const autoMax = lojaRede?.rede?.descontoAutoMaxPct ?? 10
     const senhaMax = lojaRede?.rede?.descontoSenhaMaxPct ?? 15
     const atacado = body.atacado || totalPecas >= minimoAtacado
+
+    // Estoque por canal: a reserva de varejo (estoqueVarejo) é EXCLUSIVA do varejo;
+    // o atacado só pode usar o restante (estoque − estoqueVarejo).
+    for (const item of body.itens) {
+      const v = porId.get(item.variacaoId)
+      if (!v) return reply.code(422).send({ erro: `Variação ${item.variacaoId} indisponível nesta loja (coleção não distribuída)` })
+      // Coleção em preparação ainda não está disponível para venda (liberação simultânea).
+      if (request.user.role === 'VENDEDORA' && v.produto.colecao && v.produto.colecao.status !== 'LIBERADA') {
+        return reply.code(422).send({ erro: `A coleção "${v.produto.colecao.nome}" ainda não foi liberada` })
+      }
+      const dispAtacado = v.estoque - v.estoqueVarejo
+      if (atacado) {
+        if (dispAtacado < item.quantidade) {
+          return reply.code(422).send({ erro: `Estoque de atacado insuficiente: ${v.produto.nome} ${v.cor}/${v.tamanho} tem ${dispAtacado} un para atacado (pedido: ${item.quantidade}); o restante está reservado para varejo` })
+        }
+      } else if (v.estoqueVarejo < item.quantidade) {
+        return reply.code(422).send({ erro: `Estoque de varejo insuficiente: ${v.produto.nome} ${v.cor}/${v.tamanho} tem ${v.estoqueVarejo} un reservada(s) para varejo (pedido: ${item.quantidade})` })
+      }
+    }
 
     // Preço: informado > atacado (se venda atacado e produto tem) > varejo
     const itensCalculados = body.itens.map((item) => {
@@ -230,15 +235,23 @@ export async function vendasRoutes(app: FastifyInstance) {
         })
       }
 
-      // Baixa automática de estoque + movimento por SKU
+      // Baixa automática de estoque + movimento por SKU. Atômica (condição no WHERE) para
+      // fechar a corrida entre vendas simultâneas, respeitando o balde do canal:
+      // - VAREJO: baixa da reserva (estoque e estoqueVarejo juntos).
+      // - ATACADO: baixa só do estoque, exigindo (estoque − estoqueVarejo) suficiente.
       for (const item of itensCalculados) {
-        // Baixa atômica: só decrementa se ainda houver saldo. Impede que duas vendas
-        // simultâneas (duas vendedoras) vendam a mesma peça — fecha a corrida de estoque.
-        const baixa = await tx.variacaoProduto.updateMany({
-          where: { id: item.variacaoId, estoque: { gte: item.quantidade } },
-          data: { estoque: { decrement: item.quantidade } },
-        })
-        if (baixa.count === 0) {
+        let ok: boolean
+        if (atacado) {
+          const n = await tx.$executeRaw`UPDATE "variacoes_produto" SET "estoque" = "estoque" - ${item.quantidade} WHERE "id" = ${item.variacaoId} AND ("estoque" - "estoqueVarejo") >= ${item.quantidade}`
+          ok = n > 0
+        } else {
+          const baixa = await tx.variacaoProduto.updateMany({
+            where: { id: item.variacaoId, estoqueVarejo: { gte: item.quantidade } },
+            data: { estoque: { decrement: item.quantidade }, estoqueVarejo: { decrement: item.quantidade } },
+          })
+          ok = baixa.count > 0
+        }
+        if (!ok) {
           const v = porId.get(item.variacaoId)!
           throw Object.assign(
             new Error(`Estoque esgotado durante a venda: ${v.produto.nome} ${v.cor}/${v.tamanho}`),
@@ -301,9 +314,12 @@ export async function vendasRoutes(app: FastifyInstance) {
     await prisma.$transaction(async (tx) => {
       await tx.venda.update({ where: { id }, data: { status: 'CANCELADA' } })
       for (const item of venda.itens) {
+        // Devolve ao balde de onde saiu: venda de varejo restaura também a reserva de varejo.
         await tx.variacaoProduto.update({
           where: { id: item.variacaoId },
-          data: { estoque: { increment: item.quantidade } },
+          data: venda.atacado
+            ? { estoque: { increment: item.quantidade } }
+            : { estoque: { increment: item.quantidade }, estoqueVarejo: { increment: item.quantidade } },
         })
         await tx.movimentoEstoque.create({
           data: {

@@ -11,6 +11,7 @@ const variacaoSchema = z.object({
   codigoBarras: z.string().optional(), // EAN/GTIN — opcional
   estoque: z.coerce.number().int().nonnegative().default(0),
   estoqueMinimo: z.coerce.number().int().nonnegative().default(2),
+  estoqueVarejo: z.coerce.number().int().nonnegative().default(0), // reserva exclusiva de varejo (≤ estoque)
 })
 
 const criarProdutoSchema = z.object({
@@ -187,6 +188,7 @@ export async function produtosRoutes(app: FastifyInstance) {
         tamanho: v.tamanho,
         estoque: v.estoque,
         estoqueMinimo: v.estoqueMinimo,
+        estoqueVarejo: Math.min(v.estoqueVarejo, v.estoque), // reserva nunca passa do total
         sku,
         codigoBarras: v.codigoBarras?.trim() || null,
         movimentos: v.estoque > 0 ? { create: { tipo: 'ENTRADA' as const, quantidade: v.estoque, motivo: 'Estoque inicial' } } : undefined,
@@ -260,6 +262,7 @@ export async function produtosRoutes(app: FastifyInstance) {
                 data: {
                   estoque: v.estoque,
                   estoqueMinimo: v.estoqueMinimo,
+                  estoqueVarejo: Math.min(v.estoqueVarejo, v.estoque),
                   codigoBarras: v.codigoBarras?.trim() || atual.codigoBarras,
                   movimentos: delta !== 0 ? { create: { tipo: 'AJUSTE', quantidade: delta, motivo: 'Ajuste manual de grade' } } : undefined,
                 },
@@ -274,6 +277,7 @@ export async function produtosRoutes(app: FastifyInstance) {
                   tamanho: v.tamanho,
                   estoque: v.estoque,
                   estoqueMinimo: v.estoqueMinimo,
+                  estoqueVarejo: Math.min(v.estoqueVarejo, v.estoque),
                   sku,
                   codigoBarras: v.codigoBarras?.trim() || null,
                   movimentos: v.estoque > 0 ? { create: { tipo: 'ENTRADA', quantidade: v.estoque, motivo: 'Nova variação' } } : undefined,

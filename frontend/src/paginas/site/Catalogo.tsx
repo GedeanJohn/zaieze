@@ -439,6 +439,8 @@ function CatalogoEstilos() {
       .cat-det-foto { position: relative; aspect-ratio: 3/4; background: #f2f2f2; overflow: hidden; border-radius: 10px; cursor: zoom-in; }
       .cat-det-foto img { width: 100%; height: 100%; object-fit: cover; transition: transform .08s ease-out; }
       .cat-zoom-dica { position: absolute; bottom: 8px; left: 8px; background: #00000088; color: #fff; font-size: 11px; padding: 3px 8px; border-radius: 99px; pointer-events: none; }
+      /* Em telas de toque (sem mouse) o zoom por hover não existe — esconde a dica. */
+      @media (hover: none) { .cat-zoom-dica { display: none; } .cat-det-foto { cursor: default; } }
       .cat-det-thumbs { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
       .cat-thumb { width: 54px; height: 70px; border: 2px solid transparent; border-radius: 6px; overflow: hidden; padding: 0; cursor: pointer; background: #eee; }
       .cat-thumb.ativo { border-color: var(--cat-primaria, #111); }

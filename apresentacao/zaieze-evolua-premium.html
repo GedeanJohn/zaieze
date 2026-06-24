@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<style>
+  @page { size: 1280px 720px; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .slide { width: 1280px; height: 720px; padding: 66px 84px; background: #0b0b0c; color: #f5f1ec; page-break-after: always; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+  .slide:last-child { page-break-after: auto; }
+  .kicker { font-size: 15px; letter-spacing: .28em; text-transform: uppercase; color: #e8a87c; font-weight: 700; }
+  h1 { font-size: 56px; line-height: 1.05; margin: 16px 0 0; font-weight: 800; letter-spacing: -.5px; }
+  h2 { font-size: 38px; line-height: 1.1; margin: 10px 0 22px; font-weight: 800; letter-spacing: -.3px; }
+  .sub { font-size: 20px; color: #b9b0a8; margin-top: 16px; line-height: 1.5; }
+  ul { list-style: none; display: flex; flex-direction: column; gap: 13px; margin-top: 4px; }
+  li { font-size: 20px; line-height: 1.32; display: flex; gap: 13px; align-items: flex-start; }
+  li b { color: #fff; font-weight: 700; }
+  li .d { color: #b3aaa2; }
+  .ok { color: #6ed29a; font-weight: 800; flex-shrink: 0; }
+  .new { color: #e8a87c; font-weight: 800; flex-shrink: 0; }
+  .foot { position: absolute; left: 84px; right: 84px; bottom: 30px; display: flex; justify-content: space-between; font-size: 13px; color: #6f6a64; letter-spacing: .08em; border-top: 1px solid #2a2825; padding-top: 12px; }
+  .foot .marca { color: #cabfb6; font-weight: 700; }
+  .logo { font-size: 40px; font-weight: 800; letter-spacing: 2px; }
+  .logo em { color: #e8a87c; font-style: normal; }
+  .center { justify-content: center; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 17px; }
+  th { text-align: left; color: #8d857d; font-weight: 700; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; padding: 8px 10px; border-bottom: 1px solid #2f2b27; }
+  td { padding: 9px 10px; border-bottom: 1px solid #1c1a18; vertical-align: top; }
+  .tag-ok { color: #6ed29a; font-weight: 700; }
+  .tag-new { color: #e8a87c; font-weight: 700; }
+  .legenda { font-size: 16px; color: #8d857d; margin-top: 14px; }
+  .cap-tag { font-size: 18px; color: #b9b0a8; letter-spacing: .2em; text-transform: uppercase; margin-top: 30px; }
+  .alerta { background: #221512; border: 1px solid #5a2f25; border-left: 4px solid #d2693f; border-radius: 10px; padding: 18px 22px; font-size: 19px; color: #f0c9bb; line-height: 1.45; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<!-- 1 CAPA -->
+<section class="slide center">
+  <div class="logo">ZAIE<em>Z</em>E</div>
+  <h1 style="margin-top:24px;">Igualar o Evolua Premium</h1>
+  <div class="sub" style="font-size:23px;">O que já temos e o que precisamos configurar para entregar as mesmas funcionalidades do plano Premium do Evolua.</div>
+  <div class="cap-tag">Plano técnico · Junho/2026</div>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>Plano de paridade — Evolua Premium</span></div>
+</section>
+
+<!-- 2 VISÃO GERAL -->
+<section class="slide">
+  <div class="kicker">Visão geral</div>
+  <h2>Funcionalidade → o que precisa</h2>
+  <table>
+    <tr><th>Funcionalidade (Evolua Premium)</th><th>Configuração / infra</th><th>Status</th></tr>
+    <tr><td>Conexão WhatsApp (QR)</td><td>Servidor Evolution API</td><td class="tag-ok">já temos</td></tr>
+    <tr><td>Conexão API Oficial</td><td>WhatsApp Cloud API (Meta)</td><td class="tag-new">configurar</td></tr>
+    <tr><td>Agente IA (disparo + SDR)</td><td>Motor de IA (chave LLM) ou roteiro</td><td class="tag-new">configurar</td></tr>
+    <tr><td>Evolua Chat / CRM Kanban / Funil</td><td>Inbox + Funil (já no produto)</td><td class="tag-ok">já temos</td></tr>
+    <tr><td>Extrator Google Maps</td><td>Scraping (headless + proxies)</td><td class="tag-new">novo</td></tr>
+    <tr><td>Extrator Instagram</td><td>Scraping + proxies</td><td class="tag-new">novo</td></tr>
+    <tr><td>Extrator Radar CNPJ</td><td>Base Receita / API CNPJ</td><td class="tag-new">novo</td></tr>
+    <tr><td>Extrator Grupos WhatsApp</td><td>Via Evolution (participantes)</td><td class="tag-ok">dá via Evolution</td></tr>
+  </table>
+  <div class="legenda"><span class="tag-ok">já temos</span> = pronto no ZAIEZE · <span class="tag-new">configurar/novo</span> = provisionar/integrar</div>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>02</span></div>
+</section>
+
+<!-- 3 JÁ TEMOS -->
+<section class="slide">
+  <div class="kicker">Base pronta</div>
+  <h2>O que já está no ZAIEZE</h2>
+  <ul>
+    <li><span class="ok">✓</span><span><b>Conexão WhatsApp (QR)</b> <span class="d">— Evolution API instalada e operando.</span></span></li>
+    <li><span class="ok">✓</span><span><b>CRM em Kanban + Funil de prospecção</b> <span class="d">— etapas, cores de situação e SLA.</span></span></li>
+    <li><span class="ok">✓</span><span><b>Sistema de atendimento (chat/inbox)</b> <span class="d">— conversas roteadas por carteira.</span></span></li>
+    <li><span class="ok">✓</span><span><b>Agente IA para atendimento (SDR)</b> <span class="d">— agentes roteirizados (custo zero), evoluíveis.</span></span></li>
+    <li><span class="ok">✓</span><span><b>Disparo personalizado</b> <span class="d">— campanhas por segmento + envio do link.</span></span></li>
+    <li><span class="ok">✓</span><span><b>Extrator de Grupos WhatsApp</b> <span class="d">— viável via Evolution (ler participantes).</span></span></li>
+  </ul>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>03</span></div>
+</section>
+
+<!-- 4 NOVO: EXTRATORES SCRAPING -->
+<section class="slide">
+  <div class="kicker">Configurar · novo (1/3)</div>
+  <h2>Extratores: Google Maps &amp; Instagram</h2>
+  <ul>
+    <li><span class="new">⚙</span><span><b>Worker de scraping</b> <span class="d">— navegador headless (Playwright) numa fila, em máquina dedicada (CPU/banda) — fora do servidor do app.</span></span></li>
+    <li><span class="new">⚙</span><span><b>Proxies residenciais rotativos</b> <span class="d">— essenciais para não bloquear/banir; têm custo mensal por tráfego.</span></span></li>
+    <li><span class="new">⚙</span><span><b>Google Maps</b> <span class="d">— extrai empresas locais (nome, telefone, endereço) por busca/região; alternativa paga: Google Places API.</span></span></li>
+    <li><span class="new">⚙</span><span><b>Instagram</b> <span class="d">— seguidores de concorrentes; não-oficial → risco de bloqueio do perfil.</span></span></li>
+  </ul>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>04</span></div>
+</section>
+
+<!-- 5 NOVO: CNPJ -->
+<section class="slide">
+  <div class="kicker">Configurar · novo (2/3)</div>
+  <h2>Extrator Radar CNPJ</h2>
+  <ul>
+    <li><span class="new">⚙</span><span><b>Base de Dados Abertos da Receita Federal</b> <span class="d">— importar num PostgreSQL e indexar para filtrar por CNAE, porte e data de abertura (melhor para filtros avançados).</span></span></li>
+    <li><span class="new">⚙</span><span><b>Ou API de CNPJ</b> <span class="d">— BrasilAPI / ReceitaWS / CNPJá / Casa dos Dados (algumas grátis com limite; outras pagas).</span></span></li>
+    <li><span class="new">⚙</span><span><b>Atualização periódica</b> <span class="d">— job para manter a base sincronizada.</span></span></li>
+  </ul>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>05</span></div>
+</section>
+
+<!-- 6 NOVO: CLOUD API + IA + DISPARO -->
+<section class="slide">
+  <div class="kicker">Configurar · novo (3/3)</div>
+  <h2>API Oficial, IA e disparo avançado</h2>
+  <ul>
+    <li><span class="new">⚙</span><span><b>WhatsApp Cloud API (oficial)</b> <span class="d">— conta Meta Business verificada + número + templates aprovados + webhook; cobrança por conversa.</span></span></li>
+    <li><span class="new">⚙</span><span><b>Motor de IA</b> <span class="d">— chave de LLM para disparo personalizado e SDR conversacional (ou manter roteiro, custo zero).</span></span></li>
+    <li><span class="new">⚙</span><span><b>Disparo com delays/automação</b> <span class="d">— fila com intervalos anti-ban, sequências e multiformato (texto, áudio, imagem, PDF).</span></span></li>
+    <li><span class="new">⚙</span><span><b>Métricas em tempo real</b> <span class="d">— painel de canais/conversões.</span></span></li>
+  </ul>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>06</span></div>
+</section>
+
+<!-- 7 INFRA & CUSTOS -->
+<section class="slide">
+  <div class="kicker">Infra &amp; custos</div>
+  <h2>O peso real está no scraping</h2>
+  <ul>
+    <li><span class="new">⚙</span><span><b>Máquina/worker dedicado</b> <span class="d">— para scraping e transcodes; o servidor atual do app não comporta.</span></span></li>
+    <li><span class="new">⚙</span><span><b>Proxies</b> <span class="d">— custo recorrente por volume de extração.</span></span></li>
+    <li><span class="new">⚙</span><span><b>Base CNPJ</b> <span class="d">— armazenamento + atualização.</span></span></li>
+    <li><span class="new">⚙</span><span><b>Cloud API + IA</b> <span class="d">— custo por conversa / por resposta, conforme o uso.</span></span></li>
+    <li><span class="ok">✓</span><span><b>CRM, funil, chat, Evolution, SDR</b> <span class="d">— sem custo novo (já no produto).</span></span></li>
+  </ul>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>07</span></div>
+</section>
+
+<!-- 8 ALERTAS -->
+<section class="slide">
+  <div class="kicker">Atenção</div>
+  <h2>Risco do modelo de prospecção fria</h2>
+  <div class="alerta"><b>LGPD &amp; ban de WhatsApp:</b> extrair contatos (Maps/Instagram/grupos) e disparar em massa para quem não pediu é o que mais gera <b>banimento de número</b> e <b>exposição legal (LGPD)</b>. Proxies e Cloud API mitigam, mas o risco é inerente ao modelo.</div>
+  <div class="sub"><b style="color:#fff;">Posicionamento:</b> o Evolua é prospecção/lead-gen B2B; o ZAIEZE é CRM de varejo de moda. Boa parte da base (CRM, funil, chat, Evolution, SDR) já existe — o que falta para a paridade são os <b style="color:#fff;">extratores + Cloud API + IA</b>, justamente as partes de infra pesada e risco.</div>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>08</span></div>
+</section>
+
+<!-- 9 FECHAMENTO -->
+<section class="slide center">
+  <div class="logo">ZAIE<em>Z</em>E</div>
+  <h1 style="margin-top:22px;">Paridade é viável.</h1>
+  <div class="sub" style="font-size:23px;">A base já está pronta. Faltam <b style="color:#fff;">extratores (scraping + proxies)</b>, <b style="color:#fff;">base CNPJ</b>, <b style="color:#fff;">Cloud API</b> e <b style="color:#fff;">motor de IA</b> — com atenção a custo e risco.</div>
+  <div class="foot"><span class="marca">ZAIEZE</span><span>Plano de paridade — Evolua Premium</span></div>
+</section>
+
+</body>
+</html>

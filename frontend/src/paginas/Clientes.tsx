@@ -247,7 +247,7 @@ export default function Clientes() {
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Ex.: Ana" />
           </div>
           <div className="campo">
-            <label>Segmento</label>
+            <label>Classificação</label>
             <select value={segmento} onChange={(e) => setSegmento(e.target.value)}>
               {FILTRO_SEGMENTOS.map((s) => <option key={s} value={s}>{s || 'Todos'}</option>)}
             </select>
@@ -299,7 +299,7 @@ export default function Clientes() {
               <th style={{ width: 28 }}>
                 <input type="checkbox" checked={selecao.size === clientes.length && clientes.length > 0} onChange={alternarTodos} />
               </th>
-              <th>Nome</th><th>WhatsApp</th><th>Local</th><th>Segmento</th><th>Total gasto</th><th>Última compra</th>
+              <th>Nome</th><th>WhatsApp</th><th>Local</th><th>Classificação</th><th>Total gasto</th><th>Última compra</th>
               {gerente && <th>Vendedora</th>}
               <th>LGPD</th><th></th>
             </tr>

@@ -6,7 +6,7 @@ import { lojaIdDe } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
 import { enviarWhatsapp } from './whatsapp.service'
 import { marcarLeadAtendido, garantirCicloAberto } from '../leads/leads.service'
-import { evolutionConfigurado, criarInstancia, conectarInstancia, estadoInstancia } from './evolution.service'
+import { evolutionConfigurado, criarInstancia, conectarInstancia, estadoInstancia, desconectarInstancia } from './evolution.service'
 
 const instanciaSchema = z.object({
   vendedoraId: z.string().optional(), // gerente configura a instância de uma vendedora
@@ -107,8 +107,24 @@ export async function whatsappRoutes(app: FastifyInstance) {
     const instancia = vend.waInstancia ?? `vend_${vend.id}`
     await prisma.usuario.update({ where: { id: vend.id }, data: { waInstancia: instancia, waConectado: false, waQrcode: null } })
     await criarInstancia(instancia)
-    await conectarInstancia(instancia)
-    return { instancia, status: 'aguardando_qr' }
+    // O QR já vem na resposta do connect (e o webhook também o atualiza). Guardamos de imediato.
+    const qrcode = await conectarInstancia(instancia)
+    if (qrcode) await prisma.usuario.update({ where: { id: vend.id }, data: { waQrcode: qrcode } })
+    return { instancia, status: 'aguardando_qr', qrcode: qrcode ?? null }
+  })
+
+  // Trocar número / desconectar: faz logout do número atual e zera o estado, para
+  // reconectar em seguida (a vendedora clica "Conectar" e escaneia o novo número).
+  app.post('/instancia/desconectar', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
+    const lojaId = await lojaIdDe(request)
+    const { vendedoraId } = z.object({ vendedoraId: z.string().optional() }).parse(request.body ?? {})
+    const alvoId = request.user.role === 'VENDEDORA' ? request.user.sub : vendedoraId
+    if (!alvoId) return reply.code(422).send({ erro: 'Informe a vendedora' })
+    const vend = await prisma.usuario.findFirst({ where: { id: alvoId, lojaId, role: { in: ['VENDEDORA', 'GERENTE'] } }, select: { id: true, waInstancia: true } })
+    if (!vend) return reply.code(422).send({ erro: 'Vendedora inválida para esta loja' })
+    if (vend.waInstancia && evolutionConfigurado()) await desconectarInstancia(vend.waInstancia)
+    await prisma.usuario.update({ where: { id: vend.id }, data: { waConectado: false, waNumero: null, waQrcode: null } })
+    return { ok: true }
   })
 
   // Status da conexão + QR (a vendedora faz polling enquanto escaneia).

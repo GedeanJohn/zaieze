@@ -277,7 +277,7 @@ function DashboardGeral() {
         <div className="cartao">
           <h2 className="painel-titulo">Melhores clientes</h2>
           <table>
-            <thead><tr><th>Cliente</th><th>Segmento</th><th>Total gasto</th></tr></thead>
+            <thead><tr><th>Cliente</th><th>Classificação</th><th>Total gasto</th></tr></thead>
             <tbody>
               {dados.topClientes.map((c) => (
                 <tr key={c.id}><td>{c.nome}</td><td><span className={`selo ${c.segmento}`}>{c.segmento}</span></td><td>{formataReal(c.totalGasto)}</td></tr>

@@ -76,6 +76,17 @@ export default function Campanhas() {
     } catch (e) { setErro(mensagemDeErro(e)) }
   }
 
+  // Trocar número: desconecta o atual e já dispara um novo QR para escanear outro aparelho.
+  async function trocarNumero() {
+    if (!confirm('Desconectar o número atual e conectar outro? Você vai precisar escanear o QR Code com o novo aparelho.')) return
+    setErro('')
+    try {
+      await api.post('/whatsapp/instancia/desconectar', {}, { params: escopo.params })
+      await carregarWaStatus()
+      await conectarWhatsapp()
+    } catch (e) { setErro(mensagemDeErro(e)) }
+  }
+
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
     const reqs: Promise<unknown>[] = [api.get('/campanhas', { params: escopo.params }).then(({ data }) => setCampanhas(data))]
@@ -147,8 +158,11 @@ export default function Campanhas() {
       <div className="cartao">
         <h2 className="painel-titulo">Meu WhatsApp</h2>
         {waStatus?.conectado ? (
-          <div style={{ color: 'var(--ok)', fontWeight: 600 }}>
-            ✅ WhatsApp conectado{waStatus.numero ? ` · ${waStatus.numero}` : ''}
+          <div>
+            <div style={{ color: 'var(--ok)', fontWeight: 600 }}>
+              ✅ WhatsApp conectado{waStatus.numero ? ` · ${waStatus.numero}` : ''}
+            </div>
+            <button className="btn secundario" style={{ marginTop: 10 }} onClick={trocarNumero} disabled={!escopo.pronto}>🔄 Trocar número</button>
           </div>
         ) : (
           <>
@@ -193,7 +207,7 @@ export default function Campanhas() {
               <input value={nome} onChange={(e) => setNome(e.target.value)} />
             </div>
             <div className="campo">
-              <label>Público (segmento)</label>
+              <label>Público (classificação)</label>
               <select value={segmento} onChange={(e) => setSegmento(e.target.value)}>
                 {SEGMENTOS.map((s) => <option key={s} value={s}>{s || (gerente ? 'Toda a carteira' : 'Minha carteira')}</option>)}
               </select>

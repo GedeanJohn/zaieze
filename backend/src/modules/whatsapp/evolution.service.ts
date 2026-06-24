@@ -44,9 +44,14 @@ export async function criarInstancia(instancia: string): Promise<void> {
   })
 }
 
-/** Dispara a geração do QR (o base64 chega pelo webhook). */
-export async function conectarInstancia(instancia: string): Promise<void> {
-  try { await chamar(`/instance/connect/${instancia}`) } catch { /* já conectando */ }
+/** Dispara a conexão e retorna o QR (base64) já na resposta; o webhook também o atualiza. */
+export async function conectarInstancia(instancia: string): Promise<string | null> {
+  try {
+    const r = await chamar<{ base64?: string }>(`/instance/connect/${instancia}`)
+    return r.base64 ?? null
+  } catch {
+    return null // já conectando — o QR virá pelo webhook
+  }
 }
 
 /** Estado atual: 'open' | 'connecting' | 'close'. */

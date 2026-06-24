@@ -115,7 +115,6 @@ async function main() {
       lojaId: loja.id, equipeId: equipeCentro.id, nome: 'Camila Ribeiro', email: 'camila@lojademo.com.br',
       senhaHash: senha, role: 'VENDEDORA', telefone: '5562999990002',
       slugCatalogo: 'camila', metaMensal: 50000, comissaoPadrao: 4,
-      waInstancia: 'camila-wa', waNumero: '5562999990002', waConectado: true,
     },
   })
   const ana = await prisma.usuario.create({
@@ -123,7 +122,6 @@ async function main() {
       lojaId: loja.id, equipeId: equipeOnline.id, nome: 'Ana Lima', email: 'ana@lojademo.com.br',
       senhaHash: senha, role: 'VENDEDORA', telefone: '5562999990003',
       slugCatalogo: 'ana', metaMensal: 40000, comissaoPadrao: 4,
-      waInstancia: 'ana-wa', waNumero: '5562999990003', waConectado: true,
     },
   })
 

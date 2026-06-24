@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, mensagemDeErro, usuarioLogado } from '../api'
-import { useLojaAtiva, SeletorLoja } from '../componentes/SeletorLoja'
+import { useLojaAtiva } from '../componentes/SeletorLoja'
 
 interface Colecao {
   id: string
@@ -162,10 +162,7 @@ export default function Colecoes() {
     <>
       <header>
         <h1>Coleções</h1>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-          <SeletorLoja escopo={escopo} />
-          <button className="btn" onClick={() => setForm({ nome: '' })}>+ Nova coleção</button>
-        </div>
+        <button className="btn" onClick={() => setForm({ nome: '' })}>+ Nova coleção</button>
       </header>
 
       <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, mensagemDeErro, usuarioLogado } from '../api'
-import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
+import { useLojaAtiva } from '../componentes/SeletorLoja'
 
 interface Variacao {
   id?: string
@@ -270,10 +270,7 @@ export default function Produtos() {
     <>
       <header>
         <h1>Produtos</h1>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-          <SeletorLoja escopo={escopo} />
-          {gerente && <button className="btn" onClick={abrirNovo} disabled={!escopo.pronto}>+ Novo produto</button>}
-        </div>
+        {gerente && <button className="btn" onClick={abrirNovo} disabled={!escopo.pronto}>+ Novo produto</button>}
       </header>
 
       <div className="cartao">

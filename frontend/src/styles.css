@@ -436,3 +436,61 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   .inbox-conversa { min-height: 60vh; max-height: 78vh; }
   .inbox-voltar { display: inline-flex; }
 }
+
+/* ───────────────────────── Chat Zaieze — tema escuro (escopado só nesta tela) ───────────────────────── */
+.chatz {
+  --cz-bg: #15121f; --cz-surf: #211c30; --cz-surf2: #2a2440; --cz-line: #352d4d;
+  --cz-tx: #ece9f5; --cz-mut: #9b93b4; --cz-accent: #a855f7;
+  background: var(--cz-bg); color: var(--cz-tx); border-radius: 16px; padding: 12px;
+  display: grid; grid-template-columns: 340px 1fr; gap: 12px;
+  height: calc(100dvh - 150px); min-height: 520px; overflow: hidden;
+}
+.chatz strong { color: var(--cz-tx); }
+.cz-lista, .cz-conversa { background: var(--cz-surf); border: 1px solid var(--cz-line); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.cz-lista-top { padding: 14px; border-bottom: 1px solid var(--cz-line); display: flex; flex-direction: column; gap: 10px; }
+.cz-titulo { font-weight: 700; font-size: 18px; display: flex; align-items: center; gap: 8px; font-family: var(--fonte-titulo); }
+.cz-count { background: var(--cz-accent); color: #fff; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 9px; }
+.cz-busca { background: var(--cz-bg); border: 1px solid var(--cz-line); color: var(--cz-tx); border-radius: 10px; padding: 9px 12px; font-size: 13px; width: 100%; }
+.cz-busca::placeholder { color: var(--cz-mut); }
+.cz-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.cz-tab { background: transparent; border: 1px solid var(--cz-line); color: var(--cz-mut); border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.cz-tab.ativo { background: var(--cz-accent); border-color: var(--cz-accent); color: #fff; }
+.cz-itens { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.cz-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: transparent; border: none; border-radius: 12px; padding: 10px; cursor: pointer; color: var(--cz-tx); }
+.cz-item:hover { background: var(--cz-surf2); }
+.cz-item.ativo { background: var(--cz-surf2); outline: 1px solid var(--cz-accent); }
+.cz-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: #fff; background: linear-gradient(135deg, #a855f7, #ec4899); flex: 0 0 auto; }
+.cz-avatar.sm { width: 38px; height: 38px; font-size: 14px; }
+.cz-item-main { flex: 1; min-width: 0; }
+.cz-item-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.cz-item-top strong { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cz-hora { font-size: 11px; color: var(--cz-mut); white-space: nowrap; }
+.cz-previa { font-size: 12.5px; color: var(--cz-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+.cz-badge { background: var(--cz-accent); color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 7px; min-width: 20px; text-align: center; }
+.cz-vazio { margin: auto; color: var(--cz-mut); }
+.cz-conv-top { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--cz-line); }
+.cz-conv-nome { flex: 1; min-width: 0; }
+.cz-conv-nome strong { display: block; font-size: 15px; }
+.cz-conv-nome span { font-size: 12px; color: var(--cz-mut); }
+.cz-bolhas { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 10px; background: var(--cz-bg); }
+.cz-dia { align-self: center; background: var(--cz-surf2); color: var(--cz-mut); font-size: 11px; padding: 3px 12px; border-radius: 999px; }
+.cz-bolha { max-width: 76%; padding: 9px 13px; border-radius: 14px; font-size: 14px; line-height: 1.35; word-break: break-word; }
+.cz-bolha.entrada { align-self: flex-start; background: var(--cz-surf2); border-bottom-left-radius: 4px; }
+.cz-bolha.saida { align-self: flex-end; background: linear-gradient(135deg, #7c3aed, #db2777); color: #fff; border-bottom-right-radius: 4px; }
+.cz-meta { display: block; font-size: 10px; opacity: .72; margin-top: 4px; text-align: right; }
+.cz-responder { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--cz-line); }
+.cz-responder input { flex: 1; background: var(--cz-bg); border: 1px solid var(--cz-line); color: var(--cz-tx); border-radius: 12px; padding: 11px 14px; font-size: 14px; }
+.cz-responder input::placeholder { color: var(--cz-mut); }
+.cz-enviar { background: linear-gradient(135deg, #a855f7, #ec4899); border: none; color: #fff; width: 46px; border-radius: 12px; font-size: 16px; cursor: pointer; }
+.cz-enviar:disabled { opacity: .5; cursor: default; }
+.cz-btn { background: linear-gradient(135deg, #a855f7, #ec4899); border: none; color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.cz-voltar { display: none; background: var(--cz-surf2); border: 1px solid var(--cz-line); color: var(--cz-tx); border-radius: 10px; padding: 4px 11px; font-size: 16px; cursor: pointer; }
+.cz-alerta { margin: 0 12px; background: #4a1d1d; color: #ffb4b4; border-radius: 10px; padding: 8px 12px; font-size: 13px; }
+
+@media (max-width: 720px) {
+  .chatz { grid-template-columns: 1fr; height: calc(100dvh - 96px); padding: 8px; gap: 8px; }
+  .chatz:not(.tem-sel) .cz-conversa { display: none; }
+  .chatz.tem-sel .cz-lista { display: none; }
+  .cz-voltar { display: inline-flex; }
+  .cz-bolha { max-width: 86%; }
+}

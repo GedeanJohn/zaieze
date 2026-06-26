@@ -88,7 +88,7 @@ export default function CaixaEntrada() {
   return (
     <div className="cz-pagina">
       <div className="cz-cabec">
-        <h1 className="cz-marca">Chat Zaieze</h1>
+        <h1 className="cz-marca"><span className="cz-marca-icone">💬</span> Chat Zaieze</h1>
         <SeletorLoja escopo={escopo} />
       </div>
 

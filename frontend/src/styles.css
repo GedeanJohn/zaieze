@@ -514,7 +514,9 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   font-family: var(--marca); font-weight: 600; letter-spacing: 0.05em;
   font-size: 30px; line-height: 1; text-align: center;
   padding: 14px 34px; border-radius: 14px; box-shadow: 0 8px 26px #0006;
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
 }
+.cz-marca-icone { font-size: 0.8em; line-height: 1; }
 .cz-cabec .campo label { color: #cfc8e6; text-align: center; }
 /* Fundo das conversas branco (mensagens legíveis no claro). */
 .cz-pagina .cz-bolhas { background: #fff; }

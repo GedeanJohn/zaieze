@@ -139,6 +139,10 @@ label { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 
 
 .grade-variacoes { display: grid; grid-template-columns: 1fr 0.9fr 0.8fr 1.3fr 76px 76px 76px 36px; gap: 8px; align-items: end; margin-bottom: 8px; }
 .grade-variacoes .remover { background: none; border: none; color: var(--danger); font-size: 18px; cursor: pointer; }
+/* Cada campo da grade carrega seu próprio rótulo (visível só no mobile; no desktop usa-se a linha de cabeçalho). */
+.gv-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.gv-cell > input, .gv-cell > select { width: 100%; }
+.gv-cell > span { display: none; }
 
 /* Desconto no PDV: régua + slider + totais */
 .desc-box { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-top: 14px; background: #00000005; }
@@ -226,6 +230,10 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   /* editores em grade de largura fixa (variações/itens de venda) empilham */
   .grade-variacoes, .grade-itens { grid-template-columns: 1fr; gap: 8px; }
   .grade-variacoes .remover, .grade-itens .remover { justify-self: end; }
+  /* No mobile: esconde a linha de cabeçalho e mostra o rótulo embutido em cada campo, agrupando a variação num cartão. */
+  .gv-head { display: none; }
+  .gv-cell > span { display: block; font-size: 11px; color: var(--ink-soft); }
+  .grade-variacoes:not(.gv-head) { border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
 
   /* ações do modal podem quebrar de linha */
   .modal .acoes { flex-wrap: wrap; }

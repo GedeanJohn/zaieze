@@ -103,6 +103,7 @@ export default function Produtos() {
   const [erro, setErro] = useState('')
   const [enviandoFoto, setEnviandoFoto] = useState(false)
   const [enviandoVideo, setEnviandoVideo] = useState(false)
+  const [colecoes, setColecoes] = useState<{ id: string; nome: string }[]>([])
 
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
@@ -121,6 +122,14 @@ export default function Produtos() {
   }
 
   useEffect(() => { carregar() }, [carregar])
+
+  // Coleções da marca (para o select no cadastro de produto).
+  useEffect(() => {
+    if (!escopo.pronto) return
+    api.get('/produtos/taxonomias/listar', { params: escopo.params })
+      .then(({ data }) => setColecoes(data.colecoes ?? []))
+      .catch(() => { /* sem taxonomias */ })
+  }, [escopo.pronto, escopo.params])
 
   function estoqueTotal(p: Produto) {
     return p.variacoes.reduce((s, v) => s + v.estoque, 0)
@@ -320,6 +329,16 @@ export default function Produtos() {
             <h2>{form.id ? 'Editar produto' : 'Novo produto'}</h2>
             {erro && <div className="alerta">{erro}</div>}
 
+            {/* Coleção: a peça/modelo é vinculada a uma das coleções já criadas (em Coleções). */}
+            <div className="campo">
+              <label>Coleção</label>
+              <select value={form.colecao ?? ''} onChange={(e) => setForm({ ...form, colecao: e.target.value })}>
+                <option value="">{colecoes.length ? '— Selecione a coleção —' : 'Nenhuma coleção criada (crie em Coleções)'}</option>
+                {colecoes.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+              </select>
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>Escolha a coleção de que este modelo faz parte.</div>
+            </div>
+
             {/* Essenciais */}
             <div className="linha-campos">
               <div className="campo">
@@ -413,7 +432,7 @@ export default function Produtos() {
 
             {/* Grade */}
             <h3 style={{ marginBottom: 8 }}>Grade (cor × estampa × tamanho)</h3>
-            <div className="grade-variacoes" style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
+            <div className="grade-variacoes gv-head" style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
               <span>Cor</span><span>Estampa</span><span>Tamanho</span><span>Cód. barras (EAN)</span><span>Estoque</span><span title="Reserva exclusiva p/ varejo (peças únicas)">Varejo</span><span>Mínimo</span><span></span>
             </div>
             <datalist id="estampas-sugeridas">
@@ -421,37 +440,58 @@ export default function Produtos() {
             </datalist>
             {form.variacoes.map((v, i) => (
               <div className="grade-variacoes" key={i}>
-                <input value={v.cor} onChange={(e) => mudarVariacao(i, 'cor', e.target.value)} placeholder="Preto" required />
-                <input value={v.estampa ?? ''} onChange={(e) => mudarVariacao(i, 'estampa', e.target.value)} placeholder="opcional (ex.: Paisley)" list="estampas-sugeridas" />
-                {v.livre || (v.tamanho !== '' && !TAMANHOS_SUGERIDOS.includes(v.tamanho)) ? (
-                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <input
-                      value={v.tamanho} onChange={(e) => mudarVariacao(i, 'tamanho', e.target.value)}
-                      placeholder="Tamanho" required autoFocus style={{ flex: 1, minWidth: 0 }}
-                    />
-                    <button
-                      type="button" title="Escolher da lista" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--ink-soft)' }}
-                      onClick={() => setForm({ ...form, variacoes: form.variacoes.map((x, idx) => idx === i ? { ...x, tamanho: '', livre: false } : x) })}
-                    >↩</button>
-                  </div>
-                ) : (
-                  <select
-                    value={v.tamanho} required
-                    onChange={(e) => {
-                      const val = e.target.value
-                      if (val === '__outro__') setForm({ ...form, variacoes: form.variacoes.map((x, idx) => idx === i ? { ...x, tamanho: '', livre: true } : x) })
-                      else mudarVariacao(i, 'tamanho', val)
-                    }}
-                  >
-                    <option value="" disabled>Tamanho</option>
-                    {TAMANHOS_SUGERIDOS.map((t) => <option key={t} value={t}>{t}</option>)}
-                    <option value="__outro__">Outro…</option>
-                  </select>
-                )}
-                <input value={v.codigoBarras ?? ''} onChange={(e) => mudarVariacao(i, 'codigoBarras', e.target.value)} placeholder="opcional" />
-                <input type="number" min="0" value={v.estoque} onChange={(e) => mudarVariacao(i, 'estoque', e.target.value)} />
-                <input type="number" min="0" max={v.estoque} value={v.estoqueVarejo ?? 0} onChange={(e) => mudarVariacao(i, 'estoqueVarejo', e.target.value)} title="Reserva exclusiva p/ varejo (≤ estoque)" />
-                <input type="number" min="0" value={v.estoqueMinimo} onChange={(e) => mudarVariacao(i, 'estoqueMinimo', e.target.value)} />
+                <div className="gv-cell">
+                  <span>Cor</span>
+                  <input value={v.cor} onChange={(e) => mudarVariacao(i, 'cor', e.target.value)} placeholder="Preto" required />
+                </div>
+                <div className="gv-cell">
+                  <span>Estampa</span>
+                  <input value={v.estampa ?? ''} onChange={(e) => mudarVariacao(i, 'estampa', e.target.value)} placeholder="opcional (ex.: Paisley)" list="estampas-sugeridas" />
+                </div>
+                <div className="gv-cell">
+                  <span>Tamanho</span>
+                  {v.livre || (v.tamanho !== '' && !TAMANHOS_SUGERIDOS.includes(v.tamanho)) ? (
+                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                      <input
+                        value={v.tamanho} onChange={(e) => mudarVariacao(i, 'tamanho', e.target.value)}
+                        placeholder="Tamanho" required autoFocus style={{ flex: 1, minWidth: 0 }}
+                      />
+                      <button
+                        type="button" title="Escolher da lista" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--ink-soft)' }}
+                        onClick={() => setForm({ ...form, variacoes: form.variacoes.map((x, idx) => idx === i ? { ...x, tamanho: '', livre: false } : x) })}
+                      >↩</button>
+                    </div>
+                  ) : (
+                    <select
+                      value={v.tamanho} required
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (val === '__outro__') setForm({ ...form, variacoes: form.variacoes.map((x, idx) => idx === i ? { ...x, tamanho: '', livre: true } : x) })
+                        else mudarVariacao(i, 'tamanho', val)
+                      }}
+                    >
+                      <option value="" disabled>Tamanho</option>
+                      {TAMANHOS_SUGERIDOS.map((t) => <option key={t} value={t}>{t}</option>)}
+                      <option value="__outro__">Outro…</option>
+                    </select>
+                  )}
+                </div>
+                <div className="gv-cell">
+                  <span>Cód. barras (EAN)</span>
+                  <input value={v.codigoBarras ?? ''} onChange={(e) => mudarVariacao(i, 'codigoBarras', e.target.value)} placeholder="opcional" />
+                </div>
+                <div className="gv-cell">
+                  <span>Estoque</span>
+                  <input type="number" min="0" value={v.estoque} onChange={(e) => mudarVariacao(i, 'estoque', e.target.value)} />
+                </div>
+                <div className="gv-cell">
+                  <span title="Reserva exclusiva p/ varejo (peças únicas)">Varejo</span>
+                  <input type="number" min="0" max={v.estoque} value={v.estoqueVarejo ?? 0} onChange={(e) => mudarVariacao(i, 'estoqueVarejo', e.target.value)} title="Reserva exclusiva p/ varejo (≤ estoque)" />
+                </div>
+                <div className="gv-cell">
+                  <span>Mínimo</span>
+                  <input type="number" min="0" value={v.estoqueMinimo} onChange={(e) => mudarVariacao(i, 'estoqueMinimo', e.target.value)} />
+                </div>
                 <button
                   type="button" className="remover" title="Remover"
                   onClick={() => setForm({ ...form, variacoes: form.variacoes.filter((_, idx) => idx !== i) })}
@@ -470,10 +510,6 @@ export default function Produtos() {
                 <div className="campo">
                   <label>Marca</label>
                   <input value={form.marca ?? ''} onChange={(e) => setForm({ ...form, marca: e.target.value })} />
-                </div>
-                <div className="campo">
-                  <label>Coleção / estação</label>
-                  <input value={form.colecao ?? ''} onChange={(e) => setForm({ ...form, colecao: e.target.value })} placeholder="Ex.: Verão/Primavera 2026" />
                 </div>
               </div>
               <div className="linha-campos">

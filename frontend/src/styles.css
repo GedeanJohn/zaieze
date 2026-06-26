@@ -487,8 +487,37 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .cz-voltar { display: none; background: var(--cz-surf2); border: 1px solid var(--cz-line); color: var(--cz-tx); border-radius: 10px; padding: 4px 11px; font-size: 16px; cursor: pointer; }
 .cz-alerta { margin: 0 12px; background: #4a1d1d; color: #ffb4b4; border-radius: 10px; padding: 8px 12px; font-size: 13px; }
 
+/* Funil (kanban): cards não selecionáveis no toque longo do celular — o press-and-hold arrasta, não seleciona texto. */
+.funil-kanban, .funil-kanban * {
+  -webkit-user-select: none; -moz-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+
+/* A página inteira do Chat usa a cor da conversa (full-bleed sobre o padding do .conteudo). */
+.cz-pagina {
+  background: #15121f; /* cor da conversa */
+  margin: -32px -40px; padding: 24px 40px 32px;
+  min-height: calc(100dvh - 64px);
+  display: flex; flex-direction: column;
+}
+/* Título "Chat Zaieze" em caixa branca, fonte NUSAR da marca, centralizado. */
+.cz-cabec { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 18px; }
+.cz-marca {
+  margin: 0; background: #fff; color: #15121f;
+  font-family: var(--marca); font-weight: 600; letter-spacing: 0.05em;
+  font-size: 30px; line-height: 1; text-align: center;
+  padding: 14px 34px; border-radius: 14px; box-shadow: 0 8px 26px #0006;
+}
+.cz-cabec .campo label { color: #cfc8e6; text-align: center; }
+/* Fundo das conversas branco (mensagens legíveis no claro). */
+.cz-pagina .cz-bolhas { background: #fff; }
+.cz-pagina .cz-bolha.entrada { background: #f1eef8; color: #1d1730; }
+.cz-pagina .cz-bolha.entrada .cz-meta { color: #6b6480; opacity: 1; }
+.cz-pagina .cz-dia { background: #ece9f5; color: #6b6480; }
+
 @media (max-width: 720px) {
-  .chatz { grid-template-columns: 1fr; height: calc(100dvh - 96px); padding: 8px; gap: 8px; }
+  .cz-pagina { margin: -18px -16px; padding: 14px 16px 18px; }
+  .cz-marca { font-size: 24px; padding: 12px 26px; }
+  .chatz { grid-template-columns: 1fr; height: calc(100dvh - 150px); padding: 8px; gap: 8px; }
   .chatz:not(.tem-sel) .cz-conversa { display: none; }
   .chatz.tem-sel .cz-lista { display: none; }
   .cz-voltar { display: inline-flex; }

@@ -99,7 +99,7 @@ function CardLead({ c, mover, redistribuir, podeRedistribuir }: {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: c.id, data: { card: c } })
   const ct = corTempoEspera(c)
   return (
-    <div ref={setNodeRef} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `4px solid ${ct ?? c.situacao.cor}`, background: ct ? `${ct}22` : undefined, opacity: isDragging ? 0.4 : 1 }}>
+    <div ref={setNodeRef} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `4px solid ${ct ?? c.situacao.cor}`, background: ct ? `${ct}22` : undefined, opacity: isDragging ? 0.4 : 1, userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
         <button type="button" {...attributes} {...listeners} title="Arraste para mudar de etapa" aria-label="Arrastar card"
           style={{ cursor: 'grab', touchAction: 'none', border: 'none', background: 'none', color: 'var(--ink-soft)', fontSize: 16, padding: '0 2px', lineHeight: 1.1 }}>⠿</button>
@@ -277,7 +277,7 @@ export default function Pipeline() {
         Dica: arraste o card pela alça <strong>⠿</strong> para outra etapa (no celular, pressione e segure). Ou use o seletor no card.
       </div>
       <DndContext sensors={sensors} onDragStart={aoIniciarArrasto} onDragEnd={aoSoltar}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(180px, 1fr))', gap: 10, overflowX: 'auto' }}>
+        <div className="funil-kanban" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(180px, 1fr))', gap: 10, overflowX: 'auto' }}>
           {ETAPAS.map((etapa) => {
             const cards = pipe?.colunas[etapa] ?? []
             return (

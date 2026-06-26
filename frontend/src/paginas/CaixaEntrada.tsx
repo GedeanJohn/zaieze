@@ -86,11 +86,11 @@ export default function CaixaEntrada() {
   }, [conversas, busca, filtro])
 
   return (
-    <>
-      <header>
-        <h1>💬 Chat Zaieze</h1>
+    <div className="cz-pagina">
+      <div className="cz-cabec">
+        <h1 className="cz-marca">Chat Zaieze</h1>
         <SeletorLoja escopo={escopo} />
-      </header>
+      </div>
 
       <div className={`chatz${sel ? ' tem-sel' : ''}`}>
         {/* Lista de conversas */}
@@ -157,6 +157,6 @@ export default function CaixaEntrada() {
           )}
         </section>
       </div>
-    </>
+    </div>
   )
 }

@@ -12,7 +12,19 @@ interface Membro {
   metaMensal?: string | null
   comissaoPadrao?: string | null
   ativo: boolean
+  waNumero?: string | null
+  waConectado?: boolean
   _count?: { carteira: number }
+}
+
+/** Formata o número do WhatsApp (dígitos) como +55 (62) 99999-0011 quando possível. */
+function formatarWhatsapp(num?: string | null): string {
+  const d = (num ?? '').replace(/\D/g, '')
+  if (d.length < 8) return num ?? ''
+  const br = d.startsWith('55') ? d.slice(2) : d
+  if (br.length === 11) return `+55 (${br.slice(0, 2)}) ${br.slice(2, 7)}-${br.slice(7)}`
+  if (br.length === 10) return `+55 (${br.slice(0, 2)}) ${br.slice(2, 6)}-${br.slice(6)}`
+  return `+${d}`
 }
 
 interface FormMembro {
@@ -288,7 +300,7 @@ export default function Equipe() {
             <div className="cartao">
               <table>
                 <thead>
-                  <tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Carteira</th><th>Meta mensal</th><th>Comissão</th><th>Status</th><th></th></tr>
+                  <tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>WhatsApp</th><th>Carteira</th><th>Meta mensal</th><th>Comissão</th><th>Status</th><th></th></tr>
                 </thead>
                 <tbody>
                   {equipe.map((m) => (
@@ -296,6 +308,11 @@ export default function Equipe() {
                       <td>{m.nome}</td>
                       <td>{m.email}</td>
                       <td>{m.role === 'GERENTE' ? 'Gerente de Loja' : 'Vendedora'}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        {m.waConectado && m.waNumero
+                          ? <span style={{ color: 'var(--ok)' }}>📱 {formatarWhatsapp(m.waNumero)}</span>
+                          : <span style={{ color: 'var(--ink-soft)' }}>{m.waNumero ? formatarWhatsapp(m.waNumero) : '—'}</span>}
+                      </td>
                       <td>{m._count?.carteira ?? 0} clientes</td>
                       <td>{m.metaMensal ? `R$ ${Number(m.metaMensal).toLocaleString('pt-BR')}` : '—'}</td>
                       <td>{m.comissaoPadrao ? `${Number(m.comissaoPadrao)}%` : '—'}</td>
@@ -313,7 +330,7 @@ export default function Equipe() {
                       </td>
                     </tr>
                   ))}
-                  {equipe.length === 0 && <tr><td colSpan={8} style={{ color: 'var(--ink-soft)' }}>Nenhum membro nesta loja ainda.</td></tr>}
+                  {equipe.length === 0 && <tr><td colSpan={9} style={{ color: 'var(--ink-soft)' }}>Nenhum membro nesta loja ainda.</td></tr>}
                 </tbody>
               </table>
             </div>

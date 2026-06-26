@@ -141,7 +141,7 @@ export default function Clientes() {
     e.preventDefault()
     if (!editando) return
     setErro('')
-    const corpo = {
+    const corpo: Record<string, unknown> = {
       nome: editando.nome,
       telefone: editando.telefone,
       email: editando.email || undefined,
@@ -149,9 +149,11 @@ export default function Clientes() {
       cep: editando.cep || undefined,
       cidade: editando.cidade || undefined,
       uf: editando.uf || undefined,
-      vendedoraId: (editando as { vendedoraId?: string }).vendedoraId || editando.vendedora?.id || undefined,
       consentimentoLgpd: editando.consentimentoLgpd ?? false,
     }
+    // Só o gerente/gestor define/transfere a carteira. A vendedora edita os dados do
+    // cliente sem mexer na carteira (o backend recusa vendedoraId vindo de vendedora).
+    if (gerente) corpo.vendedoraId = (editando as { vendedoraId?: string }).vendedoraId || editando.vendedora?.id || undefined
     try {
       if (editando.id) await api.patch(`/clientes/${editando.id}`, corpo, { params: escopo.params })
       else await api.post('/clientes', corpo, { params: escopo.params })

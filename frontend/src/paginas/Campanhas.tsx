@@ -87,6 +87,17 @@ export default function Campanhas() {
     } catch (e) { setErro(mensagemDeErro(e)) }
   }
 
+  // Desconectar: encerra a sessão do WhatsApp da vendedora (fica desconectada).
+  async function desconectarWhatsapp() {
+    if (!confirm('Desconectar seu WhatsApp? Você deixará de enviar/receber mensagens por aqui até conectar de novo.')) return
+    setErro('')
+    try {
+      await api.post('/whatsapp/instancia/desconectar', {}, { params: escopo.params })
+      setConectandoWa(false)
+      await carregarWaStatus()
+    } catch (e) { setErro(mensagemDeErro(e)) }
+  }
+
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
     const reqs: Promise<unknown>[] = [api.get('/campanhas', { params: escopo.params }).then(({ data }) => setCampanhas(data))]
@@ -162,7 +173,10 @@ export default function Campanhas() {
             <div style={{ color: 'var(--ok)', fontWeight: 600 }}>
               ✅ WhatsApp conectado{waStatus.numero ? ` · ${waStatus.numero}` : ''}
             </div>
-            <button className="btn secundario" style={{ marginTop: 10 }} onClick={trocarNumero} disabled={!escopo.pronto}>🔄 Trocar número</button>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+              <button className="btn secundario" onClick={trocarNumero} disabled={!escopo.pronto}>🔄 Trocar número</button>
+              <button className="btn secundario" onClick={desconectarWhatsapp} disabled={!escopo.pronto}>🔌 Desconectar</button>
+            </div>
           </div>
         ) : (
           <>

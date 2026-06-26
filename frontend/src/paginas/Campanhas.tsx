@@ -243,7 +243,8 @@ export default function Campanhas() {
               </div>
             ) : (
               <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>
-                Variáveis: {'{primeiroNome}'} {'{nome}'} {'{loja}'} {'{vendedora}'} {'{diasSemCompra}'} {'{totalGasto}'}
+                Variáveis: {'{primeiroNome}'} {'{nome}'} {'{loja}'} {'{vendedora}'} {'{diasSemCompra}'} {'{totalGasto}'} {'{link}'}
+                <br />O link do catálogo da vendedora é incluído automaticamente; use {'{link}'} para posicioná-lo no texto.
               </div>
             )}
           </div>

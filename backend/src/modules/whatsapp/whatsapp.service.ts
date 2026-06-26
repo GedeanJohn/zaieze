@@ -8,6 +8,8 @@ export interface DadosTemplate {
   totalGasto?: number
   diasSemCompra?: number | null
   segmento?: string
+  /** Link público do catálogo da vendedora (Portal do Cliente). Vazio quando o plano não inclui o portal. */
+  link?: string
 }
 
 /** Substitui os placeholders do template pela informação do cliente. */
@@ -22,6 +24,7 @@ export function aplicarTemplate(template: string, d: DadosTemplate): string {
     .replaceAll('{totalGasto}', real(d.totalGasto))
     .replaceAll('{diasSemCompra}', d.diasSemCompra != null ? String(d.diasSemCompra) : '—')
     .replaceAll('{segmento}', d.segmento ?? '')
+    .replaceAll('{link}', d.link ?? '')
 }
 
 /**

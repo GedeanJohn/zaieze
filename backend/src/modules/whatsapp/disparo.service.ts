@@ -1,6 +1,8 @@
 import type { OrigemMensagem } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { aplicarTemplate, enviarWhatsapp } from './whatsapp.service'
+import { garantirSlugCatalogo, urlCatalogoPublica } from '../catalogo/catalogo.routes'
+import { planoInclui } from '../../plugins/planos'
 
 const num = (v: unknown) => Number(v ?? 0)
 
@@ -37,13 +39,26 @@ export async function dispararParaClientes(opts: {
   clientes: ClienteAlvo[]
   vendedoraFallbackId?: string
 }): Promise<ResultadoDisparo> {
-  const loja = await prisma.loja.findUniqueOrThrow({ where: { id: opts.lojaId }, select: { nome: true } })
+  const loja = await prisma.loja.findUniqueOrThrow({
+    where: { id: opts.lojaId },
+    select: { nome: true, redeId: true, rede: { select: { slug: true, plano: true } } },
+  })
   const res: ResultadoDisparo = { alcance: opts.clientes.length, enviados: 0, simulados: 0, falhas: 0, semConsentimento: 0, semVendedora: 0 }
 
   const ids = [...new Set(opts.clientes.map((c) => c.vendedoraId ?? opts.vendedoraFallbackId).filter((v): v is string => !!v))]
   const vendedoras = new Map(
-    (await prisma.usuario.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, waInstancia: true } })).map((v) => [v.id, v]),
+    (await prisma.usuario.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, waInstancia: true, slugCatalogo: true } })).map((v) => [v.id, v]),
   )
+
+  // Link do catálogo de cada vendedora (Portal do Cliente). Só existe se o plano da marca inclui o portal.
+  const portalAtivo = planoInclui(loja.rede.plano, 'portal_cliente')
+  const links = new Map<string, string>()
+  if (portalAtivo) {
+    for (const v of vendedoras.values()) {
+      const slug = await garantirSlugCatalogo(v, loja.redeId)
+      links.set(v.id, urlCatalogoPublica(loja.rede.slug, slug))
+    }
+  }
 
   for (const c of opts.clientes) {
     if (!c.consentimentoLgpd) {
@@ -58,14 +73,18 @@ export async function dispararParaClientes(opts: {
     }
 
     const dias = c.ultimaCompraEm ? Math.floor((Date.now() - c.ultimaCompraEm.getTime()) / 86_400_000) : null
-    const texto = aplicarTemplate(opts.template, {
+    const link = links.get(vend.id) ?? ''
+    let texto = aplicarTemplate(opts.template, {
       nome: c.nome,
       loja: loja.nome,
       vendedora: vend.nome,
       totalGasto: num(c.totalGasto),
       diasSemCompra: dias,
       segmento: c.segmento,
+      link,
     })
+    // Garante que o link da vendedora vá na mensagem mesmo quando o template não usa {link}.
+    if (link && !opts.template.includes('{link}')) texto = `${texto}\n\n👉 Veja o catálogo: ${link}`
     const status = await enviarWhatsapp({ instancia: vend.waInstancia, telefone: c.telefone, texto })
 
     await prisma.mensagemWhatsapp.create({

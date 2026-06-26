@@ -61,7 +61,8 @@ export async function sugerirMensagem(opts: { segmento?: string | null; contexto
       max_tokens: 400,
       system:
         'Você escreve mensagens curtas e calorosas de WhatsApp para clientes de uma loja de moda, em português do Brasil. ' +
-        'Use EXATAMENTE estes placeholders entre chaves quando fizer sentido: {primeiroNome}, {loja}, {vendedora}, {diasSemCompra}, {totalGasto}. ' +
+        'Use EXATAMENTE estes placeholders entre chaves quando fizer sentido: {primeiroNome}, {loja}, {vendedora}, {diasSemCompra}, {totalGasto}, {link}. ' +
+        'O {link} é o link do catálogo da vendedora — inclua um convite curto para ver o catálogo com {link} quando combinar. ' +
         'No máximo 2 frases e 1 emoji, tom de vendedora próxima e gentil. Responda apenas com a mensagem, sem aspas nem explicações.',
       messages: [
         {

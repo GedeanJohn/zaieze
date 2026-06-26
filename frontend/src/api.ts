@@ -40,7 +40,7 @@ export const rotuloPapel: Record<Papel, string> = {
   SUPER_ADMIN: 'Admin SaaS',
   GESTOR: 'Gestor da marca',
   ESTOQUISTA: 'Gestor de Estoque',
-  GERENTE: 'Gerente',
+  GERENTE: 'Gerente de Loja',
   VENDEDORA: 'Vendedora',
   CLIENTE: 'Cliente',
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, mensagemDeErro, usuarioLogado } from '../api'
+import { api, mensagemDeErro, temFeature, usuarioLogado } from '../api'
 import ConvidarModal from '../componentes/ConvidarModal'
 
 interface Membro {
@@ -27,30 +27,83 @@ interface FormMembro {
   comissaoPadrao?: string
 }
 
+interface Loja {
+  id: string
+  nome: string
+  slug: string
+  cnpj?: string | null
+  telefone?: string | null
+  ativo: boolean
+  usuarios?: { id: string; nome: string; email: string }[]
+  _count?: { usuarios: number; clientes: number; equipes: number }
+}
+
+interface FormLoja {
+  nome: string
+  slug: string
+  cnpj?: string
+  telefone?: string
+  gerente: { nome: string; email: string; senha: string }
+}
+
+interface Estoquista {
+  id: string
+  nome: string
+  email: string
+  telefone?: string | null
+  ativo: boolean
+}
+
+type Aba = 'equipe' | 'lojas' | 'estoque'
+
 export default function Equipe() {
   const usuario = usuarioLogado()!
   const ehGestor = usuario.role === 'GESTOR' || usuario.role === 'SUPER_ADMIN'
+  const multiLoja = temFeature('multi_loja')
+  // O gestor administra lojas e gestores de estoque (nível rede). O gerente só vê a equipe da própria loja.
+  const mostraLojas = ehGestor && multiLoja
+  const mostraEstoque = ehGestor && multiLoja
+
+  const [aba, setAba] = useState<Aba>('equipe')
+
+  // ── Lojas da rede (gestor) + loja selecionada para a aba "Equipe da loja" ──
+  const [lojas, setLojas] = useState<Loja[]>([])
+  const [lojaSel, setLojaSel] = useState<string>(() => (ehGestor ? localStorage.getItem('modacrm_lojaId') ?? '' : ''))
+  const teamParams = ehGestor && lojaSel ? { lojaId: lojaSel } : {}
+  const teamPronto = !ehGestor || !!lojaSel
+
+  function escolherLoja(id: string) {
+    localStorage.setItem('modacrm_lojaId', id)
+    setLojaSel(id)
+  }
+
+  const carregarLojas = useCallback(async () => {
+    if (!ehGestor) return
+    const { data } = await api.get('/lojas')
+    setLojas(data)
+    setLojaSel((atual) => (data.some((l: Loja) => l.id === atual) ? atual : data[0]?.id ?? ''))
+  }, [ehGestor])
+
+  useEffect(() => { carregarLojas() }, [carregarLojas])
+
+  // ── Equipe da loja (gerentes + vendedoras) ──
   const [equipe, setEquipe] = useState<Membro[]>([])
   const [form, setForm] = useState<FormMembro | null>(null)
   const [convidar, setConvidar] = useState(false)
-  const [lojas, setLojas] = useState<{ id: string; nome: string }[]>([])
   const [gerenciar, setGerenciar] = useState<Membro | null>(null)
   const [gModo, setGModo] = useState<'substituir' | 'desligar'>('substituir')
   const [gForm, setGForm] = useState({ nome: '', email: '', senha: '' })
   const [gDestino, setGDestino] = useState('')
   const [erro, setErro] = useState('')
 
-  const carregar = useCallback(async () => {
-    const { data } = await api.get('/usuarios')
+  const carregarEquipe = useCallback(async () => {
+    if (!teamPronto) return
+    const { data } = await api.get('/usuarios', { params: teamParams })
     setEquipe(data)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamPronto, lojaSel])
 
-  useEffect(() => { carregar() }, [carregar])
-
-  // Gestor precisa escolher a loja do convidado → carrega as lojas da rede.
-  useEffect(() => {
-    if (ehGestor) api.get('/lojas').then(({ data }) => setLojas(data.map((l: { id: string; nome: string }) => ({ id: l.id, nome: l.nome })))).catch(() => {})
-  }, [ehGestor])
+  useEffect(() => { carregarEquipe() }, [carregarEquipe])
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault()
@@ -65,21 +118,22 @@ export default function Equipe() {
       comissaoPadrao: form.comissaoPadrao ? Number(form.comissaoPadrao) : undefined,
     }
     if (form.senha) corpo.senha = form.senha
-    if (!form.id) corpo.role = 'VENDEDORA'
-    else if (ehGestor && form.role) corpo.role = form.role // gestor pode mudar a função
+    // Gestor escolhe a função (Gerente de Loja / Vendedora); gerente só cria vendedora.
+    if (ehGestor && form.role) corpo.role = form.role
+    else if (!form.id) corpo.role = 'VENDEDORA'
     try {
-      if (form.id) await api.patch(`/usuarios/${form.id}`, corpo)
-      else await api.post('/usuarios', corpo)
+      if (form.id) await api.patch(`/usuarios/${form.id}`, corpo, { params: teamParams })
+      else await api.post('/usuarios', corpo, { params: teamParams })
       setForm(null)
-      carregar()
+      carregarEquipe()
     } catch (err) {
       setErro(mensagemDeErro(err))
     }
   }
 
   async function alternarAtivo(m: Membro) {
-    await api.patch(`/usuarios/${m.id}`, { ativo: !m.ativo })
-    carregar()
+    await api.patch(`/usuarios/${m.id}`, { ativo: !m.ativo }, { params: teamParams })
+    carregarEquipe()
   }
 
   function abrirGerenciar(m: Membro) {
@@ -90,8 +144,8 @@ export default function Equipe() {
     if (!gerenciar) return
     setErro('')
     try {
-      await api.post(`/usuarios/${gerenciar.id}/substituir`, gForm)
-      setGerenciar(null); carregar()
+      await api.post(`/usuarios/${gerenciar.id}/substituir`, gForm, { params: teamParams })
+      setGerenciar(null); carregarEquipe()
     } catch (err) { setErro(mensagemDeErro(err)) }
   }
   async function desligar() {
@@ -99,65 +153,247 @@ export default function Equipe() {
     if (!confirm(`Desligar ${gerenciar.nome}?${gDestino ? ' A carteira será transferida.' : ' (sem transferir a carteira)'}`)) return
     setErro('')
     try {
-      const { data } = await api.post(`/usuarios/${gerenciar.id}/desligar`, { paraVendedoraId: gDestino || undefined })
-      setGerenciar(null); carregar()
+      const { data } = await api.post(`/usuarios/${gerenciar.id}/desligar`, { paraVendedoraId: gDestino || undefined }, { params: teamParams })
+      setGerenciar(null); carregarEquipe()
       alert(`${gerenciar.nome} desligada.` + (gDestino ? ` ${data.clientesTransferidos} cliente(s) e ${data.leadsTransferidos} lead(s) transferidos.` : ''))
     } catch (err) { setErro(mensagemDeErro(err)) }
   }
+
+  // ── Lojas: cadastrar / editar ──
+  const [formLoja, setFormLoja] = useState<FormLoja | null>(null)
+  const [editLoja, setEditLoja] = useState<Loja | null>(null)
+
+  async function salvarLoja(e: React.FormEvent) {
+    e.preventDefault()
+    if (!formLoja) return
+    setErro('')
+    try {
+      await api.post('/lojas', {
+        nome: formLoja.nome,
+        slug: formLoja.slug,
+        cnpj: formLoja.cnpj || undefined,
+        telefone: formLoja.telefone || undefined,
+        gerente: formLoja.gerente,
+      })
+      setFormLoja(null)
+      carregarLojas()
+    } catch (err) { setErro(mensagemDeErro(err)) }
+  }
+
+  async function salvarEdicaoLoja(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editLoja) return
+    setErro('')
+    try {
+      await api.patch(`/lojas/${editLoja.id}`, {
+        nome: editLoja.nome,
+        cnpj: editLoja.cnpj || null,
+        telefone: editLoja.telefone || null,
+        ativo: editLoja.ativo,
+      })
+      setEditLoja(null)
+      carregarLojas()
+    } catch (err) { setErro(mensagemDeErro(err)) }
+  }
+
+  // ── Gestores de estoque (nível rede) ──
+  const [estoquistas, setEstoquistas] = useState<Estoquista[]>([])
+  const [formE, setFormE] = useState<{ id?: string; nome: string; email: string; senha?: string; telefone?: string } | null>(null)
+  const [convidarE, setConvidarE] = useState(false)
+
+  const carregarEstoquistas = useCallback(async () => {
+    if (!mostraEstoque) return
+    const { data } = await api.get('/estoquistas')
+    setEstoquistas(data)
+  }, [mostraEstoque])
+
+  useEffect(() => { carregarEstoquistas() }, [carregarEstoquistas])
+
+  async function salvarEstoquista(e: React.FormEvent) {
+    e.preventDefault()
+    if (!formE) return
+    setErro('')
+    const corpo: Record<string, unknown> = { nome: formE.nome, email: formE.email, telefone: formE.telefone || undefined }
+    if (formE.senha) corpo.senha = formE.senha
+    try {
+      if (formE.id) await api.patch(`/estoquistas/${formE.id}`, corpo)
+      else await api.post('/estoquistas', corpo)
+      setFormE(null)
+      carregarEstoquistas()
+    } catch (err) { setErro(mensagemDeErro(err)) }
+  }
+
+  async function alternarEstoquista(es: Estoquista) {
+    await api.patch(`/estoquistas/${es.id}`, { ativo: !es.ativo })
+    carregarEstoquistas()
+  }
+
+  const lojaAtualNome = lojas.find((l) => l.id === lojaSel)?.nome
 
   return (
     <>
       <header>
         <h1>Equipe</h1>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn" onClick={() => setConvidar(true)}>✉️ Convidar por link</button>
-          <button className="btn secundario" onClick={() => setForm({ nome: '', email: '' })}>+ Nova (com senha)</button>
-        </div>
+        {aba === 'equipe' && (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn" onClick={() => setConvidar(true)} disabled={!teamPronto}>✉️ Convidar por link</button>
+            <button className="btn secundario" onClick={() => setForm({ nome: '', email: '', role: 'VENDEDORA' })} disabled={!teamPronto}>+ Novo (com senha)</button>
+          </div>
+        )}
+        {aba === 'lojas' && (
+          <button className="btn" onClick={() => setFormLoja({ nome: '', slug: '', gerente: { nome: '', email: '', senha: '' } })}>+ Nova loja</button>
+        )}
+        {aba === 'estoque' && (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn" onClick={() => setConvidarE(true)}>✉️ Convidar por link</button>
+            <button className="btn secundario" onClick={() => setFormE({ nome: '', email: '', senha: '' })}>+ Novo (com senha)</button>
+          </div>
+        )}
       </header>
 
-      <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-        Plano <strong>{usuario.rede?.plano ?? '—'}</strong> — o limite de vendedoras é aplicado automaticamente
-        (Start: 2 · Pro: 10 · Elite: ilimitado).
-      </div>
+      {/* Abas (só fazem sentido para o gestor com multi-loja) */}
+      {(mostraLojas || mostraEstoque) && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+          <button className={`btn ${aba === 'equipe' ? '' : 'secundario'}`} onClick={() => setAba('equipe')}>👥 Equipe da loja</button>
+          {mostraLojas && <button className={`btn ${aba === 'lojas' ? '' : 'secundario'}`} onClick={() => setAba('lojas')}>🏬 Lojas</button>}
+          {mostraEstoque && <button className={`btn ${aba === 'estoque' ? '' : 'secundario'}`} onClick={() => setAba('estoque')}>🦺 Gestores de Estoque</button>}
+        </div>
+      )}
 
-      <div className="cartao">
-        <table>
-          <thead>
-            <tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Carteira</th><th>Meta mensal</th><th>Comissão</th><th>Status</th><th></th></tr>
-          </thead>
-          <tbody>
-            {equipe.map((m) => (
-              <tr key={m.id} style={{ opacity: m.ativo ? 1 : 0.5 }}>
-                <td>{m.nome}</td>
-                <td>{m.email}</td>
-                <td>{m.role === 'GERENTE' ? 'Gerente' : 'Vendedora'}</td>
-                <td>{m._count?.carteira ?? 0} clientes</td>
-                <td>{m.metaMensal ? `R$ ${Number(m.metaMensal).toLocaleString('pt-BR')}` : '—'}</td>
-                <td>{m.comissaoPadrao ? `${Number(m.comissaoPadrao)}%` : '—'}</td>
-                <td><span className={`selo ${m.ativo ? 'ok' : 'baixo'}`}>{m.ativo ? 'ativa' : 'inativa'}</span></td>
-                <td style={{ whiteSpace: 'nowrap' }}>
-                  <a href="#" onClick={(e) => { e.preventDefault(); setForm({ ...m, metaMensal: m.metaMensal ?? '', comissaoPadrao: m.comissaoPadrao ?? '', senha: '' } as FormMembro) }}>editar</a>
-                  {m.role === 'VENDEDORA' && (
-                    <>
-                      {' · '}
-                      <a href="#" onClick={(e) => { e.preventDefault(); alternarAtivo(m) }}>{m.ativo ? 'desativar' : 'reativar'}</a>
-                      {' · '}
-                      <a href="#" onClick={(e) => { e.preventDefault(); abrirGerenciar(m) }}>substituir/desligar</a>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {erro && <div className="alerta">{erro}</div>}
 
+      {/* ===================== ABA: EQUIPE DA LOJA ===================== */}
+      {aba === 'equipe' && (
+        <>
+          <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>
+              Plano <strong>{usuario.rede?.plano ?? '—'}</strong> — lojas e vendedoras ilimitadas; a diferença entre planos é por funcionalidade.
+              {ehGestor && ' Cada Gerente de Loja administra as vendedoras da loja dele.'}
+            </span>
+            {ehGestor && lojas.length > 0 && (
+              <span className="campo" style={{ minWidth: 220, marginBottom: 0 }}>
+                <label>Loja</label>
+                <select value={lojaSel} onChange={(e) => escolherLoja(e.target.value)}>
+                  {lojas.map((l) => <option key={l.id} value={l.id}>{l.nome}{l.ativo ? '' : ' (inativa)'}</option>)}
+                </select>
+              </span>
+            )}
+          </div>
+
+          {ehGestor && lojas.length === 0 ? (
+            <div className="cartao" style={{ color: 'var(--ink-soft)' }}>
+              Nenhuma loja cadastrada ainda. {mostraLojas ? 'Cadastre uma loja na aba “Lojas” (você define o Gerente de Loja na criação).' : 'Cadastre uma loja para começar.'}
+            </div>
+          ) : (
+            <div className="cartao">
+              <table>
+                <thead>
+                  <tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Carteira</th><th>Meta mensal</th><th>Comissão</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {equipe.map((m) => (
+                    <tr key={m.id} style={{ opacity: m.ativo ? 1 : 0.5 }}>
+                      <td>{m.nome}</td>
+                      <td>{m.email}</td>
+                      <td>{m.role === 'GERENTE' ? 'Gerente de Loja' : 'Vendedora'}</td>
+                      <td>{m._count?.carteira ?? 0} clientes</td>
+                      <td>{m.metaMensal ? `R$ ${Number(m.metaMensal).toLocaleString('pt-BR')}` : '—'}</td>
+                      <td>{m.comissaoPadrao ? `${Number(m.comissaoPadrao)}%` : '—'}</td>
+                      <td><span className={`selo ${m.ativo ? 'ok' : 'baixo'}`}>{m.ativo ? 'ativa' : 'inativa'}</span></td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <a href="#" onClick={(e) => { e.preventDefault(); setForm({ ...m, metaMensal: m.metaMensal ?? '', comissaoPadrao: m.comissaoPadrao ?? '', senha: '' } as FormMembro) }}>editar</a>
+                        {m.role === 'VENDEDORA' && (
+                          <>
+                            {' · '}
+                            <a href="#" onClick={(e) => { e.preventDefault(); alternarAtivo(m) }}>{m.ativo ? 'desativar' : 'reativar'}</a>
+                            {' · '}
+                            <a href="#" onClick={(e) => { e.preventDefault(); abrirGerenciar(m) }}>substituir/desligar</a>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {equipe.length === 0 && <tr><td colSpan={8} style={{ color: 'var(--ink-soft)' }}>Nenhum membro nesta loja ainda.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ===================== ABA: LOJAS ===================== */}
+      {aba === 'lojas' && mostraLojas && (
+        <div className="cartao">
+          <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
+            Cada loja vive em <strong>{usuario.rede?.nome ?? 'sua marca'}</strong> e tem um <strong>Gerente de Loja</strong> (você define na criação; pode adicionar mais na aba “Equipe da loja”). O Gerente aloca as vendedoras da loja dele.
+          </div>
+          <table>
+            <thead>
+              <tr><th>Loja</th><th>Endereço (slug)</th><th>Gerente(s)</th><th>Pessoas</th><th>Clientes</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+              {lojas.map((l) => (
+                <tr key={l.id} style={{ opacity: l.ativo ? 1 : 0.5 }}>
+                  <td>{l.nome}</td>
+                  <td style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{l.slug}.{usuario.rede ? '' : ''}…</td>
+                  <td>{l.usuarios?.length ? l.usuarios.map((g) => g.nome).join(', ') : <span style={{ color: 'var(--ink-soft)' }}>—</span>}</td>
+                  <td>{l._count?.usuarios ?? 0}</td>
+                  <td>{l._count?.clientes ?? 0}</td>
+                  <td><span className={`selo ${l.ativo ? 'ok' : 'baixo'}`}>{l.ativo ? 'ativa' : 'inativa'}</span></td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <a href="#" onClick={(e) => { e.preventDefault(); setEditLoja(l) }}>editar</a>
+                    {' · '}
+                    <a href="#" onClick={(e) => { e.preventDefault(); escolherLoja(l.id); setAba('equipe') }}>ver equipe</a>
+                  </td>
+                </tr>
+              ))}
+              {lojas.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--ink-soft)' }}>Nenhuma loja cadastrada.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ===================== ABA: GESTORES DE ESTOQUE ===================== */}
+      {aba === 'estoque' && mostraEstoque && (
+        <div className="cartao">
+          <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
+            Gestores de estoque atuam no nível da <strong>rede</strong>: lançam entradas de produção, fazem transferências e ajustes de estoque nas lojas. Pode ter mais de um.
+          </div>
+          <table>
+            <thead>
+              <tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+              {estoquistas.map((es) => (
+                <tr key={es.id} style={{ opacity: es.ativo ? 1 : 0.5 }}>
+                  <td>{es.nome}</td>
+                  <td>{es.email}</td>
+                  <td>{es.telefone ?? '—'}</td>
+                  <td><span className={`selo ${es.ativo ? 'ok' : 'baixo'}`}>{es.ativo ? 'Ativo' : 'Inativo'}</span></td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <a href="#" onClick={(e) => { e.preventDefault(); setFormE({ id: es.id, nome: es.nome, email: es.email, telefone: es.telefone ?? '' }) }}>editar</a>
+                    {' · '}
+                    <a href="#" onClick={(e) => { e.preventDefault(); alternarEstoquista(es) }}>{es.ativo ? 'desativar' : 'ativar'}</a>
+                  </td>
+                </tr>
+              ))}
+              {estoquistas.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--ink-soft)' }}>Nenhum gestor de estoque cadastrado.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ===================== MODAIS ===================== */}
       {convidar && (
         <ConvidarModal
-          papeis={ehGestor ? [{ valor: 'VENDEDORA', rotulo: 'Vendedora' }, { valor: 'GERENTE', rotulo: 'Gerente' }] : [{ valor: 'VENDEDORA', rotulo: 'Vendedora' }]}
-          lojas={ehGestor ? lojas : undefined}
+          papeis={ehGestor ? [{ valor: 'VENDEDORA', rotulo: 'Vendedora' }, { valor: 'GERENTE', rotulo: 'Gerente de Loja' }] : [{ valor: 'VENDEDORA', rotulo: 'Vendedora' }]}
+          lojas={ehGestor ? lojas.map((l) => ({ id: l.id, nome: l.nome })) : undefined}
           onClose={() => setConvidar(false)}
         />
+      )}
+
+      {convidarE && (
+        <ConvidarModal papeis={[{ valor: 'ESTOQUISTA', rotulo: 'Gestor de Estoque' }]} onClose={() => setConvidarE(false)} />
       )}
 
       {gerenciar && (
@@ -212,7 +448,7 @@ export default function Equipe() {
       {form && (
         <div className="modal-fundo" onClick={() => setForm(null)}>
           <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvar}>
-            <h2>{form.id ? 'Editar membro' : 'Nova vendedora'}</h2>
+            <h2>{form.id ? 'Editar membro' : 'Novo membro'}{!form.id && lojaAtualNome ? ` — ${lojaAtualNome}` : ''}</h2>
             {erro && <div className="alerta">{erro}</div>}
             <div className="linha-campos">
               <div className="campo">
@@ -224,14 +460,16 @@ export default function Equipe() {
                 <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
               </div>
             </div>
-            {form.id && ehGestor && (
+            {ehGestor && (
               <div className="campo">
                 <label>Função</label>
                 <select value={form.role ?? 'VENDEDORA'} onChange={(e) => setForm({ ...form, role: e.target.value as 'GERENTE' | 'VENDEDORA' })}>
                   <option value="VENDEDORA">Vendedora</option>
-                  <option value="GERENTE">Gerente</option>
+                  <option value="GERENTE">Gerente de Loja</option>
                 </select>
-                <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>Mudou de função? Troque aqui (a carteira e o histórico são mantidos).</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>
+                  {form.id ? 'Mudou de função? Troque aqui (a carteira e o histórico são mantidos).' : 'Pode haver mais de um Gerente de Loja por loja.'}
+                </div>
               </div>
             )}
             <div className="linha-campos">
@@ -260,6 +498,122 @@ export default function Equipe() {
             </div>
             <div className="acoes">
               <button type="button" className="btn secundario" onClick={() => setForm(null)}>Cancelar</button>
+              <button className="btn">Salvar</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {formLoja && (
+        <div className="modal-fundo" onClick={() => setFormLoja(null)}>
+          <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvarLoja} style={{ width: 'min(560px, 94vw)' }}>
+            <h2>Nova loja</h2>
+            <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
+              A loja entra na sua marca e já nasce com um <strong>Gerente de Loja</strong>. Depois ele aloca as vendedoras na aba “Equipe da loja”.
+            </p>
+            {erro && <div className="alerta">{erro}</div>}
+            <div className="linha-campos">
+              <div className="campo">
+                <label>Nome da loja*</label>
+                <input value={formLoja.nome} onChange={(e) => setFormLoja({ ...formLoja, nome: e.target.value })} required />
+              </div>
+              <div className="campo">
+                <label>Slug (endereço)*</label>
+                <input value={formLoja.slug} onChange={(e) => setFormLoja({ ...formLoja, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} placeholder="loja-shopping" required />
+              </div>
+            </div>
+            <div className="linha-campos">
+              <div className="campo">
+                <label>CNPJ</label>
+                <input value={formLoja.cnpj ?? ''} onChange={(e) => setFormLoja({ ...formLoja, cnpj: e.target.value })} />
+              </div>
+              <div className="campo">
+                <label>Telefone</label>
+                <input value={formLoja.telefone ?? ''} onChange={(e) => setFormLoja({ ...formLoja, telefone: e.target.value })} placeholder="5562999990011" />
+              </div>
+            </div>
+            <h3 style={{ marginBottom: 6 }}>Gerente de Loja</h3>
+            <div className="campo">
+              <label>Nome*</label>
+              <input value={formLoja.gerente.nome} onChange={(e) => setFormLoja({ ...formLoja, gerente: { ...formLoja.gerente, nome: e.target.value } })} required />
+            </div>
+            <div className="linha-campos">
+              <div className="campo">
+                <label>E-mail (login)*</label>
+                <input type="email" value={formLoja.gerente.email} onChange={(e) => setFormLoja({ ...formLoja, gerente: { ...formLoja.gerente, email: e.target.value } })} required />
+              </div>
+              <div className="campo">
+                <label>Senha* (mín. 6)</label>
+                <input type="password" value={formLoja.gerente.senha} onChange={(e) => setFormLoja({ ...formLoja, gerente: { ...formLoja.gerente, senha: e.target.value } })} minLength={6} required />
+              </div>
+            </div>
+            <div className="acoes">
+              <button type="button" className="btn secundario" onClick={() => setFormLoja(null)}>Cancelar</button>
+              <button className="btn">Criar loja</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {editLoja && (
+        <div className="modal-fundo" onClick={() => setEditLoja(null)}>
+          <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvarEdicaoLoja} style={{ width: 'min(520px, 94vw)' }}>
+            <h2>Editar loja — {editLoja.nome}</h2>
+            {erro && <div className="alerta">{erro}</div>}
+            <div className="campo">
+              <label>Nome*</label>
+              <input value={editLoja.nome} onChange={(e) => setEditLoja({ ...editLoja, nome: e.target.value })} required />
+            </div>
+            <div className="linha-campos">
+              <div className="campo">
+                <label>CNPJ</label>
+                <input value={editLoja.cnpj ?? ''} onChange={(e) => setEditLoja({ ...editLoja, cnpj: e.target.value })} />
+              </div>
+              <div className="campo">
+                <label>Telefone</label>
+                <input value={editLoja.telefone ?? ''} onChange={(e) => setEditLoja({ ...editLoja, telefone: e.target.value })} />
+              </div>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, marginBottom: 8 }}>
+              <input type="checkbox" checked={editLoja.ativo} onChange={(e) => setEditLoja({ ...editLoja, ativo: e.target.checked })} style={{ width: 'auto' }} />
+              Loja ativa
+            </label>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 8 }}>
+              O endereço (slug <strong>{editLoja.slug}</strong>) não é alterável após a criação.
+            </div>
+            <div className="acoes">
+              <button type="button" className="btn secundario" onClick={() => setEditLoja(null)}>Cancelar</button>
+              <button className="btn">Salvar</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {formE && (
+        <div className="modal-fundo" onClick={() => setFormE(null)}>
+          <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvarEstoquista} style={{ width: 'min(520px, 92vw)' }}>
+            <h2>{formE.id ? 'Editar gestor de estoque' : 'Novo gestor de estoque'}</h2>
+            {erro && <div className="alerta">{erro}</div>}
+            <div className="campo">
+              <label>Nome*</label>
+              <input value={formE.nome} onChange={(e) => setFormE({ ...formE, nome: e.target.value })} required />
+            </div>
+            <div className="linha-campos">
+              <div className="campo">
+                <label>E-mail*</label>
+                <input type="email" value={formE.email} onChange={(e) => setFormE({ ...formE, email: e.target.value })} required />
+              </div>
+              <div className="campo">
+                <label>Telefone</label>
+                <input value={formE.telefone ?? ''} onChange={(e) => setFormE({ ...formE, telefone: e.target.value })} placeholder="5562999990011" />
+              </div>
+            </div>
+            <div className="campo">
+              <label>{formE.id ? 'Nova senha (deixe vazio para manter)' : 'Senha*'}</label>
+              <input type="password" value={formE.senha ?? ''} onChange={(e) => setFormE({ ...formE, senha: e.target.value })} required={!formE.id} minLength={6} placeholder="mínimo 6 caracteres" />
+            </div>
+            <div className="acoes">
+              <button type="button" className="btn secundario" onClick={() => setFormE(null)}>Cancelar</button>
               <button className="btn">Salvar</button>
             </div>
           </form>

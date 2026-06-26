@@ -18,7 +18,6 @@ import Mural from './paginas/Mural'
 import Atacado from './paginas/Atacado'
 import Produtos from './paginas/Produtos'
 import Equipe from './paginas/Equipe'
-import Estoquistas from './paginas/Estoquistas'
 import Planos from './paginas/Planos'
 import Colecoes from './paginas/Colecoes'
 import Marca from './paginas/Marca'
@@ -71,7 +70,6 @@ function CrmApp() {
         <Route path="produtos" element={<Produtos />} />
         <Route path="colecoes" element={<Colecoes />} />
         <Route path="equipe" element={<Equipe />} />
-        <Route path="estoquistas" element={<Estoquistas />} />
         <Route path="marca" element={<Marca />} />
         <Route path="funil" element={<Pipeline />} />
         <Route path="manual" element={<Manual />} />

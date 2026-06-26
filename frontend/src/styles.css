@@ -10,7 +10,9 @@
   --danger: #c62828;
   --border: #e8e0d8;
   --radius: 12px;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  /* Fontes do app dos operadores: texto Inter Regular, cabeçalhos Montserrat SemiBold */
+  --fonte-titulo: 'Montserrat', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -19,7 +21,7 @@
 html, body { max-width: 100%; overflow-x: clip; }
 body { margin: 0; background: var(--bg); color: var(--ink); }
 img, video, table { max-width: 100%; }
-h1, h2, h3 { font-family: Georgia, 'Times New Roman', serif; font-weight: 600; }
+h1, h2, h3 { font-family: var(--fonte-titulo); font-weight: 600; }
 a { color: var(--accent); text-decoration: none; }
 
 .app-shell { display: flex; min-height: 100vh; }
@@ -32,7 +34,7 @@ a { color: var(--accent); text-decoration: none; }
   width: 230px; background: var(--ink); color: #f5efe9; padding: 24px 16px;
   display: flex; flex-direction: column; gap: 4px; flex-shrink: 0;
 }
-.sidebar .logo { font-family: Georgia, serif; font-size: 22px; margin-bottom: 24px; }
+.sidebar .logo { font-family: var(--fonte-titulo); font-weight: 600; font-size: 22px; margin-bottom: 24px; }
 .sidebar .logo em { color: #e8a87c; font-style: italic; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
 .sidebar a {
@@ -173,7 +175,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 /* Dashboard */
 .barra-meta { background: var(--accent-soft); border-radius: 999px; height: 8px; overflow: hidden; margin-top: 6px; }
 .barra-meta > span { display: block; height: 100%; background: var(--accent); }
-.painel-titulo { font-family: Georgia, serif; font-size: 17px; margin: 0 0 12px; }
+.painel-titulo { font-family: var(--fonte-titulo); font-weight: 600; font-size: 17px; margin: 0 0 12px; }
 .grade-paineis { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
 
 /* ───────────────────────── Mobile do CRM (drawer + primitivas) ─────────────────────────
@@ -186,7 +188,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
     background: var(--ink); color: #f5efe9; padding: 12px 16px;
     position: sticky; top: 0; z-index: 40;
   }
-  .topbar-mobile .logo { font-family: Georgia, serif; font-size: 20px; }
+  .topbar-mobile .logo { font-family: var(--fonte-titulo); font-weight: 600; font-size: 20px; }
   .topbar-mobile .logo em { color: #e8a87c; font-style: italic; }
   .menu-toggle {
     background: none; border: none; color: #f5efe9; font-size: 26px; line-height: 1;

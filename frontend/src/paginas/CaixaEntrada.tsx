@@ -68,7 +68,7 @@ export default function CaixaEntrada() {
   return (
     <>
       <header>
-        <h1>📥 Caixa de entrada</h1>
+        <h1>💬 Chat Zaieze</h1>
         <SeletorLoja escopo={escopo} />
       </header>
 

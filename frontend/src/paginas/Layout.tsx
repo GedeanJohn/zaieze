@@ -60,7 +60,7 @@ export default function Layout() {
         <NavLink to="/" end className={cls}><LayoutDashboard {...ICON} /><span>Dashboard</span></NavLink>
         {podeVendasClientes && <NavLink to="/vendas" className={cls}><ShoppingBag {...ICON} /><span>Vendas</span></NavLink>}
         {podeVendasClientes && <NavLink to="/clientes" className={cls}><Users {...ICON} /><span>Clientes</span></NavLink>}
-        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/caixa" className={cls}><Inbox {...ICON} /><span>Caixa de entrada</span></NavLink>}
+        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/caixa" className={cls}><Inbox {...ICON} /><span>Chat Zaieze</span></NavLink>}
         {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/campanhas" className={cls}><MessageCircle {...ICON} /><span>WhatsApp</span></NavLink>}
         {podeVendasClientes && temFeature('portal_cliente') && <NavLink to="/funil" className={cls}><Filter {...ICON} /><span>Funil de vendas</span></NavLink>}
         {podeVendasClientes && temFeature('radar') && <NavLink to="/radar" className={cls}><Radar {...ICON} /><span>Radar</span></NavLink>}

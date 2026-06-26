@@ -89,7 +89,7 @@ export const FEATURE_MIN: Record<string, Plano> = {
 export const rotuloFeature: Record<string, string> = {
   vendas: 'PDV / Vendas', produtos: 'Catálogo de produtos', estoque: 'Controle de estoque',
   clientes: 'Cadastro de clientes', dashboard: 'Dashboard de vendas', forma_recebimento: 'Forma de recebimento',
-  whatsapp: 'WhatsApp (disparos, réguas, caixa de entrada)',
+  whatsapp: 'WhatsApp (disparos, réguas, Chat Zaieze)',
   crm_segmentacao: 'Carteira inteligente (segmentação)', gamificacao: 'Comissão, ranking e mural',
   estoque_inteligente: 'Estoque inteligente (encalhados/ruptura)',
   multi_loja: 'Operação em rede (várias lojas vendendo do estoque central da marca)', radar: 'Radar de Oportunidades',

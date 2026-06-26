@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import {
+  DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors, useDraggable, useDroppable,
+  type DragEndEvent, type DragStartEvent,
+} from '@dnd-kit/core'
 import { api, mensagemDeErro, usuarioLogado } from '../api'
 import { urlCatalogo } from '../host'
 import { useLojaAtiva, SeletorLoja } from '../componentes/SeletorLoja'
@@ -77,6 +81,52 @@ function corTempoEspera(c: Card): string | null {
   return null
 }
 
+// Coluna do funil = área onde se SOLTA o card (droppable).
+function ColunaDrop({ etapa, children }: { etapa: Etapa; children: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: etapa })
+  return (
+    <div ref={setNodeRef} style={{
+      background: isOver ? '#c2552b22' : '#ffffff08', borderRadius: 10, padding: 8, minWidth: 180,
+      outline: isOver ? '2px dashed var(--accent)' : 'none', transition: 'background .12s',
+    }}>{children}</div>
+  )
+}
+
+// Card do cliente = item ARRASTÁVEL (alça ⠿). O select continua como alternativa.
+function CardLead({ c, mover, redistribuir, podeRedistribuir }: {
+  c: Card; mover: (c: Card, etapa: Etapa) => void; redistribuir: (c: Card) => void; podeRedistribuir: boolean
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: c.id, data: { card: c } })
+  const ct = corTempoEspera(c)
+  return (
+    <div ref={setNodeRef} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `4px solid ${ct ?? c.situacao.cor}`, background: ct ? `${ct}22` : undefined, opacity: isDragging ? 0.4 : 1 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+        <button type="button" {...attributes} {...listeners} title="Arraste para mudar de etapa" aria-label="Arrastar card"
+          style={{ cursor: 'grab', touchAction: 'none', border: 'none', background: 'none', color: 'var(--ink-soft)', fontSize: 16, padding: '0 2px', lineHeight: 1.1 }}>⠿</button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{c.cliente?.nome ?? c.nome ?? '—'}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{c.cliente?.telefone ?? c.telefone ?? ''}</div>
+        </div>
+      </div>
+      <div style={{ marginTop: 6 }}><BadgeSituacao s={c.situacao} /></div>
+      <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginTop: 4 }}>
+        👤 {c.vendedora.nome}{c.redistribuicoes > 0 && ` · ${c.redistribuicoes}× redistr.`}
+      </div>
+      <div style={{ fontSize: 11, marginTop: 2, color: c.atrasado ? '#ff6b6b' : 'var(--ink-soft)' }}>
+        ⏱ {tempoNaEtapa(c.etapaDesde)} nesta etapa{c.atrasado && ' · atrasado'}
+      </div>
+      <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
+        <select value={c.status} onChange={(e) => mover(c, e.target.value as Etapa)} style={{ flex: 1, fontSize: 12, padding: 4 }}>
+          {ETAPAS.map((et) => <option key={et} value={et}>{rotuloEtapa[et]}</option>)}
+        </select>
+        {podeRedistribuir && ['ENTROU', 'ATENDIDO', 'NEGOCIANDO'].includes(c.status) && (
+          <button className="btn secundario" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => redistribuir(c)}>↪</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function Pipeline() {
   const usuario = usuarioLogado()!
   const ehVendedora = usuario.role === 'VENDEDORA'
@@ -120,6 +170,20 @@ export default function Pipeline() {
       const { data } = await api.post('/leads/redistribuir-atrasados', {}, { params: escopo.params })
       alert(`${data.redistribuidos} ciclo(s) redistribuído(s).`); carregar()
     } catch (err) { alert(mensagemDeErro(err)) }
+  }
+
+  // Drag-and-drop (desktop = mouse; mobile = pressionar e segurar p/ não brigar com o scroll).
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  )
+  const [arrastando, setArrastando] = useState<Card | null>(null)
+  function aoIniciarArrasto(e: DragStartEvent) { setArrastando((e.active.data.current?.card as Card) ?? null) }
+  function aoSoltar(e: DragEndEvent) {
+    setArrastando(null)
+    const card = e.active.data.current?.card as Card | undefined
+    const destino = e.over?.id as Etapa | undefined
+    if (card && destino && ETAPAS.includes(destino) && destino !== card.status) mover(card, destino)
   }
 
   const m = pipe?.metricas
@@ -195,45 +259,37 @@ export default function Pipeline() {
         </div>
       )}
 
-      {/* Kanban */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(180px, 1fr))', gap: 10, overflowX: 'auto' }}>
-        {ETAPAS.map((etapa) => {
-          const cards = pipe?.colunas[etapa] ?? []
-          return (
-            <div key={etapa} style={{ background: '#ffffff08', borderRadius: 10, padding: 8, minWidth: 180 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px 8px', borderBottom: `2px solid ${corEtapa[etapa]}`, marginBottom: 8 }}>
-                <strong style={{ color: corEtapa[etapa] }}>{rotuloEtapa[etapa]}</strong>
-                <span style={{ color: 'var(--ink-soft)', fontSize: 12 }}>{cards.length}</span>
-              </div>
-              {cards.map((c) => {
-                const ct = corTempoEspera(c)
-                return (
-                <div key={c.id} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `4px solid ${ct ?? c.situacao.cor}`, background: ct ? `${ct}22` : undefined }}>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{c.cliente?.nome ?? c.nome ?? '—'}</div>
-                  <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{c.cliente?.telefone ?? c.telefone ?? ''}</div>
-                  <div style={{ marginTop: 6 }}><BadgeSituacao s={c.situacao} /></div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginTop: 4 }}>
-                    👤 {c.vendedora.nome}{c.redistribuicoes > 0 && ` · ${c.redistribuicoes}× redistr.`}
-                  </div>
-                  <div style={{ fontSize: 11, marginTop: 2, color: c.atrasado ? '#ff6b6b' : 'var(--ink-soft)' }}>
-                    ⏱ {tempoNaEtapa(c.etapaDesde)} nesta etapa{c.atrasado && ' · atrasado'}
-                  </div>
-                  <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
-                    <select value={c.status} onChange={(e) => mover(c, e.target.value as Etapa)} style={{ flex: 1, fontSize: 12, padding: 4 }}>
-                      {ETAPAS.map((et) => <option key={et} value={et}>{rotuloEtapa[et]}</option>)}
-                    </select>
-                    {podeRedistribuir && ['ENTROU', 'ATENDIDO', 'NEGOCIANDO'].includes(c.status) && (
-                      <button className="btn secundario" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => redistribuir(c)}>↪</button>
-                    )}
-                  </div>
-                </div>
-                )
-              })}
-              {cards.length === 0 && <div style={{ color: 'var(--ink-soft)', fontSize: 12, padding: 6 }}>—</div>}
-            </div>
-          )
-        })}
+      {/* Kanban com arrastar-e-soltar (alça ⠿) — desktop e mobile. O select continua como alternativa. */}
+      <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '0 0 6px' }}>
+        Dica: arraste o card pela alça <strong>⠿</strong> para outra etapa (no celular, pressione e segure). Ou use o seletor no card.
       </div>
+      <DndContext sensors={sensors} onDragStart={aoIniciarArrasto} onDragEnd={aoSoltar}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(180px, 1fr))', gap: 10, overflowX: 'auto' }}>
+          {ETAPAS.map((etapa) => {
+            const cards = pipe?.colunas[etapa] ?? []
+            return (
+              <ColunaDrop key={etapa} etapa={etapa}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px 8px', borderBottom: `2px solid ${corEtapa[etapa]}`, marginBottom: 8 }}>
+                  <strong style={{ color: corEtapa[etapa] }}>{rotuloEtapa[etapa]}</strong>
+                  <span style={{ color: 'var(--ink-soft)', fontSize: 12 }}>{cards.length}</span>
+                </div>
+                {cards.map((c) => (
+                  <CardLead key={c.id} c={c} mover={mover} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} />
+                ))}
+                {cards.length === 0 && <div style={{ color: 'var(--ink-soft)', fontSize: 12, padding: 6 }}>—</div>}
+              </ColunaDrop>
+            )
+          })}
+        </div>
+        <DragOverlay>
+          {arrastando ? (
+            <div className="cartao" style={{ padding: 10, borderLeft: `4px solid ${corTempoEspera(arrastando) ?? arrastando.situacao.cor}`, boxShadow: '0 8px 24px #0005' }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{arrastando.cliente?.nome ?? arrastando.nome ?? '—'}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-soft)' }}>Solte numa etapa</div>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
     </>
   )
 }

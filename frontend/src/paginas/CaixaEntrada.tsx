@@ -72,7 +72,7 @@ export default function CaixaEntrada() {
         <SeletorLoja escopo={escopo} />
       </header>
 
-      <div className="inbox">
+      <div className={`inbox${sel ? ' com-sel' : ''}`}>
         <div className="inbox-lista cartao">
           {conversas.map((c) => (
             <button key={c.cliente.id} className={`inbox-item ${sel?.cliente.id === c.cliente.id ? 'ativo' : ''}`} onClick={() => abrir(c)}>
@@ -98,9 +98,12 @@ export default function CaixaEntrada() {
           ) : (
             <>
               <div className="inbox-conversa-topo">
-                <div>
-                  <strong>{sel.cliente.nome}</strong>
-                  <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{sel.cliente.telefone}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                  <button type="button" className="inbox-voltar" onClick={() => setSel(null)} aria-label="Voltar para a lista">←</button>
+                  <div style={{ minWidth: 0 }}>
+                    <strong>{sel.cliente.nome}</strong>
+                    <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{sel.cliente.telefone}</div>
+                  </div>
                 </div>
                 <button className="btn" onClick={() => navigate(`/vendas?cliente=${sel.cliente.id}`)}>
                   🛒 Registrar venda online

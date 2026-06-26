@@ -223,8 +223,14 @@ function DetalheProduto({ produto, onFechar, onAdicionar }: { produto: Produto; 
     })
   }
 
-  // Galeria troca conforme a cor: se a cor tem fotos próprias, mostra elas; senão, a galeria geral.
-  const fotos = (produto.fotosPorCor?.[cor]?.length ? produto.fotosPorCor[cor] : produto.fotos) ?? []
+  // Galeria troca conforme a cor: mostra todas as fotos MENOS as marcadas para OUTRAS cores
+  // (ou seja, as fotos gerais/sem cor + as desta cor). Assim as miniaturas aparecem já na abertura.
+  const fotos = useMemo(() => {
+    const porCor = produto.fotosPorCor ?? {}
+    const deOutrasCores = new Set(Object.entries(porCor).filter(([c]) => c !== cor).flatMap(([, arr]) => arr))
+    const lista = (produto.fotos ?? []).filter((f) => !deOutrasCores.has(f))
+    return lista.length ? lista : (produto.fotos ?? [])
+  }, [produto.fotos, produto.fotosPorCor, cor])
 
   return (
     <div className="cat-modal-fundo" onClick={onFechar}>

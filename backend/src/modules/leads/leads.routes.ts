@@ -5,7 +5,7 @@ import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
 import {
-  ETAPAS_ABERTAS, escolherVendedoraDisponivel, redistribuirLead, redistribuirAtrasados, moverEtapa, situacaoLead,
+  ETAPAS_ABERTAS, escolherVendedoraDisponivel, redistribuirLead, redistribuirAtrasados, moverEtapa, situacaoLead, apertadoPctDaRede,
 } from './leads.service'
 
 /**
@@ -21,12 +21,18 @@ const incluiLead = {
   cliente: { select: { id: true, nome: true, telefone: true } },
 }
 
-function decorar<T extends { status: StatusLead; prazoEm: Date; etapaDesde: Date; redistribuidoEm: Date | null }>(l: T, agora: number) {
+function decorar<T extends { status: StatusLead; prazoEm: Date; etapaDesde: Date; redistribuidoEm: Date | null }>(l: T, agora: number, apertadoPct?: number) {
   return {
     ...l,
     atrasado: ETAPAS_ABERTAS.includes(l.status) && l.prazoEm.getTime() < agora,
-    situacao: situacaoLead(l, agora),
+    situacao: situacaoLead(l, agora, apertadoPct),
   }
+}
+
+/** % de "apertado" da rede a partir da loja do escopo (deriva o redeId da loja). */
+async function pctDaLoja(lojaId: string): Promise<number> {
+  const loja = await prisma.loja.findUnique({ where: { id: lojaId }, select: { redeId: true } })
+  return apertadoPctDaRede(loja?.redeId ?? null)
 }
 
 export async function leadsRoutes(app: FastifyInstance) {
@@ -40,7 +46,8 @@ export async function leadsRoutes(app: FastifyInstance) {
 
     const leads = await prisma.lead.findMany({ where, orderBy: { createdAt: 'desc' }, take: 300, include: incluiLead })
     const agora = Date.now()
-    return leads.map((l) => decorar(l, agora))
+    const pct = await pctDaLoja(lojaId)
+    return leads.map((l) => decorar(l, agora, pct))
   })
 
   // Pipeline: cards agrupados por etapa + métricas do funil.
@@ -51,12 +58,13 @@ export async function leadsRoutes(app: FastifyInstance) {
 
     const leads = await prisma.lead.findMany({ where: base, orderBy: { etapaDesde: 'desc' }, take: 500, include: incluiLead })
     const agora = Date.now()
+    const pct = await pctDaLoja(lojaId)
 
     const colunas: Record<string, ReturnType<typeof decorar>[]> = { ENTROU: [], ATENDIDO: [], NEGOCIANDO: [], CONVERTIDO: [], PERDIDO: [] }
     const porSituacao: Record<string, number> = {}
     let convertidos = 0, perdidos = 0, somaResposta = 0, comResposta = 0
     for (const l of leads) {
-      const card = decorar(l, agora)
+      const card = decorar(l, agora, pct)
       colunas[l.status].push(card)
       porSituacao[card.situacao.chave] = (porSituacao[card.situacao.chave] ?? 0) + 1
       if (l.status === 'CONVERTIDO') convertidos += 1

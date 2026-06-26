@@ -1,4 +1,4 @@
-import type { StatusLead } from '@prisma/client'
+import type { Prisma, StatusLead } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 
 // Etapas "abertas" do funil (em andamento) × "fechadas" (encerradas).
@@ -27,6 +27,7 @@ const REDIST_RECENTE_MS = 24 * 60 * 60 * 1000
 export function situacaoLead(
   l: { status: StatusLead; prazoEm: Date; etapaDesde: Date; redistribuidoEm: Date | null },
   agora: number = Date.now(),
+  apertadoPct: number = APERTADO_PCT, // fração (0–1) do prazo restante p/ "apertado" (laranja)
 ): Situacao {
   if (l.status === 'CONVERTIDO') return { chave: 'CONVERTIDO', label: 'Convertido', cor: '#059669' }
   if (l.status === 'PERDIDO') return { chave: 'PERDIDO', label: 'Perdido', cor: '#9CA3AF' }
@@ -40,7 +41,7 @@ export function situacaoLead(
     if (atrasado) return { chave: 'ESPERA_ATRASADO', label: 'Em espera — atrasado', cor: '#EF4444' }
     const total = l.prazoEm.getTime() - l.etapaDesde.getTime()
     const restante = l.prazoEm.getTime() - agora
-    if (total > 0 && restante / total <= APERTADO_PCT) {
+    if (total > 0 && restante / total <= apertadoPct) {
       return { chave: 'ESPERA_APERTADO', label: 'Em espera — apertado', cor: '#F59E0B' }
     }
     return { chave: 'ESPERA_NO_PRAZO', label: 'Em espera — no prazo', cor: '#38BDF8' }
@@ -49,6 +50,31 @@ export function situacaoLead(
   // ATENDIDO ou NEGOCIANDO
   if (atrasado) return { chave: 'ATENDIMENTO_ATRASADO', label: 'Em atendimento — atrasado', cor: '#F97316' }
   return { chave: 'ATENDIMENTO_NO_PRAZO', label: 'Em atendimento', cor: '#22C55E' }
+}
+
+/** Fração (0–1) do prazo restante para "apertado" (laranja), conforme a rede. */
+export async function apertadoPctDaRede(redeId: string | null): Promise<number> {
+  if (!redeId) return APERTADO_PCT
+  const r = await prisma.rede.findUnique({ where: { id: redeId }, select: { slaApertadoPct: true } })
+  return r ? Math.min(0.9, Math.max(0.01, r.slaApertadoPct / 100)) : APERTADO_PCT
+}
+
+/** Conta os ciclos ABERTOS por cor (verde/laranja/vermelho) num escopo de leads. */
+export async function contarFunilPorCor(where: Prisma.LeadWhereInput, apertadoPct: number) {
+  const leads = await prisma.lead.findMany({
+    where: { ...where, status: { in: ETAPAS_ABERTAS } },
+    select: { status: true, prazoEm: true, etapaDesde: true, redistribuidoEm: true },
+    take: 2000,
+  })
+  const agora = Date.now()
+  let noPrazo = 0, apertado = 0, atrasado = 0
+  for (const l of leads) {
+    const ch = situacaoLead(l, agora, apertadoPct).chave
+    if (ch === 'ESPERA_ATRASADO' || ch === 'ATENDIMENTO_ATRASADO') atrasado += 1
+    else if (ch === 'ESPERA_APERTADO') apertado += 1
+    else noPrazo += 1 // no prazo + atendimento no prazo + redistribuído recente
+  }
+  return { noPrazo, apertado, atrasado, total: leads.length }
 }
 
 const SLA_PADRAO = { ENTROU: 30, ATENDIDO: 1440, NEGOCIANDO: 4320 }

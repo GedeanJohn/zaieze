@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe, redeIdDe, redeIdDeQualquer } from '../../plugins/auth'
+import { apertadoPctDaRede, contarFunilPorCor } from '../leads/leads.service'
 
 function inicioDoDia(): Date {
   const d = new Date()
@@ -180,9 +181,11 @@ async function dashboardDaLoja(lojaId: string) {
     prisma.lead.count({ where: { lojaId, vendaId: { not: null }, createdAt: { gte: inicioDoMes() } } }),
   ])
   const conversao = leadsTotal > 0 ? { total: leadsTotal, convertidos: leadsConv, pct: Math.round((leadsConv / leadsTotal) * 100) } : null
+  const funilCores = await contarFunilPorCor({ lojaId }, await apertadoPctDaRede(redeId))
 
   return {
     ...kpis,
+    funilCores,
     porVendedora,
     porFormaRecebimento,
     conversao,
@@ -223,7 +226,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
           where: { vendedoraId, status: 'CONCLUIDA', canal: 'ONLINE', createdAt: { gte: inicioDoMes() } },
           _sum: { total: true }, _count: true,
         }),
-        prisma.usuario.findUniqueOrThrow({ where: { id: vendedoraId }, select: { metaMensal: true, equipe: { select: { nome: true } } } }),
+        prisma.usuario.findUniqueOrThrow({ where: { id: vendedoraId }, select: { metaMensal: true, equipe: { select: { nome: true } }, loja: { select: { redeId: true } } } }),
         prisma.cliente.count({ where: { vendedoraId, ativo: true } }),
         prisma.venda.groupBy({
           by: ['formaRecebimento'],
@@ -234,9 +237,11 @@ export async function dashboardRoutes(app: FastifyInstance) {
       const totalMes = num(mes._sum.total)
       const onlineMes = num(online._sum.total)
       const meta = eu.metaMensal ? num(eu.metaMensal) : null
+      const funilCores = await contarFunilPorCor({ vendedoraId }, await apertadoPctDaRede(eu.loja?.redeId ?? null))
       return {
         papel: 'VENDEDORA',
         equipe: eu.equipe?.nome ?? null,
+        funilCores,
         hoje: { total: num(hoje._sum.total), vendas: hoje._count },
         mes: { total: totalMes, vendas: mes._count, ticketMedio: mes._count > 0 ? totalMes / mes._count : 0 },
         online: { total: onlineMes, vendas: online._count, pct: totalMes > 0 ? Math.round((onlineMes / totalMes) * 100) : 0 },
@@ -260,9 +265,11 @@ export async function dashboardRoutes(app: FastifyInstance) {
       const porLoja = await Promise.all(
         lojas.map(async (l) => ({ id: l.id, nome: l.nome, ativo: l.ativo, ...(await kpisDaLoja(l.id)) })),
       )
+      const funilCores = await contarFunilPorCor({ loja: { redeId } }, await apertadoPctDaRede(redeId))
       return {
         papel: 'GESTOR',
         rede,
+        funilCores,
         consolidado: {
           faturamentoHoje: porLoja.reduce((s, l) => s + l.faturamentoHoje, 0),
           faturamentoMes: porLoja.reduce((s, l) => s + l.faturamentoMes, 0),

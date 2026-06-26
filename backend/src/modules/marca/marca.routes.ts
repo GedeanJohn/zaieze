@@ -21,6 +21,7 @@ const atualizarSchema = z.object({
   slaEntrouMin: z.coerce.number().int().min(1).max(10080).optional(),
   slaAtendidoMin: z.coerce.number().int().min(1).max(43200).optional(),
   slaNegociandoMin: z.coerce.number().int().min(1).max(43200).optional(),
+  slaApertadoPct: z.coerce.number().int().min(1).max(90).optional(),
   slaAutoRedistribuir: z.boolean().optional(),
   pedidoMinimoAtacado: z.coerce.number().int().min(2).max(1000).optional(),
   textoDisparoPadrao: z.string().max(1000).optional(),
@@ -29,7 +30,7 @@ const atualizarSchema = z.object({
 
 const selectMarca = {
   id: true, nome: true, slug: true, logoUrl: true, corPrimaria: true, corSecundaria: true,
-  slaEntrouMin: true, slaAtendidoMin: true, slaNegociandoMin: true, slaAutoRedistribuir: true,
+  slaEntrouMin: true, slaAtendidoMin: true, slaNegociandoMin: true, slaApertadoPct: true, slaAutoRedistribuir: true,
   pedidoMinimoAtacado: true,
   textoDisparoPadrao: true, disparoVendedoraEditavel: true,
 }

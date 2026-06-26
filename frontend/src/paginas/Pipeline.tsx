@@ -67,6 +67,16 @@ function tempoNaEtapa(iso: string): string {
   return `${Math.floor(h / 24)}d`
 }
 
+// Cor do CARD conforme o tempo de espera vs. SLA: verde (no prazo) · laranja claro (apertado) · vermelho (atrasado).
+// Cards finalizados (convertido/perdido/redistribuído) não recebem cor de tempo.
+const VERDE = '#22C55E', LARANJA = '#F59E0B', VERMELHO = '#EF4444'
+function corTempoEspera(c: Card): string | null {
+  if (c.atrasado || c.situacao.chave === 'ESPERA_ATRASADO' || c.situacao.chave === 'ATENDIMENTO_ATRASADO') return VERMELHO
+  if (c.situacao.chave === 'ESPERA_APERTADO') return LARANJA
+  if (c.situacao.chave === 'ESPERA_NO_PRAZO' || c.situacao.chave === 'ATENDIMENTO_NO_PRAZO') return VERDE
+  return null
+}
+
 export default function Pipeline() {
   const usuario = usuarioLogado()!
   const ehVendedora = usuario.role === 'VENDEDORA'
@@ -195,8 +205,10 @@ export default function Pipeline() {
                 <strong style={{ color: corEtapa[etapa] }}>{rotuloEtapa[etapa]}</strong>
                 <span style={{ color: 'var(--ink-soft)', fontSize: 12 }}>{cards.length}</span>
               </div>
-              {cards.map((c) => (
-                <div key={c.id} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `3px solid ${c.situacao.cor}` }}>
+              {cards.map((c) => {
+                const ct = corTempoEspera(c)
+                return (
+                <div key={c.id} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `4px solid ${ct ?? c.situacao.cor}`, background: ct ? `${ct}22` : undefined }}>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{c.cliente?.nome ?? c.nome ?? '—'}</div>
                   <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{c.cliente?.telefone ?? c.telefone ?? ''}</div>
                   <div style={{ marginTop: 6 }}><BadgeSituacao s={c.situacao} /></div>
@@ -215,7 +227,8 @@ export default function Pipeline() {
                     )}
                   </div>
                 </div>
-              ))}
+                )
+              })}
               {cards.length === 0 && <div style={{ color: 'var(--ink-soft)', fontSize: 12, padding: 6 }}>—</div>}
             </div>
           )

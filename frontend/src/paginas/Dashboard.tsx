@@ -4,10 +4,12 @@ import DashboardEstoque from './DashboardEstoque'
 
 // ─── Tipos das três visões devolvidas por /api/dashboard ───
 interface FormaResumo { forma: string; total: number; qtd: number }
+interface FunilCores { noPrazo: number; apertado: number; atrasado: number; total: number }
 
 interface VisaoVendedora {
   papel: 'VENDEDORA'
   equipe: string | null
+  funilCores?: FunilCores
   hoje: { total: number; vendas: number }
   mes: { total: number; vendas: number; ticketMedio: number }
   online: { total: number; vendas: number; pct: number }
@@ -27,6 +29,7 @@ interface KpisLoja {
 interface VisaoGestor {
   papel: 'GESTOR'
   rede: { nome: string; plano: string }
+  funilCores?: FunilCores
   consolidado: { faturamentoHoje: number; faturamentoMes: number; faturamentoOnlineMes: number; vendasMes: number; vendasOnlineMes: number; clientes: number }
   porLoja: (KpisLoja & { id: string; nome: string; ativo: boolean })[]
 }
@@ -45,6 +48,7 @@ interface FormaLoja extends FormaResumo {
 interface VisaoLoja extends KpisLoja {
   papel: 'LOJA'
   loja: string
+  funilCores?: FunilCores
   porVendedora: VendedoraLinha[]
   porFormaRecebimento: FormaLoja[]
   porEquipe: { nome: string; total: number; qtd: number; vendedoras: number }[]
@@ -62,6 +66,28 @@ function Kpi({ rotulo, valor }: { rotulo: string; valor: string }) {
     <div className="cartao kpi">
       <div className="rotulo">{rotulo}</div>
       <div className="valor">{valor}</div>
+    </div>
+  )
+}
+
+// Card "Funil agora": ciclos abertos por cor de tempo de espera (verde/laranja/vermelho).
+function FunilCard({ f }: { f: FunilCores }) {
+  const itens = [
+    { rotulo: 'No prazo', valor: f.noPrazo, cor: '#16a34a', icone: '🟢' },
+    { rotulo: 'Apertado', valor: f.apertado, cor: '#d97706', icone: '🟠' },
+    { rotulo: 'Atrasado', valor: f.atrasado, cor: '#dc2626', icone: '🔴' },
+  ]
+  return (
+    <div className="cartao">
+      <h2 className="painel-titulo">Funil agora — tempo de espera ({f.total} aberto{f.total === 1 ? '' : 's'})</h2>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        {itens.map((i) => (
+          <div key={i.rotulo} style={{ flex: 1, minWidth: 110, border: `1px solid ${i.cor}55`, background: `${i.cor}14`, borderRadius: 10, padding: '10px 12px' }}>
+            <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{i.icone} {i.rotulo}</div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: i.cor }}>{i.valor}</div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -124,6 +150,7 @@ function DashboardGeral() {
           <Kpi rotulo="Ticket médio" valor={formataReal(dados.mes.ticketMedio)} />
           <Kpi rotulo="Clientes na carteira" valor={String(dados.clientesCarteira)} />
         </div>
+        {dados.funilCores && <div style={{ marginTop: 16 }}><FunilCard f={dados.funilCores} /></div>}
         {dados.meta != null && (
           <div className="cartao" style={{ marginTop: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
@@ -170,6 +197,7 @@ function DashboardGeral() {
           <Kpi rotulo="Vendas no mês" valor={String(dados.consolidado.vendasMes)} />
           <Kpi rotulo="Clientes" valor={String(dados.consolidado.clientes)} />
         </div>
+        {dados.funilCores && <div style={{ marginTop: 16 }}><FunilCard f={dados.funilCores} /></div>}
         <div className="cartao" style={{ marginTop: 16 }}>
           <h2 className="painel-titulo">Lojas</h2>
           <table>
@@ -210,6 +238,8 @@ function DashboardGeral() {
         <Kpi rotulo="Inativos (90+ dias)" valor={String(dados.clientesInativos)} />
         {dados.conversao && <Kpi rotulo={`Conversão (${dados.conversao.convertidos}/${dados.conversao.total})`} valor={`${dados.conversao.pct}%`} />}
       </div>
+
+      {dados.funilCores && <div style={{ marginTop: 16 }}><FunilCard f={dados.funilCores} /></div>}
 
       <div className="grade-paineis" style={{ marginTop: 16 }}>
         <div className="cartao">

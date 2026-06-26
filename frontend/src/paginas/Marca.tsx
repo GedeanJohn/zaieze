@@ -9,6 +9,7 @@ interface Marca {
   slaEntrouMin: number
   slaAtendidoMin: number
   slaNegociandoMin: number
+  slaApertadoPct: number
   slaAutoRedistribuir: boolean
   pedidoMinimoAtacado: number
   textoDisparoPadrao: string | null
@@ -36,6 +37,7 @@ export default function Marca() {
         slaEntrouMin: marca.slaEntrouMin,
         slaAtendidoMin: marca.slaAtendidoMin,
         slaNegociandoMin: marca.slaNegociandoMin,
+        slaApertadoPct: marca.slaApertadoPct,
         slaAutoRedistribuir: marca.slaAutoRedistribuir,
         pedidoMinimoAtacado: marca.pedidoMinimoAtacado,
         textoDisparoPadrao: marca.textoDisparoPadrao ?? '',
@@ -127,6 +129,19 @@ export default function Marca() {
             <input type="checkbox" checked={marca.slaAutoRedistribuir} onChange={(e) => setMarca({ ...marca, slaAutoRedistribuir: e.target.checked })} style={{ width: 'auto' }} />
             Redistribuir automaticamente quando “Entrou” estourar o prazo
           </label>
+        </div>
+        <h3 style={{ margin: '8px 0 4px' }}>Cores do card no funil (tempo de espera)</h3>
+        <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 0 }}>
+          O card do cliente no funil muda de cor conforme o tempo vs. o SLA da etapa:
+          <span style={{ color: '#16a34a', fontWeight: 700 }}> 🟢 verde</span> (no prazo) →
+          <span style={{ color: '#d97706', fontWeight: 700 }}> 🟠 laranja</span> (apertado: faltando ≤ X% do prazo) →
+          <span style={{ color: '#dc2626', fontWeight: 700 }}> 🔴 vermelho</span> (atrasado: passou do SLA).
+        </p>
+        <div className="linha-campos">
+          <div className="campo" style={{ maxWidth: 280 }}>
+            <label>Laranja quando faltar ≤ (% do prazo)</label>
+            <input type="number" min={1} max={90} value={marca.slaApertadoPct} onChange={(e) => setMarca({ ...marca, slaApertadoPct: Number(e.target.value) })} />
+          </div>
         </div>
         <h3 style={{ margin: '8px 0 4px' }}>Atacado × varejo</h3>
         <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 0 }}>

@@ -1,5 +1,10 @@
 import { env } from '../../env'
 
+// Modelo de IA: Haiku 4.5 (claude-haiku-4-5), via API oficial da Anthropic
+// (créditos comprados direto na Anthropic — NÃO usamos AWS Bedrock).
+// $1/$5 por 1M tokens (in/out), contexto 200K. Trocar aqui se mudar de modelo.
+const MODELO_IA = 'claude-haiku-4-5'
+
 // Mensagens-modelo por segmento (fallback quando não há ANTHROPIC_API_KEY)
 const FALLBACK: Record<string, string> = {
   VIP: 'Oi {primeiroNome}! 💎 Como cliente VIP da {loja}, separei novidades exclusivas pensando em você. Posso te mostrar? — {vendedora}',
@@ -25,7 +30,7 @@ export async function sugerirLook(base: string, complementos: string[]): Promise
     const { default: Anthropic } = await import('@anthropic-ai/sdk')
     const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
     const resp = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: MODELO_IA,
       max_tokens: 400,
       system: 'Você é um(a) consultor(a) de moda. Monte um look combinando a peça base com os complementos informados, em português do Brasil, 2 a 3 frases, tom animado, 1 emoji. Responda só a sugestão.',
       messages: [{ role: 'user', content: `Peça base: ${base}. Complementos disponíveis: ${lista || 'nenhum'}. Monte o look.` }],
@@ -40,7 +45,7 @@ export async function sugerirLook(base: string, complementos: string[]): Promise
 }
 
 /**
- * Sugere uma mensagem de campanha. Usa Claude (claude-sonnet-4-6) quando há
+ * Sugere uma mensagem de campanha. Usa Claude (Haiku 4.5) quando há
  * ANTHROPIC_API_KEY; caso contrário, devolve a mensagem-modelo do segmento.
  */
 export async function sugerirMensagem(opts: { segmento?: string | null; contexto?: string }): Promise<{ texto: string; viaIa: boolean }> {
@@ -52,7 +57,7 @@ export async function sugerirMensagem(opts: { segmento?: string | null; contexto
     const { default: Anthropic } = await import('@anthropic-ai/sdk')
     const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
     const resp = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: MODELO_IA,
       max_tokens: 400,
       system:
         'Você escreve mensagens curtas e calorosas de WhatsApp para clientes de uma loja de moda, em português do Brasil. ' +

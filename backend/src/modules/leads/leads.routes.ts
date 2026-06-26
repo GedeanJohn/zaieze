@@ -53,8 +53,10 @@ export async function leadsRoutes(app: FastifyInstance) {
   // Pipeline: cards agrupados por etapa + métricas do funil.
   app.get('/pipeline', { preHandler: [requireFeature('portal_cliente'), app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
+    const q = request.query as { vendedoraId?: string }
     const base: Prisma.LeadWhereInput = { lojaId }
     if (request.user.role === 'VENDEDORA') base.vendedoraId = request.user.sub
+    else if (q.vendedoraId) base.vendedoraId = q.vendedoraId // filtro por vendedora (gestor/gerente)
 
     const leads = await prisma.lead.findMany({ where: base, orderBy: { etapaDesde: 'desc' }, take: 500, include: incluiLead })
     const agora = Date.now()

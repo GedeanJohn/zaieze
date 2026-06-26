@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, usuarioLogado } from '../api'
 
 export interface LojaResumo { id: string; nome: string; ativo: boolean }
@@ -32,8 +32,16 @@ export function useLojaAtiva() {
     setLojaIdState(id)
   }
 
-  /** Params de escopo a anexar nas chamadas — { lojaId } para gestor, vazio para os demais. */
-  const params: Record<string, string> = ehGestor && lojaId ? { lojaId } : {}
+  /**
+   * Params de escopo a anexar nas chamadas — { lojaId } para gestor, vazio para os demais.
+   * Memoizado para manter a MESMA referência entre renders: sem isso, cada render gera
+   * um objeto novo e os useEffect/useCallback que dependem dele disparam em loop (painel "tremendo").
+   */
+  const params = useMemo<Record<string, string>>(() => {
+    const p: Record<string, string> = {}
+    if (ehGestor && lojaId) p.lojaId = lojaId
+    return p
+  }, [ehGestor, lojaId])
   const pronto = !ehGestor || lojaId !== null
 
   return { ehGestor, lojas, lojaId, setLojaId, params, pronto }

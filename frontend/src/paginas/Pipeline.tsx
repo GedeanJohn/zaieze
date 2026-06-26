@@ -136,6 +136,7 @@ export default function Pipeline() {
   const [pipe, setPipe] = useState<Pipeline | null>(null)
   const [meuLink, setMeuLink] = useState<LinkVend | null>(null)
   const [links, setLinks] = useState<LinkVend[]>([])
+  const [vendFiltro, setVendFiltro] = useState('')
   const [erro, setErro] = useState('')
   const [copiado, setCopiado] = useState('')
 
@@ -143,13 +144,16 @@ export default function Pipeline() {
     if (!escopo.pronto) return
     setErro('')
     try {
-      setPipe((await api.get('/leads/pipeline', { params: escopo.params })).data)
+      const params = vendFiltro ? { ...escopo.params, vendedoraId: vendFiltro } : escopo.params
+      setPipe((await api.get('/leads/pipeline', { params })).data)
       if (ehVendedora) setMeuLink((await api.get('/catalogo/meu-link')).data)
       else setLinks((await api.get('/catalogo/links', { params: escopo.params })).data)
     } catch (err) { setErro(mensagemDeErro(err)) }
-  }, [escopo.pronto, escopo.params, ehVendedora])
+  }, [escopo.pronto, escopo.params, ehVendedora, vendFiltro])
 
   useEffect(() => { carregar() }, [carregar])
+  // Ao trocar de loja, zera o filtro de vendedora (ela pode não existir na outra loja).
+  useEffect(() => { setVendFiltro('') }, [escopo.lojaId])
 
   async function copiar(redeSlug: string, path: string, chave: string) {
     try { await navigator.clipboard.writeText(urlCatalogo(redeSlug, path)) } catch { /* ignore */ }
@@ -191,8 +195,17 @@ export default function Pipeline() {
     <>
       <header>
         <h1>Funil de atendimento &amp; vendas</h1>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <SeletorLoja escopo={escopo} />
+          {!ehVendedora && links.length > 0 && (
+            <div className="campo" style={{ minWidth: 200, marginBottom: 0 }}>
+              <label>Vendedora</label>
+              <select value={vendFiltro} onChange={(e) => setVendFiltro(e.target.value)}>
+                <option value="">Todas as vendedoras</option>
+                {links.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
+              </select>
+            </div>
+          )}
           {podeRedistribuir && <button className="btn secundario" onClick={redistribuirAtrasados}>Redistribuir atrasados</button>}
         </div>
       </header>

@@ -223,13 +223,15 @@ function DetalheProduto({ produto, onFechar, onAdicionar }: { produto: Produto; 
     })
   }
 
-  // Galeria troca conforme a cor: mostra todas as fotos MENOS as marcadas para OUTRAS cores
-  // (ou seja, as fotos gerais/sem cor + as desta cor). Assim as miniaturas aparecem já na abertura.
+  // Galeria por cor: mostra as fotos gerais (sem cor) + as marcadas para a cor atual.
+  // Só estreita a galeria quando a cor tem um conjunto PRÓPRIO (2+ fotos); senão mostra a
+  // galeria completa — assim as miniaturas nunca somem na abertura, mesmo quando a 1ª cor
+  // tem só 1 foto e todas as fotos foram marcadas por cor (nenhuma "geral").
   const fotos = useMemo(() => {
     const porCor = produto.fotosPorCor ?? {}
     const deOutrasCores = new Set(Object.entries(porCor).filter(([c]) => c !== cor).flatMap(([, arr]) => arr))
     const lista = (produto.fotos ?? []).filter((f) => !deOutrasCores.has(f))
-    return lista.length ? lista : (produto.fotos ?? [])
+    return lista.length > 1 ? lista : (produto.fotos ?? [])
   }, [produto.fotos, produto.fotosPorCor, cor])
 
   return (

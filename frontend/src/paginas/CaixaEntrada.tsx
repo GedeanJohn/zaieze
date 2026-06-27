@@ -383,7 +383,7 @@ export default function CaixaEntrada() {
                   <strong>{sel.cliente.nome}</strong>
                   <span>{sel.cliente.telefone}</span>
                 </div>
-                <button className="cz-btn" onClick={() => navigate(`/vendas?cliente=${sel.cliente.id}`)}>🛒 Registrar venda</button>
+                <button className="cz-btn cz-btn-venda" onClick={() => navigate(`/vendas?cliente=${sel.cliente.id}`)} title="Registrar venda">🛒<span className="cz-btn-txt"> Registrar venda</span></button>
               </div>
 
               <div className="cz-bolhas">

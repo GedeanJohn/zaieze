@@ -56,10 +56,11 @@ function BadgeSituacao({ s }: { s: Situacao }) {
   return (
     <span title={s.label} style={{
       display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600,
-      padding: '1px 7px', borderRadius: 999, color: s.cor,
-      background: `${s.cor}22`, border: `1px solid ${s.cor}55`, whiteSpace: 'nowrap',
+      padding: '2px 8px', borderRadius: 12, color: s.cor, lineHeight: 1.25,
+      background: `${s.cor}22`, border: `1px solid ${s.cor}55`, maxWidth: '100%',
     }}>
-      <span aria-hidden>{iconeSituacao[s.chave]}</span>{s.label}
+      <span aria-hidden style={{ flex: '0 0 auto' }}>{iconeSituacao[s.chave]}</span>
+      <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{s.label}</span>
     </span>
   )
 }
@@ -111,8 +112,8 @@ function CardLead({ c, redistribuir, podeRedistribuir, abrirChat }: {
         <button type="button" onClick={() => clienteId && abrirChat(clienteId)} disabled={!clienteId}
           title={clienteId ? 'Abrir conversa no Chat Zaieze' : undefined}
           style={{ flex: 1, minWidth: 0, textAlign: 'left', border: 'none', background: 'none', padding: 0, cursor: clienteId ? 'pointer' : 'default', color: 'inherit', display: 'block' }}>
-          <div style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.25, color: clienteId ? 'var(--accent)' : undefined }}>{nome}</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-soft)', lineHeight: 1.25 }}>{telefone}</div>
+          <div style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.25, color: clienteId ? 'var(--accent)' : undefined, overflowWrap: 'anywhere' }}>{nome}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-soft)', lineHeight: 1.25, overflowWrap: 'anywhere' }}>{telefone}</div>
         </button>
       </div>
       <div style={{ marginTop: 6 }}><BadgeSituacao s={c.situacao} /></div>

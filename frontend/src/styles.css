@@ -479,10 +479,11 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .cz-previa { font-size: 12.5px; color: var(--cz-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
 .cz-badge { background: linear-gradient(135deg, #ec4899, #db2777); color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 7px; min-width: 22px; text-align: center; box-shadow: 0 2px 8px #ec489966; align-self: center; }
 .cz-vazio { margin: auto; color: var(--cz-mut); }
-.cz-conv-top { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--cz-line); }
+.cz-conv-top { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--cz-line); }
 .cz-conv-nome { flex: 1; min-width: 0; }
-.cz-conv-nome strong { display: block; font-size: 15px; }
-.cz-conv-nome span { font-size: 12px; color: var(--cz-mut); }
+.cz-conv-nome strong { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cz-conv-nome span { display: block; font-size: 12px; color: var(--cz-mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cz-btn-venda { flex: 0 0 auto; }
 .cz-bolhas { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 10px; background: var(--cz-bg); }
 .cz-dia { align-self: center; background: var(--cz-surf2); color: var(--cz-mut); font-size: 11px; padding: 3px 12px; border-radius: 999px; }
 .cz-bolha { max-width: 76%; padding: 9px 13px; border-radius: 14px; font-size: 14px; line-height: 1.35; word-break: break-word; }
@@ -604,4 +605,10 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   .chatz.tem-sel .cz-lista { display: none; }
   .cz-voltar { display: inline-flex; }
   .cz-bolha { max-width: 86%; }
+  /* Cabeçalho da conversa compacto no celular: botão só ícone, controles menores. */
+  .cz-conv-top { gap: 8px; padding: 9px 10px; }
+  .cz-btn-venda .cz-btn-txt { display: none; }
+  .cz-btn-venda { padding: 9px 12px; font-size: 16px; }
+  .cz-voltar { padding: 6px 10px; }
+  .cz-avatar.sm { width: 36px; height: 36px; }
 }

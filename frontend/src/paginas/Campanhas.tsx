@@ -19,12 +19,19 @@ interface ResumoCampanhas {
   campanhas: number; enviadas: number; simuladas: number; falhas: number; semLgpd: number; alcance: number
   porVendedora: { nome: string; campanhas: number; enviadas: number; alcance: number }[]
 }
+interface Modelo {
+  id: string; nome: string; mensagemTemplate: string; segmentoAlvo: string | null; imagemUrl: string | null
+  ativa: boolean; criadaPor: string; createdAt: string
+  resultado?: { disparos: number; enviadas: number; simuladas: number; falhas: number; semLgpd: number; alcance: number }
+}
 
 const SEGMENTOS = ['', 'NOVO', 'FREQUENTE', 'VIP', 'INATIVO', 'ATACADO']
 
 export default function Campanhas() {
   const usuario = usuarioLogado()!
   const gerente = usuario.role !== 'VENDEDORA'
+  const ehGestor = usuario.role === 'GESTOR' || usuario.role === 'SUPER_ADMIN'
+  const podeDisparar = usuario.role === 'VENDEDORA' || usuario.role === 'GERENTE'
   // Só quem tem carteira/WhatsApp próprio conecta um número. Gestor/admin não têm WhatsApp pessoal.
   const podeConectarWa = usuario.role === 'VENDEDORA' || usuario.role === 'GERENTE'
   const escopo = useLojaAtiva()
@@ -32,6 +39,15 @@ export default function Campanhas() {
   const [campanhas, setCampanhas] = useState<Campanha[]>([])
   const [resumo, setResumo] = useState<ResumoCampanhas | null>(null)
   const [reguas, setReguas] = useState<Regua[]>([])
+
+  // Catálogo de campanhas da marca
+  const [modelos, setModelos] = useState<Modelo[]>([])
+  const [mNome, setMNome] = useState('')
+  const [mMsg, setMMsg] = useState('')
+  const [mSeg, setMSeg] = useState('')
+  const [mImg, setMImg] = useState('')
+  const [mSalvando, setMSalvando] = useState(false)
+  const [dispSeg, setDispSeg] = useState<Record<string, string>>({})
   const [nome, setNome] = useState('Novidades da semana')
   const [segmento, setSegmento] = useState('')
   const [template, setTemplate] = useState('Oi {primeiroNome}! 😍 Chegaram novidades na {loja} pensando em você. Quer ver? — {vendedora}')
@@ -108,6 +124,7 @@ export default function Campanhas() {
     const reqs: Promise<unknown>[] = [api.get('/campanhas', { params: escopo.params }).then(({ data }) => setCampanhas(data))]
     if (gerente) reqs.push(api.get('/reguas', { params: escopo.params }).then(({ data }) => setReguas(data)))
     if (gerente) reqs.push(api.get('/campanhas/resumo', { params: escopo.params }).then(({ data }) => setResumo(data)).catch(() => {}))
+    reqs.push(api.get('/campanhas/modelos', { params: escopo.params }).then(({ data }) => setModelos(data)).catch(() => {}))
     await Promise.all(reqs)
   }, [escopo.pronto, escopo.params, gerente])
 
@@ -138,6 +155,45 @@ export default function Campanhas() {
     } finally {
       setEnviando(false)
     }
+  }
+
+  // ── Catálogo de campanhas da marca ──
+  async function criarModelo(e: React.FormEvent) {
+    e.preventDefault()
+    setMSalvando(true); setErro(''); setAviso('')
+    try {
+      await api.post('/campanhas/modelos', { nome: mNome, mensagemTemplate: mMsg, segmento: mSeg || null, imagemUrl: mImg || null }, { params: escopo.params })
+      setMNome(''); setMMsg(''); setMSeg(''); setMImg('')
+      setAviso('Campanha da marca publicada — já disponível para as vendedoras.')
+      carregar()
+    } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setMSalvando(false) }
+  }
+  async function enviarImagemModelo(arquivo: File) {
+    setErro('')
+    try {
+      const fd = new FormData(); fd.append('file', arquivo)
+      const { data } = await api.post('/midia/imagem', fd, { params: escopo.params })
+      setMImg(data.url)
+    } catch (e2) { setErro(mensagemDeErro(e2)) }
+  }
+  async function alternarModelo(m: Modelo) {
+    try { await api.patch(`/campanhas/modelos/${m.id}`, { ativa: !m.ativa }, { params: escopo.params }); carregar() }
+    catch (e2) { setErro(mensagemDeErro(e2)) }
+  }
+  async function excluirModelo(id: string) {
+    if (!confirm('Excluir esta campanha da marca? Os disparos já feitos são mantidos no histórico.')) return
+    try { await api.delete(`/campanhas/modelos/${id}`, { params: escopo.params }); carregar() }
+    catch (e2) { setErro(mensagemDeErro(e2)) }
+  }
+  async function dispararModelo(m: Modelo) {
+    setEnviando(true); setErro(''); setAviso('')
+    try {
+      const seg = dispSeg[m.id] || undefined
+      const { data } = await api.post(`/campanhas/modelos/${m.id}/disparar`, { segmento: seg }, { params: escopo.params })
+      const partes = [`${data.enviados} enviada(s)`, data.simulados ? `${data.simulados} simulada(s)` : '', data.falhas ? `${data.falhas} falha(s)` : '', data.semConsentimento ? `${data.semConsentimento} sem LGPD` : '']
+      setAviso(`"${m.nome}" disparada para ${data.alcance} cliente(s): ${partes.filter(Boolean).join(' · ')}.`)
+      carregar()
+    } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setEnviando(false) }
   }
 
   async function processarReguas() {
@@ -215,6 +271,76 @@ export default function Campanhas() {
           </>
         )}
       </div>
+      )}
+
+      {/* Campanhas da marca — o gestor monta e disponibiliza */}
+      {ehGestor && (
+        <div className="cartao">
+          <h2 className="painel-titulo">Campanhas da marca</h2>
+          <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
+            Monte a campanha uma vez e disponibilize para as vendedoras dispararem na carteira delas. O resultado de todos os disparos aparece consolidado aqui.
+          </p>
+          <form onSubmit={criarModelo} style={{ display: 'grid', gap: 10, maxWidth: 560 }}>
+            <div className="campo"><label>Nome da campanha</label><input value={mNome} onChange={(e) => setMNome(e.target.value)} required placeholder="Ex.: Liquida de inverno" /></div>
+            <div className="campo"><label>Segmento sugerido</label>
+              <select value={mSeg} onChange={(e) => setMSeg(e.target.value)}>
+                {SEGMENTOS.map((s) => <option key={s} value={s}>{s || 'Carteira toda'}</option>)}
+              </select>
+            </div>
+            <div className="campo"><label>Mensagem</label><textarea value={mMsg} onChange={(e) => setMMsg(e.target.value)} required rows={4} placeholder="Use {primeiroNome}, {loja}, {link}…" /></div>
+            <div className="campo"><label>Banner (opcional)</label>
+              <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarImagemModelo(f); e.target.value = '' }} />
+              {mImg && <img src={mImg} alt="" style={{ marginTop: 8, maxHeight: 120, borderRadius: 8, display: 'block' }} />}
+              <small style={{ color: 'var(--ink-soft)' }}>A imagem aparece para a vendedora; o envio do banner pelo WhatsApp entra na migração oficial.</small>
+            </div>
+            <div className="acoes"><button className="btn" disabled={mSalvando}>{mSalvando ? 'Publicando…' : '➕ Publicar campanha'}</button></div>
+          </form>
+
+          {modelos.length > 0 && (
+            <table style={{ marginTop: 16 }}>
+              <thead><tr><th>Campanha</th><th>Segmento</th><th>Status</th><th>Resultado</th><th></th></tr></thead>
+              <tbody>
+                {modelos.map((m) => (
+                  <tr key={m.id}>
+                    <td>{m.nome}</td>
+                    <td>{m.segmentoAlvo ? <span className={`selo ${m.segmentoAlvo}`}>{m.segmentoAlvo}</span> : 'Carteira toda'}</td>
+                    <td>{m.ativa ? <span className="selo ok">disponível</span> : <span className="selo baixo">pausada</span>}</td>
+                    <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{m.resultado ? `${m.resultado.disparos} disparo(s) · ${m.resultado.alcance} alcance · ${m.resultado.enviadas} enviadas` : '—'}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <button className="btn secundario" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => alternarModelo(m)}>{m.ativa ? 'Pausar' : 'Ativar'}</button>{' '}
+                      <button className="btn secundario" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => excluirModelo(m.id)}>🗑</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* Campanhas disponíveis — a vendedora/gerente dispara com 1 clique */}
+      {podeDisparar && modelos.length > 0 && (
+        <div className="cartao">
+          <h2 className="painel-titulo">Campanhas disponíveis</h2>
+          <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>Campanhas da marca prontas — dispare para a sua carteira com 1 clique.</p>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {modelos.map((m) => (
+              <div key={m.id} className="cartao" style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                {m.imagemUrl && <img src={m.imagemUrl} alt="" style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 8 }} />}
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <strong>{m.nome}</strong>
+                  <div style={{ fontSize: 13, color: 'var(--ink-soft)', whiteSpace: 'pre-wrap', marginTop: 4 }}>{m.mensagemTemplate}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <select value={dispSeg[m.id] ?? (m.segmentoAlvo ?? '')} onChange={(e) => setDispSeg((s) => ({ ...s, [m.id]: e.target.value }))}>
+                    {SEGMENTOS.map((s) => <option key={s} value={s}>{s || 'Carteira toda'}</option>)}
+                  </select>
+                  <button className="btn" disabled={enviando} onClick={() => dispararModelo(m)}>📲 Disparar</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="grade-paineis">

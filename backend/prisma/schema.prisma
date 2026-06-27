@@ -171,6 +171,7 @@ model Rede {
   produtos   Produto[]
   categorias Categoria[]
   marcas     Marca[]
+  campanhasModelo CampanhaModelo[]
 
   @@map("redes")
 }
@@ -280,6 +281,7 @@ model Usuario {
   vendas            Venda[]
   mensagens         MensagemWhatsapp[] @relation("MensagensVendedora")
   campanhas         Campanha[]
+  campanhasModelo   CampanhaModelo[]   @relation("ModelosCampanhaCriados")
   postsMural        PostMural[]
   leads             Lead[]             @relation("LeadsVendedora")
   gruposTransmissao GrupoTransmissao[] @relation("GruposVendedora")
@@ -612,6 +614,7 @@ model Campanha {
   id               String           @id @default(cuid())
   lojaId           String
   criadaPorId      String
+  modeloId         String? // disparo originado de uma campanha da marca (catálogo centralizado)
   nome             String
   segmentoAlvo     SegmentoCliente? // null = lista manual de clientes
   mensagemTemplate String
@@ -624,10 +627,35 @@ model Campanha {
 
   loja      Loja               @relation(fields: [lojaId], references: [id], onDelete: Cascade)
   criadaPor Usuario            @relation(fields: [criadaPorId], references: [id])
+  modelo    CampanhaModelo?    @relation(fields: [modeloId], references: [id], onDelete: SetNull)
   mensagens MensagemWhatsapp[]
 
   @@index([lojaId, createdAt])
+  @@index([modeloId])
   @@map("campanhas")
+}
+
+// Campanha da MARCA (catálogo centralizado): o gestor monta uma vez no nível da rede e
+// disponibiliza (ativa = true); as vendedoras disparam para a própria carteira com 1 clique.
+// Cada disparo vira uma Campanha (loja) ligada a este modelo, consolidando os resultados.
+model CampanhaModelo {
+  id               String           @id @default(cuid())
+  redeId           String
+  criadaPorId      String
+  nome             String
+  mensagemTemplate String
+  segmentoAlvo     SegmentoCliente? // segmento sugerido (null = carteira toda)
+  imagemUrl        String? // peça/banner (exibida no catálogo; envio pelo WhatsApp na migração oficial)
+  ativa            Boolean          @default(true) // disponível para as vendedoras dispararem
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  rede      Rede       @relation(fields: [redeId], references: [id], onDelete: Cascade)
+  criadaPor Usuario    @relation("ModelosCampanhaCriados", fields: [criadaPorId], references: [id])
+  disparos  Campanha[]
+
+  @@index([redeId, ativa])
+  @@map("campanhas_modelo")
 }
 
 model MensagemWhatsapp {

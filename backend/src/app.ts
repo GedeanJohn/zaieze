@@ -6,6 +6,7 @@ import rateLimit from '@fastify/rate-limit'
 import multipart from '@fastify/multipart'
 import fastifyStatic from '@fastify/static'
 import { ZodError } from 'zod'
+import { Prisma } from '@prisma/client'
 import { env } from './env'
 import { registrarAuth } from './plugins/auth'
 import { authRoutes } from './modules/auth/auth.routes'
@@ -57,6 +58,17 @@ export async function buildApp() {
         erro: 'Dados inválidos',
         detalhes: error.issues.map((i) => ({ campo: i.path.join('.'), mensagem: i.message })),
       })
+    }
+    // Violação de unicidade do banco (P2002) → 409 com mensagem clara (evita "Erro interno" genérico).
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const alvo = Array.isArray(error.meta?.target) ? (error.meta?.target as string[]) : []
+      const msg =
+        alvo.includes('slugCatalogo') ? 'Esse slug do catálogo já está em uso nesta loja. Escolha outro.'
+        : alvo.includes('email') ? 'Esse e-mail já está cadastrado.'
+        : alvo.includes('telefone') ? 'Já existe um cadastro com esse telefone.'
+        : alvo.includes('slug') ? 'Esse endereço (slug) já está em uso.'
+        : 'Já existe um registro com esse valor (duplicado).'
+      return reply.code(409).send({ erro: msg })
     }
     const err = error as { statusCode?: number; message?: string }
     const statusCode = err.statusCode ?? 500

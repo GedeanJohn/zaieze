@@ -118,6 +118,49 @@ export async function vendasRoutes(app: FastifyInstance) {
     return venda
   })
 
+  // Pedidos a separar (gestor de estoque + gerente): pedidos fechados, pendentes por padrão.
+  // O gerente acompanha/cobra; o gestor de estoque marca como separado.
+  app.get('/separacao', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'ESTOQUISTA')] }, async (request) => {
+    const lojaId = await lojaIdDe(request)
+    const { status } = request.query as { status?: string } // 'todos' = inclui já separados
+    const where: Prisma.VendaWhereInput = { lojaId, status: 'CONCLUIDA' }
+    if (status !== 'todos') where.separado = false
+
+    const vendas = await prisma.venda.findMany({
+      where,
+      orderBy: [{ separado: 'asc' }, { createdAt: 'desc' }],
+      take: 200,
+      select: {
+        id: true, tokenPublico: true, createdAt: true, total: true, atacado: true,
+        separado: true, separadoEm: true,
+        cliente: { select: { nome: true } },
+        vendedora: { select: { nome: true } },
+        itens: { select: { quantidade: true } },
+      },
+    })
+    return vendas.map((v) => ({
+      id: v.id, tokenPublico: v.tokenPublico, createdAt: v.createdAt, total: v.total,
+      atacado: v.atacado, separado: v.separado, separadoEm: v.separadoEm,
+      cliente: v.cliente?.nome ?? 'Consumidor avulso',
+      vendedora: v.vendedora.nome,
+      pecas: v.itens.reduce((s, i) => s + i.quantidade, 0),
+    }))
+  })
+
+  // Marca/desmarca o pedido como separado fisicamente.
+  app.patch('/:id/separado', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'ESTOQUISTA')] }, async (request, reply) => {
+    const lojaId = await lojaIdDe(request)
+    const { id } = request.params as { id: string }
+    const { separado } = z.object({ separado: z.boolean() }).parse(request.body)
+    const venda = await prisma.venda.findFirst({ where: { id, lojaId }, select: { id: true } })
+    if (!venda) return reply.code(404).send({ erro: 'Pedido não encontrado' })
+    return prisma.venda.update({
+      where: { id },
+      data: { separado, separadoEm: separado ? new Date() : null },
+      select: { id: true, separado: true, separadoEm: true },
+    })
+  })
+
   app.post('/', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const body = criarVendaSchema.parse(request.body)

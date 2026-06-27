@@ -543,6 +543,10 @@ model Venda {
   // cashback creditado ao cliente nesta venda (Portal do Cliente) — base do estorno no cancelamento
   cashbackGerado   Decimal          @default(0) @db.Decimal(12, 2)
   observacao       String?
+  // Separação física (gestor de estoque): pedido entra como pendente ao fechar a venda; o
+  // gestor marca como separado. O gerente acompanha/cobra os pendentes na tela "Pedidos a separar".
+  separado         Boolean          @default(false)
+  separadoEm       DateTime?
   createdAt        DateTime         @default(now())
 
   loja             Loja        @relation(fields: [lojaId], references: [id], onDelete: Cascade)

@@ -9,6 +9,7 @@ import Layout from './paginas/Layout'
 import Dashboard from './paginas/Dashboard'
 import Vendas from './paginas/Vendas'
 import Estoque from './paginas/Estoque'
+import Separacao from './paginas/Separacao'
 import Clientes from './paginas/Clientes'
 import Campanhas from './paginas/Campanhas'
 import CaixaEntrada from './paginas/CaixaEntrada'
@@ -62,6 +63,7 @@ function CrmApp() {
         <Route index element={<Dashboard />} />
         <Route path="vendas" element={<Vendas />} />
         <Route path="estoque" element={<Estoque />} />
+        <Route path="separacao" element={<Separacao />} />
         <Route path="clientes" element={<Clientes />} />
         <Route path="campanhas" element={<Campanhas />} />
         <Route path="caixa" element={<CaixaEntrada />} />

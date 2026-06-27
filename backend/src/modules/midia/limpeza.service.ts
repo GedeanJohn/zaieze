@@ -1,6 +1,51 @@
+import path from 'node:path'
+import fs from 'node:fs/promises'
 import type { Plano } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
+import { env } from '../../env'
 import { excluirDoR2 } from './r2.service'
+
+/** Dias de retenção das mensagens de voz do Chat antes do expurgo automático. */
+export const RETENCAO_AUDIO_DIAS = 7
+
+/** Remove um upload local (dev), se a URL for do /api/uploads. Ignora URLs do R2. */
+async function removerUploadLocal(url: string): Promise<void> {
+  const marca = '/api/uploads/'
+  const i = url.indexOf(marca)
+  if (i === -1) return
+  const nome = url.slice(i + marca.length)
+  if (!nome || nome.includes('/') || nome.includes('..')) return
+  await fs.unlink(path.join(path.resolve(process.cwd(), env.UPLOAD_DIR), nome)).catch(() => {})
+}
+
+/**
+ * Expurga as mensagens de voz (áudio) com mais de RETENCAO_AUDIO_DIAS dias: apaga o arquivo
+ * (R2 e/ou local) e converte a mensagem em "áudio expirado" — o histórico da conversa fica,
+ * mas o áudio some. Roda no job diário. Idempotente.
+ * @returns nº de áudios expurgados.
+ */
+export async function limparAudiosAntigos(): Promise<number> {
+  const limite = new Date(Date.now() - RETENCAO_AUDIO_DIAS * 24 * 60 * 60 * 1000)
+  const antigos = await prisma.mensagemWhatsapp.findMany({
+    where: { tipoMidia: 'AUDIO', midiaUrl: { not: null }, createdAt: { lt: limite } },
+    select: { id: true, midiaUrl: true },
+  })
+  if (antigos.length === 0) return 0
+
+  const urls = antigos.map((a) => a.midiaUrl).filter((u): u is string => !!u)
+  try {
+    await excluirDoR2(urls) // no-op em dev (sem R2)
+  } catch {
+    return 0 // falha no R2 → tenta de novo no próximo ciclo (não zera o banco)
+  }
+  await Promise.all(urls.map((u) => removerUploadLocal(u)))
+
+  await prisma.mensagemWhatsapp.updateMany({
+    where: { id: { in: antigos.map((a) => a.id) } },
+    data: { tipoMidia: null, midiaUrl: null, texto: '🎤 Mensagem de voz (expirada após 7 dias)' },
+  })
+  return antigos.length
+}
 
 /**
  * Limpeza de mídia do catálogo por plano (Cloudflare R2).

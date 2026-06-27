@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors, useDraggable, useDroppable,
   type DragEndEvent, type DragStartEvent,
@@ -92,21 +93,27 @@ function ColunaDrop({ etapa, children }: { etapa: Etapa; children: ReactNode }) 
   )
 }
 
-// Card do cliente = item ARRASTÁVEL (alça ⠿). O select continua como alternativa.
-function CardLead({ c, mover, redistribuir, podeRedistribuir }: {
-  c: Card; mover: (c: Card, etapa: Etapa) => void; redistribuir: (c: Card) => void; podeRedistribuir: boolean
+// Card do cliente = item ARRASTÁVEL (alça ⠿). Mudança de etapa SÓ por arrastar (sem seletor).
+// Clicar no nome/telefone abre a conversa do cliente no Chat Zaieze.
+function CardLead({ c, redistribuir, podeRedistribuir, abrirChat }: {
+  c: Card; redistribuir: (c: Card) => void; podeRedistribuir: boolean; abrirChat: (clienteId: string) => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: c.id, data: { card: c } })
   const ct = corTempoEspera(c)
+  const clienteId = c.cliente?.id ?? null
+  const nome = c.cliente?.nome ?? c.nome ?? '—'
+  const telefone = c.cliente?.telefone ?? c.telefone ?? ''
   return (
     <div ref={setNodeRef} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `4px solid ${ct ?? c.situacao.cor}`, background: ct ? `${ct}22` : undefined, opacity: isDragging ? 0.4 : 1, userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
         <button type="button" {...attributes} {...listeners} title="Arraste para mudar de etapa" aria-label="Arrastar card"
-          style={{ cursor: 'grab', touchAction: 'none', border: 'none', background: 'none', color: 'var(--ink-soft)', fontSize: 16, padding: '0 2px', lineHeight: 1.1 }}>⠿</button>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 14 }}>{c.cliente?.nome ?? c.nome ?? '—'}</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{c.cliente?.telefone ?? c.telefone ?? ''}</div>
-        </div>
+          style={{ cursor: 'grab', touchAction: 'none', border: 'none', background: 'none', color: 'var(--ink-soft)', fontSize: 24, padding: '2px 4px', lineHeight: 1, alignSelf: 'stretch' }}>⠿</button>
+        <button type="button" onClick={() => clienteId && abrirChat(clienteId)} disabled={!clienteId}
+          title={clienteId ? 'Abrir conversa no Chat Zaieze' : undefined}
+          style={{ flex: 1, minWidth: 0, textAlign: 'left', border: 'none', background: 'none', padding: 0, cursor: clienteId ? 'pointer' : 'default', color: 'inherit', display: 'block' }}>
+          <div style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.25, color: clienteId ? 'var(--accent)' : undefined }}>{nome}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-soft)', lineHeight: 1.25 }}>{telefone}</div>
+        </button>
       </div>
       <div style={{ marginTop: 6 }}><BadgeSituacao s={c.situacao} /></div>
       <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginTop: 4 }}>
@@ -115,14 +122,11 @@ function CardLead({ c, mover, redistribuir, podeRedistribuir }: {
       <div style={{ fontSize: 11, marginTop: 2, color: c.atrasado ? '#ff6b6b' : 'var(--ink-soft)' }}>
         ⏱ {tempoNaEtapa(c.etapaDesde)} nesta etapa{c.atrasado && ' · atrasado'}
       </div>
-      <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
-        <select value={c.status} onChange={(e) => mover(c, e.target.value as Etapa)} style={{ flex: 1, fontSize: 12, padding: 4 }}>
-          {ETAPAS.map((et) => <option key={et} value={et}>{rotuloEtapa[et]}</option>)}
-        </select>
-        {podeRedistribuir && ['ENTROU', 'ATENDIDO', 'NEGOCIANDO'].includes(c.status) && (
-          <button className="btn secundario" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => redistribuir(c)}>↪</button>
-        )}
-      </div>
+      {podeRedistribuir && ['ENTROU', 'ATENDIDO', 'NEGOCIANDO'].includes(c.status) && (
+        <div style={{ marginTop: 8 }}>
+          <button className="btn secundario" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => redistribuir(c)} title="Redistribuir para outra vendedora">↪ Redistribuir</button>
+        </div>
+      )}
     </div>
   )
 }
@@ -132,6 +136,8 @@ export default function Pipeline() {
   const ehVendedora = usuario.role === 'VENDEDORA'
   const podeRedistribuir = usuario.role === 'GESTOR' || usuario.role === 'GERENTE' || usuario.role === 'SUPER_ADMIN'
   const escopo = useLojaAtiva()
+  const navigate = useNavigate()
+  const abrirChat = useCallback((clienteId: string) => navigate(`/caixa?cliente=${clienteId}`), [navigate])
 
   const [pipe, setPipe] = useState<Pipeline | null>(null)
   const [meuLink, setMeuLink] = useState<LinkVend | null>(null)
@@ -272,9 +278,9 @@ export default function Pipeline() {
         </div>
       )}
 
-      {/* Kanban com arrastar-e-soltar (alça ⠿) — desktop e mobile. O select continua como alternativa. */}
+      {/* Kanban com arrastar-e-soltar (alça ⠿) — desktop e mobile. Mudança de etapa só por arrastar. */}
       <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '0 0 6px' }}>
-        Dica: arraste o card pela alça <strong>⠿</strong> para outra etapa (no celular, pressione e segure). Ou use o seletor no card.
+        Dica: arraste o card pela alça <strong>⠿</strong> para outra etapa (no celular, pressione e segure). Toque no nome para abrir a conversa no Chat.
       </div>
       <DndContext sensors={sensors} onDragStart={aoIniciarArrasto} onDragEnd={aoSoltar}>
         <div className="funil-kanban" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(180px, 1fr))', gap: 10, overflowX: 'auto' }}>
@@ -287,7 +293,7 @@ export default function Pipeline() {
                   <span style={{ color: 'var(--ink-soft)', fontSize: 12 }}>{cards.length}</span>
                 </div>
                 {cards.map((c) => (
-                  <CardLead key={c.id} c={c} mover={mover} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} />
+                  <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat} />
                 ))}
                 {cards.length === 0 && <div style={{ color: 'var(--ink-soft)', fontSize: 12, padding: 6 }}>—</div>}
               </ColunaDrop>

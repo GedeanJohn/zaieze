@@ -463,9 +463,12 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .cz-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
 .cz-tab { background: transparent; border: 1px solid var(--cz-line); color: var(--cz-mut); border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .cz-tab.ativo { background: var(--cz-accent); border-color: var(--cz-accent); color: #fff; }
-.cz-itens { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
-.cz-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: transparent; border: none; border-radius: 12px; padding: 10px; cursor: pointer; color: var(--cz-tx); }
+.cz-tab-badge { background: linear-gradient(135deg, #ec4899, #db2777); color: #fff; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 0 6px; margin-left: 6px; min-width: 16px; display: inline-block; text-align: center; }
+.cz-itens { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 0; }
+.cz-item { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; background: transparent; border: none; border-radius: 12px; padding: 11px 10px; cursor: pointer; color: var(--cz-tx); position: relative; }
+.cz-item + .cz-item::before { content: ''; position: absolute; top: 0; left: 63px; right: 10px; border-top: 1px solid var(--cz-line); }
 .cz-item:hover { background: var(--cz-surf2); }
+.cz-item:hover::before, .cz-item.ativo::before, .cz-item.ativo + .cz-item::before { border-color: transparent; }
 .cz-item.ativo { background: var(--cz-surf2); outline: 1px solid var(--cz-accent); }
 .cz-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: #fff; background: linear-gradient(135deg, #a855f7, #ec4899); flex: 0 0 auto; }
 .cz-avatar.sm { width: 38px; height: 38px; font-size: 14px; }
@@ -474,7 +477,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .cz-item-top strong { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cz-hora { font-size: 11px; color: var(--cz-mut); white-space: nowrap; }
 .cz-previa { font-size: 12.5px; color: var(--cz-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
-.cz-badge { background: var(--cz-accent); color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 7px; min-width: 20px; text-align: center; }
+.cz-badge { background: linear-gradient(135deg, #ec4899, #db2777); color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 7px; min-width: 22px; text-align: center; box-shadow: 0 2px 8px #ec489966; align-self: center; }
 .cz-vazio { margin: auto; color: var(--cz-mut); }
 .cz-conv-top { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--cz-line); }
 .cz-conv-nome { flex: 1; min-width: 0; }
@@ -491,9 +494,71 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .cz-responder input::placeholder { color: var(--cz-mut); }
 .cz-enviar { background: linear-gradient(135deg, #a855f7, #ec4899); border: none; color: #fff; width: 46px; border-radius: 12px; font-size: 16px; cursor: pointer; }
 .cz-enviar:disabled { opacity: .5; cursor: default; }
+.cz-mic { background: var(--cz-surf2); border: 1px solid var(--cz-line); color: var(--cz-tx); width: 46px; border-radius: 12px; font-size: 18px; cursor: pointer; }
+.cz-mic:hover { background: #34304a; }
+.cz-mic:disabled { opacity: .5; cursor: default; }
+/* Barra de gravação (substitui o composer enquanto grava) */
+.cz-gravando { display: flex; align-items: center; gap: 10px; padding: 12px; border-top: 1px solid var(--cz-line); }
+.cz-grav-lixo { background: transparent; border: none; color: #ff8d8d; font-size: 18px; cursor: pointer; }
+.cz-grav-rec { flex: 1; display: flex; align-items: center; gap: 8px; color: var(--cz-tx); font-size: 14px; font-variant-numeric: tabular-nums; }
+.cz-grav-dot { width: 11px; height: 11px; border-radius: 50%; background: #ef4444; animation: cz-pulse 1.1s ease-in-out infinite; }
+@keyframes cz-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+/* Player de áudio dentro da bolha */
+.cz-audio { height: 38px; max-width: 240px; }
+.cz-bolha.saida .cz-audio { filter: invert(1) hue-rotate(180deg); } /* contraste sobre a bolha roxa */
 .cz-btn { background: linear-gradient(135deg, #a855f7, #ec4899); border: none; color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .cz-voltar { display: none; background: var(--cz-surf2); border: 1px solid var(--cz-line); color: var(--cz-tx); border-radius: 10px; padding: 4px 11px; font-size: 16px; cursor: pointer; }
 .cz-alerta { margin: 0 12px; background: #4a1d1d; color: #ffb4b4; border-radius: 10px; padding: 8px 12px; font-size: 13px; }
+.cz-aviso { color: var(--cz-mut); padding: 14px; font-size: 13px; }
+
+/* Avatar do grupo (tom diferente das pessoas) + selo/online */
+.cz-avatar.grupo { background: linear-gradient(135deg, #14b8a6, #0ea5e9); }
+.cz-avatar-wrap { position: relative; flex: 0 0 auto; display: inline-flex; }
+.cz-online { position: absolute; right: 0; bottom: 0; width: 11px; height: 11px; border-radius: 50%; background: #22c55e; border: 2px solid var(--cz-surf); }
+.cz-verificado { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; margin-left: 5px; border-radius: 50%; background: #22c55e; color: #fff; font-size: 9px; vertical-align: middle; }
+.cz-item-top strong { display: inline-flex; align-items: center; }
+
+/* Botão "Criar grupo" no topo da lista de grupos */
+.cz-criar-grupo { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin: 2px 0 8px; padding: 11px; border: 1px dashed var(--cz-accent); background: #a855f71a; color: #d8b4fe; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.cz-criar-grupo:hover { background: #a855f72e; }
+
+/* Corpo do grupo (membros + disparos) */
+.cz-grupo-corpo { gap: 12px; }
+.cz-grupo-membros { display: flex; flex-wrap: wrap; gap: 6px; }
+.cz-chip { background: #ece9f5; color: #3a2f54; border-radius: 999px; padding: 4px 11px; font-size: 12.5px; font-weight: 600; }
+.cz-resultado { align-self: stretch; background: #eafaf0; color: #166534; border: 1px solid #bbf7d0; border-radius: 10px; padding: 8px 12px; font-size: 12.5px; }
+
+/* Botões variantes */
+.cz-btn.perigo { background: #2a2440; color: #ffb4b4; border: 1px solid var(--cz-line); }
+.cz-btn.fantasma { background: transparent; color: var(--cz-tx); border: 1px solid var(--cz-line); }
+
+/* Perfil da vendedora no cabeçalho do Chat */
+.cz-perfil { display: flex; align-items: center; gap: 12px; background: #ffffff14; border: 1px solid #ffffff24; border-radius: 999px; padding: 7px 16px 7px 7px; }
+.cz-perfil-avatar { position: relative; border: none; background: transparent; padding: 0; cursor: pointer; width: 48px; height: 48px; border-radius: 50%; }
+.cz-perfil-avatar img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; display: block; }
+.cz-perfil-avatar .cz-avatar { width: 48px; height: 48px; font-size: 17px; }
+.cz-perfil-avatar:disabled { opacity: .7; cursor: default; }
+.cz-perfil-cam { position: absolute; right: -2px; bottom: -2px; width: 20px; height: 20px; border-radius: 50%; background: linear-gradient(135deg, #a855f7, #ec4899); color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; border: 2px solid #15121f; }
+.cz-perfil-info { display: flex; flex-direction: column; line-height: 1.15; }
+.cz-perfil-rotulo { font-size: 11px; color: #c9c0e6; text-transform: uppercase; letter-spacing: .06em; }
+.cz-perfil-info strong { color: #fff; font-size: 15px; }
+
+/* Modal de criação de grupo */
+.cz-modal-fundo { position: fixed; inset: 0; background: #0009; display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+.cz-modal { width: 100%; max-width: 460px; max-height: 88vh; display: flex; flex-direction: column; gap: 10px; background: #211c30; color: #ece9f5; border: 1px solid #352d4d; border-radius: 16px; padding: 18px; --cz-bg: #15121f; --cz-line: #352d4d; --cz-tx: #ece9f5; --cz-mut: #9b93b4; --cz-accent: #a855f7; }
+.cz-modal-top { display: flex; align-items: center; justify-content: space-between; }
+.cz-modal-top strong { font-size: 18px; font-family: var(--fonte-titulo); }
+.cz-modal-x { background: transparent; border: none; color: #9b93b4; font-size: 24px; line-height: 1; cursor: pointer; }
+.cz-modal-sub { font-size: 13px; font-weight: 700; color: #c9c0e6; display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.cz-modal-clientes { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; min-height: 140px; max-height: 42vh; border: 1px solid #352d4d; border-radius: 12px; padding: 6px; }
+.cz-cliente-op { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 10px; cursor: pointer; }
+.cz-cliente-op:hover { background: #2a2440; }
+.cz-cliente-op.sel { background: #a855f71f; outline: 1px solid #a855f7; }
+.cz-cliente-op input { accent-color: #a855f7; width: 17px; height: 17px; }
+.cz-cliente-nome { display: flex; flex-direction: column; min-width: 0; }
+.cz-cliente-nome strong { font-size: 14px; }
+.cz-cliente-nome span { font-size: 12px; color: #9b93b4; }
+.cz-modal-acoes { display: flex; justify-content: flex-end; gap: 8px; }
 
 /* Funil (kanban): cards não selecionáveis no toque longo do celular — o press-and-hold arrasta, não seleciona texto. */
 .funil-kanban, .funil-kanban * {
@@ -524,10 +589,17 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .cz-pagina .cz-bolha.entrada .cz-meta { color: #6b6480; opacity: 1; }
 .cz-pagina .cz-dia { background: #ece9f5; color: #6b6480; }
 
+/* Modo zen: ao abrir uma conversa/grupo, some a barra "Chat Zaieze" e a conversa ocupa a tela toda. */
+.cz-pagina.zen .cz-cabec { display: none; }
+.cz-pagina.zen .chatz { height: calc(100dvh - 70px); }
+.cz-pagina.zen .cz-voltar { display: inline-flex; } /* botão "voltar" também no desktop p/ sair do zen */
+
 @media (max-width: 720px) {
   .cz-pagina { margin: -18px -16px; padding: 14px 16px 18px; }
   .cz-marca { font-size: 24px; padding: 12px 26px; }
   .chatz { grid-template-columns: 1fr; height: calc(100dvh - 150px); padding: 8px; gap: 8px; }
+  .cz-pagina.zen { padding-top: 8px; }
+  .cz-pagina.zen .chatz { height: calc(100dvh - 30px); padding: 6px; }
   .chatz:not(.tem-sel) .cz-conversa { display: none; }
   .chatz.tem-sel .cz-lista { display: none; }
   .cz-voltar { display: inline-flex; }

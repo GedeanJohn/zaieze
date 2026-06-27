@@ -2,7 +2,7 @@ import { buildApp } from './app'
 import { env } from './env'
 import { segmentarTodasAsLojas } from './modules/clientes/segmentacao'
 import { redistribuirAtrasados } from './modules/leads/leads.service'
-import { limparMidiaExpirada } from './modules/midia/limpeza.service'
+import { limparMidiaExpirada, limparAudiosAntigos } from './modules/midia/limpeza.service'
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000
 
@@ -25,6 +25,13 @@ async function main() {
       .catch((err) => app.log.error({ err }, 'Falha na limpeza de mídia expirada'))
     limpar()
     setInterval(limpar, UM_DIA_MS).unref()
+
+    // Expurgo das mensagens de voz com mais de 7 dias (apaga o áudio; mantém o histórico). Boot + 24h.
+    const limparAudios = () => limparAudiosAntigos()
+      .then((n) => { if (n > 0) app.log.info(`Mensagens de voz expiradas (7 dias) expurgadas: ${n}`) })
+      .catch((err) => app.log.error({ err }, 'Falha no expurgo de áudios antigos'))
+    limparAudios()
+    setInterval(limparAudios, UM_DIA_MS).unref()
 
     // Segmentação automática: em produção roda via agendamento diário (cron).
     // No boot só roda se SEGMENTAR_BOOT=true — assim, em dev/demo, o recálculo

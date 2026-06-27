@@ -47,3 +47,25 @@ export async function enviarWhatsapp(opts: { instancia?: string | null; telefone
     return 'FALHA'
   }
 }
+
+/**
+ * Envia uma mensagem de voz (PTT) via Evolution API. `audioUrl` deve ser uma URL pública
+ * de um arquivo OGG/Opus. Sem provedor configurado → SIMULADA (registra mas não envia).
+ * NOTA: na migração para a WhatsApp Cloud API este envio será re-feito (upload de mídia + tipo audio).
+ */
+export async function enviarWhatsappAudio(opts: { instancia?: string | null; telefone: string; audioUrl: string }): Promise<StatusMensagem> {
+  if (!env.EVOLUTION_API_URL || !opts.instancia) return 'SIMULADA'
+  try {
+    const resp = await fetch(`${env.EVOLUTION_API_URL}/message/sendWhatsAppAudio/${opts.instancia}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(env.EVOLUTION_API_KEY ? { apikey: env.EVOLUTION_API_KEY } : {}),
+      },
+      body: JSON.stringify({ number: opts.telefone, audio: opts.audioUrl }),
+    })
+    return resp.ok ? 'ENVIADA' : 'FALHA'
+  } catch {
+    return 'FALHA'
+  }
+}

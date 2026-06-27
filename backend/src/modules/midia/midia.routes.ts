@@ -21,12 +21,38 @@ import { enviarParaR2, r2Configurado } from './r2.service'
 const TIPOS_IMG = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/avif'])
 const MUTACAO = ['SUPER_ADMIN', 'GESTOR', 'ESTOQUISTA', 'GERENTE'] as const
 
-async function salvarLocal(buffer: Buffer, ext: string): Promise<string> {
+export async function salvarUploadLocal(buffer: Buffer, ext: string): Promise<string> {
   const dir = path.resolve(process.cwd(), env.UPLOAD_DIR)
   await fs.mkdir(dir, { recursive: true })
   const nome = `midia-${Date.now()}-${crypto.randomBytes(6).toString('hex')}.${ext}`
   await fs.writeFile(path.join(dir, nome), buffer)
   return `/api/uploads/${nome}`
+}
+
+/**
+ * Transcodifica um áudio (qualquer formato gravado no navegador: webm/opus, mp4/aac…)
+ * para OGG/Opus — o formato que o WhatsApp reconhece como "mensagem de voz" (PTT).
+ * Recebe e devolve Buffer (lida com os arquivos temporários internamente).
+ */
+export async function transcodificarAudioOpus(entrada: Buffer): Promise<Buffer> {
+  const tmp = os.tmpdir()
+  const id = crypto.randomBytes(8).toString('hex')
+  const fin = path.join(tmp, `aud-in-${id}`)
+  const fout = path.join(tmp, `aud-out-${id}.ogg`)
+  try {
+    await fs.writeFile(fin, entrada)
+    await new Promise<void>((resolve, reject) => {
+      const ff = spawn('ffmpeg', ['-i', fin, '-c:a', 'libopus', '-b:a', '32k', '-ar', '48000', '-ac', '1', '-application', 'voip', '-y', fout])
+      let stderr = ''
+      ff.stderr.on('data', (d) => { stderr += d.toString() })
+      ff.on('error', reject)
+      ff.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`ffmpeg áudio falhou (${code}): ${stderr.slice(-400)}`))))
+    })
+    return await fs.readFile(fout)
+  } finally {
+    fs.unlink(fin).catch(() => {})
+    fs.unlink(fout).catch(() => {})
+  }
 }
 
 /** Transcodifica um arquivo de vídeo para MP4 H.264/AAC (máx 1280px, faststart). */
@@ -58,7 +84,7 @@ export async function midiaRoutes(app: FastifyInstance) {
     const original = await arquivo.toBuffer()
     const buffer = await sharp(original).rotate().resize({ width: 1280, withoutEnlargement: true }).webp({ quality: 80 }).toBuffer()
 
-    const url = (await enviarParaR2({ buffer, contentType: 'image/webp', ext: 'webp', lojaId, pasta: 'fotos' })) ?? (await salvarLocal(buffer, 'webp'))
+    const url = (await enviarParaR2({ buffer, contentType: 'image/webp', ext: 'webp', lojaId, pasta: 'fotos' })) ?? (await salvarUploadLocal(buffer, 'webp'))
     return { url, modo: r2Configurado() ? 'r2' : 'local' }
   })
 
@@ -81,7 +107,7 @@ export async function midiaRoutes(app: FastifyInstance) {
       await transcodificarMp4(entrada, saida)
       const buffer = await fs.readFile(saida)
 
-      const url = (await enviarParaR2({ buffer, contentType: 'video/mp4', ext: 'mp4', lojaId, pasta: 'videos' })) ?? (await salvarLocal(buffer, 'mp4'))
+      const url = (await enviarParaR2({ buffer, contentType: 'video/mp4', ext: 'mp4', lojaId, pasta: 'videos' })) ?? (await salvarUploadLocal(buffer, 'mp4'))
       return { url, modo: r2Configurado() ? 'r2' : 'local' }
     } catch (e) {
       request.log.error({ err: e }, 'falha ao processar vídeo')

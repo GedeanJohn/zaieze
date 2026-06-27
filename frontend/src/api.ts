@@ -27,8 +27,18 @@ export interface Usuario {
   nome: string
   email: string
   role: Papel
+  fotoUrl?: string | null
   rede: { id: string; nome: string; plano: string } | null
   loja: { id: string; nome: string; slug: string } | null
+}
+
+/** Atualiza o usuário salvo no localStorage (ex.: após trocar a foto de perfil). */
+export function atualizarUsuarioLocal(patch: Partial<Usuario>): Usuario | null {
+  const atual = usuarioLogado()
+  if (!atual) return null
+  const novo = { ...atual, ...patch }
+  localStorage.setItem('modacrm_usuario', JSON.stringify(novo))
+  return novo
 }
 
 export function usuarioLogado(): Usuario | null {

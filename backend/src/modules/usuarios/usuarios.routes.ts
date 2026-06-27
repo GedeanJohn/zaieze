@@ -1,9 +1,14 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
+import sharp from 'sharp'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
 import { ETAPAS_ABERTAS } from '../leads/leads.service'
+import { enviarParaR2 } from '../midia/r2.service'
+import { salvarUploadLocal } from '../midia/midia.routes'
+
+const TIPOS_IMG = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/avif'])
 
 const criarUsuarioSchema = z.object({
   nome: z.string().min(2),
@@ -24,7 +29,7 @@ const atualizarUsuarioSchema = criarUsuarioSchema.partial().extend({
 })
 
 const selecaoPublica = {
-  id: true, nome: true, email: true, role: true, telefone: true,
+  id: true, nome: true, email: true, role: true, telefone: true, fotoUrl: true,
   slugCatalogo: true, metaMensal: true, comissaoPadrao: true, ativo: true, createdAt: true,
   waNumero: true, waConectado: true,
   equipe: { select: { id: true, nome: true } },
@@ -61,6 +66,29 @@ export async function usuariosRoutes(app: FastifyInstance) {
       },
       select: { id: true, nome: true, email: true, role: true },
     })
+  })
+
+  // Foto de perfil própria (qualquer papel, inclusive VENDEDORA): comprime e devolve a URL.
+  // É a foto exibida no cabeçalho do Chat Zaieze.
+  app.post('/me/foto', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const lojaId = await lojaIdDe(request).catch(() => 'sem-loja') // gestor/super-admin não têm loja
+    const arquivo = await request.file()
+    if (!arquivo) return reply.code(422).send({ erro: 'Envie um arquivo de imagem no campo "file"' })
+    if (!TIPOS_IMG.has(arquivo.mimetype)) return reply.code(422).send({ erro: 'Formato inválido. Use PNG, JPG, WEBP ou AVIF.' })
+
+    const original = await arquivo.toBuffer()
+    // quadrado, recortado no centro, máx 512px — avatar de perfil
+    const buffer = await sharp(original).rotate().resize(512, 512, { fit: 'cover' }).webp({ quality: 82 }).toBuffer()
+    const url = (await enviarParaR2({ buffer, contentType: 'image/webp', ext: 'webp', lojaId, pasta: 'perfil' })) ?? (await salvarUploadLocal(buffer, 'webp'))
+
+    await prisma.usuario.update({ where: { id: request.user.sub }, data: { fotoUrl: url } })
+    return { fotoUrl: url }
+  })
+
+  // Remove a foto de perfil.
+  app.delete('/me/foto', { preHandler: [app.authenticate] }, async (request) => {
+    await prisma.usuario.update({ where: { id: request.user.sub }, data: { fotoUrl: null } })
+    return { ok: true }
   })
 
   app.post('/', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async (request, reply) => {

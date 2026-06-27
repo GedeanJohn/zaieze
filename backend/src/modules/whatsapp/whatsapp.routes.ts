@@ -4,9 +4,11 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
-import { enviarWhatsapp } from './whatsapp.service'
+import { enviarWhatsapp, enviarWhatsappAudio } from './whatsapp.service'
 import { marcarLeadAtendido, garantirCicloAberto } from '../leads/leads.service'
 import { evolutionConfigurado, criarInstancia, conectarInstancia, estadoInstancia, desconectarInstancia } from './evolution.service'
+import { transcodificarAudioOpus, salvarUploadLocal } from '../midia/midia.routes'
+import { enviarParaR2 } from '../midia/r2.service'
 
 const instanciaSchema = z.object({
   vendedoraId: z.string().optional(), // gerente configura a instância de uma vendedora
@@ -219,6 +221,48 @@ export async function whatsappRoutes(app: FastifyInstance) {
       },
     })
     // A vendedora respondeu → fecha o SLA do lead aberto desse cliente ("atender = responder").
+    await marcarLeadAtendido({ lojaId, clienteId })
+    return msg
+  })
+
+  // Responder com uma MENSAGEM DE VOZ (PTT): recebe o áudio gravado no navegador,
+  // transcodifica para OGG/Opus, sobe ao R2/local e registra a mensagem.
+  // O envio real ao WhatsApp será finalizado na migração para a API oficial (hoje: SIMULADA sem provedor).
+  app.post('/conversas/:clienteId/audio', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
+    const lojaId = await lojaIdDe(request)
+    const { clienteId } = request.params as { clienteId: string }
+    const arquivo = await request.file()
+    if (!arquivo) return reply.code(422).send({ erro: 'Envie o áudio no campo "file"' })
+    if (!arquivo.mimetype.startsWith('audio/') && !arquivo.mimetype.startsWith('video/')) {
+      return reply.code(422).send({ erro: 'Formato inválido. Envie um arquivo de áudio.' })
+    }
+
+    const cliente = await prisma.cliente.findFirst({ where: { id: clienteId, lojaId } })
+    if (!cliente) return reply.code(404).send({ erro: 'Cliente não encontrado' })
+    if (request.user.role === 'VENDEDORA' && cliente.vendedoraId !== request.user.sub) {
+      return reply.code(403).send({ erro: 'Cliente não está na sua carteira' })
+    }
+    const vendId = cliente.vendedoraId ?? (request.user.role === 'VENDEDORA' ? request.user.sub : null)
+    if (!vendId) return reply.code(422).send({ erro: 'Cliente sem vendedora responsável — defina a carteira primeiro.' })
+    const vend = await prisma.usuario.findUniqueOrThrow({ where: { id: vendId }, select: { waInstancia: true } })
+
+    let midiaUrl: string
+    try {
+      const ogg = await transcodificarAudioOpus(await arquivo.toBuffer())
+      midiaUrl = (await enviarParaR2({ buffer: ogg, contentType: 'audio/ogg', ext: 'ogg', lojaId, pasta: 'audio' })) ?? (await salvarUploadLocal(ogg, 'ogg'))
+    } catch (e) {
+      request.log.error({ err: e }, 'falha ao processar áudio')
+      return reply.code(500).send({ erro: 'Não foi possível processar o áudio. Tente novamente.' })
+    }
+
+    const status = await enviarWhatsappAudio({ instancia: vend.waInstancia, telefone: cliente.telefone, audioUrl: midiaUrl })
+    const msg = await prisma.mensagemWhatsapp.create({
+      data: {
+        lojaId, clienteId, vendedoraId: vendId,
+        direcao: 'ENVIADA', status, origem: 'MANUAL', telefone: cliente.telefone,
+        texto: '🎤 Mensagem de voz', tipoMidia: 'AUDIO', midiaUrl,
+      },
+    })
     await marcarLeadAtendido({ lojaId, clienteId })
     return msg
   })

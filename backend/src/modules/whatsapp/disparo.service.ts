@@ -36,6 +36,7 @@ export async function dispararParaClientes(opts: {
   template: string
   origem: OrigemMensagem
   campanhaId?: string
+  grupoId?: string
   clientes: ClienteAlvo[]
   vendedoraFallbackId?: string
 }): Promise<ResultadoDisparo> {
@@ -93,6 +94,7 @@ export async function dispararParaClientes(opts: {
         clienteId: c.id,
         vendedoraId: vend.id,
         campanhaId: opts.campanhaId,
+        grupoId: opts.grupoId,
         direcao: 'ENVIADA',
         status,
         origem: opts.origem,

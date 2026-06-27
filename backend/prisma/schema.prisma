@@ -129,38 +129,38 @@ enum OrigemLead {
 // ─────────────────────────── Rede (marca) — tenant raiz ───────────────────────────
 
 model Rede {
-  id        String   @id @default(cuid())
-  nome      String // nome da marca
-  slug      String   @unique
-  plano     Plano    @default(START)
-  ativo     Boolean  @default(true)
+  id                       String   @id @default(cuid())
+  nome                     String // nome da marca
+  slug                     String   @unique
+  plano                    Plano    @default(START)
+  ativo                    Boolean  @default(true)
   // Identidade visual da marca (usada no catálogo público / Portal do Cliente)
-  logoUrl       String? // caminho do arquivo enviado pelo gestor (servido em /uploads)
-  corPrimaria   String  @default("#111111") // cor de destaque (botões/CTA)
-  corSecundaria String  @default("#ffffff") // cor de fundo
+  logoUrl                  String? // caminho do arquivo enviado pelo gestor (servido em /uploads)
+  corPrimaria              String   @default("#111111") // cor de destaque (botões/CTA)
+  corSecundaria            String   @default("#ffffff") // cor de fundo
   // SLA por etapa do funil (minutos): tempo máximo do ciclo em cada etapa antes de "atrasar".
-  slaEntrouMin     Int     @default(30) // 1ª resposta; estourou + auto = redistribui
-  slaAtendidoMin   Int     @default(1440) // avançar do "atendido" (1 dia)
-  slaNegociandoMin Int     @default(4320) // fechar a negociação (3 dias)
-  slaAutoRedistribuir Boolean @default(false) // redistribui sozinho quando ENTROU estoura o prazo
+  slaEntrouMin             Int      @default(30) // 1ª resposta; estourou + auto = redistribui
+  slaAtendidoMin           Int      @default(1440) // avançar do "atendido" (1 dia)
+  slaNegociandoMin         Int      @default(4320) // fechar a negociação (3 dias)
+  slaAutoRedistribuir      Boolean  @default(false) // redistribui sozinho quando ENTROU estoura o prazo
   // Card do funil colorido por tempo de espera: VERMELHO quando passa do SLA (atrasado);
   // LARANJA quando falta <= slaApertadoPct% do prazo; VERDE no resto.
-  slaApertadoPct      Int     @default(20)
+  slaApertadoPct           Int      @default(20)
   // Canal varejo×atacado por QUANTIDADE de peças no pedido/carrinho: pedido com nº de peças
   // >= este mínimo é ATACADO (aplica preço de atacado); abaixo é VAREJO. Definido pelo gestor.
-  pedidoMinimoAtacado Int @default(6)
+  pedidoMinimoAtacado      Int      @default(6)
   // Lote mínimo de atacado para INFANTIL (costuma ser maior, ex.: 12). Demais gêneros usam pedidoMinimoAtacado.
-  pedidoMinimoInfantil Int @default(12)
+  pedidoMinimoInfantil     Int      @default(12)
   // Desconto no PDV: régua sugerida por total (JSON [{ate, pct}]) + limites de autorização.
-  descontoRegua        Json?            // null = usa a régua padrão do sistema
-  descontoAutoMaxPct   Int @default(10) // até este % a vendedora aplica sozinha
-  descontoSenhaMaxPct  Int @default(15) // acima de auto e até aqui pede senha da própria; acima pede gerente
+  descontoRegua            Json? // null = usa a régua padrão do sistema
+  descontoAutoMaxPct       Int      @default(10) // até este % a vendedora aplica sozinha
+  descontoSenhaMaxPct      Int      @default(15) // acima de auto e até aqui pede senha da própria; acima pede gerente
   // Texto padrão de disparo/campanha definido pelo GESTOR para as vendedoras.
   // disparoVendedoraEditavel = a vendedora pode personalizar o texto (true) ou fica travada (false).
   textoDisparoPadrao       String?
-  disparoVendedoraEditavel Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  disparoVendedoraEditavel Boolean  @default(true)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
   lojas      Loja[]
   usuarios   Usuario[] // gestores da rede
@@ -179,19 +179,19 @@ model Rede {
 // Cada rede (tenant) tem uma assinatura recorrente. Sem MERCADOPAGO_ACCESS_TOKEN, opera simulada.
 
 model Assinatura {
-  id              String           @id @default(cuid())
-  redeId          String           @unique
-  plano           Plano
-  status          StatusAssinatura @default(PENDENTE)
-  valor           Decimal          @db.Decimal(12, 2)
-  mpPreapprovalId String? // id da assinatura no Mercado Pago (preapproval); null em modo simulado
-  simulada        Boolean          @default(false)
+  id                       String           @id @default(cuid())
+  redeId                   String           @unique
+  plano                    Plano
+  status                   StatusAssinatura @default(PENDENTE)
+  valor                    Decimal          @db.Decimal(12, 2)
+  mpPreapprovalId          String? // id da assinatura no Mercado Pago (preapproval); null em modo simulado
+  simulada                 Boolean          @default(false)
   // Política de cancelamento por FIM DE CICLO (vale p/ MP, lojista e admin):
   cicloFimEm               DateTime? // acesso garantido até o fim do ciclo pago vigente
   cancelamentoSolicitadoEm DateTime? // quando o cancelamento foi pedido (null = renovando normalmente)
   cancelamentoOrigem       String? // LOJISTA | ADMIN | MERCADO_PAGO (auditoria)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
 
   rede Rede @relation(fields: [redeId], references: [id], onDelete: Cascade)
 
@@ -199,32 +199,33 @@ model Assinatura {
 }
 
 model Loja {
-  id       String  @id @default(cuid())
-  redeId   String
-  nome     String
-  slug     String  @unique // links de catálogo: loja.com/<slug>/<vendedora>
-  cnpj     String?
-  telefone String?
-  ativo    Boolean @default(true)
+  id              String   @id @default(cuid())
+  redeId          String
+  nome            String
+  slug            String   @unique // links de catálogo: loja.com/<slug>/<vendedora>
+  cnpj            String?
+  telefone        String?
+  ativo           Boolean  @default(true)
   // limite de volume acumulado (R$) a partir do qual o cliente é segmentado como ATACADO
-  limiteAtacado Decimal  @default(5000) @db.Decimal(12, 2)
+  limiteAtacado   Decimal  @default(5000) @db.Decimal(12, 2)
   // % de cashback creditado ao cliente a cada compra (Portal do Cliente — fase 7). 0 = desligado.
-  cashbackPercent Decimal @default(0) @db.Decimal(5, 2)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  cashbackPercent Decimal  @default(0) @db.Decimal(5, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  rede       Rede        @relation(fields: [redeId], references: [id], onDelete: Cascade)
-  usuarios   Usuario[]
-  equipes    Equipe[]
-  clientes   Cliente[]
-  vendas     Venda[]
+  rede                 Rede               @relation(fields: [redeId], references: [id], onDelete: Cascade)
+  usuarios             Usuario[]
+  equipes              Equipe[]
+  clientes             Cliente[]
+  vendas               Venda[]
   // Distribuição: coleções (da rede) que esta loja pode vender. Estoque é central (não por loja).
   colecoesDistribuidas ColecaoLoja[]
-  campanhas Campanha[]
-  reguas    ReguaInatividade[]
-  regrasComissao RegraComissao[]
-  postsMural     PostMural[]
-  leads          Lead[]
+  campanhas            Campanha[]
+  reguas               ReguaInatividade[]
+  regrasComissao       RegraComissao[]
+  postsMural           PostMural[]
+  leads                Lead[]
+  gruposTransmissao    GrupoTransmissao[]
 
   @@index([redeId])
   @@map("lojas")
@@ -248,37 +249,40 @@ model Equipe {
 // ─────────────────────────── Usuários ───────────────────────────
 
 model Usuario {
-  id        String  @id @default(cuid())
-  redeId    String? // GESTOR (escopo = rede inteira)
-  lojaId    String? // GERENTE / VENDEDORA
-  equipeId  String? // VENDEDORA (equipe do gerente)
-  nome      String
-  email     String  @unique
-  senhaHash String
-  role      Role
-  telefone  String?
+  id             String   @id @default(cuid())
+  redeId         String? // GESTOR (escopo = rede inteira)
+  lojaId         String? // GERENTE / VENDEDORA
+  equipeId       String? // VENDEDORA (equipe do gerente)
+  nome           String
+  email          String   @unique
+  senhaHash      String
+  role           Role
+  telefone       String?
+  // foto de perfil da vendedora (exibida no cabeçalho do Chat Zaieze; URL no R2/local)
+  fotoUrl        String?
   // slug do catálogo da vendedora: loja.com/<loja>/<slugCatalogo> (fase 6)
   slugCatalogo   String?
   metaMensal     Decimal? @db.Decimal(12, 2)
   comissaoPadrao Decimal? @db.Decimal(5, 2) // % padrão da vendedora
   // WhatsApp da vendedora (Evolution API): uma instância/número por vendedora
-  waInstancia String?
-  waNumero    String?
-  waConectado Boolean @default(false)
-  waQrcode    String? // QR (base64) recebido do Evolution via webhook QRCODE_UPDATED; limpo ao conectar
-  ativo     Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  waInstancia    String?
+  waNumero       String?
+  waConectado    Boolean  @default(false)
+  waQrcode       String? // QR (base64) recebido do Evolution via webhook QRCODE_UPDATED; limpo ao conectar
+  ativo          Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  rede     Rede?     @relation(fields: [redeId], references: [id], onDelete: Cascade)
-  loja     Loja?     @relation(fields: [lojaId], references: [id], onDelete: Cascade)
-  equipe   Equipe?   @relation(fields: [equipeId], references: [id], onDelete: SetNull)
-  carteira Cliente[] @relation("CarteiraVendedora")
-  vendas   Venda[]
-  mensagens MensagemWhatsapp[] @relation("MensagensVendedora")
-  campanhas Campanha[]
-  postsMural PostMural[]
-  leads     Lead[]             @relation("LeadsVendedora")
+  rede              Rede?              @relation(fields: [redeId], references: [id], onDelete: Cascade)
+  loja              Loja?              @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  equipe            Equipe?            @relation(fields: [equipeId], references: [id], onDelete: SetNull)
+  carteira          Cliente[]          @relation("CarteiraVendedora")
+  vendas            Venda[]
+  mensagens         MensagemWhatsapp[] @relation("MensagensVendedora")
+  campanhas         Campanha[]
+  postsMural        PostMural[]
+  leads             Lead[]             @relation("LeadsVendedora")
+  gruposTransmissao GrupoTransmissao[] @relation("GruposVendedora")
 
   @@unique([lojaId, slugCatalogo])
   @@index([lojaId, role])
@@ -309,38 +313,39 @@ model Convite {
 // ─────────────────────────── Clientes (CRM) ───────────────────────────
 
 model Cliente {
-  id          String          @id @default(cuid())
-  lojaId      String
-  vendedoraId String? // dona da carteira; null = sem carteira definida
-  nome        String
-  telefone    String // WhatsApp — chave de roteamento de conversas
-  email       String?
-  cpf         String?
-  instagram   String?
+  id                String          @id @default(cuid())
+  lojaId            String
+  vendedoraId       String? // dona da carteira; null = sem carteira definida
+  nome              String
+  telefone          String // WhatsApp — chave de roteamento de conversas
+  email             String?
+  cpf               String?
+  instagram         String?
   // Endereço (para filtros de segmentação geográfica em campanhas/seleção — R1).
   // Preenchidos via CEP (ViaCEP) no cadastro; DDD é derivado do telefone.
-  cep         String?
-  cidade      String?
-  uf          String? // sigla do estado (ex.: GO); região é derivada da UF
-  segmento    SegmentoCliente @default(NOVO)
+  cep               String?
+  cidade            String?
+  uf                String? // sigla do estado (ex.: GO); região é derivada da UF
+  segmento          SegmentoCliente @default(NOVO)
   // agregados mantidos pelo módulo de vendas e job de segmentação (fase 3)
-  totalGasto     Decimal   @default(0) @db.Decimal(12, 2)
-  ultimaCompraEm DateTime?
+  totalGasto        Decimal         @default(0) @db.Decimal(12, 2)
+  ultimaCompraEm    DateTime?
   // LGPD: consentimento para campanhas (WhatsApp/Custom Audiences — módulos 4, 10, 16)
-  consentimentoLgpd Boolean  @default(false)
+  consentimentoLgpd Boolean         @default(false)
   observacoes       String?
   // Portal do Cliente (fase 7): acesso próprio do cliente + saldo de cashback acumulado
   senhaHash         String?
-  saldoCashback     Decimal  @default(0) @db.Decimal(12, 2)
-  ativo             Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  saldoCashback     Decimal         @default(0) @db.Decimal(12, 2)
+  ativo             Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
-  loja      Loja     @relation(fields: [lojaId], references: [id], onDelete: Cascade)
-  vendedora Usuario? @relation("CarteiraVendedora", fields: [vendedoraId], references: [id], onDelete: SetNull)
-  vendas    Venda[]
-  mensagens MensagemWhatsapp[]
-  leads     Lead[]
+  loja         Loja               @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  vendedora    Usuario?           @relation("CarteiraVendedora", fields: [vendedoraId], references: [id], onDelete: SetNull)
+  vendas       Venda[]
+  mensagens    MensagemWhatsapp[]
+  leads        Lead[]
+  gruposMembro GrupoMembro[]
 
   @@unique([lojaId, telefone])
   @@index([lojaId, vendedoraId])
@@ -354,26 +359,26 @@ model Cliente {
 // Se estourar o SLA (regra do gestor), o lead é redistribuído a outra vendedora.
 
 model Lead {
-  id           String     @id @default(cuid())
-  lojaId       String
-  vendedoraId  String // dona atual do ciclo
-  clienteId    String? // vinculado quando o telefone do cliente é identificado
-  nome         String?
-  telefone     String?
-  origem       OrigemLead @default(CATALOGO)
-  status       StatusLead @default(ENTROU)
-  slugCatalogo String? // slug da vendedora que originou o ciclo (auditoria)
-  produtoId    String? // peça que despertou o interesse (opcional)
-  etapaDesde      DateTime @default(now()) // quando entrou na etapa atual (tempo em etapa)
+  id              String     @id @default(cuid())
+  lojaId          String
+  vendedoraId     String // dona atual do ciclo
+  clienteId       String? // vinculado quando o telefone do cliente é identificado
+  nome            String?
+  telefone        String?
+  origem          OrigemLead @default(CATALOGO)
+  status          StatusLead @default(ENTROU)
+  slugCatalogo    String? // slug da vendedora que originou o ciclo (auditoria)
+  produtoId       String? // peça que despertou o interesse (opcional)
+  etapaDesde      DateTime   @default(now()) // quando entrou na etapa atual (tempo em etapa)
   prazoEm         DateTime // limite do SLA da etapa atual (etapaDesde + limite da etapa)
   atendidoEm      DateTime? // 1ª resposta da vendedora
   fechadoEm       DateTime? // quando foi CONVERTIDO ou PERDIDO
   motivoPerda     String?
   vendaId         String? // venda que converteu o ciclo
   redistribuidoEm DateTime?
-  redistribuicoes Int      @default(0)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  redistribuicoes Int        @default(0)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   loja      Loja     @relation(fields: [lojaId], references: [id], onDelete: Cascade)
   vendedora Usuario  @relation("LeadsVendedora", fields: [vendedoraId], references: [id], onDelete: Cascade)
@@ -412,23 +417,23 @@ model Marca {
 }
 
 model Colecao {
-  id         String        @id @default(cuid())
-  redeId     String
-  nome       String
-  descricao  String?
-  status     StatusColecao @default(EM_PREPARACAO)
-  liberadaEm DateTime? // quando foi liberada para as vendedoras
+  id                String        @id @default(cuid())
+  redeId            String
+  nome              String
+  descricao         String?
+  status            StatusColecao @default(EM_PREPARACAO)
+  liberadaEm        DateTime? // quando foi liberada para as vendedoras
   // Outlet: marcado MANUALMENTE pelo gestor (ortogonal ao status — coleção Outlet continua LIBERADA/vendável).
-  outlet            Boolean   @default(false)
+  outlet            Boolean       @default(false)
   outletDesde       DateTime?
   descontoOutletPct Int? // desconto % aplicado à COLEÇÃO inteira em Outlet (null = sem desconto de coleção; peça pode ter o seu)
   // Limpeza de mídia por plano: a mídia do catálogo expira em liberadaEm + retenção(plano)
   // (START 6m / PRO 12m / ELITE perpétuo). Quando apagada do R2, registra a data aqui.
   midiaExpiradaEm   DateTime?
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
-  rede     Rede      @relation(fields: [redeId], references: [id], onDelete: Cascade)
+  rede     Rede          @relation(fields: [redeId], references: [id], onDelete: Cascade)
   produtos Produto[]
   lojas    ColecaoLoja[] // distribuição: lojas que podem vender esta coleção
 
@@ -454,35 +459,35 @@ model ColecaoLoja {
 }
 
 model Produto {
-  id          String  @id @default(cuid())
-  redeId      String
+  id                String   @id @default(cuid())
+  redeId            String
   // Referência do modelo (lançada pelo gestor de estoque, vinda da confecção) — base do SKU
-  referencia  String?
-  nome        String // nome do modelo (ex.: "Júlia")
-  descricao   String?
-  genero      Genero  @default(FEMININO)
-  categoriaId String? // tipo de peça (ex.: "Vestido Longo")
-  marcaId     String?
-  colecaoId   String? // ex.: "Verão/Primavera 2026"
-  precoVarejo  Decimal  @db.Decimal(12, 2)
-  precoAtacado Decimal? @db.Decimal(12, 2)
-  custo        Decimal? @db.Decimal(12, 2)
+  referencia        String?
+  nome              String // nome do modelo (ex.: "Júlia")
+  descricao         String?
+  genero            Genero   @default(FEMININO)
+  categoriaId       String? // tipo de peça (ex.: "Vestido Longo")
+  marcaId           String?
+  colecaoId         String? // ex.: "Verão/Primavera 2026"
+  precoVarejo       Decimal  @db.Decimal(12, 2)
+  precoAtacado      Decimal? @db.Decimal(12, 2)
+  custo             Decimal? @db.Decimal(12, 2)
   descontoOutletPct Int? // desconto % específico desta peça em Outlet (override do desconto da coleção)
   // Opcionais de moda (usa quem quiser)
-  composicao  String? // tecido/composição (ex.: "95% viscose, 5% elastano")
-  modelagem   String? // caimento/fit (ex.: "evasê", "slim")
-  ncm         String? // código fiscal
-  fornecedor  String? // confecção/fornecedor
-  pesoGramas  Int? // peso para frete/e-commerce
-  faixaEtaria String? // infantil (ex.: "4-6 anos")
-  fotos        String[] @default([])
+  composicao        String? // tecido/composição (ex.: "95% viscose, 5% elastano")
+  modelagem         String? // caimento/fit (ex.: "evasê", "slim")
+  ncm               String? // código fiscal
+  fornecedor        String? // confecção/fornecedor
+  pesoGramas        Int? // peso para frete/e-commerce
+  faixaEtaria       String? // infantil (ex.: "4-6 anos")
+  fotos             String[] @default([])
   // Cor de cada foto, alinhado por índice com `fotos` ('' = serve para todas as cores).
   // Permite trocar a galeria ao escolher a cor no catálogo.
-  fotosCores   String[] @default([])
-  videos       String[] @default([]) // URLs de vídeo (Cloudflare R2 / cdn.zaieze.com)
-  ativo        Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  fotosCores        String[] @default([])
+  videos            String[] @default([]) // URLs de vídeo (Cloudflare R2 / cdn.zaieze.com)
+  ativo             Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   rede      Rede              @relation(fields: [redeId], references: [id], onDelete: Cascade)
   categoria Categoria?        @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
@@ -497,7 +502,7 @@ model Produto {
 
 // Grade: variação = produto × cor × tamanho (SKU). Estoque vive aqui.
 model VariacaoProduto {
-  id            String @id @default(cuid())
+  id            String  @id @default(cuid())
   produtoId     String
   cor           String
   estampa       String  @default("") // estampa/padronagem (ex.: Paisley, Floral); vazio = liso/sem estampa
@@ -522,26 +527,26 @@ model VariacaoProduto {
 // ─────────────────────────── Vendas + Estoque ───────────────────────────
 
 model Venda {
-  id          String      @id @default(cuid())
-  lojaId      String
-  clienteId   String?
-  vendedoraId String
-  status      StatusVenda      @default(CONCLUIDA)
-  canal       CanalVenda       @default(BALCAO)
+  id               String           @id @default(cuid())
+  lojaId           String
+  clienteId        String?
+  vendedoraId      String
+  status           StatusVenda      @default(CONCLUIDA)
+  canal            CanalVenda       @default(BALCAO)
   formaRecebimento FormaRecebimento @default(DINHEIRO)
-  total       Decimal     @db.Decimal(12, 2)
-  desconto    Decimal     @default(0) @db.Decimal(12, 2)
-  descontoPct Decimal     @default(0) @db.Decimal(5, 2)
-  atacado     Boolean     @default(false)
+  total            Decimal          @db.Decimal(12, 2)
+  desconto         Decimal          @default(0) @db.Decimal(12, 2)
+  descontoPct      Decimal          @default(0) @db.Decimal(5, 2)
+  atacado          Boolean          @default(false)
   // cashback creditado ao cliente nesta venda (Portal do Cliente) — base do estorno no cancelamento
-  cashbackGerado Decimal  @default(0) @db.Decimal(12, 2)
-  observacao  String?
-  createdAt   DateTime    @default(now())
+  cashbackGerado   Decimal          @default(0) @db.Decimal(12, 2)
+  observacao       String?
+  createdAt        DateTime         @default(now())
 
-  loja      Loja        @relation(fields: [lojaId], references: [id], onDelete: Cascade)
-  cliente   Cliente?    @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  vendedora Usuario     @relation(fields: [vendedoraId], references: [id])
-  itens     ItemVenda[]
+  loja             Loja        @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  cliente          Cliente?    @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  vendedora        Usuario     @relation(fields: [vendedoraId], references: [id])
+  itens            ItemVenda[]
   leadsConvertidos Lead[]
 
   @@index([lojaId, createdAt])
@@ -554,12 +559,12 @@ model AuditoriaDesconto {
   id                String   @id @default(cuid())
   lojaId            String
   vendaId           String?
-  usuarioId         String   // quem aplicou o desconto
+  usuarioId         String // quem aplicou o desconto
   usuarioNome       String
   pct               Decimal  @db.Decimal(5, 2)
   valorBruto        Decimal  @db.Decimal(12, 2)
   valorDesconto     Decimal  @db.Decimal(12, 2)
-  autorizadoPorId   String?  // gerente/gestor que autorizou (quando exigido)
+  autorizadoPorId   String? // gerente/gestor que autorizou (quando exigido)
   autorizadoPorNome String?
   createdAt         DateTime @default(now())
 
@@ -598,18 +603,18 @@ model MovimentoEstoque {
 // ─────────────────────────── WhatsApp / Campanhas / Réguas ───────────────────────────
 
 model Campanha {
-  id              String           @id @default(cuid())
-  lojaId          String
-  criadaPorId     String
-  nome            String
-  segmentoAlvo    SegmentoCliente? // null = lista manual de clientes
+  id               String           @id @default(cuid())
+  lojaId           String
+  criadaPorId      String
+  nome             String
+  segmentoAlvo     SegmentoCliente? // null = lista manual de clientes
   mensagemTemplate String
   // contadores do disparo
-  enviados        Int              @default(0)
-  simulados       Int              @default(0)
-  falhas          Int              @default(0)
-  semConsentimento Int             @default(0)
-  createdAt       DateTime         @default(now())
+  enviados         Int              @default(0)
+  simulados        Int              @default(0)
+  falhas           Int              @default(0)
+  semConsentimento Int              @default(0)
+  createdAt        DateTime         @default(now())
 
   loja      Loja               @relation(fields: [lojaId], references: [id], onDelete: Cascade)
   criadaPor Usuario            @relation(fields: [criadaPorId], references: [id])
@@ -625,20 +630,61 @@ model MensagemWhatsapp {
   clienteId   String?
   vendedoraId String // dona do atendimento (roteamento por carteira)
   campanhaId  String?
+  grupoId     String? // disparo originado de um grupo de transmissão (lista interna)
   direcao     DirecaoMensagem
   status      StatusMensagem
   origem      OrigemMensagem  @default(MANUAL)
   telefone    String
   texto       String
+  // Mídia (ex.: áudio/PTT). tipoMidia null = mensagem de texto pura.
+  tipoMidia   String? // 'AUDIO' (futuro: IMAGEM, VIDEO, DOC)
+  midiaUrl    String?
   createdAt   DateTime        @default(now())
 
-  cliente   Cliente?  @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  vendedora Usuario   @relation("MensagensVendedora", fields: [vendedoraId], references: [id])
-  campanha  Campanha? @relation(fields: [campanhaId], references: [id], onDelete: SetNull)
+  cliente   Cliente?          @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  vendedora Usuario           @relation("MensagensVendedora", fields: [vendedoraId], references: [id])
+  campanha  Campanha?         @relation(fields: [campanhaId], references: [id], onDelete: SetNull)
+  grupo     GrupoTransmissao? @relation(fields: [grupoId], references: [id], onDelete: SetNull)
 
   @@index([clienteId, createdAt])
   @@index([lojaId, createdAt])
+  @@index([grupoId, createdAt])
   @@map("mensagens_whatsapp")
+}
+
+// ─────────────────────────── Grupos de transmissão (Chat Zaieze) ───────────────────────────
+// A API oficial da Meta não cria grupos nativos do WhatsApp. Aqui "grupo" é uma LISTA INTERNA:
+// a vendedora junta clientes da carteira e dispara UMA mensagem que sai INDIVIDUAL a cada membro
+// (cada cliente recebe no privado e o disparo aparece na conversa individual dele).
+
+model GrupoTransmissao {
+  id          String   @id @default(cuid())
+  lojaId      String
+  vendedoraId String // dona/criadora do grupo
+  nome        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  loja      Loja               @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  vendedora Usuario            @relation("GruposVendedora", fields: [vendedoraId], references: [id], onDelete: Cascade)
+  membros   GrupoMembro[]
+  mensagens MensagemWhatsapp[]
+
+  @@index([lojaId, vendedoraId])
+  @@map("grupos_transmissao")
+}
+
+model GrupoMembro {
+  grupoId   String
+  clienteId String
+  createdAt DateTime @default(now())
+
+  grupo   GrupoTransmissao @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  cliente Cliente          @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@id([grupoId, clienteId])
+  @@index([clienteId])
+  @@map("grupos_membros")
 }
 
 model ReguaInatividade {
@@ -658,13 +704,13 @@ model ReguaInatividade {
 // ─────────────────────────── Comissão + Gamificação ───────────────────────────
 
 model RegraComissao {
-  id        String         @id @default(cuid())
-  lojaId    String
-  escopo    EscopoComissao
-  refId     String? // produtoId / categoriaId / marcaId (null quando PADRAO)
-  percentual     Decimal  @db.Decimal(5, 2) // % base
-  percentualMeta Decimal? @db.Decimal(5, 2) // % quando a vendedora bate a meta do mês
-  createdAt DateTime @default(now())
+  id             String         @id @default(cuid())
+  lojaId         String
+  escopo         EscopoComissao
+  refId          String? // produtoId / categoriaId / marcaId (null quando PADRAO)
+  percentual     Decimal        @db.Decimal(5, 2) // % base
+  percentualMeta Decimal?       @db.Decimal(5, 2) // % quando a vendedora bate a meta do mês
+  createdAt      DateTime       @default(now())
 
   loja Loja @relation(fields: [lojaId], references: [id], onDelete: Cascade)
 

@@ -38,11 +38,11 @@ export default function Pedido() {
     api.get(url).then(({ data }) => setP(data)).catch(() => setErro('Pedido não encontrado.'))
   }, [id, token])
 
-  // Link público do comprovante (sem login). Na visão pública é a própria URL; na visão
-  // logada, montamos a partir do token — é esse link que vai no QR e no envio ao cliente.
-  const linkPublico = token
-    ? window.location.href
-    : (p?.tokenPublico ? `${window.location.origin}/pedido/publico/${p.tokenPublico}` : '')
+  // Link público do comprovante (sem login) + link do PDF gerado no backend.
+  // É o link público que vai no QR e no envio ao cliente.
+  const tk = token ?? p?.tokenPublico ?? ''
+  const linkPublico = tk ? `${window.location.origin}/pedido/publico/${tk}` : ''
+  const linkPdf = tk ? `${window.location.origin}/api/vendas/publico/${tk}/pdf` : ''
 
   useEffect(() => {
     if (linkPublico) QRCode.toDataURL(linkPublico, { margin: 1, width: 160 }).then(setQr).catch(() => {})
@@ -76,7 +76,8 @@ export default function Pedido() {
     <div className="ped-root">
       <PedidoEstilos />
       <div className="ped-acoes ped-noprint">
-        <button className="ped-btn" onClick={() => window.print()}>🖨️ Imprimir / Salvar PDF</button>
+        <button className="ped-btn cinza" onClick={() => window.print()}>🖨️ Imprimir</button>
+        <button className="ped-btn" onClick={() => linkPdf && window.open(linkPdf, '_blank')}>📄 Salvar PDF</button>
         <button className="ped-btn alt" onClick={enviarWhatsapp}>💬 Enviar para o cliente</button>
       </div>
 
@@ -153,6 +154,7 @@ function PedidoEstilos() {
       .ped-acoes { max-width: 760px; margin: 0 auto 14px; display: flex; gap: 10px; justify-content: flex-end; }
       .ped-btn { background: #111; color: #fff; border: none; padding: 11px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; }
       .ped-btn.alt { background: #25d366; }
+      .ped-btn.cinza { background: #e9e9e9; color: #333; }
       .ped-folha { max-width: 760px; margin: 0 auto; background: #fff; padding: 34px; border-radius: 8px; box-shadow: 0 4px 20px #00000014; }
       .ped-cab { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 14px; }
       .ped-logo { max-height: 56px; max-width: 200px; object-fit: contain; }

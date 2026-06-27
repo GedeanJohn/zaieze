@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
 import { converterCicloPorVenda } from '../leads/leads.service'
+import { gerarPedidoPdf, type VendaPdf } from './pedido-pdf.service'
 
 // Régua de desconto padrão (sugestão por total do pedido). Editável por rede em descontoRegua.
 const REGUA_PADRAO = [
@@ -116,6 +117,25 @@ export async function vendasRoutes(app: FastifyInstance) {
     })
     if (!venda) return reply.code(404).send({ erro: 'Pedido não encontrado' })
     return venda
+  })
+
+  // PDF do comprovante (público, por token): gerado no backend, baixável/anexável.
+  app.get('/publico/:token/pdf', async (request, reply) => {
+    const { token } = request.params as { token: string }
+    const venda = await prisma.venda.findUnique({
+      where: { tokenPublico: token },
+      include: {
+        cliente: { select: { nome: true, telefone: true } },
+        vendedora: { select: { nome: true } },
+        loja: { select: { nome: true, rede: { select: { nome: true } } } },
+        itens: { include: { variacao: { select: { cor: true, estampa: true, tamanho: true, produto: { select: { nome: true, referencia: true } } } } } },
+      },
+    })
+    if (!venda) return reply.code(404).send({ erro: 'Pedido não encontrado' })
+    const pdf = await gerarPedidoPdf(venda as unknown as VendaPdf)
+    reply.header('Content-Type', 'application/pdf')
+    reply.header('Content-Disposition', `inline; filename="pedido-${venda.id.slice(-6).toUpperCase()}.pdf"`)
+    return reply.send(pdf)
   })
 
   // Pedidos a separar (gestor de estoque + gerente): pedidos fechados, pendentes por padrão.

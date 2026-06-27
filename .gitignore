@@ -25,3 +25,8 @@ npm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Documentos gerados localmente (lista de funcionalidades) e locks do Office
+funcionalidades.xlsx
+funcionalidades.pdf
+~$*

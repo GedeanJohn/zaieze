@@ -92,6 +92,32 @@ export async function vendasRoutes(app: FastifyInstance) {
     return venda
   })
 
+  // Comprovante PÚBLICO (sem login): o cliente abre/imprime pelo link com o token.
+  // Mesmo conteúdo do comprovante; o token é não-adivinhável (uuid/cuid).
+  app.get('/publico/:token', async (request, reply) => {
+    const { token } = request.params as { token: string }
+    const venda = await prisma.venda.findUnique({
+      where: { tokenPublico: token },
+      include: {
+        cliente: { select: { nome: true, telefone: true } },
+        vendedora: { select: { nome: true } },
+        loja: { select: { nome: true, rede: { select: { nome: true, logoUrl: true } } } },
+        itens: {
+          include: {
+            variacao: {
+              select: {
+                cor: true, estampa: true, tamanho: true,
+                produto: { select: { nome: true, referencia: true, fotos: true } },
+              },
+            },
+          },
+        },
+      },
+    })
+    if (!venda) return reply.code(404).send({ erro: 'Pedido não encontrado' })
+    return venda
+  })
+
   app.post('/', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const body = criarVendaSchema.parse(request.body)

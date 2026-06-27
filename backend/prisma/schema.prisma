@@ -528,6 +528,8 @@ model VariacaoProduto {
 
 model Venda {
   id               String           @id @default(cuid())
+  // token público do comprovante: link sem login para o cliente abrir/imprimir o pedido
+  tokenPublico     String           @unique @default(cuid())
   lojaId           String
   clienteId        String?
   vendedoraId      String

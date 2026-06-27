@@ -56,6 +56,8 @@ function CrmApp() {
       <Route path="/login" element={<Login />} />
       <Route path="/convite/:token" element={<Convite />} />
       <Route path="/pedido/:id" element={<Protegida><Pedido /></Protegida>} />
+      {/* Comprovante público do pedido (sem login): link enviado ao cliente */}
+      <Route path="/pedido/publico/:token" element={<Pedido />} />
       <Route path="/" element={<Protegida><Layout /></Protegida>}>
         <Route index element={<Dashboard />} />
         <Route path="vendas" element={<Vendas />} />

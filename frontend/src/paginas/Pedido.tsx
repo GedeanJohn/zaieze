@@ -10,6 +10,7 @@ interface ItemPedido {
 }
 interface Pedido {
   id: string
+  tokenPublico?: string
   createdAt: string
   total: string
   desconto: string
@@ -27,15 +28,25 @@ const real = (v: number | string) => formataReal(Number(v))
 const dataBR = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 export default function Pedido() {
-  const { id } = useParams<{ id: string }>()
+  const { id, token } = useParams<{ id?: string; token?: string }>()
   const [p, setP] = useState<Pedido | null>(null)
   const [erro, setErro] = useState('')
   const [qr, setQr] = useState('')
 
   useEffect(() => {
-    api.get(`/vendas/${id}`).then(({ data }) => setP(data)).catch(() => setErro('Pedido não encontrado.'))
-    QRCode.toDataURL(window.location.href, { margin: 1, width: 160 }).then(setQr).catch(() => {})
-  }, [id])
+    const url = token ? `/vendas/publico/${token}` : `/vendas/${id}`
+    api.get(url).then(({ data }) => setP(data)).catch(() => setErro('Pedido não encontrado.'))
+  }, [id, token])
+
+  // Link público do comprovante (sem login). Na visão pública é a própria URL; na visão
+  // logada, montamos a partir do token — é esse link que vai no QR e no envio ao cliente.
+  const linkPublico = token
+    ? window.location.href
+    : (p?.tokenPublico ? `${window.location.origin}/pedido/publico/${p.tokenPublico}` : '')
+
+  useEffect(() => {
+    if (linkPublico) QRCode.toDataURL(linkPublico, { margin: 1, width: 160 }).then(setQr).catch(() => {})
+  }, [linkPublico])
 
   if (erro) return <div style={{ padding: 40, textAlign: 'center', color: '#777' }}>{erro}</div>
   if (!p) return <div style={{ padding: 40, textAlign: 'center', color: '#777' }}>Carregando…</div>
@@ -54,7 +65,7 @@ export default function Pedido() {
       Number(p.desconto) > 0 ? `Desconto: ${p.descontoPct}% (− ${real(p.desconto)})` : '',
       `*Total: ${real(p.total)}*`,
       `Pagamento: ${rotuloForma[p.formaRecebimento]}`,
-      '', `Ver pedido: ${window.location.href}`,
+      '', linkPublico ? `Ver pedido: ${linkPublico}` : '',
     ].filter(Boolean).join('\n')
     const tel = (p.cliente?.telefone ?? '').replace(/\D/g, '')
     const base = tel ? `https://wa.me/55${tel}` : 'https://wa.me/'

@@ -55,6 +55,26 @@ a { color: var(--accent); text-decoration: none; }
 .topbar-ini { display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #fff; background: linear-gradient(135deg, #a855f7, #ec4899); }
 .topbar-nome { color: #f0e9e3; font-size: 14px; font-weight: 600; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Topbar estilo app (LinkedIn): avatar à esquerda · busca · ícone de chat à direita */
+:root { --zz-navh: 58px; --zz-strip: 74px; }
+.topbar-avatar { display: flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; padding: 0; flex-shrink: 0; }
+.topbar-avatar img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; display: block; }
+.topbar-busca {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; cursor: pointer;
+  background: rgba(255, 255, 255, 0.08); border: none; border-radius: 999px; padding: 9px 16px;
+  color: #cdc6d8; font-size: 14px; transition: background 0.15s ease;
+}
+.topbar-busca span { color: #9a93a8; }
+.topbar-chat {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 38px; height: 38px; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(255, 255, 255, 0.06); color: #f0e9e3; transition: background 0.15s ease;
+}
+.topbar-busca:hover, .topbar-chat:hover { background: rgba(255, 255, 255, 0.14); }
+
+/* Barra de menu no rodapé — escondida no desktop; aparece no mobile (≤860) */
+.bottom-nav { display: none; }
+
 .shell-corpo { display: flex; flex: 1; min-height: 0; }
 .menu-overlay { display: none; }
 
@@ -64,7 +84,7 @@ a { color: var(--accent); text-decoration: none; }
   border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 /* Marca ZAIEZE no topo do menu (fonte NUSAR) — só no drawer mobile (no desktop já está na barra de topo) */
-.sidebar-marca { display: none; font-family: var(--marca); font-weight: 600; font-size: 26px; letter-spacing: 0.12em; color: #fff; margin: 2px 8px 18px; }
+.sidebar-marca { display: block; font-family: var(--marca); font-weight: 600; font-size: 26px; letter-spacing: 0.12em; color: #fff; margin: 2px 8px 18px; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
 .sidebar a {
   display: flex; align-items: center; gap: 11px;
@@ -232,9 +252,25 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
     display: block; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 50;
   }
 
-  .conteudo { padding: 18px 16px; max-width: 100%; }
+  .conteudo { padding: 18px 16px calc(18px + var(--zz-navh)); max-width: 100%; }
   .conteudo header { flex-wrap: wrap; gap: 12px; }
   .conteudo header h1 { font-size: 22px; }
+
+  /* Barra de menu no rodapé (mobile) */
+  .bottom-nav {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 45;
+    height: var(--zz-navh); background: #0a0a0b; border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .bottom-nav a, .bottom-nav .bn-mais {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    background: none; border: none; color: #8f8f97; font-size: 10.5px; font-weight: 600; cursor: pointer; text-decoration: none;
+  }
+  .bottom-nav a svg, .bottom-nav .bn-mais svg { opacity: 0.85; }
+  .bottom-nav a.ativo, .bottom-nav .bn-mais.ativo { color: #fff; }
+  .bottom-nav a.ativo svg, .bottom-nav .bn-mais.ativo svg { opacity: 1; }
+  /* Ao abrir uma conversa (modo zen), o rodapé some para a conversa ocupar a tela toda */
+  .app-shell:has(.cz-pagina.zen) .bottom-nav { display: none; }
 
   .cartao { padding: 16px; }
   .modal { padding: 22px; }
@@ -478,10 +514,14 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 }
 /* Estatísticas da vendedora no topo do chat */
 .cz-topo { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
-.cz-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-.cz-stat { background: #211c30; border-radius: 14px; padding: 13px 15px; display: flex; flex-direction: column; gap: 5px; }
-.cz-stat-rot { font-size: 12px; color: #9b93b4; }
-.cz-stat-val { font-size: 21px; font-weight: 800; color: #fff; font-family: var(--fonte-titulo); line-height: 1.1; }
+.cz-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.cz-stat { background: #211c30; border-radius: 11px; padding: 9px 12px; display: flex; flex-direction: column; gap: 3px; }
+.cz-stat-rot { font-size: 11px; color: #9b93b4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cz-stat-val { font-size: 17px; font-weight: 800; color: #fff; font-family: var(--fonte-titulo); line-height: 1.1; }
+/* Card da Meta: anel de progresso com o % no centro */
+.cz-stat-meta { align-items: flex-start; }
+.cz-meta-anel { position: relative; display: flex; align-items: center; justify-content: center; align-self: center; }
+.cz-meta-pct { position: absolute; font-size: 12px; font-weight: 800; color: #fff; font-family: var(--fonte-titulo); }
 .chatz strong { color: var(--cz-tx); }
 .cz-lista, .cz-conversa { background: var(--cz-surf); border: none; border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 .cz-lista-top { padding: 14px; border-bottom: 1px solid var(--cz-line); display: flex; flex-direction: column; gap: 10px; }
@@ -628,10 +668,19 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 
 @media (max-width: 720px) {
   .cz-pagina { margin: -18px -16px; padding: 14px 16px 18px; }
-  .cz-stats { grid-template-columns: repeat(2, 1fr); }
-  .cz-stat-val { font-size: 19px; }
+  /* Cards (com a Meta no lugar de "Negócios ativos") numa faixa fixa ACIMA do menu do rodapé — só no Chat */
+  .cz-stats {
+    position: fixed; left: 0; right: 0; bottom: var(--zz-navh); z-index: 40; margin: 0;
+    grid-template-columns: repeat(4, 1fr); gap: 6px;
+    padding: 7px 10px; background: #15121f; border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .cz-stat { padding: 6px 8px; border-radius: 9px; gap: 1px; }
+  .cz-stat-rot { font-size: 9px; }
+  .cz-stat-val { font-size: 14px; }
+  .cz-meta-anel svg { width: 30px; height: 30px; }
+  .cz-meta-pct { font-size: 10px; }
   .cz-marca { font-size: 24px; padding: 12px 26px; }
-  .chatz { grid-template-columns: 1fr; height: calc(100dvh - 150px); padding: 8px; gap: 8px; }
+  .chatz { grid-template-columns: 1fr; height: calc(100dvh - 110px - var(--zz-navh) - var(--zz-strip)); padding: 8px; gap: 8px; }
   .cz-pagina.zen { padding-top: 8px; }
   .cz-pagina.zen .chatz { height: calc(100dvh - 30px); padding: 6px; }
   .chatz:not(.tem-sel) .cz-conversa { display: none; }

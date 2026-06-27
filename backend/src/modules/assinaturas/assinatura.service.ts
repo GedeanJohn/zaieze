@@ -1,7 +1,7 @@
 import { prisma } from '../../lib/prisma'
 import { limparMidiaDaRede } from '../midia/limpeza.service'
 
-export type OrigemCancelamento = 'LOJISTA' | 'ADMIN' | 'MERCADO_PAGO'
+export type OrigemCancelamento = 'LOJISTA' | 'ADMIN' | 'MERCADO_PAGO' | 'DISTRATO_TERMOS'
 
 /** Fim do próximo ciclo mensal a partir de uma data (default: agora). */
 export function proximoCicloFim(base = new Date()): Date {

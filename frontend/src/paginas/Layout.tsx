@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
   Megaphone, Package, Tag, Layers, Boxes, UsersRound,
-  Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck,
+  Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Search,
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
 
@@ -22,8 +22,11 @@ export default function Layout() {
 
   // Aviso global de encerramento de acesso (cancelamento agendado) — todos os papéis, todas as telas
   const [encerraEm, setEncerraEm] = useState<string | null>(null)
+  // Pendência de aceite dos termos (banner) — qualquer usuário da rede vê; o aceite é do gestor
+  const [reaceite, setReaceite] = useState<{ pendente: boolean; diasRestantes: number | null } | null>(null)
   useEffect(() => {
     api.get('/assinaturas/aviso').then(({ data }) => setEncerraEm(data.encerraEm)).catch(() => {})
+    api.get('/contrato/status').then(({ data }) => setReaceite(data)).catch(() => {})
   }, [])
 
   // Contagem regressiva amigável até o encerramento
@@ -54,14 +57,19 @@ export default function Layout() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <button className="menu-toggle" onClick={() => setMenuAberto(true)} aria-label="Abrir menu"><Menu size={22} strokeWidth={2} /></button>
-        <div className="marca-zaieze">ZAIEZE</div>
-        <button className="topbar-perfil" onClick={() => navigate('/conta')} title="Minha conta">
+        <button className="topbar-avatar" onClick={() => navigate('/conta')} title="Minha conta" aria-label="Minha conta">
           {usuario.fotoUrl
             ? <img src={usuario.fotoUrl} alt="" />
             : <span className="topbar-ini">{iniciais(usuario.nome)}</span>}
-          <span className="topbar-nome">{usuario.nome}</span>
         </button>
+        <button className="topbar-busca" onClick={() => navigate('/clientes')} aria-label="Pesquisar">
+          <Search size={17} strokeWidth={2} /><span>Pesquisar</span>
+        </button>
+        {podeVendasClientes && temFeature('whatsapp') && (
+          <button className="topbar-chat" onClick={() => navigate('/caixa')} title="Chat Zaieze" aria-label="Chat">
+            <MessageCircle size={20} strokeWidth={1.9} />
+          </button>
+        )}
       </header>
       {menuAberto && <div className="menu-overlay" onClick={() => setMenuAberto(false)} />}
       <div className="shell-corpo">
@@ -89,6 +97,7 @@ export default function Layout() {
         {ehDonoRede && temFeature('portal_cliente') && <NavLink to="/marca" className={cls}><Palette {...ICON} /><span>Marca</span></NavLink>}
         {ehDonoRede && <NavLink to="/manual" className={cls}><BookOpen {...ICON} /><span>Manual</span></NavLink>}
         {ehDonoRede && <NavLink to="/planos" className={cls}><CreditCard {...ICON} /><span>Planos</span></NavLink>}
+        {ehDonoRede && <NavLink to="/contrato" className={cls}><FileText {...ICON} /><span>Contrato</span></NavLink>}
         <NavLink to="/conta" className={cls}><UserCog {...ICON} /><span>Minha conta</span></NavLink>
         </nav>
         <div className="rodape">
@@ -99,6 +108,17 @@ export default function Layout() {
         </div>
       </aside>
       <main className="conteudo">
+        {reaceite?.pendente && (
+          <div className="aviso-encerramento" style={{ background: '#3a2a12', color: '#f0c987' }}>
+            📄 <strong>Atualizamos nossos termos de prestação de serviços e conduta.</strong>{' '}
+            {reaceite.diasRestantes != null && reaceite.diasRestantes > 0
+              ? <>Aceite em até <strong>{reaceite.diasRestantes} dia{reaceite.diasRestantes === 1 ? '' : 's'}</strong> para evitar o distrato.</>
+              : <>Prazo encerrado — o distrato será aplicado.</>}{' '}
+            {ehDonoRede
+              ? <Link to="/contrato" style={{ color: '#ffd9a0', fontWeight: 700 }}>Ler e aceitar</Link>
+              : <span>Solicite ao gestor da marca para aceitar.</span>}
+          </div>
+        )}
         {encerraEm && (
           <div className="aviso-encerramento">
             🗓️ Seu acesso vai até{' '}
@@ -113,6 +133,17 @@ export default function Layout() {
         <Outlet />
       </main>
       </div>
+
+      {/* Barra de menu no rodapé (só celular) — estilo app. "Mais" abre o menu completo. */}
+      <nav className="bottom-nav">
+        <NavLink to="/" end className={cls}><LayoutDashboard size={20} strokeWidth={1.9} /><span>Início</span></NavLink>
+        {podeVendasClientes && <NavLink to="/vendas" className={cls}><ShoppingBag size={20} strokeWidth={1.9} /><span>Vendas</span></NavLink>}
+        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/caixa" className={cls}><Inbox size={20} strokeWidth={1.9} /><span>Chat</span></NavLink>}
+        {podeVendasClientes && <NavLink to="/clientes" className={cls}><Users size={20} strokeWidth={1.9} /><span>Clientes</span></NavLink>}
+        <button type="button" className={`bn-mais${menuAberto ? ' ativo' : ''}`} onClick={() => setMenuAberto(true)}>
+          <Menu size={20} strokeWidth={1.9} /><span>Mais</span>
+        </button>
+      </nav>
     </div>
   )
 }

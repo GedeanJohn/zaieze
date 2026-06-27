@@ -7,6 +7,8 @@ import { redeIdDe } from '../../plugins/auth'
 import { PLANOS } from '../../plugins/planos'
 import { consultarPreapproval, criarPreapproval, mpConfigurado, valorDoPlano } from './mercadopago.service'
 import { confirmarCiclo, proximoCicloFim, reativarAssinatura, solicitarCancelamento } from './assinatura.service'
+import { CONTRATO_VERSAO } from '../contrato/contrato.template'
+import { temAceiteVigente } from '../contrato/contrato.service'
 
 const checkoutSchema = z.object({
   plano: z.enum(['START', 'PRO', 'ELITE']),
@@ -64,6 +66,17 @@ export async function assinaturasRoutes(app: FastifyInstance) {
       const r = await tx.rede.create({ data: { nome: body.redeNome, slug, plano: body.plano, ativo: simulada } })
       await tx.usuario.create({
         data: { redeId: r.id, nome: body.gestorNome, email, senhaHash, role: 'GESTOR' },
+      })
+      // Aceite eletrônico da versão vigente do contrato, firmado no ato da adesão.
+      await tx.aceiteContrato.create({
+        data: {
+          redeId: r.id,
+          versao: CONTRATO_VERSAO,
+          assinanteNome: body.gestorNome,
+          assinanteEmail: email,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'] ?? null,
+        },
       })
       await tx.assinatura.create({
         data: {
@@ -194,6 +207,40 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     const ok = await reativarAssinatura(redeId)
     if (!ok) return reply.code(422).send({ erro: 'Assinatura já encerrada — faça uma nova assinatura.' })
     return { ok: true }
+  })
+
+  // Reassinar = NOVO CONTRATO (nova recorrência), preservando a rede, lojas e todas as
+  // configurações. Exige o aceite da versão vigente. Usado após um distrato (recorrência
+  // cancelada) ou quando a assinatura foi encerrada.
+  app.post('/reassinar', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
+    const redeId = redeIdDe(request)
+    const rede = await prisma.rede.findUnique({ where: { id: redeId }, include: { assinatura: true } })
+    if (!rede?.assinatura) return reply.code(404).send({ erro: 'Rede sem assinatura' })
+    if (!(await temAceiteVigente(redeId))) {
+      return reply.code(409).send({ erro: 'Aceite os termos atualizados antes de reativar.' })
+    }
+
+    const plano = rede.assinatura.plano
+    const valor = valorDoPlano(plano)
+
+    // Modo simulado: reativa direto (equivale ao webhook de pagamento aprovado).
+    if (!mpConfigurado()) {
+      await confirmarCiclo(redeId)
+      return { simulado: true, redirect: `${urlTenant(rede.slug)}/login` }
+    }
+
+    // Mercado Pago real: a recorrência anterior foi cancelada no distrato, então cria um
+    // NOVO preapproval. O acesso só é (re)ativado quando o pagamento confirma, via webhook.
+    const gestor = await prisma.usuario.findFirst({ where: { redeId, role: 'GESTOR' }, orderBy: { createdAt: 'asc' } })
+    const pre = await criarPreapproval({
+      plano,
+      valor,
+      email: gestor?.email ?? '',
+      redeSlug: rede.slug,
+      backUrl: `${urlTenant(rede.slug)}/login`,
+    })
+    await prisma.assinatura.update({ where: { redeId }, data: { mpPreapprovalId: pre.id, plano, valor } })
+    return { simulado: false, initPoint: pre.initPoint }
   })
 
   // Aprovação simulada (dev) — equivale ao webhook quando não há Mercado Pago configurado.

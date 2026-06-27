@@ -25,7 +25,7 @@ interface Mensagem {
   createdAt: string
 }
 
-interface ChatStats { receitaMes: number; negociosAtivos: number; novosLeads: number; taxaConversao: number }
+interface ChatStats { receitaMes: number; negociosAtivos: number; novosLeads: number; taxaConversao: number; metaMes: number | null; pctMeta: number | null }
 interface ClienteLite { id: string; nome: string; telefone: string; segmento: string }
 interface Grupo { id: string; nome: string; membros: number; ultimaMensagem: string | null; ultimaEm: string }
 interface Disparo { id: string; texto: string; status: string; createdAt: string }
@@ -246,12 +246,14 @@ export default function CaixaEntrada() {
       {!temSel && (
         <div className="cz-topo">
           <SeletorLoja escopo={escopo} />
-          <div className="cz-stats">
-            <StatCard rotulo="Receita do mês" valor={stats ? formataReal(stats.receitaMes) : '—'} cor="#a855f7" />
-            <StatCard rotulo="Negócios ativos" valor={stats ? String(stats.negociosAtivos) : '—'} cor="#38bdf8" />
-            <StatCard rotulo="Novos leads" valor={stats ? String(stats.novosLeads) : '—'} cor="#22c55e" />
-            <StatCard rotulo="Taxa de conversão" valor={stats ? `${stats.taxaConversao}%` : '—'} cor="#ec4899" />
-          </div>
+        </div>
+      )}
+      {!temSel && (
+        <div className="cz-stats">
+          <StatCard rotulo="Receita do mês" valor={stats ? formataReal(stats.receitaMes) : '—'} cor="#a855f7" />
+          <MetaCard pct={stats ? stats.pctMeta : null} valor={stats ? stats.metaMes : null} cor="#c084fc" />
+          <StatCard rotulo="Novos leads" valor={stats ? String(stats.novosLeads) : '—'} cor="#22c55e" />
+          <StatCard rotulo="Taxa de conversão" valor={stats ? `${stats.taxaConversao}%` : '—'} cor="#ec4899" />
         </div>
       )}
 
@@ -417,6 +419,29 @@ function StatCard({ rotulo, valor, cor }: { rotulo: string; valor: string; cor: 
     <div className="cz-stat" style={{ borderTop: `3px solid ${cor}` }}>
       <span className="cz-stat-rot">{rotulo}</span>
       <strong className="cz-stat-val">{valor}</strong>
+    </div>
+  )
+}
+
+/** Card "Meta do mês": anel de progresso com o % atingido no centro. */
+function MetaCard({ pct, valor, cor }: { pct: number | null; valor: number | null; cor: string }) {
+  const v = Math.max(0, Math.min(pct ?? 0, 100))
+  const r = 15
+  const circ = 2 * Math.PI * r
+  const off = circ * (1 - v / 100)
+  return (
+    <div className="cz-stat cz-stat-meta" style={{ borderTop: `3px solid ${cor}` }}>
+      <span className="cz-stat-rot">Meta do mês{valor != null ? ` · ${formataReal(valor)}` : ''}</span>
+      <div className="cz-meta-anel">
+        <svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
+          <circle cx="20" cy="20" r={r} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="4" />
+          <circle
+            cx="20" cy="20" r={r} fill="none" stroke={cor} strokeWidth="4" strokeLinecap="round"
+            strokeDasharray={circ} strokeDashoffset={off} transform="rotate(-90 20 20)"
+          />
+        </svg>
+        <strong className="cz-meta-pct">{pct != null ? `${pct}%` : '—'}</strong>
+      </div>
     </div>
   )
 }

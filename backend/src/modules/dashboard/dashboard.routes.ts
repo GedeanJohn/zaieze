@@ -210,7 +210,8 @@ export async function dashboardRoutes(app: FastifyInstance) {
   // Estatísticas resumidas para o topo do Chat (por vendedora; gerente/gestor = loja).
   app.get('/chat-stats', { preHandler: [app.authenticate] }, async (request: FastifyRequest) => {
     const ehVend = request.user.role === 'VENDEDORA'
-    const esc = ehVend ? { vendedoraId: request.user.sub } : { lojaId: await lojaIdDe(request) }
+    const lojaId = ehVend ? null : await lojaIdDe(request)
+    const esc = ehVend ? { vendedoraId: request.user.sub } : { lojaId: lojaId! }
     const desdeMes = inicioDoMes()
     const [receita, ativos, novos, conv] = await Promise.all([
       prisma.venda.aggregate({ where: { ...esc, status: 'CONCLUIDA', createdAt: { gte: desdeMes } }, _sum: { total: true } }),
@@ -218,11 +219,27 @@ export async function dashboardRoutes(app: FastifyInstance) {
       prisma.lead.count({ where: { ...esc, createdAt: { gte: desdeMes } } }),
       prisma.lead.count({ where: { ...esc, createdAt: { gte: desdeMes }, status: 'CONVERTIDO' } }),
     ])
+
+    // Meta do mês = valor total de vendas pelo qual a vendedora é responsável.
+    // Vendedora: a própria meta. Loja (gerente/gestor): soma das metas das vendedoras.
+    let meta = 0
+    if (ehVend) {
+      const u = await prisma.usuario.findUnique({ where: { id: request.user.sub }, select: { metaMensal: true } })
+      meta = num(u?.metaMensal)
+    } else {
+      const a = await prisma.usuario.aggregate({ where: { role: 'VENDEDORA', lojaId: lojaId! }, _sum: { metaMensal: true } })
+      meta = num(a._sum.metaMensal)
+    }
+    const receitaMes = num(receita._sum.total)
+
     return {
-      receitaMes: num(receita._sum.total),
+      receitaMes,
       negociosAtivos: ativos,
       novosLeads: novos,
       taxaConversao: novos > 0 ? Math.round((conv / novos) * 100) : 0,
+      // Medidor da meta (substitui o card "Negócios ativos" no Chat)
+      metaMes: meta > 0 ? meta : null,
+      pctMeta: meta > 0 ? Math.round((receitaMes / meta) * 100) : null,
     }
   })
 

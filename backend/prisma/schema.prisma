@@ -172,8 +172,28 @@ model Rede {
   categorias Categoria[]
   marcas     Marca[]
   campanhasModelo CampanhaModelo[]
+  aceitesContrato AceiteContrato[]
 
   @@map("redes")
+}
+
+/// Registro de aceite eletrônico do contrato de prestação de serviços (assinado
+/// pelo GESTOR em nome da rede). Prova jurídica: quem, quando, IP e versão —
+/// art. 10, §2º da MP 2.200-2/2001. Cada nova versão do contrato gera novo aceite.
+model AceiteContrato {
+  id             String   @id @default(cuid())
+  redeId         String
+  versao         String // versão do contrato aceita
+  assinanteNome  String   @map("assinante_nome")
+  assinanteEmail String   @map("assinante_email")
+  ip             String?
+  userAgent      String?  @map("user_agent")
+  aceitoEm       DateTime @default(now()) @map("aceito_em")
+
+  rede Rede @relation(fields: [redeId], references: [id], onDelete: Cascade)
+
+  @@index([redeId, aceitoEm])
+  @@map("aceites_contrato")
 }
 
 // ─────────────────────────── Billing SaaS (assinatura por rede) ───────────────────────────

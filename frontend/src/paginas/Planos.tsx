@@ -23,6 +23,7 @@ interface Assinatura {
   simulada: boolean
   cicloFimEm: string | null
   cancelamentoSolicitadoEm: string | null
+  cancelamentoOrigem: string | null
   createdAt: string
 }
 
@@ -36,6 +37,7 @@ const rotuloStatus: Record<string, string> = { PENDENTE: 'Pendente', ATIVA: 'Ati
 export default function Planos() {
   const [dados, setDados] = useState<RespostaPlanos | null>(null)
   const [assinatura, setAssinatura] = useState<Assinatura | null>(null)
+  const [contratoAceito, setContratoAceito] = useState(true)
   const [erro, setErro] = useState('')
   const [msg, setMsg] = useState('')
   const [ocupado, setOcupado] = useState(false)
@@ -44,6 +46,7 @@ export default function Planos() {
   function carregar() {
     api.get('/planos').then(({ data }) => setDados(data)).catch(() => setErro('Não foi possível carregar os planos.'))
     api.get('/assinaturas/minha').then(({ data }) => setAssinatura(data.assinatura)).catch(() => setAssinatura(null))
+    api.get('/contrato/status').then(({ data }) => setContratoAceito(Boolean(data.aceito))).catch(() => {})
   }
   useEffect(() => { carregar() }, [])
 
@@ -93,6 +96,21 @@ export default function Planos() {
     }
   }
 
+  // Novo contrato (após distrato/encerramento): exige aceite vigente; preserva toda a rede.
+  async function reassinar() {
+    setErro(''); setMsg(''); setOcupado(true)
+    try {
+      const { data } = await api.post('/assinaturas/reassinar', {})
+      if (data.initPoint) { window.location.href = data.initPoint; return }
+      setMsg('Assinatura reativada (modo simulado). É necessário entrar novamente.')
+      carregar()
+    } catch (e) {
+      setErro(mensagemDeErro(e))
+    } finally {
+      setOcupado(false)
+    }
+  }
+
   if (erro && !dados) return <div className="cartao alerta">{erro}</div>
   if (!dados) return <div className="cartao">Carregando…</div>
 
@@ -120,6 +138,9 @@ export default function Planos() {
 
       {assinatura && (() => {
         const agendado = !!assinatura.cancelamentoSolicitadoEm && assinatura.status !== 'CANCELADA'
+        const distrato = agendado && assinatura.cancelamentoOrigem === 'DISTRATO_TERMOS'
+        // Reassinar (novo contrato) vale para conta encerrada ou distratada (recorrência cancelada).
+        const podeReassinar = assinatura.status === 'CANCELADA' || distrato
         return (
           <div className="cartao" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div>
@@ -134,12 +155,18 @@ export default function Planos() {
               <div style={{ fontSize: 13, color: agendado ? 'var(--danger)' : 'var(--ink-soft)', marginTop: 4 }}>
                 {assinatura.status === 'CANCELADA'
                   ? 'Conta encerrada.'
-                  : agendado
-                    ? `Cancelamento agendado — acesso até ${fmtData(assinatura.cicloFimEm)}, sem nova cobrança.`
-                    : assinatura.cicloFimEm ? `Renova em ${fmtData(assinatura.cicloFimEm)}.` : ''}
+                  : distrato
+                    ? `Distrato dos termos — acesso até ${fmtData(assinatura.cicloFimEm)}. Reassine (novo contrato) para manter, sem refazer a loja.`
+                    : agendado
+                      ? `Cancelamento agendado — acesso até ${fmtData(assinatura.cicloFimEm)}, sem nova cobrança.`
+                      : assinatura.cicloFimEm ? `Renova em ${fmtData(assinatura.cicloFimEm)}.` : ''}
               </div>
             </div>
-            {assinatura.status !== 'CANCELADA' && (
+            {podeReassinar ? (
+              contratoAceito
+                ? <button className="btn" onClick={reassinar} disabled={ocupado}>Reassinar (novo contrato)</button>
+                : <button className="btn" onClick={() => navigate('/contrato')} disabled={ocupado}>Aceitar os novos termos</button>
+            ) : assinatura.status !== 'CANCELADA' && (
               agendado
                 ? <button className="btn" onClick={reativar} disabled={ocupado}>Reativar assinatura</button>
                 : <button className="btn secundario" onClick={cancelar} disabled={ocupado}>Cancelar assinatura</button>

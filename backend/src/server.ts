@@ -3,6 +3,8 @@ import { env } from './env'
 import { segmentarTodasAsLojas } from './modules/clientes/segmentacao'
 import { redistribuirAtrasados } from './modules/leads/leads.service'
 import { limparMidiaExpirada, limparAudiosAntigos } from './modules/midia/limpeza.service'
+import { encerrarAssinaturasVencidas } from './modules/assinaturas/assinatura.service'
+import { aplicarDistratoTermos } from './modules/contrato/contrato.service'
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000
 
@@ -32,6 +34,17 @@ async function main() {
       .catch((err) => app.log.error({ err }, 'Falha no expurgo de áudios antigos'))
     limparAudios()
     setInterval(limparAudios, UM_DIA_MS).unref()
+
+    // Termos/distrato + encerramento de assinaturas: roda no boot e a cada 24h.
+    // 1) distrata quem não aceitou os termos no prazo (cancela recorrência + fim de ciclo);
+    // 2) encerra as assinaturas cujo ciclo pago já venceu.
+    const aplicarTermos = () => aplicarDistratoTermos()
+      .then((d) => { if (d > 0) app.log.info(`Distrato por não-aceite dos termos: ${d} rede(s)`) })
+      .then(() => encerrarAssinaturasVencidas())
+      .then((e) => { if (e > 0) app.log.info(`Assinaturas encerradas (ciclo vencido): ${e}`) })
+      .catch((err) => app.log.error({ err }, 'Falha no job de termos/assinaturas'))
+    aplicarTermos()
+    setInterval(aplicarTermos, UM_DIA_MS).unref()
 
     // Segmentação automática: em produção roda via agendamento diário (cron).
     // No boot só roda se SEGMENTAR_BOOT=true — assim, em dev/demo, o recálculo

@@ -62,6 +62,26 @@ export async function criarPreapproval(opts: {
 }
 
 /**
+ * Cancela uma assinatura recorrente (preapproval) no Mercado Pago. Um preapproval
+ * cancelado é terminal — não volta a cobrar. No-op em modo simulado.
+ */
+export async function cancelarPreapproval(id: string): Promise<void> {
+  if (!env.MERCADOPAGO_ACCESS_TOKEN) return
+  const resp = await fetch(`https://api.mercadopago.com/preapproval/${id}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${env.MERCADOPAGO_ACCESS_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ status: 'cancelled' }),
+  })
+  if (!resp.ok) {
+    const txt = await resp.text()
+    throw Object.assign(new Error(`Mercado Pago respondeu ${resp.status}: ${txt}`), { statusCode: 502 })
+  }
+}
+
+/**
  * Consulta o status de uma assinatura (preapproval) no Mercado Pago.
  * Status possíveis: 'pending' | 'authorized' | 'paused' | 'cancelled'.
  * Usado no webhook para NÃO confiar cegamente na notificação recebida.

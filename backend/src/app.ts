@@ -31,6 +31,7 @@ import { muralRoutes } from './modules/mural/mural.routes'
 import { atacadoRoutes } from './modules/atacado/atacado.routes'
 import { planosRoutes } from './modules/planos/planos.routes'
 import { assinaturasRoutes } from './modules/assinaturas/assinaturas.routes'
+import { contratoRoutes } from './modules/contrato/contrato.routes'
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes'
 import { colecoesRoutes } from './modules/colecoes/colecoes.routes'
 import { marcaRoutes } from './modules/marca/marca.routes'
@@ -100,6 +101,7 @@ export async function buildApp() {
   await app.register(atacadoRoutes, { prefix: '/api/atacado' })
   await app.register(planosRoutes, { prefix: '/api/planos' })
   await app.register(assinaturasRoutes, { prefix: '/api/assinaturas' })
+  await app.register(contratoRoutes, { prefix: '/api/contrato' })
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' })
   await app.register(colecoesRoutes, { prefix: '/api/colecoes' })
   await app.register(marcaRoutes, { prefix: '/api/marca' })

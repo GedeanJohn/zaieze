@@ -49,6 +49,21 @@ const decks: Deck[] = [
         'Cor primária = botões/CTA; cor secundária = fundo.',
         'Configurado uma vez e vale para todas as lojas da marca.',
       ] },
+      { titulo: '6. Campanhas da marca', bullets: [
+        'Monte a campanha uma vez: nome, segmento sugerido, mensagem e banner (opcional).',
+        'Publique — ela fica disponível para as vendedoras dispararem na carteira delas.',
+        'Pause/ative quando quiser; o resultado de todos os disparos vem consolidado.',
+      ], nota: 'Onde: menu WhatsApp → "Campanhas da marca". O banner some no envio pelo WhatsApp até a API oficial.' },
+      { titulo: '7. Pedidos a separar', bullets: [
+        'Toda venda fechada entra como pedido PENDENTE de separação.',
+        'O gestor de estoque separa as peças e marca como "separado".',
+        'Você acompanha e cobra os pendentes (mostra há quanto tempo estão na fila).',
+      ], nota: 'Onde: menu "Pedidos a separar".' },
+      { titulo: '8. Texto padrão de disparo', bullets: [
+        'Em Marca você define o texto padrão de campanha da marca.',
+        'Pode TRAVAR a edição: a vendedora dispara só com o texto da marca.',
+        'Acompanhe os resultados das campanhas no painel do menu WhatsApp.',
+      ] },
     ],
   },
   {
@@ -80,6 +95,21 @@ const decks: Deck[] = [
         'O estoque é compartilhado: quem fecha primeiro leva a peça.',
         'Registre a venda como Online (WhatsApp) para contar no seu resultado.',
       ] },
+      { titulo: '6. Campanhas da marca', bullets: [
+        'No menu WhatsApp, veja as "Campanhas disponíveis" prontas pela marca.',
+        'Clique em "Disparar" para enviar à sua carteira (pode escolher o segmento).',
+        'Conecte o seu WhatsApp para os disparos saírem de fato.',
+      ], nota: 'Você também pode criar um "Disparo personalizado" para a sua carteira.' },
+      { titulo: '7. Chat Zaieze', bullets: [
+        'Converse com seus clientes no menu Chat (abas Novidades / Não Lidas / Grupos).',
+        'Crie um Grupo de transmissão: uma mensagem sai para vários clientes de uma vez.',
+        'Grave áudio (mensagem de voz) e troque sua foto de perfil em "Minha conta".',
+      ], nota: 'No topo do Chat você vê seus números do mês (receita, negócios, leads, conversão).' },
+      { titulo: '8. Comprovante do pedido', bullets: [
+        'No funil ou no Chat, toque no nome do cliente para abrir a conversa.',
+        'Ao registrar a venda, o pedido gera um comprovante com link público e PDF.',
+        'Envie ao cliente pelo WhatsApp direto da tela do pedido.',
+      ] },
     ],
   },
   {
@@ -110,6 +140,11 @@ const decks: Deck[] = [
         'Use "recolher" para tirar a coleção do ar novamente.',
         'Ajuste as peças em Produtos e libere de novo quando estiver ok.',
       ] },
+      { titulo: '6. Pedidos a separar', bullets: [
+        'Toda venda fechada vira um pedido PENDENTE de separação.',
+        'No menu "Pedidos a separar", abra o comprovante e confira os itens.',
+        'Separe as peças e clique em "Marcar separado".',
+      ], nota: 'O gerente acompanha e cobra os pedidos que seguem pendentes.' },
     ],
   },
 ]

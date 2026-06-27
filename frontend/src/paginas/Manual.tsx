@@ -73,6 +73,39 @@ export default function Manual() {
         <p><strong>Onde:</strong> menu <em>Marca</em>.</p>
       </section>
 
+      <section className="manual-secao">
+        <h2>6. Campanhas da marca</h2>
+        <p>Centralize as campanhas: você <strong>monta uma vez</strong> e as vendedoras <strong>disparam</strong> para a carteira delas.</p>
+        <ul>
+          <li>Crie a campanha com <strong>nome</strong>, <strong>segmento sugerido</strong>, <strong>mensagem</strong> e <strong>banner</strong> (opcional).</li>
+          <li><strong>Publique</strong> — ela fica disponível para as vendedoras. Pode <em>pausar</em>/<em>ativar</em> a qualquer momento.</li>
+          <li>Cada disparo de vendedora soma no <strong>resultado consolidado</strong> da campanha (alcance, enviadas).</li>
+        </ul>
+        <p className="manual-nota">O banner aparece para a vendedora no catálogo; o envio do banner pelo WhatsApp entra com a API oficial. O texto padrão e a trava de edição ficam em <em>Marca</em>.</p>
+        <p><strong>Onde:</strong> menu <em>WhatsApp</em> → “Campanhas da marca”. O painel de resultados fica na mesma tela.</p>
+      </section>
+
+      <section className="manual-secao">
+        <h2>7. Pedidos a separar</h2>
+        <p>Toda venda fechada entra como <strong>pedido pendente</strong> de separação física.</p>
+        <ul>
+          <li>O <strong>gestor de estoque</strong> separa as peças e marca como <strong>separado</strong>.</li>
+          <li>Você e o gerente <strong>acompanham e cobram</strong> os pendentes (mostra há quanto tempo estão na fila).</li>
+          <li>Cada pedido abre o <strong>comprovante</strong> (link público + PDF) para conferência.</li>
+        </ul>
+        <p><strong>Onde:</strong> menu <em>Pedidos a separar</em>.</p>
+      </section>
+
+      <section className="manual-secao">
+        <h2>8. Comprovante de pedido</h2>
+        <p>Ao registrar a venda, o pedido gera um comprovante que a vendedora envia ao cliente.</p>
+        <ul>
+          <li><strong>Link público</strong> (sem login) para o cliente abrir no celular.</li>
+          <li><strong>PDF</strong> gerado no sistema, para baixar ou imprimir.</li>
+          <li>Botão <strong>“Enviar para o cliente”</strong> abre o WhatsApp com o resumo e o link.</li>
+        </ul>
+      </section>
+
       <footer className="manual-rodape">ZAIEZE · Sistemas Inteligentes para a Moda</footer>
     </div>
   )

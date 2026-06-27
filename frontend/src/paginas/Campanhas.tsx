@@ -15,6 +15,10 @@ interface Campanha {
   criadaPor: { nome: string }
 }
 interface Regua { id: string; dias: number; mensagemTemplate: string; ativa: boolean }
+interface ResumoCampanhas {
+  campanhas: number; enviadas: number; simuladas: number; falhas: number; semLgpd: number; alcance: number
+  porVendedora: { nome: string; campanhas: number; enviadas: number; alcance: number }[]
+}
 
 const SEGMENTOS = ['', 'NOVO', 'FREQUENTE', 'VIP', 'INATIVO', 'ATACADO']
 
@@ -26,6 +30,7 @@ export default function Campanhas() {
   const escopo = useLojaAtiva()
 
   const [campanhas, setCampanhas] = useState<Campanha[]>([])
+  const [resumo, setResumo] = useState<ResumoCampanhas | null>(null)
   const [reguas, setReguas] = useState<Regua[]>([])
   const [nome, setNome] = useState('Novidades da semana')
   const [segmento, setSegmento] = useState('')
@@ -102,6 +107,7 @@ export default function Campanhas() {
     if (!escopo.pronto) return
     const reqs: Promise<unknown>[] = [api.get('/campanhas', { params: escopo.params }).then(({ data }) => setCampanhas(data))]
     if (gerente) reqs.push(api.get('/reguas', { params: escopo.params }).then(({ data }) => setReguas(data)))
+    if (gerente) reqs.push(api.get('/campanhas/resumo', { params: escopo.params }).then(({ data }) => setResumo(data)).catch(() => {}))
     await Promise.all(reqs)
   }, [escopo.pronto, escopo.params, gerente])
 
@@ -282,6 +288,31 @@ export default function Campanhas() {
           </div>
         )}
       </div>
+
+      {/* Painel de resultados (gestor / gerente) */}
+      {gerente && resumo && resumo.campanhas > 0 && (
+        <div className="cartao cr-banner">
+          <h2 className="painel-titulo">📊 Resultados das campanhas</h2>
+          <div className="cr-kpis">
+            <div className="cr-kpi"><span>Campanhas</span><strong>{resumo.campanhas}</strong></div>
+            <div className="cr-kpi destaque"><span>Público alcançado</span><strong>{resumo.alcance}</strong></div>
+            <div className="cr-kpi"><span>Enviadas</span><strong>{resumo.enviadas}</strong></div>
+            <div className="cr-kpi"><span>Simuladas</span><strong>{resumo.simuladas}</strong></div>
+            <div className="cr-kpi"><span>Falhas</span><strong>{resumo.falhas}</strong></div>
+            <div className="cr-kpi"><span>Sem LGPD</span><strong>{resumo.semLgpd}</strong></div>
+          </div>
+          {resumo.porVendedora.length > 0 && (
+            <table style={{ marginTop: 14 }}>
+              <thead><tr><th>Por vendedora</th><th>Campanhas</th><th>Enviadas</th><th>Alcance</th></tr></thead>
+              <tbody>
+                {resumo.porVendedora.map((v, i) => (
+                  <tr key={i}><td>{v.nome}</td><td>{v.campanhas}</td><td>{v.enviadas}</td><td>{v.alcance}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       {/* Histórico de campanhas */}
       <div className="cartao">

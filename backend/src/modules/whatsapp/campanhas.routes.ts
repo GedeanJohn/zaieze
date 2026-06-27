@@ -49,6 +49,34 @@ export async function campanhasRoutes(app: FastifyInstance) {
     })
   })
 
+  // Resultados agregados das campanhas da loja (painel do gestor/gerente).
+  app.get('/resumo', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async (request) => {
+    const lojaId = await lojaIdDe(request)
+    const campanhas = await prisma.campanha.findMany({
+      where: { lojaId },
+      select: {
+        enviados: true, simulados: true, falhas: true, semConsentimento: true,
+        criadaPorId: true, criadaPor: { select: { nome: true } },
+      },
+    })
+
+    const tot = { campanhas: campanhas.length, enviadas: 0, simuladas: 0, falhas: 0, semLgpd: 0 }
+    const porVend = new Map<string, { nome: string; campanhas: number; enviadas: number; alcance: number }>()
+    for (const c of campanhas) {
+      tot.enviadas += c.enviados; tot.simuladas += c.simulados; tot.falhas += c.falhas; tot.semLgpd += c.semConsentimento
+      const alcance = c.enviados + c.simulados + c.falhas + c.semConsentimento
+      const v = porVend.get(c.criadaPorId) ?? { nome: c.criadaPor.nome, campanhas: 0, enviadas: 0, alcance: 0 }
+      v.campanhas += 1; v.enviadas += c.enviados; v.alcance += alcance
+      porVend.set(c.criadaPorId, v)
+    }
+    return {
+      ...tot,
+      // público alcançado = soma de todos os contatos atingidos pelos disparos
+      alcance: tot.enviadas + tot.simuladas + tot.falhas + tot.semLgpd,
+      porVendedora: [...porVend.values()].sort((a, b) => b.alcance - a.alcance),
+    }
+  })
+
   // Cria a campanha e dispara para o público-alvo (segmento ou lista de clientes)
   app.post('/', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)

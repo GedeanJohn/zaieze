@@ -26,6 +26,17 @@ a { color: var(--accent); text-decoration: none; }
 
 .app-shell { display: flex; flex-direction: column; min-height: 100vh; }
 
+/* Banner de resultados das campanhas (gestor/gerente) */
+.cr-banner { border-left: 4px solid var(--accent); }
+.cr-kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.cr-kpi { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; display: flex; flex-direction: column; gap: 3px; }
+.cr-kpi span { font-size: 12px; color: var(--ink-soft); }
+.cr-kpi strong { font-size: 22px; font-family: var(--fonte-titulo); line-height: 1.05; }
+.cr-kpi.destaque { background: var(--accent); border-color: var(--accent); }
+.cr-kpi.destaque span { color: #ffffffcc; }
+.cr-kpi.destaque strong { color: #fff; }
+@media (max-width: 720px) { .cr-kpis { grid-template-columns: repeat(2, 1fr); } }
+
 /* Barra de topo global: marca ZAIEZE (NUSAR) à esquerda, perfil da vendedora à direita */
 .topbar {
   display: flex; align-items: center; gap: 14px; flex-shrink: 0;

@@ -69,6 +69,7 @@ export default function Layout() {
         className={`sidebar ${menuAberto ? 'aberta' : ''}`}
         onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setMenuAberto(false) }}
       >
+        <div className="sidebar-marca">ZAIEZE</div>
         <nav className="sidebar-nav">
         <NavLink to="/" end className={cls}><LayoutDashboard {...ICON} /><span>Dashboard</span></NavLink>
         {podeVendasClientes && <NavLink to="/vendas" className={cls}><ShoppingBag {...ICON} /><span>Vendas</span></NavLink>}

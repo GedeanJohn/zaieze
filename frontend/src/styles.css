@@ -29,8 +29,8 @@ a { color: var(--accent); text-decoration: none; }
 /* Barra de topo global: marca ZAIEZE (NUSAR) à esquerda, perfil da vendedora à direita */
 .topbar {
   display: flex; align-items: center; gap: 14px; flex-shrink: 0;
-  background: var(--ink); color: #f5efe9; padding: 10px 20px;
-  position: sticky; top: 0; z-index: 40;
+  background: #0a0a0b; color: #f3f3f3; padding: 10px 20px;
+  position: sticky; top: 0; z-index: 40; border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .marca-zaieze { font-family: var(--marca); font-weight: 600; font-size: 24px; letter-spacing: 0.10em; color: #fff; line-height: 1; }
 .menu-toggle { display: none; background: none; border: none; color: #f5efe9; cursor: pointer; padding: 0 2px; align-items: center; }
@@ -48,28 +48,31 @@ a { color: var(--accent); text-decoration: none; }
 .menu-overlay { display: none; }
 
 .sidebar {
-  width: 230px; background: var(--ink); color: #f5efe9; padding: 20px 16px;
-  display: flex; flex-direction: column; gap: 4px; flex-shrink: 0;
+  width: 230px; background: #0a0a0b; color: #ececec; padding: 18px 14px;
+  display: flex; flex-direction: column; gap: 3px; flex-shrink: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
+/* Marca ZAIEZE no topo do menu (fonte NUSAR) — só no drawer mobile (no desktop já está na barra de topo) */
+.sidebar-marca { display: none; font-family: var(--marca); font-weight: 600; font-size: 26px; letter-spacing: 0.12em; color: #fff; margin: 2px 8px 18px; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
 .sidebar a {
   display: flex; align-items: center; gap: 11px;
-  color: #cbc2bb; padding: 9px 12px; border-radius: 9px; font-size: 14px; letter-spacing: 0.01em;
+  color: #b3b3b3; padding: 10px 13px; border-radius: 10px; font-size: 14px; letter-spacing: 0.01em;
   transition: background 0.15s ease, color 0.15s ease;
 }
-.sidebar a svg { flex-shrink: 0; opacity: 0.8; transition: opacity 0.15s ease; }
-.sidebar a:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.sidebar a svg { flex-shrink: 0; opacity: 0.85; transition: opacity 0.15s ease; }
+.sidebar a:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
 .sidebar a:hover svg { opacity: 1; }
-.sidebar a.ativo { background: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 4px 14px rgba(194, 85, 43, 0.35); }
+.sidebar a.ativo { background: #fff; color: #0a0a0b; font-weight: 700; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); }
 .sidebar a.ativo svg { opacity: 1; }
-.sidebar .rodape { margin-top: auto; padding-top: 14px; font-size: 12px; color: #a89d96; border-top: 1px solid rgba(255, 255, 255, 0.08); }
-.sidebar .rodape .rodape-nome { color: #f0e9e3; font-weight: 600; font-size: 13px; }
+.sidebar .rodape { margin-top: auto; padding-top: 14px; font-size: 12px; color: #8a8a8a; border-top: 1px solid rgba(255, 255, 255, 0.12); }
+.sidebar .rodape .rodape-nome { color: #fff; font-weight: 600; font-size: 13px; }
 .sidebar .rodape button {
   display: flex; align-items: center; justify-content: center; gap: 6px;
-  background: none; border: 1px solid #5a4f49; color: #d8cfc8; border-radius: 8px;
-  padding: 7px 12px; cursor: pointer; margin-top: 10px; width: 100%; transition: background 0.15s ease;
+  background: none; border: 1px solid rgba(255, 255, 255, 0.2); color: #ddd; border-radius: 8px;
+  padding: 8px 12px; cursor: pointer; margin-top: 10px; width: 100%; transition: background 0.15s ease;
 }
-.sidebar .rodape button:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.sidebar .rodape button:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
 
 .conteudo { flex: 1; padding: 32px 40px; max-width: 1200px; }
 .conteudo header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
@@ -205,6 +208,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   .topbar { padding: 10px 14px; gap: 12px; }
   .marca-zaieze { font-size: 21px; }
   .topbar-nome { display: none; }
+  .sidebar-marca { display: block; }
 
   /* sidebar fora de tela; entra com .aberta */
   .sidebar {

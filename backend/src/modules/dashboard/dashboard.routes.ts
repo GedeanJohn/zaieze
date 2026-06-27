@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe, redeIdDe, redeIdDeQualquer } from '../../plugins/auth'
-import { apertadoPctDaRede, contarFunilPorCor } from '../leads/leads.service'
+import { apertadoPctDaRede, contarFunilPorCor, ETAPAS_ABERTAS } from '../leads/leads.service'
 
 function inicioDoDia(): Date {
   const d = new Date()
@@ -207,6 +207,25 @@ async function dashboardDaLoja(lojaId: string) {
  * - VENDEDORA: apenas o relatório das próprias vendas.
  */
 export async function dashboardRoutes(app: FastifyInstance) {
+  // Estatísticas resumidas para o topo do Chat (por vendedora; gerente/gestor = loja).
+  app.get('/chat-stats', { preHandler: [app.authenticate] }, async (request: FastifyRequest) => {
+    const ehVend = request.user.role === 'VENDEDORA'
+    const esc = ehVend ? { vendedoraId: request.user.sub } : { lojaId: await lojaIdDe(request) }
+    const desdeMes = inicioDoMes()
+    const [receita, ativos, novos, conv] = await Promise.all([
+      prisma.venda.aggregate({ where: { ...esc, status: 'CONCLUIDA', createdAt: { gte: desdeMes } }, _sum: { total: true } }),
+      prisma.lead.count({ where: { ...esc, status: { in: ETAPAS_ABERTAS } } }),
+      prisma.lead.count({ where: { ...esc, createdAt: { gte: desdeMes } } }),
+      prisma.lead.count({ where: { ...esc, createdAt: { gte: desdeMes }, status: 'CONVERTIDO' } }),
+    ])
+    return {
+      receitaMes: num(receita._sum.total),
+      negociosAtivos: ativos,
+      novosLeads: novos,
+      taxaConversao: novos > 0 ? Math.round((conv / novos) * 100) : 0,
+    }
+  })
+
   app.get('/', { preHandler: [app.authenticate] }, async (request: FastifyRequest) => {
     const { role } = request.user
 

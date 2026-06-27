@@ -24,18 +24,33 @@ img, video, table { max-width: 100%; }
 h1, h2, h3 { font-family: var(--fonte-titulo); font-weight: 600; }
 a { color: var(--accent); text-decoration: none; }
 
-.app-shell { display: flex; min-height: 100vh; }
+.app-shell { display: flex; flex-direction: column; min-height: 100vh; }
 
-/* Barra superior + overlay do drawer: só aparecem no mobile (regras em @media abaixo) */
-.topbar-mobile { display: none; }
+/* Barra de topo global: marca ZAIEZE (NUSAR) à esquerda, perfil da vendedora à direita */
+.topbar {
+  display: flex; align-items: center; gap: 14px; flex-shrink: 0;
+  background: var(--ink); color: #f5efe9; padding: 10px 20px;
+  position: sticky; top: 0; z-index: 40;
+}
+.marca-zaieze { font-family: var(--marca); font-weight: 600; font-size: 24px; letter-spacing: 0.10em; color: #fff; line-height: 1; }
+.menu-toggle { display: none; background: none; border: none; color: #f5efe9; cursor: pointer; padding: 0 2px; align-items: center; }
+.topbar-perfil {
+  margin-left: auto; display: flex; align-items: center; gap: 9px; cursor: pointer;
+  background: rgba(255, 255, 255, 0.06); border: none; border-radius: 999px; padding: 5px 14px 5px 5px;
+  transition: background 0.15s ease;
+}
+.topbar-perfil:hover { background: rgba(255, 255, 255, 0.12); }
+.topbar-perfil img, .topbar-ini { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex-shrink: 0; display: block; }
+.topbar-ini { display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #fff; background: linear-gradient(135deg, #a855f7, #ec4899); }
+.topbar-nome { color: #f0e9e3; font-size: 14px; font-weight: 600; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.shell-corpo { display: flex; flex: 1; min-height: 0; }
 .menu-overlay { display: none; }
 
 .sidebar {
-  width: 230px; background: var(--ink); color: #f5efe9; padding: 24px 16px;
+  width: 230px; background: var(--ink); color: #f5efe9; padding: 20px 16px;
   display: flex; flex-direction: column; gap: 4px; flex-shrink: 0;
 }
-.sidebar .logo { font-family: var(--fonte-titulo); font-weight: 600; font-size: 22px; margin-bottom: 24px; }
-.sidebar .logo em { color: #e8a87c; font-style: italic; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
 .sidebar a {
   display: flex; align-items: center; gap: 11px;
@@ -185,19 +200,11 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 /* ───────────────────────── Mobile do CRM (drawer + primitivas) ─────────────────────────
    Em ≤ 860px a sidebar vira um painel deslizante acionado pelo ☰; o desktop fica intacto. */
 @media (max-width: 860px) {
-  .app-shell { flex-direction: column; }
-
-  .topbar-mobile {
-    display: flex; align-items: center; gap: 14px;
-    background: var(--ink); color: #f5efe9; padding: 12px 16px;
-    position: sticky; top: 0; z-index: 40;
-  }
-  .topbar-mobile .logo { font-family: var(--fonte-titulo); font-weight: 600; font-size: 20px; }
-  .topbar-mobile .logo em { color: #e8a87c; font-style: italic; }
-  .menu-toggle {
-    background: none; border: none; color: #f5efe9; font-size: 26px; line-height: 1;
-    cursor: pointer; padding: 0 4px;
-  }
+  /* A barra de topo é global; no celular só aparece o ☰ e o nome do perfil some (fica só o avatar) */
+  .menu-toggle { display: inline-flex; }
+  .topbar { padding: 10px 14px; gap: 12px; }
+  .marca-zaieze { font-size: 21px; }
+  .topbar-nome { display: none; }
 
   /* sidebar fora de tela; entra com .aberta */
   .sidebar {
@@ -449,12 +456,18 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .chatz {
   --cz-bg: #15121f; --cz-surf: #211c30; --cz-surf2: #2a2440; --cz-line: #352d4d;
   --cz-tx: #ece9f5; --cz-mut: #9b93b4; --cz-accent: #a855f7;
-  background: var(--cz-bg); color: var(--cz-tx); border-radius: 16px; padding: 12px;
+  background: var(--cz-bg); color: var(--cz-tx); border-radius: 0; padding: 0;
   display: grid; grid-template-columns: 340px 1fr; gap: 12px;
   height: calc(100dvh - 150px); min-height: 520px; overflow: hidden;
 }
+/* Estatísticas da vendedora no topo do chat */
+.cz-topo { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+.cz-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.cz-stat { background: #211c30; border-radius: 14px; padding: 13px 15px; display: flex; flex-direction: column; gap: 5px; }
+.cz-stat-rot { font-size: 12px; color: #9b93b4; }
+.cz-stat-val { font-size: 21px; font-weight: 800; color: #fff; font-family: var(--fonte-titulo); line-height: 1.1; }
 .chatz strong { color: var(--cz-tx); }
-.cz-lista, .cz-conversa { background: var(--cz-surf); border: 1px solid var(--cz-line); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.cz-lista, .cz-conversa { background: var(--cz-surf); border: none; border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 .cz-lista-top { padding: 14px; border-bottom: 1px solid var(--cz-line); display: flex; flex-direction: column; gap: 10px; }
 .cz-titulo { font-weight: 700; font-size: 18px; display: flex; align-items: center; gap: 8px; font-family: var(--fonte-titulo); }
 .cz-count { background: var(--cz-accent); color: #fff; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 9px; }
@@ -597,6 +610,8 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 
 @media (max-width: 720px) {
   .cz-pagina { margin: -18px -16px; padding: 14px 16px 18px; }
+  .cz-stats { grid-template-columns: repeat(2, 1fr); }
+  .cz-stat-val { font-size: 19px; }
   .cz-marca { font-size: 24px; padding: 12px 26px; }
   .chatz { grid-template-columns: 1fr; height: calc(100dvh - 150px); padding: 8px; gap: 8px; }
   .cz-pagina.zen { padding-top: 8px; }

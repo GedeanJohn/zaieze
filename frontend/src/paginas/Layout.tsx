@@ -9,6 +9,12 @@ import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
 
 const ICON = { size: 18, strokeWidth: 1.75 } as const
 
+/** Iniciais do nome para o avatar do perfil no topo. */
+function iniciais(nome: string): string {
+  const p = nome.trim().split(/\s+/)
+  return ((p[0]?.[0] ?? '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase() || '?'
+}
+
 export default function Layout() {
   const usuario = usuarioLogado()!
   const navigate = useNavigate()
@@ -47,16 +53,22 @@ export default function Layout() {
 
   return (
     <div className="app-shell">
-      <header className="topbar-mobile">
-        <button className="menu-toggle" onClick={() => setMenuAberto(true)} aria-label="Abrir menu"><Menu size={24} strokeWidth={2} /></button>
-        <div className="logo">Moda<em>CRM</em> AI</div>
+      <header className="topbar">
+        <button className="menu-toggle" onClick={() => setMenuAberto(true)} aria-label="Abrir menu"><Menu size={22} strokeWidth={2} /></button>
+        <div className="marca-zaieze">ZAIEZE</div>
+        <button className="topbar-perfil" onClick={() => navigate('/conta')} title="Minha conta">
+          {usuario.fotoUrl
+            ? <img src={usuario.fotoUrl} alt="" />
+            : <span className="topbar-ini">{iniciais(usuario.nome)}</span>}
+          <span className="topbar-nome">{usuario.nome}</span>
+        </button>
       </header>
       {menuAberto && <div className="menu-overlay" onClick={() => setMenuAberto(false)} />}
+      <div className="shell-corpo">
       <aside
         className={`sidebar ${menuAberto ? 'aberta' : ''}`}
         onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setMenuAberto(false) }}
       >
-        <div className="logo">Moda<em>CRM</em> AI</div>
         <nav className="sidebar-nav">
         <NavLink to="/" end className={cls}><LayoutDashboard {...ICON} /><span>Dashboard</span></NavLink>
         {podeVendasClientes && <NavLink to="/vendas" className={cls}><ShoppingBag {...ICON} /><span>Vendas</span></NavLink>}
@@ -99,6 +111,7 @@ export default function Layout() {
         )}
         <Outlet />
       </main>
+      </div>
     </div>
   )
 }

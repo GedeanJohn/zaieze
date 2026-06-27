@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { api, mensagemDeErro, usuarioLogado, atualizarUsuarioLocal } from '../api'
+import { api, mensagemDeErro, formataReal } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 
 interface Conversa {
@@ -25,6 +25,7 @@ interface Mensagem {
   createdAt: string
 }
 
+interface ChatStats { receitaMes: number; negociosAtivos: number; novosLeads: number; taxaConversao: number }
 interface ClienteLite { id: string; nome: string; telefone: string; segmento: string }
 interface Grupo { id: string; nome: string; membros: number; ultimaMensagem: string | null; ultimaEm: string }
 interface Disparo { id: string; texto: string; status: string; createdAt: string }
@@ -52,8 +53,8 @@ export default function CaixaEntrada() {
   const escopo = useLojaAtiva()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const me = usuarioLogado()
   const abriuParam = useRef(false)
+  const [stats, setStats] = useState<ChatStats | null>(null)
 
   const [conversas, setConversas] = useState<Conversa[]>([])
   const [sel, setSel] = useState<Conversa | null>(null)
@@ -71,10 +72,6 @@ export default function CaixaEntrada() {
   const chunks = useRef<Blob[]>([])
   const timerGrav = useRef<number | null>(null)
 
-  // Perfil (foto da vendedora no cabeçalho)
-  const [fotoUrl, setFotoUrl] = useState<string | null>(me?.fotoUrl ?? null)
-  const [enviandoFoto, setEnviandoFoto] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
 
   // Grupos
   const [grupos, setGrupos] = useState<Grupo[]>([])
@@ -96,6 +93,12 @@ export default function CaixaEntrada() {
   }, [escopo.pronto, escopo.params])
 
   useEffect(() => { carregar() }, [carregar])
+
+  // Estatísticas da vendedora (topo do chat)
+  useEffect(() => {
+    if (!escopo.pronto) return
+    api.get('/dashboard/chat-stats', { params: escopo.params }).then(({ data }) => setStats(data)).catch(() => {})
+  }, [escopo.pronto, escopo.params])
   useEffect(() => { if (filtro === 'GRUPOS') carregarGrupos() }, [filtro, carregarGrupos])
 
   const abrir = useCallback(async (c: Conversa) => {
@@ -220,20 +223,6 @@ export default function CaixaEntrada() {
     carregarGrupos()
   }
 
-  async function enviarFoto(arquivo: File) {
-    setEnviandoFoto(true); setErro('')
-    try {
-      const fd = new FormData()
-      fd.append('file', arquivo)
-      const { data } = await api.post('/usuarios/me/foto', fd)
-      setFotoUrl(data.fotoUrl)
-      atualizarUsuarioLocal({ fotoUrl: data.fotoUrl })
-    } catch (err) {
-      setErro(mensagemDeErro(err))
-    } finally {
-      setEnviandoFoto(false)
-    }
-  }
 
   const totalNaoLidas = conversas.reduce((s, c) => s + (c.naoLidas > 0 ? 1 : 0), 0)
   const lista = useMemo(() => {
@@ -254,24 +243,17 @@ export default function CaixaEntrada() {
 
   return (
     <div className={`cz-pagina${temSel ? ' zen' : ''}`}>
-      <div className="cz-cabec">
-        <h1 className="cz-marca"><span className="cz-marca-icone">💬</span> Chat Zaieze</h1>
-
-        {/* Perfil da vendedora (foto exibida no cabeçalho) */}
-        <div className="cz-perfil">
-          <button type="button" className="cz-perfil-avatar" onClick={() => fileRef.current?.click()} disabled={enviandoFoto} title="Trocar foto de perfil">
-            {fotoUrl ? <img src={fotoUrl} alt="" /> : <span className="cz-avatar">{iniciais(me?.nome ?? 'Você')}</span>}
-            <span className="cz-perfil-cam">{enviandoFoto ? '…' : '📷'}</span>
-          </button>
-          <div className="cz-perfil-info">
-            <span className="cz-perfil-rotulo">Você</span>
-            <strong>{me?.nome ?? 'Minha conta'}</strong>
+      {!temSel && (
+        <div className="cz-topo">
+          <SeletorLoja escopo={escopo} />
+          <div className="cz-stats">
+            <StatCard rotulo="Receita do mês" valor={stats ? formataReal(stats.receitaMes) : '—'} cor="#a855f7" />
+            <StatCard rotulo="Negócios ativos" valor={stats ? String(stats.negociosAtivos) : '—'} cor="#38bdf8" />
+            <StatCard rotulo="Novos leads" valor={stats ? String(stats.novosLeads) : '—'} cor="#22c55e" />
+            <StatCard rotulo="Taxa de conversão" valor={stats ? `${stats.taxaConversao}%` : '—'} cor="#ec4899" />
           </div>
-          <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarFoto(f); e.target.value = '' }} />
         </div>
-
-        <SeletorLoja escopo={escopo} />
-      </div>
+      )}
 
       <div className={`chatz${temSel ? ' tem-sel' : ''}`}>
         {/* Lista (conversas ou grupos) */}
@@ -425,6 +407,16 @@ export default function CaixaEntrada() {
           onCriado={() => { setModalGrupo(false); carregarGrupos() }}
         />
       )}
+    </div>
+  )
+}
+
+/** Cartão de estatística no topo do chat (por vendedora). */
+function StatCard({ rotulo, valor, cor }: { rotulo: string; valor: string; cor: string }) {
+  return (
+    <div className="cz-stat" style={{ borderTop: `3px solid ${cor}` }}>
+      <span className="cz-stat-rot">{rotulo}</span>
+      <strong className="cz-stat-val">{valor}</strong>
     </div>
   )
 }

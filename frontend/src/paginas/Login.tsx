@@ -29,8 +29,8 @@ export default function Login() {
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={entrar}>
-        <h1>Moda<em>CRM</em> AI</h1>
-        <p>Gestão de vendas, relacionamento e estoque para lojas de moda</p>
+        <h1>Zaieze</h1>
+        <p className="login-lema">Sistemas Inteligentes para a Moda</p>
         {erro && <div className="alerta">{erro}</div>}
         <div className="campo">
           <label>E-mail</label>

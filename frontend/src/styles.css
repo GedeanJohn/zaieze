@@ -170,6 +170,7 @@ label { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 
 .login-card h1 { margin: 0 0 4px; font-size: 26px; font-family: var(--marca); letter-spacing: 0.04em; color: #fff; }
 .login-card h1 em { color: #fff; font-style: normal; opacity: 0.6; }
 .login-card p { color: var(--zz-mut); font-size: 14px; margin: 0 0 24px; }
+.login-card p.login-lema { font-family: var(--marca); font-size: 13px; letter-spacing: 0.06em; }
 .login-card label { color: var(--zz-mut); }
 .login-card input { background: #111; color: #fff; border-color: var(--zz-line); }
 .login-card input:focus { outline: none; border-color: #fff; }

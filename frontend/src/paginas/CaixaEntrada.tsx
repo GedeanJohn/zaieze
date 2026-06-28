@@ -251,7 +251,7 @@ export default function CaixaEntrada() {
       {!temSel && (
         <div className="cz-stats">
           <StatCard rotulo="Receita do mês" valor={stats ? formataReal(stats.receitaMes) : '—'} cor="#a855f7" />
-          <MetaCard pct={stats ? stats.pctMeta : null} valor={stats ? stats.metaMes : null} cor="#c084fc" />
+          <MetaCard pct={stats ? stats.pctMeta : null} cor="#c084fc" />
           <StatCard rotulo="Novos leads" valor={stats ? String(stats.novosLeads) : '—'} cor="#22c55e" />
           <StatCard rotulo="Taxa de conversão" valor={stats ? `${stats.taxaConversao}%` : '—'} cor="#ec4899" />
         </div>
@@ -424,14 +424,14 @@ function StatCard({ rotulo, valor, cor }: { rotulo: string; valor: string; cor: 
 }
 
 /** Card "Meta do mês": anel de progresso com o % atingido no centro. */
-function MetaCard({ pct, valor, cor }: { pct: number | null; valor: number | null; cor: string }) {
+function MetaCard({ pct, cor }: { pct: number | null; cor: string }) {
   const v = Math.max(0, Math.min(pct ?? 0, 100))
   const r = 15
   const circ = 2 * Math.PI * r
   const off = circ * (1 - v / 100)
   return (
     <div className="cz-stat cz-stat-meta" style={{ borderTop: `3px solid ${cor}` }}>
-      <span className="cz-stat-rot">Meta do mês{valor != null ? ` · ${formataReal(valor)}` : ''}</span>
+      <span className="cz-stat-rot">Meta Mês</span>
       <div className="cz-meta-anel">
         <svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
           <circle cx="20" cy="20" r={r} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="4" />

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe, redeIdDeQualquer } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
+import { metaDaLoja, numVendedorasAtivas } from '../metas/metas.service'
 
 const num = (v: unknown) => Number(v ?? 0)
 
@@ -65,10 +66,15 @@ export async function comissoesRoutes(app: FastifyInstance) {
       porVend.set(v.vendedoraId, arr)
     }
 
+    // Meta derivada da vendedora = meta da loja ÷ nº de vendedoras ativas (todas iguais).
+    const metaLoja = await metaDaLoja(lojaId)
+    const nAtivas = await numVendedorasAtivas(lojaId)
+    const metaVend = nAtivas > 0 ? metaLoja / nAtivas : 0
+
     const resultado = vendedoras.map((vd) => {
       const minhasVendas = porVend.get(vd.id) ?? []
       const totalVendido = minhasVendas.reduce((s, v) => s + v.itens.reduce((si, i) => si + num(i.precoUnitario) * i.quantidade, 0), 0)
-      const meta = vd.metaMensal != null ? num(vd.metaMensal) : null
+      const meta = metaVend > 0 ? metaVend : null
       const atingiuMeta = meta != null && meta > 0 && totalVendido >= meta
       const padraoVend = vd.comissaoPadrao != null ? { p: num(vd.comissaoPadrao), pm: null } : null
 

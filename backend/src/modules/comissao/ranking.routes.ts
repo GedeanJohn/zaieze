@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
+import { metaDaLoja } from '../metas/metas.service'
 
 const num = (v: unknown) => Number(v ?? 0)
 
@@ -32,10 +33,14 @@ export async function rankingRoutes(app: FastifyInstance) {
       agg.set(v.vendedoraId, a)
     }
 
+    // Meta derivada: meta da loja ÷ nº de vendedoras ativas (todas têm a mesma).
+    const metaLoja = await metaDaLoja(lojaId)
+    const metaVend = vendedoras.length > 0 ? metaLoja / vendedoras.length : 0
+
     return vendedoras
       .map((vd) => {
         const a = agg.get(vd.id) ?? { total: 0, vendas: 0 }
-        const meta = vd.metaMensal != null ? num(vd.metaMensal) : null
+        const meta = metaVend > 0 ? metaVend : null
         return {
           id: vd.id,
           nome: vd.nome,

@@ -159,6 +159,11 @@ model Rede {
   // disparoVendedoraEditavel = a vendedora pode personalizar o texto (true) ou fica travada (false).
   textoDisparoPadrao       String?
   disparoVendedoraEditavel Boolean  @default(true)
+  // Meta mensal da MARCA (valor total do mês). Distribuída às lojas conforme metaModo:
+  // IGUAL = meta da marca ÷ nº de lojas; MANUAL = valor definido em cada Loja.metaMensal.
+  // A meta da vendedora é derivada: meta da loja ÷ nº de vendedoras ativas da loja.
+  metaMensal               Decimal? @db.Decimal(12, 2)
+  metaModo                 String   @default("IGUAL") // IGUAL | MANUAL
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
@@ -231,6 +236,8 @@ model Loja {
   limiteAtacado   Decimal  @default(5000) @db.Decimal(12, 2)
   // % de cashback creditado ao cliente a cada compra (Portal do Cliente — fase 7). 0 = desligado.
   cashbackPercent Decimal  @default(0) @db.Decimal(5, 2)
+  // Meta mensal da loja (usada quando a rede está em metaModo = MANUAL).
+  metaMensal      Decimal? @db.Decimal(12, 2)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

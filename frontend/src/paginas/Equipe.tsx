@@ -117,6 +117,15 @@ export default function Equipe() {
 
   useEffect(() => { carregarEquipe() }, [carregarEquipe])
 
+  // Meta derivada da loja (meta da loja ÷ nº de vendedoras) — mostrada na coluna da tabela.
+  const [metaLojaData, setMetaLojaData] = useState<{ metaVendedora: number } | null>(null)
+  const carregarMetaLoja = useCallback(() => {
+    if (!teamPronto) { setMetaLojaData(null); return }
+    api.get('/metas/loja', { params: teamParams }).then(({ data }) => setMetaLojaData(data)).catch(() => setMetaLojaData(null))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamPronto, lojaSel])
+  useEffect(() => { carregarMetaLoja() }, [carregarMetaLoja, equipe.length])
+
   async function salvar(e: React.FormEvent) {
     e.preventDefault()
     if (!form) return
@@ -126,7 +135,6 @@ export default function Equipe() {
       email: form.email,
       telefone: form.telefone || undefined,
       slugCatalogo: form.slugCatalogo || undefined,
-      metaMensal: form.metaMensal ? Number(form.metaMensal) : undefined,
       comissaoPadrao: form.comissaoPadrao ? Number(form.comissaoPadrao) : undefined,
     }
     if (form.senha) corpo.senha = form.senha
@@ -292,6 +300,8 @@ export default function Equipe() {
             )}
           </div>
 
+          {ehGestor && lojas.length > 0 && <MetasConfig onSalvo={carregarMetaLoja} />}
+
           {ehGestor && lojas.length === 0 ? (
             <div className="cartao" style={{ color: 'var(--ink-soft)' }}>
               Nenhuma loja cadastrada ainda. {mostraLojas ? 'Cadastre uma loja na aba “Lojas” (você define o Gerente de Loja na criação).' : 'Cadastre uma loja para começar.'}
@@ -314,11 +324,11 @@ export default function Equipe() {
                           : <span style={{ color: 'var(--ink-soft)' }}>{m.waNumero ? formatarWhatsapp(m.waNumero) : '—'}</span>}
                       </td>
                       <td>{m._count?.carteira ?? 0} clientes</td>
-                      <td>{m.metaMensal ? `R$ ${Number(m.metaMensal).toLocaleString('pt-BR')}` : '—'}</td>
+                      <td>{m.role === 'VENDEDORA' && metaLojaData ? `R$ ${metaLojaData.metaVendedora.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}</td>
                       <td>{m.comissaoPadrao ? `${Number(m.comissaoPadrao)}%` : '—'}</td>
                       <td><span className={`selo ${m.ativo ? 'ok' : 'baixo'}`}>{m.ativo ? 'ativa' : 'inativa'}</span></td>
                       <td style={{ whiteSpace: 'nowrap' }}>
-                        <a href="#" onClick={(e) => { e.preventDefault(); setForm({ ...m, metaMensal: m.metaMensal ?? '', comissaoPadrao: m.comissaoPadrao ?? '', senha: '' } as FormMembro) }}>editar</a>
+                        <a href="#" onClick={(e) => { e.preventDefault(); setForm({ ...m, comissaoPadrao: m.comissaoPadrao ?? '', senha: '' } as FormMembro) }}>editar</a>
                         {m.role === 'VENDEDORA' && (
                           <>
                             {' · '}
@@ -505,10 +515,6 @@ export default function Equipe() {
                 <input value={form.slugCatalogo ?? ''} onChange={(e) => setForm({ ...form, slugCatalogo: e.target.value })} placeholder="camila" />
               </div>
               <div className="campo">
-                <label>Meta mensal (R$)</label>
-                <input type="number" step="0.01" value={form.metaMensal ?? ''} onChange={(e) => setForm({ ...form, metaMensal: e.target.value })} />
-              </div>
-              <div className="campo">
                 <label>Comissão padrão (%)</label>
                 <input type="number" step="0.1" min="0" max="100" value={form.comissaoPadrao ?? ''} onChange={(e) => setForm({ ...form, comissaoPadrao: e.target.value })} />
               </div>
@@ -637,5 +643,101 @@ export default function Equipe() {
         </div>
       )}
     </>
+  )
+}
+
+// ── Configuração das metas (marca → loja → vendedora) — gestor ──
+interface LojaMeta { id: string; nome: string; metaManual: number; numVendedoras: number; metaLoja: number; metaVendedora: number }
+interface MetasResp { metaMensal: number; metaModo: 'IGUAL' | 'MANUAL'; lojas: LojaMeta[] }
+
+function brl(v: number): string {
+  return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+}
+
+function MetasConfig({ onSalvo }: { onSalvo: () => void }) {
+  const [cfg, setCfg] = useState<MetasResp | null>(null)
+  const [meta, setMeta] = useState('')
+  const [modo, setModo] = useState<'IGUAL' | 'MANUAL'>('IGUAL')
+  const [porLoja, setPorLoja] = useState<Record<string, string>>({})
+  const [msg, setMsg] = useState('')
+  const [erro, setErro] = useState('')
+  const [ocupado, setOcupado] = useState(false)
+
+  const carregar = useCallback(() => {
+    api.get('/metas').then(({ data }) => {
+      const d = data as MetasResp
+      setCfg(d)
+      setMeta(d.metaMensal ? String(d.metaMensal) : '')
+      setModo(d.metaModo)
+      setPorLoja(Object.fromEntries(d.lojas.map((l) => [l.id, l.metaManual ? String(l.metaManual) : ''])))
+    }).catch(() => {})
+  }, [])
+  useEffect(() => { carregar() }, [carregar])
+
+  async function salvar() {
+    setOcupado(true); setMsg(''); setErro('')
+    try {
+      await api.put('/metas', {
+        metaMensal: meta ? Number(meta) : 0,
+        metaModo: modo,
+        metasPorLoja: modo === 'MANUAL'
+          ? Object.fromEntries(Object.entries(porLoja).map(([k, v]) => [k, v ? Number(v) : 0]))
+          : undefined,
+      })
+      setMsg('Metas salvas.')
+      carregar()
+      onSalvo()
+    } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
+  }
+
+  if (!cfg) return null
+  return (
+    <div className="cartao">
+      <h2 style={{ marginTop: 0 }}>🎯 Metas mensais</h2>
+      <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
+        Defina a meta da marca; ela é distribuída às lojas e, dentro de cada loja, dividida igualmente entre as vendedoras.
+      </div>
+      <div className="linha-campos">
+        <div className="campo">
+          <label>Meta da marca (R$/mês)</label>
+          <input type="number" step="0.01" min="0" value={meta} onChange={(e) => setMeta(e.target.value)} />
+        </div>
+        <div className="campo">
+          <label>Distribuição entre as lojas</label>
+          <select value={modo} onChange={(e) => setModo(e.target.value as 'IGUAL' | 'MANUAL')}>
+            <option value="IGUAL">Igual (divide a meta da marca entre as lojas)</option>
+            <option value="MANUAL">Manual (defino a meta de cada loja)</option>
+          </select>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Loja</th><th>Vendedoras</th><th>Meta da loja</th><th>Meta por vendedora</th></tr>
+        </thead>
+        <tbody>
+          {cfg.lojas.map((l) => (
+            <tr key={l.id}>
+              <td>{l.nome}</td>
+              <td>{l.numVendedoras}</td>
+              <td>
+                {modo === 'MANUAL'
+                  ? <input type="number" step="0.01" min="0" value={porLoja[l.id] ?? ''} onChange={(e) => setPorLoja({ ...porLoja, [l.id]: e.target.value })} style={{ width: 130 }} />
+                  : brl(l.metaLoja)}
+              </td>
+              <td>{brl(l.metaVendedora)}</td>
+            </tr>
+          ))}
+          {cfg.lojas.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--ink-soft)' }}>Cadastre uma loja primeiro.</td></tr>}
+        </tbody>
+      </table>
+      {erro && <div className="alerta" style={{ marginTop: 8 }}>{erro}</div>}
+      {msg && <div className="sucesso" style={{ marginTop: 8 }}>{msg}</div>}
+      <div style={{ marginTop: 10 }}>
+        <button className="btn" onClick={salvar} disabled={ocupado}>{ocupado ? 'Salvando…' : 'Salvar metas'}</button>
+        <span style={{ fontSize: 12, color: 'var(--ink-soft)', marginLeft: 10 }}>
+          Os valores "por vendedora" atualizam após salvar.
+        </span>
+      </div>
+    </div>
   )
 }

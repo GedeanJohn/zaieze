@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe, redeIdDe, redeIdDeQualquer } from '../../plugins/auth'
 import { apertadoPctDaRede, contarFunilPorCor, ETAPAS_ABERTAS } from '../leads/leads.service'
+import { metaDaLoja, metaDaVendedora } from '../metas/metas.service'
 
 function inicioDoDia(): Date {
   const d = new Date()
@@ -220,16 +221,9 @@ export async function dashboardRoutes(app: FastifyInstance) {
       prisma.lead.count({ where: { ...esc, createdAt: { gte: desdeMes }, status: 'CONVERTIDO' } }),
     ])
 
-    // Meta do mês = valor total de vendas pelo qual a vendedora é responsável.
-    // Vendedora: a própria meta. Loja (gerente/gestor): soma das metas das vendedoras.
-    let meta = 0
-    if (ehVend) {
-      const u = await prisma.usuario.findUnique({ where: { id: request.user.sub }, select: { metaMensal: true } })
-      meta = num(u?.metaMensal)
-    } else {
-      const a = await prisma.usuario.aggregate({ where: { role: 'VENDEDORA', lojaId: lojaId! }, _sum: { metaMensal: true } })
-      meta = num(a._sum.metaMensal)
-    }
+    // Meta do mês (modelo hierárquico marca→loja→vendedora).
+    // Vendedora: meta da loja ÷ nº de vendedoras. Loja (gerente/gestor): meta da loja.
+    const meta = ehVend ? await metaDaVendedora(request.user.sub) : await metaDaLoja(lojaId!)
     const receitaMes = num(receita._sum.total)
 
     return {
@@ -272,7 +266,8 @@ export async function dashboardRoutes(app: FastifyInstance) {
       ])
       const totalMes = num(mes._sum.total)
       const onlineMes = num(online._sum.total)
-      const meta = eu.metaMensal ? num(eu.metaMensal) : null
+      const metaV = await metaDaVendedora(vendedoraId)
+      const meta = metaV > 0 ? metaV : null
       const funilCores = await contarFunilPorCor({ vendedoraId }, await apertadoPctDaRede(eu.loja?.redeId ?? null))
       return {
         papel: 'VENDEDORA',

@@ -504,10 +504,10 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   .inbox-voltar { display: inline-flex; }
 }
 
-/* ───────────────────────── Chat Zaieze — tema escuro (escopado só nesta tela) ───────────────────────── */
+/* ───────────────────────── Chat Zaieze — tema claro/creme (escopado só nesta tela) ───────────────────────── */
 .chatz {
-  --cz-bg: #15121f; --cz-surf: #211c30; --cz-surf2: #2a2440; --cz-line: #352d4d;
-  --cz-tx: #ece9f5; --cz-mut: #9b93b4; --cz-accent: #a855f7;
+  --cz-bg: #efe9e0; --cz-surf: #ffffff; --cz-surf2: #ffffff; --cz-line: #e6ddcf;
+  --cz-tx: #2b2320; --cz-mut: #8a7d72; --cz-accent: #a855f7;
   background: var(--cz-bg); color: var(--cz-tx); border-radius: 0; padding: 0;
   display: grid; grid-template-columns: 340px 1fr; gap: 12px;
   height: calc(100dvh - 150px); min-height: 520px; overflow: hidden;
@@ -565,7 +565,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .cz-enviar { background: linear-gradient(135deg, #a855f7, #ec4899); border: none; color: #fff; width: 46px; border-radius: 12px; font-size: 16px; cursor: pointer; }
 .cz-enviar:disabled { opacity: .5; cursor: default; }
 .cz-mic { background: var(--cz-surf2); border: 1px solid var(--cz-line); color: var(--cz-tx); width: 46px; border-radius: 12px; font-size: 18px; cursor: pointer; }
-.cz-mic:hover { background: #34304a; }
+.cz-mic:hover { background: #f0e9dd; }
 .cz-mic:disabled { opacity: .5; cursor: default; }
 /* Barra de gravação (substitui o composer enquanto grava) */
 .cz-gravando { display: flex; align-items: center; gap: 10px; padding: 12px; border-top: 1px solid var(--cz-line); }
@@ -591,7 +591,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .cz-item-top strong { display: inline-flex; align-items: center; }
 
 /* Botão "Criar grupo" no topo da lista de grupos */
-.cz-criar-grupo { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin: 2px 0 8px; padding: 11px; border: 1px dashed var(--cz-accent); background: #a855f71a; color: #d8b4fe; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.cz-criar-grupo { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin: 2px 0 8px; padding: 11px; border: 1px dashed var(--cz-accent); background: #a855f714; color: #7c3aed; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
 .cz-criar-grupo:hover { background: #a855f72e; }
 
 /* Corpo do grupo (membros + disparos) */
@@ -639,7 +639,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 
 /* A página inteira do Chat usa a cor da conversa (full-bleed sobre o padding do .conteudo). */
 .cz-pagina {
-  background: #15121f; /* cor da conversa */
+  background: #efe9e0; /* cor da conversa (creme) */
   margin: -32px -40px; padding: 24px 40px 32px;
   min-height: calc(100dvh - 64px);
   display: flex; flex-direction: column;
@@ -654,12 +654,12 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   display: inline-flex; align-items: center; justify-content: center; gap: 10px;
 }
 .cz-marca-icone { font-size: 0.8em; line-height: 1; }
-.cz-cabec .campo label { color: #cfc8e6; text-align: center; }
-/* Conversa no tema escuro da marca (igual ao mockup): fundo escuro, balão recebido em superfície escura. */
-.cz-pagina .cz-bolhas { background: #15121f; }
-.cz-pagina .cz-bolha.entrada { background: #241f33; color: #ece9f5; }
-.cz-pagina .cz-bolha.entrada .cz-meta { color: #9b93b4; opacity: 1; }
-.cz-pagina .cz-dia { background: #2a2440; color: #c9c0e6; }
+.cz-cabec .campo label { color: #7d716b; text-align: center; }
+/* Conversa em tema claro (creme): enviado mantém o gradiente; recebido em branco com texto escuro. */
+.cz-pagina .cz-bolhas { background: var(--cz-bg); }
+.cz-pagina .cz-bolha.entrada { background: #ffffff; color: var(--cz-tx); border: 1px solid var(--cz-line); }
+.cz-pagina .cz-bolha.entrada .cz-meta { color: #9b8e85; opacity: 1; }
+.cz-pagina .cz-dia { background: #ffffff; color: var(--cz-mut); border: 1px solid var(--cz-line); }
 
 /* Modo zen: ao abrir uma conversa/grupo, some a barra "Chat Zaieze" e a conversa ocupa a tela toda. */
 .cz-pagina.zen .cz-cabec { display: none; }
@@ -674,13 +674,19 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
     grid-template-columns: repeat(4, 1fr); gap: 6px;
     padding: 7px 10px; background: #15121f; border-top: 1px solid rgba(255, 255, 255, 0.08);
   }
-  .cz-stat { padding: 6px 8px; border-radius: 9px; gap: 1px; }
-  .cz-stat-rot { font-size: 9px; }
-  .cz-stat-val { font-size: 14px; }
-  .cz-meta-anel svg { width: 30px; height: 30px; }
-  .cz-meta-pct { font-size: 10px; }
+  .cz-stat { padding: 6px 7px; border-radius: 9px; gap: 1px; }
+  .cz-stat-rot { font-size: 8.5px; }
+  .cz-stat-val { font-size: 11px; }
+  .cz-meta-anel svg { width: 28px; height: 28px; }
+  .cz-meta-pct { font-size: 9.5px; }
   .cz-marca { font-size: 24px; padding: 12px 26px; }
   .chatz { grid-template-columns: 1fr; height: calc(100dvh - 110px - var(--zz-navh) - var(--zz-strip)); padding: 8px; gap: 8px; }
+
+  /* Dashboard ("Meu desempenho"): cards de KPI compactos e centralizados no celular */
+  .grade-cards { gap: 8px; }
+  .cartao.kpi { padding: 9px 12px; text-align: center; }
+  .kpi .rotulo { font-size: 11px; }
+  .kpi .valor { font-size: 18px; margin-top: 1px; }
   .cz-pagina.zen { padding-top: 8px; }
   .cz-pagina.zen .chatz { height: calc(100dvh - 30px); padding: 6px; }
   .chatz:not(.tem-sel) .cz-conversa { display: none; }

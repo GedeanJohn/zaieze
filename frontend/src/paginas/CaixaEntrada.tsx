@@ -394,7 +394,9 @@ export default function CaixaEntrada() {
                   <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Digite sua mensagem…" />
                   {texto.trim()
                     ? <button className="cz-enviar" disabled={enviando} aria-label="Enviar">{enviando ? '…' : '➤'}</button>
-                    : <button type="button" className="cz-mic" onClick={iniciarGravacao} disabled={enviando} aria-label="Gravar áudio">🎤</button>}
+                    : <button type="button" className="cz-mic" onClick={iniciarGravacao} disabled={enviando} aria-label="Gravar áudio">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>
+                      </button>}
                 </form>
               )}
             </>
@@ -434,7 +436,7 @@ function MetaCard({ pct, cor }: { pct: number | null; cor: string }) {
       <span className="cz-stat-rot">Meta Mês</span>
       <div className="cz-meta-anel">
         <svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
-          <circle cx="20" cy="20" r={r} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="4" />
+          <circle cx="20" cy="20" r={r} fill="none" stroke="rgba(0,0,0,0.12)" strokeWidth="4" />
           <circle
             cx="20" cy="20" r={r} fill="none" stroke={cor} strokeWidth="4" strokeLinecap="round"
             strokeDasharray={circ} strokeDashoffset={off} transform="rotate(-90 20 20)"

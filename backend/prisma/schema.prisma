@@ -224,6 +224,50 @@ model Assinatura {
   @@map("assinaturas")
 }
 
+/// Preço de cada plano (editável pelo SUPER_ADMIN no Painel do Admin, sem deploy).
+/// A classificação de funcionalidades por plano continua no código (FEATURE_MIN_PLANO).
+model ConfigPlano {
+  plano     Plano    @id
+  preco     Decimal  @db.Decimal(12, 2)
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@map("config_planos")
+}
+
+/// Histórico de reajustes de preço (ex.: IGP-M acumulado). Auditoria do admin.
+model ReajusteHistorico {
+  id          String   @id @default(cuid())
+  indice      String // IGP-M
+  percentual  Decimal  @db.Decimal(6, 3) // % aplicado
+  detalhe     Json? // { START: { de, para }, PRO: {...}, ELITE: {...} }
+  aplicadoPor String? // nome/e-mail do admin
+  aplicadoEm  DateTime @default(now())
+
+  @@map("reajustes_historico")
+}
+
+enum TipoPromocao {
+  DIAS_GRATIS // começa a pagar depois de N dias (free trial)
+  PERCENTUAL // % de desconto na mensalidade
+}
+
+/// Código promocional aplicado no checkout (criado pelo SUPER_ADMIN).
+model CodigoPromocional {
+  id          String       @id @default(cuid())
+  codigo      String       @unique
+  tipo        TipoPromocao
+  dias        Int? // DIAS_GRATIS: dias grátis antes da 1ª cobrança
+  percentual  Decimal?     @db.Decimal(5, 2) // PERCENTUAL: % de desconto na mensalidade
+  descricao   String?
+  validadeAte DateTime? // último dia em que pode ser usado (null = sem prazo)
+  maxUsos     Int? // limite de usos (null = ilimitado)
+  usos        Int          @default(0)
+  ativo       Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+
+  @@map("codigos_promocionais")
+}
+
 model Loja {
   id              String   @id @default(cuid())
   redeId          String

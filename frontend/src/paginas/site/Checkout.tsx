@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, formataReal, mensagemDeErro, type Plano } from '../../api'
 
-const PRECO: Record<Plano, number> = { START: 97, PRO: 297, ELITE: 697 }
 const NOME: Record<Plano, string> = { START: 'Start', PRO: 'Pro', ELITE: 'Elite' }
+
+interface PlanoInfo { plano: Plano; nome: string; preco: number }
+interface PromoInfo { valido: boolean; beneficio?: string; tipo?: 'DIAS_GRATIS' | 'PERCENTUAL'; dias?: number | null; percentual?: string | null }
 
 export default function Checkout() {
   const [params] = useSearchParams()
@@ -12,21 +14,34 @@ export default function Checkout() {
 
   const [form, setForm] = useState({ redeNome: '', slug: '', gestorNome: '', email: '', senha: '' })
   const [dominio, setDominio] = useState('zaieze.com')
+  const [planos, setPlanos] = useState<PlanoInfo[]>([])
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checando' | 'ok' | 'indisponivel'>('idle')
+  const [codigoPromo, setCodigoPromo] = useState('')
+  const [promo, setPromo] = useState<PromoInfo | null>(null)
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
 
   useEffect(() => {
-    api.get('/assinaturas/planos').then(({ data }) => setDominio(data.dominioBase)).catch(() => {})
+    api.get('/assinaturas/planos').then(({ data }) => { setDominio(data.dominioBase); setPlanos(data.planos) }).catch(() => {})
   }, [])
 
-  // sugere o slug a partir do nome da loja
+  const info = planos.find((p) => p.plano === plano)
+  const preco = info?.preco ?? 0
+  const nome = info?.nome ?? NOME[plano]
+
+  // valor exibido considerando o código promocional
+  const precoComDesc = useMemo(() => {
+    if (promo?.valido && promo.tipo === 'PERCENTUAL' && promo.percentual) {
+      return Math.round(preco * (1 - Number(promo.percentual) / 100) * 100) / 100
+    }
+    return preco
+  }, [promo, preco])
+
   function onNomeRede(v: string) {
     const sugestao = v.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
     setForm((f) => ({ ...f, redeNome: v, slug: f.slug || sugestao }))
   }
 
-  // verifica disponibilidade do slug (debounce simples)
   useEffect(() => {
     const s = form.slug
     if (!s || s.length < 3) { setSlugStatus('idle'); return }
@@ -40,6 +55,19 @@ export default function Checkout() {
     return () => clearTimeout(t)
   }, [form.slug])
 
+  // valida o código promocional (debounce)
+  useEffect(() => {
+    const c = codigoPromo.trim()
+    if (!c) { setPromo(null); return }
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await api.get('/assinaturas/codigo-promo', { params: { codigo: c } })
+        setPromo(data)
+      } catch { setPromo({ valido: false }) }
+    }, 400)
+    return () => clearTimeout(t)
+  }, [codigoPromo])
+
   const podeEnviar = useMemo(
     () => form.redeNome && form.slug.length >= 3 && form.gestorNome && form.email && form.senha.length >= 6 && slugStatus !== 'indisponivel',
     [form, slugStatus],
@@ -47,15 +75,14 @@ export default function Checkout() {
 
   async function assinar(e: React.FormEvent) {
     e.preventDefault()
-    setErro('')
-    setEnviando(true)
+    setErro(''); setEnviando(true)
     try {
-      const { data } = await api.post('/assinaturas/checkout', { plano, ...form, slug: form.slug.toLowerCase() })
-      if (data.simulado) {
-        navigate(`/sucesso?slug=${data.slug}&plano=${plano}&simulado=1`)
-      } else if (data.initPoint) {
-        window.location.href = data.initPoint // redireciona ao Mercado Pago
-      }
+      const { data } = await api.post('/assinaturas/checkout', {
+        plano, ...form, slug: form.slug.toLowerCase(),
+        codigoPromo: codigoPromo.trim() || undefined,
+      })
+      if (data.simulado) navigate(`/sucesso?slug=${data.slug}&plano=${plano}&simulado=1`)
+      else if (data.initPoint) window.location.href = data.initPoint
     } catch (err) {
       setErro(mensagemDeErro(err))
     } finally {
@@ -68,8 +95,15 @@ export default function Checkout() {
       <Link to="/" className="voltar">← Voltar</Link>
       <div className="checkout-card">
         <div className="checkout-resumo">
-          <h2>Plano {NOME[plano]}</h2>
-          <div className="preco">{formataReal(PRECO[plano])}<span>/mês</span></div>
+          <h2>Plano {nome}</h2>
+          <div className="preco">
+            {promo?.valido && promo.tipo === 'PERCENTUAL'
+              ? <><s style={{ opacity: .55, fontSize: '0.6em' }}>{formataReal(preco)}</s> {formataReal(precoComDesc)}<span>/mês</span></>
+              : <>{formataReal(preco)}<span>/mês</span></>}
+          </div>
+          {promo?.valido && promo.tipo === 'DIAS_GRATIS' && (
+            <p style={{ color: '#22c55e', fontWeight: 600 }}>🎁 {promo.dias} dias grátis — comece a pagar depois</p>
+          )}
           <p>Lojas e vendedoras ilimitadas. Cobrança recorrente mensal via Mercado Pago. Cancele quando quiser.</p>
         </div>
 
@@ -109,6 +143,16 @@ export default function Checkout() {
           <div className="campo">
             <label>Senha (mín. 6 caracteres)*</label>
             <input type="password" value={form.senha} onChange={(e) => setForm({ ...form, senha: e.target.value })} required />
+          </div>
+
+          <div className="campo">
+            <label>Código promocional (opcional)</label>
+            <input value={codigoPromo} onChange={(e) => setCodigoPromo(e.target.value.toUpperCase())} placeholder="Tem um cupom?" />
+            {codigoPromo.trim() && promo && (
+              promo.valido
+                ? <small className="dica ok">✓ {promo.beneficio}</small>
+                : <small className="dica erro">Código inválido ou expirado</small>
+            )}
           </div>
 
           <button className="btn grande" style={{ width: '100%' }} disabled={!podeEnviar || enviando}>

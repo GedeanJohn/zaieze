@@ -27,10 +27,11 @@ export function planoInclui(plano: Plano, feature: Feature): boolean {
  * Catálogo dos planos para a tela de upgrade.
  * Lojas e vendedoras são ILIMITADAS em todos os planos — a diferenciação é por funcionalidade.
  */
-export const PLANOS = [
-  { plano: 'START' as Plano, nome: 'Start', preco: 97, limite: 'Lojas e vendedoras ilimitadas', resumo: 'Operação completa + WhatsApp + funil de vendas, atacado e operação em rede' },
-  { plano: 'PRO' as Plano, nome: 'Pro', preco: 297, limite: 'Lojas e vendedoras ilimitadas', resumo: 'Tudo do Start + carteira inteligente e comissão/ranking' },
-  { plano: 'ELITE' as Plano, nome: 'Elite', preco: 697, limite: 'Lojas e vendedoras ilimitadas', resumo: 'Tudo do Pro + Radar, estoque inteligente, IA avançada e Portal do Cliente' },
+// Metadados dos planos (preço vem do banco — ver planos.service.precosDosPlanos).
+export const PLANOS_META = [
+  { plano: 'START' as Plano, nome: 'Start', limite: 'Lojas e vendedoras ilimitadas', resumo: 'Operação completa + WhatsApp + funil de vendas, atacado e operação em rede' },
+  { plano: 'PRO' as Plano, nome: 'Pro', limite: 'Lojas e vendedoras ilimitadas', resumo: 'Tudo do Start + carteira inteligente e comissão/ranking' },
+  { plano: 'ELITE' as Plano, nome: 'Elite', limite: 'Lojas e vendedoras ilimitadas', resumo: 'Tudo do Pro + Radar, estoque inteligente, IA avançada e Portal do Cliente' },
 ]
 
 /**

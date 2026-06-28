@@ -1,12 +1,6 @@
 import type { Plano } from '@prisma/client'
 import { env } from '../../env'
 
-const PRECO_PLANO: Record<Plano, number> = { START: 97, PRO: 297, ELITE: 697 }
-
-export function valorDoPlano(plano: Plano): number {
-  return PRECO_PLANO[plano]
-}
-
 /** Sem token configurado, o checkout opera em modo simulado (igual Evolution/Claude no projeto). */
 export function mpConfigurado(): boolean {
   return Boolean(env.MERCADOPAGO_ACCESS_TOKEN)
@@ -27,6 +21,7 @@ export async function criarPreapproval(opts: {
   email: string
   redeSlug: string
   backUrl: string
+  diasGratis?: number // free trial: 1ª cobrança só depois de N dias
 }): Promise<PreapprovalResult> {
   const resp = await fetch('https://api.mercadopago.com/preapproval', {
     method: 'POST',
@@ -47,6 +42,10 @@ export async function criarPreapproval(opts: {
         frequency_type: 'months',
         transaction_amount: opts.valor,
         currency_id: 'BRL',
+        // Dias grátis (ex.: "comece a pagar daqui a 90 dias") via código promocional.
+        ...(opts.diasGratis && opts.diasGratis > 0
+          ? { free_trial: { frequency: opts.diasGratis, frequency_type: 'days' } }
+          : {}),
       },
       status: 'pending',
     }),

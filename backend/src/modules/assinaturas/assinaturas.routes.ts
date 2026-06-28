@@ -4,11 +4,14 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
 import { redeIdDe } from '../../plugins/auth'
-import { PLANOS } from '../../plugins/planos'
-import { consultarPreapproval, criarPreapproval, mpConfigurado, valorDoPlano } from './mercadopago.service'
+import { consultarPreapproval, criarPreapproval, mpConfigurado } from './mercadopago.service'
 import { confirmarCiclo, proximoCicloFim, reativarAssinatura, solicitarCancelamento } from './assinatura.service'
+import { listarPlanos, precoDoPlano } from '../planos/planos.service'
+import { consumirCodigo, descricaoBeneficio, validarCodigo } from '../promo/promo.service'
 import { CONTRATO_VERSAO } from '../contrato/contrato.template'
 import { temAceiteVigente } from '../contrato/contrato.service'
+
+const arred2 = (n: number) => Math.round(n * 100) / 100
 
 const checkoutSchema = z.object({
   plano: z.enum(['START', 'PRO', 'ELITE']),
@@ -17,6 +20,7 @@ const checkoutSchema = z.object({
   gestorNome: z.string().min(2),
   email: z.string().email(),
   senha: z.string().min(6),
+  codigoPromo: z.string().optional(),
 })
 
 // Subdomínios que não podem virar slug de tenant (colidem com o SaaS)
@@ -29,7 +33,15 @@ function urlTenant(slug: string): string {
 /** Billing SaaS — checkout público (landing) + webhook do Mercado Pago + provisionamento do tenant. */
 export async function assinaturasRoutes(app: FastifyInstance) {
   // Catálogo público de planos (consumido pela landing) — sem autenticação
-  app.get('/planos', async () => ({ planos: PLANOS, dominioBase: env.DOMINIO_BASE }))
+  app.get('/planos', async () => ({ planos: await listarPlanos(), dominioBase: env.DOMINIO_BASE }))
+
+  // Validação pública de código promocional (landing mostra o benefício antes do checkout)
+  app.get('/codigo-promo', async (request) => {
+    const { codigo } = request.query as { codigo?: string }
+    const c = await validarCodigo(codigo)
+    if (!c) return { valido: false }
+    return { valido: true, beneficio: descricaoBeneficio(c), tipo: c.tipo, dias: c.dias, percentual: c.percentual }
+  })
 
   // Verifica disponibilidade do endereço (slug) — usado pela landing em tempo real
   app.get('/slug-disponivel', async (request) => {
@@ -56,9 +68,25 @@ export async function assinaturasRoutes(app: FastifyInstance) {
       return reply.code(409).send({ erro: 'Já existe uma conta com este e-mail.' })
     }
 
-    const valor = valorDoPlano(body.plano)
+    // Código promocional (opcional): % de desconto na mensalidade ou dias grátis.
+    const promo = await validarCodigo(body.codigoPromo)
+    if (body.codigoPromo && body.codigoPromo.trim() && !promo) {
+      return reply.code(422).send({ erro: 'Código promocional inválido ou expirado.' })
+    }
+    let valor = await precoDoPlano(body.plano)
+    if (promo?.tipo === 'PERCENTUAL' && promo.percentual) {
+      valor = arred2(valor * (1 - Number(promo.percentual) / 100))
+    }
+    const diasGratis = promo?.tipo === 'DIAS_GRATIS' ? promo.dias ?? 0 : 0
+
     const senhaHash = await bcrypt.hash(body.senha, 10)
     const simulada = !mpConfigurado()
+
+    // Início do 1º ciclo: com dias grátis, o acesso vai até now+dias (depois cobra).
+    const inicioCiclo = () => {
+      if (!diasGratis) return proximoCicloFim()
+      const d = new Date(); d.setDate(d.getDate() + diasGratis); return d
+    }
 
     // Provisiona o tenant. Em modo simulado já nasce ATIVO; em modo real fica inativo
     // até o webhook de pagamento aprovado liberar o acesso.
@@ -82,14 +110,15 @@ export async function assinaturasRoutes(app: FastifyInstance) {
         data: {
           redeId: r.id, plano: body.plano, valor, simulada,
           status: simulada ? 'ATIVA' : 'PENDENTE',
-          // simulado já entra com ciclo de 1 mês; no modo real o ciclo começa no webhook aprovado
-          cicloFimEm: simulada ? proximoCicloFim() : null,
+          // simulado já entra com ciclo (dias grátis ou 1 mês); no modo real o ciclo começa no webhook
+          cicloFimEm: simulada ? inicioCiclo() : null,
         },
       })
       return r
     })
 
     if (simulada) {
+      if (promo) await consumirCodigo(promo.id)
       return reply.code(201).send({
         simulado: true,
         plano: body.plano,
@@ -107,8 +136,10 @@ export async function assinaturasRoutes(app: FastifyInstance) {
         email,
         redeSlug: slug,
         backUrl: `${urlTenant(slug)}/login`,
+        diasGratis,
       })
       await prisma.assinatura.update({ where: { redeId: rede.id }, data: { mpPreapprovalId: pre.id } })
+      if (promo) await consumirCodigo(promo.id)
       return reply.code(201).send({ simulado: false, plano: body.plano, slug, initPoint: pre.initPoint })
     } catch (e) {
       // Desfaz o provisionamento se o Mercado Pago falhar
@@ -175,11 +206,12 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     if (!assinatura) return reply.code(404).send({ erro: 'Rede sem assinatura' })
     if (assinatura.plano === plano) return reply.code(422).send({ erro: 'A rede já está neste plano.' })
 
+    const valor = await precoDoPlano(plano)
     await prisma.$transaction([
       prisma.assinatura.update({
         where: { redeId },
         data: {
-          plano, valor: valorDoPlano(plano), status: 'ATIVA',
+          plano, valor, status: 'ATIVA',
           // trocar de plano reengaja: cancela um cancelamento agendado e garante ciclo vigente
           cancelamentoSolicitadoEm: null, cancelamentoOrigem: null,
           cicloFimEm: assinatura.cicloFimEm ?? proximoCicloFim(),
@@ -221,7 +253,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     }
 
     const plano = rede.assinatura.plano
-    const valor = valorDoPlano(plano)
+    const valor = await precoDoPlano(plano)
 
     // Modo simulado: reativa direto (equivale ao webhook de pagamento aprovado).
     if (!mpConfigurado()) {

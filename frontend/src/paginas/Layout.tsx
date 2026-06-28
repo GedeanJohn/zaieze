@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
   Megaphone, Package, Tag, Layers, Boxes, UsersRound,
-  Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Search,
+  Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Search, Wrench,
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
 
@@ -44,6 +44,7 @@ export default function Layout() {
   const podeEstoque = role !== 'VENDEDORA' && role !== 'CLIENTE'
   const podeEquipe = role === 'GESTOR' || role === 'GERENTE' || role === 'SUPER_ADMIN'
   const ehDonoRede = role === 'GESTOR' || role === 'SUPER_ADMIN'
+  const ehAdmin = role === 'SUPER_ADMIN'
   // Pedidos a separar: gestor de estoque (separa) + gerente/gestor/admin (acompanham e cobram)
   const podeSeparacao = role === 'ESTOQUISTA' || role === 'GERENTE' || role === 'GESTOR' || role === 'SUPER_ADMIN'
   const cls = ({ isActive }: { isActive: boolean }) => (isActive ? 'ativo' : '')
@@ -98,6 +99,7 @@ export default function Layout() {
         {ehDonoRede && <NavLink to="/manual" className={cls}><BookOpen {...ICON} /><span>Manual</span></NavLink>}
         {ehDonoRede && <NavLink to="/planos" className={cls}><CreditCard {...ICON} /><span>Planos</span></NavLink>}
         {ehDonoRede && <NavLink to="/contrato" className={cls}><FileText {...ICON} /><span>Contrato</span></NavLink>}
+        {ehAdmin && <NavLink to="/admin" className={cls}><Wrench {...ICON} /><span>Admin</span></NavLink>}
         <NavLink to="/conta" className={cls}><UserCog {...ICON} /><span>Minha conta</span></NavLink>
         </nav>
         <div className="rodape">

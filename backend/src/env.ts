@@ -14,10 +14,12 @@ const envSchema = z.object({
   HOST: z.string().default('0.0.0.0'),
   CORS_ORIGIN: z.string().default('http://localhost:5184'),
   // Integrações opcionais — quando ausentes, o sistema opera em modo simulado
-  EVOLUTION_API_URL: z.string().url().optional(),
-  EVOLUTION_API_KEY: z.string().optional(),
-  // URL que o Evolution chama de volta (webhook). Default: serviço interno da rede Docker.
-  EVOLUTION_WEBHOOK_URL: z.string().url().default('http://api:3050/api/whatsapp/webhook/evolution'),
+  // WhatsApp Cloud API (oficial da Meta). As credenciais por marca ficam na Rede (Rede.wa*);
+  // aqui só ficam os parâmetros globais. Sem credenciais na rede → envio em modo SIMULADO.
+  META_API_VERSION: z.string().default('v21.0'),
+  // Chave para criptografar o token permanente da WABA em repouso (AES-256-GCM).
+  // Obrigatória para SALVAR um token; ausente → o /whatsapp/config recusa gravar token.
+  WA_TOKEN_SECRET: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   // Mercado Pago (Assinaturas/preapproval) — sem token o checkout opera em modo simulado
   MERCADOPAGO_ACCESS_TOKEN: z.string().optional(),

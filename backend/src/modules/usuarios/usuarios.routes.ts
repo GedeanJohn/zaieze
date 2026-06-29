@@ -31,7 +31,7 @@ const atualizarUsuarioSchema = criarUsuarioSchema.partial().extend({
 const selecaoPublica = {
   id: true, nome: true, email: true, role: true, telefone: true, fotoUrl: true,
   slugCatalogo: true, metaMensal: true, comissaoPadrao: true, ativo: true, createdAt: true,
-  waNumero: true, waConectado: true,
+  waNumero: true,
   equipe: { select: { id: true, nome: true } },
 } as const
 
@@ -174,7 +174,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
       where: { id },
       data: {
         nome: body.nome, email, senhaHash: await bcrypt.hash(body.senha, 10),
-        waInstancia: null, waConectado: false, waQrcode: null, ativo: true,
+        ativo: true,
       },
       select: selecaoPublica,
     })

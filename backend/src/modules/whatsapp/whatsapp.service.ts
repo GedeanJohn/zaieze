@@ -1,5 +1,4 @@
-import type { StatusMensagem } from '@prisma/client'
-import { env } from '../../env'
+import { enviarTexto, type EnvioResultado, type RedeWA } from './meta.service'
 
 export interface DadosTemplate {
   nome: string
@@ -28,44 +27,21 @@ export function aplicarTemplate(template: string, d: DadosTemplate): string {
 }
 
 /**
- * Envia uma mensagem via Evolution API (uma instância por vendedora).
- * Sem EVOLUTION_API_URL/instância configurada → modo SIMULADO (registra mas não envia).
+ * Envia uma mensagem de TEXTO pelo número OFICIAL da marca (WhatsApp Cloud API).
+ * Sem a marca configurada (Rede.wa*) → modo SIMULADO (registra mas não envia).
+ *
+ * Atenção à janela de 24h: a Meta só aceita texto livre até 24h após a última mensagem
+ * RECEBIDA do cliente. Fora da janela, o envio falha na Meta — use template (Fase 2).
+ * O chamador (chat) valida a janela antes; campanhas migram para template na Fase 2.
  */
-export async function enviarWhatsapp(opts: { instancia?: string | null; telefone: string; texto: string }): Promise<StatusMensagem> {
-  if (!env.EVOLUTION_API_URL || !opts.instancia) return 'SIMULADA'
-  try {
-    const resp = await fetch(`${env.EVOLUTION_API_URL}/message/sendText/${opts.instancia}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(env.EVOLUTION_API_KEY ? { apikey: env.EVOLUTION_API_KEY } : {}),
-      },
-      body: JSON.stringify({ number: opts.telefone, text: opts.texto }),
-    })
-    return resp.ok ? 'ENVIADA' : 'FALHA'
-  } catch {
-    return 'FALHA'
-  }
+export async function enviarWhatsapp(opts: { rede: RedeWA; telefone: string; texto: string }): Promise<EnvioResultado> {
+  return enviarTexto({ rede: opts.rede, telefone: opts.telefone, texto: opts.texto })
 }
 
 /**
- * Envia uma mensagem de voz (PTT) via Evolution API. `audioUrl` deve ser uma URL pública
- * de um arquivo OGG/Opus. Sem provedor configurado → SIMULADA (registra mas não envia).
- * NOTA: na migração para a WhatsApp Cloud API este envio será re-feito (upload de mídia + tipo audio).
+ * Mensagem de voz (PTT) — na Cloud API exige upload de mídia + tipo audio (Fase 3).
+ * Por ora registra como SIMULADA (não envia o áudio de verdade).
  */
-export async function enviarWhatsappAudio(opts: { instancia?: string | null; telefone: string; audioUrl: string }): Promise<StatusMensagem> {
-  if (!env.EVOLUTION_API_URL || !opts.instancia) return 'SIMULADA'
-  try {
-    const resp = await fetch(`${env.EVOLUTION_API_URL}/message/sendWhatsAppAudio/${opts.instancia}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(env.EVOLUTION_API_KEY ? { apikey: env.EVOLUTION_API_KEY } : {}),
-      },
-      body: JSON.stringify({ number: opts.telefone, audio: opts.audioUrl }),
-    })
-    return resp.ok ? 'ENVIADA' : 'FALHA'
-  } catch {
-    return 'FALHA'
-  }
+export async function enviarWhatsappAudio(_opts: { rede: RedeWA; telefone: string; audioUrl: string }): Promise<EnvioResultado> {
+  return { status: 'SIMULADA' }
 }

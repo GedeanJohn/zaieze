@@ -42,13 +42,15 @@ export async function dispararParaClientes(opts: {
 }): Promise<ResultadoDisparo> {
   const loja = await prisma.loja.findUniqueOrThrow({
     where: { id: opts.lojaId },
-    select: { nome: true, redeId: true, rede: { select: { slug: true, plano: true } } },
+    select: { nome: true, redeId: true, rede: { select: { slug: true, plano: true, waPhoneNumberId: true, waTokenCifrado: true } } },
   })
+  // Número oficial da marca (Cloud API). Sem config → envio SIMULADO.
+  const redeWA = { waPhoneNumberId: loja.rede.waPhoneNumberId, waTokenCifrado: loja.rede.waTokenCifrado }
   const res: ResultadoDisparo = { alcance: opts.clientes.length, enviados: 0, simulados: 0, falhas: 0, semConsentimento: 0, semVendedora: 0 }
 
   const ids = [...new Set(opts.clientes.map((c) => c.vendedoraId ?? opts.vendedoraFallbackId).filter((v): v is string => !!v))]
   const vendedoras = new Map(
-    (await prisma.usuario.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, waInstancia: true, slugCatalogo: true } })).map((v) => [v.id, v]),
+    (await prisma.usuario.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, slugCatalogo: true } })).map((v) => [v.id, v]),
   )
 
   // Link do catálogo de cada vendedora (Portal do Cliente). Só existe se o plano da marca inclui o portal.
@@ -86,7 +88,10 @@ export async function dispararParaClientes(opts: {
     })
     // Garante que o link da vendedora vá na mensagem mesmo quando o template não usa {link}.
     if (link && !opts.template.includes('{link}')) texto = `${texto}\n\n👉 Veja o catálogo: ${link}`
-    const status = await enviarWhatsapp({ instancia: vend.waInstancia, telefone: c.telefone, texto })
+    // Fase 1: envio por texto (Cloud API). Campanhas estão fora da janela de 24h → a Meta só
+    // entregará via TEMPLATE aprovado (Fase 2); até lá, sem config = SIMULADA, com config = FALHA.
+    const r = await enviarWhatsapp({ rede: redeWA, telefone: c.telefone, texto })
+    const status = r.status
 
     await prisma.mensagemWhatsapp.create({
       data: {
@@ -100,6 +105,7 @@ export async function dispararParaClientes(opts: {
         origem: opts.origem,
         telefone: c.telefone,
         texto,
+        waMessageId: r.waMessageId ?? null,
       },
     })
 

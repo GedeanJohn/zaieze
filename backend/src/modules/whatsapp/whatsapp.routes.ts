@@ -1,59 +1,55 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import type { Prisma } from '@prisma/client'
+import type { Prisma, StatusMensagem } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
-import { lojaIdDe } from '../../plugins/auth'
+import { env } from '../../env'
+import { lojaIdDe, redeIdDe } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
 import { enviarWhatsapp, enviarWhatsappAudio } from './whatsapp.service'
+import { metaConfigurado, cifrar, decifrar, podeCifrar, verificarNumero, enviarTexto } from './meta.service'
 import { marcarLeadAtendido, garantirCicloAberto } from '../leads/leads.service'
-import { evolutionConfigurado, criarInstancia, conectarInstancia, estadoInstancia, desconectarInstancia } from './evolution.service'
 import { transcodificarAudioOpus, salvarUploadLocal } from '../midia/midia.routes'
 import { enviarParaR2 } from '../midia/r2.service'
 
-const instanciaSchema = z.object({
-  vendedoraId: z.string().optional(), // gerente configura a instância de uma vendedora
-  instancia: z.string().min(1),
-  numero: z.string().min(8),
-})
+const JANELA_MS = 24 * 60 * 60 * 1000
 
-const webhookSchema = z.object({
-  telefone: z.string().optional(),
-  numero: z.string().optional(),
-  texto: z.string().min(1),
-  instancia: z.string().optional(),
-})
+/** Config da WABA (número por marca) selecionada da Rede. */
+type RedeConfig = {
+  id: string
+  waPhoneNumberId: string | null
+  waTokenCifrado: string | null
+}
+
+const selectRedeConfig = { id: true, waPhoneNumberId: true, waTokenCifrado: true } as const
+
+async function redeDaLoja(lojaId: string): Promise<RedeConfig | null> {
+  const loja = await prisma.loja.findUnique({ where: { id: lojaId }, select: { rede: { select: selectRedeConfig } } })
+  return loja?.rede ?? null
+}
+
+/** true se ainda dá para enviar texto livre (≤24h da última mensagem recebida do cliente). */
+function dentroDaJanela(ultimaEntradaEm: Date | null | undefined): boolean {
+  return !!ultimaEntradaEm && Date.now() - ultimaEntradaEm.getTime() < JANELA_MS
+}
 
 /**
- * Roteia uma mensagem RECEBIDA para a vendedora dona do cliente (ou cria o cliente na
- * carteira da vendedora dona da instância que recebeu). Garante um ciclo aberto e loga.
- * Reusado pelo webhook normalizado e pelo webhook real do Evolution.
+ * Roteia uma mensagem RECEBIDA para a vendedora dona do cliente. Atualiza a janela de 24h
+ * (waUltimaEntradaEm), garante um ciclo aberto e registra a mensagem.
+ * Com número por marca não há mais auto-criação por instância: se o cliente não existe na
+ * rede (ou está sem vendedora), a mensagem fica sem roteamento (roteado:false).
  */
-async function rotearMensagemRecebida(params: { numero: string; texto: string; instancia?: string | null; nome?: string | null }) {
+async function rotearMensagemRecebida(params: { numero: string; texto: string; redeId?: string | null; nome?: string | null }) {
   const numero = params.numero.replace(/\D/g, '')
   if (!numero) return { roteado: false }
 
-  let cliente = await prisma.cliente.findFirst({
-    where: { telefone: numero },
+  const cliente = await prisma.cliente.findFirst({
+    where: { telefone: numero, ...(params.redeId ? { loja: { redeId: params.redeId } } : {}) },
     select: { id: true, lojaId: true, vendedoraId: true, loja: { select: { redeId: true } } },
   })
-
-  if (!cliente && params.instancia) {
-    const vend = await prisma.usuario.findFirst({
-      where: { waInstancia: params.instancia, role: 'VENDEDORA', ativo: true },
-      select: { id: true, lojaId: true },
-    })
-    if (vend?.lojaId) {
-      cliente = await prisma.cliente.create({
-        data: {
-          lojaId: vend.lojaId, telefone: numero, nome: params.nome?.trim() || 'Cliente do WhatsApp',
-          vendedoraId: vend.id, consentimentoLgpd: true, observacoes: 'Entrou pelo WhatsApp',
-        },
-        select: { id: true, lojaId: true, vendedoraId: true, loja: { select: { redeId: true } } },
-      })
-    }
-  }
-
   if (!cliente || !cliente.vendedoraId) return { roteado: false }
+
+  // Janela de 24h: marca o instante da última entrada do cliente.
+  await prisma.cliente.update({ where: { id: cliente.id }, data: { waUltimaEntradaEm: new Date() } })
 
   const ciclo = await garantirCicloAberto({
     lojaId: cliente.lojaId, vendedoraId: cliente.vendedoraId, redeId: cliente.loja.redeId,
@@ -68,94 +64,115 @@ async function rotearMensagemRecebida(params: { numero: string; texto: string; i
   return { roteado: true, mensagemId: msg.id, novoLead: ciclo.novo }
 }
 
-/** Extrai o texto de um payload de mensagem do WhatsApp (vários formatos do Baileys). */
-function textoDaMensagem(m: Record<string, unknown> | undefined): string {
-  if (!m) return ''
-  const ext = m.extendedTextMessage as { text?: string } | undefined
-  const img = m.imageMessage as { caption?: string } | undefined
-  const vid = m.videoMessage as { caption?: string } | undefined
-  return (m.conversation as string) || ext?.text || img?.caption || vid?.caption || '[mídia]'
+/** Extrai um texto exibível de uma mensagem da Cloud API (vários tipos). */
+function textoMeta(m: Record<string, any>): string {
+  switch (m.type) {
+    case 'text': return m.text?.body ?? ''
+    case 'image': return m.image?.caption ?? '[imagem]'
+    case 'video': return m.video?.caption ?? '[vídeo]'
+    case 'audio': return '[áudio]'
+    case 'document': return m.document?.filename ?? '[documento]'
+    case 'sticker': return '[figurinha]'
+    case 'button': return m.button?.text ?? ''
+    case 'interactive': return m.interactive?.button_reply?.title ?? m.interactive?.list_reply?.title ?? '[interação]'
+    default: return `[${m.type ?? 'mensagem'}]`
+  }
 }
 
+const STATUS_META: Record<string, StatusMensagem> = {
+  sent: 'ENVIADA', delivered: 'ENTREGUE', read: 'LIDA', failed: 'FALHA',
+}
+
+const configSchema = z.object({
+  waPhoneNumberId: z.string().min(1),
+  waWabaId: z.string().optional(),
+  waNumeroExibicao: z.string().optional(),
+  token: z.string().optional(), // token permanente (System User); só vem quando muda
+  waVerifyToken: z.string().min(6),
+  waAppSecret: z.string().optional(),
+})
+
 export async function whatsappRoutes(app: FastifyInstance) {
-  // Conecta a instância/número de WhatsApp da vendedora (mock; Evolution real via env)
-  app.post('/instancia', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
-    const lojaId = await lojaIdDe(request)
-    const b = instanciaSchema.parse(request.body)
-    const alvoId = request.user.role === 'VENDEDORA' ? request.user.sub : b.vendedoraId
-    if (!alvoId) return reply.code(422).send({ erro: 'Informe a vendedora' })
+  // ─────────── Configuração da WABA (número oficial por marca) — GESTOR ───────────
 
-    const vend = await prisma.usuario.findFirst({ where: { id: alvoId, lojaId, role: { in: ['VENDEDORA', 'GERENTE'] } } })
-    if (!vend) return reply.code(422).send({ erro: 'Vendedora inválida para esta loja' })
-
-    return prisma.usuario.update({
-      where: { id: alvoId },
-      data: { waInstancia: b.instancia, waNumero: b.numero, waConectado: true },
-      select: { id: true, nome: true, waInstancia: true, waNumero: true, waConectado: true },
+  // Lê a config atual (sem expor o token). Inclui a URL do webhook a configurar na Meta.
+  app.get('/config', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request) => {
+    const redeId = redeIdDe(request)
+    const r = await prisma.rede.findUniqueOrThrow({
+      where: { id: redeId },
+      select: {
+        slug: true, waPhoneNumberId: true, waWabaId: true, waNumeroExibicao: true,
+        waVerifyToken: true, waAppSecret: true, waTokenCifrado: true, waConectado: true, waConectadoEm: true,
+      },
     })
-  })
-
-  // ─────────── Conexão real via Evolution (QR) ───────────
-  // Cria/conecta a instância do usuário e dispara o QR (entregue pelo webhook QRCODE_UPDATED).
-  app.post('/instancia/conectar', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
-    const lojaId = await lojaIdDe(request)
-    const { vendedoraId } = z.object({ vendedoraId: z.string().optional() }).parse(request.body ?? {})
-    const alvoId = request.user.role === 'VENDEDORA' ? request.user.sub : vendedoraId
-    if (!alvoId) return reply.code(422).send({ erro: 'Informe a vendedora' })
-    const vend = await prisma.usuario.findFirst({ where: { id: alvoId, lojaId, role: { in: ['VENDEDORA', 'GERENTE'] } }, select: { id: true, waInstancia: true } })
-    if (!vend) return reply.code(422).send({ erro: 'Vendedora inválida para esta loja' })
-    if (!evolutionConfigurado()) return reply.code(503).send({ erro: 'WhatsApp não configurado no servidor (Evolution).' })
-
-    const instancia = vend.waInstancia ?? `vend_${vend.id}`
-    await prisma.usuario.update({ where: { id: vend.id }, data: { waInstancia: instancia, waConectado: false, waQrcode: null } })
-    await criarInstancia(instancia)
-    // O QR já vem na resposta do connect (e o webhook também o atualiza). Guardamos de imediato.
-    const qrcode = await conectarInstancia(instancia)
-    if (qrcode) await prisma.usuario.update({ where: { id: vend.id }, data: { waQrcode: qrcode } })
-    return { instancia, status: 'aguardando_qr', qrcode: qrcode ?? null }
-  })
-
-  // Trocar número / desconectar: faz logout do número atual e zera o estado, para
-  // reconectar em seguida (a vendedora clica "Conectar" e escaneia o novo número).
-  app.post('/instancia/desconectar', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
-    const lojaId = await lojaIdDe(request)
-    const { vendedoraId } = z.object({ vendedoraId: z.string().optional() }).parse(request.body ?? {})
-    const alvoId = request.user.role === 'VENDEDORA' ? request.user.sub : vendedoraId
-    if (!alvoId) return reply.code(422).send({ erro: 'Informe a vendedora' })
-    const vend = await prisma.usuario.findFirst({ where: { id: alvoId, lojaId, role: { in: ['VENDEDORA', 'GERENTE'] } }, select: { id: true, waInstancia: true } })
-    if (!vend) return reply.code(422).send({ erro: 'Vendedora inválida para esta loja' })
-    if (vend.waInstancia && evolutionConfigurado()) await desconectarInstancia(vend.waInstancia)
-    await prisma.usuario.update({ where: { id: vend.id }, data: { waConectado: false, waNumero: null, waQrcode: null } })
-    return { ok: true }
-  })
-
-  // Status da conexão + QR (a vendedora faz polling enquanto escaneia).
-  app.get('/instancia/status', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request) => {
-    const lojaId = await lojaIdDe(request)
-    const { vendedoraId } = request.query as { vendedoraId?: string }
-    const alvoId = request.user.role === 'VENDEDORA' ? request.user.sub : (vendedoraId ?? request.user.sub)
-    const vend = await prisma.usuario.findFirst({ where: { id: alvoId, lojaId }, select: { id: true, waInstancia: true, waNumero: true, waConectado: true, waQrcode: true } })
-    if (!vend) return { conectado: false, qrcode: null, estado: 'close' }
-
-    let estado = 'close'
-    if (vend.waInstancia && evolutionConfigurado()) {
-      estado = await estadoInstancia(vend.waInstancia)
-      if (estado === 'open' && !vend.waConectado) {
-        await prisma.usuario.update({ where: { id: vend.id }, data: { waConectado: true, waQrcode: null } })
-        vend.waConectado = true; vend.waQrcode = null
-      }
+    return {
+      waPhoneNumberId: r.waPhoneNumberId,
+      waWabaId: r.waWabaId,
+      waNumeroExibicao: r.waNumeroExibicao,
+      waVerifyToken: r.waVerifyToken,
+      temToken: !!r.waTokenCifrado,
+      temAppSecret: !!r.waAppSecret,
+      conectado: r.waConectado,
+      conectadoEm: r.waConectadoEm,
+      webhookUrl: `${env.TENANT_SCHEME}://${r.slug}.${env.DOMINIO_BASE}/api/whatsapp/webhook/${r.slug}`,
+      servidorPodeCifrar: podeCifrar(),
     }
-    return { conectado: vend.waConectado, estado, qrcode: vend.waConectado ? null : vend.waQrcode, numero: vend.waNumero }
   })
 
-  // Caixa de entrada: conversas (clientes com mensagens), com a última mensagem de cada um.
-  // VENDEDORA vê só a própria carteira; gerente/gestor veem a loja.
+  // Grava a config; se houver número + token válidos, testa no Graph e marca conectado.
+  app.put('/config', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
+    const redeId = redeIdDe(request)
+    const b = configSchema.parse(request.body)
+
+    const data: Prisma.RedeUpdateInput = {
+      waPhoneNumberId: b.waPhoneNumberId,
+      waWabaId: b.waWabaId ?? null,
+      waNumeroExibicao: b.waNumeroExibicao ?? null,
+      waVerifyToken: b.waVerifyToken,
+      waAppSecret: b.waAppSecret ?? null,
+    }
+    if (b.token) {
+      if (!podeCifrar()) return reply.code(422).send({ erro: 'Servidor sem WA_TOKEN_SECRET — não é possível guardar o token com segurança.' })
+      data.waTokenCifrado = cifrar(b.token)
+    }
+
+    // Testa a conexão (precisa de número + algum token: o novo ou o já salvo).
+    const atual = await prisma.rede.findUniqueOrThrow({ where: { id: redeId }, select: { waTokenCifrado: true } })
+    const tokenCifrado = b.token ? (data.waTokenCifrado as string) : atual.waTokenCifrado
+    let conectado = false
+    let numero: string | undefined
+    let erroTeste: string | undefined
+    if (b.waPhoneNumberId && tokenCifrado) {
+      const v = await verificarNumero(b.waPhoneNumberId, decifrar(tokenCifrado))
+      conectado = v.ok; numero = v.numero; erroTeste = v.erro
+    }
+    data.waConectado = conectado
+    data.waConectadoEm = conectado ? new Date() : null
+    if (conectado && numero && !b.waNumeroExibicao) data.waNumeroExibicao = numero
+
+    await prisma.rede.update({ where: { id: redeId }, data })
+    return { ok: true, conectado, numero: numero ?? null, erro: conectado ? null : erroTeste ?? null }
+  })
+
+  // Envia uma mensagem de teste pelo número da marca (valida ponta a ponta).
+  app.post('/testar', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
+    const redeId = redeIdDe(request)
+    const { telefone } = z.object({ telefone: z.string().min(8) }).parse(request.body)
+    const rede = await prisma.rede.findUniqueOrThrow({ where: { id: redeId }, select: selectRedeConfig })
+    if (!metaConfigurado(rede)) return reply.code(422).send({ erro: 'Configure o número e o token antes de testar.' })
+    const r = await enviarTexto({ rede, telefone, texto: 'Mensagem de teste do ZAIEZE ✅ (WhatsApp oficial conectado).' })
+    if (r.status === 'FALHA') return reply.code(502).send({ erro: r.erro ?? 'Falha ao enviar.' })
+    return { ok: true, status: r.status, waMessageId: r.waMessageId ?? null }
+  })
+
+  // ─────────── Caixa de entrada / conversas ───────────
+
+  // Conversas (clientes com mensagens), com a última mensagem de cada um.
   app.get('/conversas', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     const where: Prisma.MensagemWhatsappWhereInput = { lojaId, clienteId: { not: null } }
     if (request.user.role === 'VENDEDORA') where.vendedoraId = request.user.sub
 
-    // janela recente de mensagens; agrega por cliente em memória (1 conversa por cliente)
     const msgs = await prisma.mensagemWhatsapp.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -194,40 +211,40 @@ export async function whatsappRoutes(app: FastifyInstance) {
     return prisma.mensagemWhatsapp.findMany({ where, orderBy: { createdAt: 'asc' }, take: 200 })
   })
 
-  // Responder a um cliente pela caixa de entrada (envio individual via Evolution; SIMULADA sem config)
+  // Responder a um cliente (texto). Respeita a janela de 24h quando a marca está conectada.
   app.post('/conversas/:clienteId/responder', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { clienteId } = request.params as { clienteId: string }
     const { texto } = z.object({ texto: z.string().min(1) }).parse(request.body)
 
-    const cliente = await prisma.cliente.findFirst({ where: { id: clienteId, lojaId } })
+    const cliente = await prisma.cliente.findFirst({ where: { id: clienteId, lojaId }, select: { id: true, telefone: true, vendedoraId: true, waUltimaEntradaEm: true } })
     if (!cliente) return reply.code(404).send({ erro: 'Cliente não encontrado' })
-
-    // VENDEDORA só responde a clientes da própria carteira
     if (request.user.role === 'VENDEDORA' && cliente.vendedoraId !== request.user.sub) {
       return reply.code(403).send({ erro: 'Cliente não está na sua carteira' })
     }
-
-    // roteia pela vendedora dona do cliente; gerente sem dono usa a própria identidade
     const vendId = cliente.vendedoraId ?? (request.user.role === 'VENDEDORA' ? request.user.sub : null)
     if (!vendId) return reply.code(422).send({ erro: 'Cliente sem vendedora responsável — defina a carteira primeiro.' })
-    const vend = await prisma.usuario.findUniqueOrThrow({ where: { id: vendId }, select: { waInstancia: true } })
 
-    const status = await enviarWhatsapp({ instancia: vend.waInstancia, telefone: cliente.telefone, texto })
+    const rede = await redeDaLoja(lojaId)
+    // Conectada à Meta e fora da janela → texto livre não é permitido (precisa de template HSM).
+    if (rede && metaConfigurado(rede) && !dentroDaJanela(cliente.waUltimaEntradaEm)) {
+      return reply.code(422).send({ erro: 'Fora da janela de 24h. Para reabrir a conversa, use um template aprovado (campanha).' })
+    }
+
+    const r = rede ? await enviarWhatsapp({ rede, telefone: cliente.telefone, texto }) : { status: 'SIMULADA' as StatusMensagem }
     const msg = await prisma.mensagemWhatsapp.create({
       data: {
         lojaId, clienteId, vendedoraId: vendId,
-        direcao: 'ENVIADA', status, origem: 'MANUAL', telefone: cliente.telefone, texto,
+        direcao: 'ENVIADA', status: r.status, origem: 'MANUAL', telefone: cliente.telefone, texto,
+        waMessageId: r.waMessageId ?? null,
       },
     })
-    // A vendedora respondeu → fecha o SLA do lead aberto desse cliente ("atender = responder").
     await marcarLeadAtendido({ lojaId, clienteId })
     return msg
   })
 
-  // Responder com uma MENSAGEM DE VOZ (PTT): recebe o áudio gravado no navegador,
-  // transcodifica para OGG/Opus, sobe ao R2/local e registra a mensagem.
-  // O envio real ao WhatsApp será finalizado na migração para a API oficial (hoje: SIMULADA sem provedor).
+  // Responder com MENSAGEM DE VOZ (PTT): grava o áudio (R2/local). O envio real do áudio pela
+  // Cloud API entra na Fase 3 (upload de mídia); por ora registra como SIMULADA.
   app.post('/conversas/:clienteId/audio', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { clienteId } = request.params as { clienteId: string }
@@ -244,7 +261,6 @@ export async function whatsappRoutes(app: FastifyInstance) {
     }
     const vendId = cliente.vendedoraId ?? (request.user.role === 'VENDEDORA' ? request.user.sub : null)
     if (!vendId) return reply.code(422).send({ erro: 'Cliente sem vendedora responsável — defina a carteira primeiro.' })
-    const vend = await prisma.usuario.findUniqueOrThrow({ where: { id: vendId }, select: { waInstancia: true } })
 
     let midiaUrl: string
     try {
@@ -255,63 +271,67 @@ export async function whatsappRoutes(app: FastifyInstance) {
       return reply.code(500).send({ erro: 'Não foi possível processar o áudio. Tente novamente.' })
     }
 
-    const status = await enviarWhatsappAudio({ instancia: vend.waInstancia, telefone: cliente.telefone, audioUrl: midiaUrl })
+    const rede = await redeDaLoja(lojaId)
+    const r = rede ? await enviarWhatsappAudio({ rede, telefone: cliente.telefone, audioUrl: midiaUrl }) : { status: 'SIMULADA' as StatusMensagem }
     const msg = await prisma.mensagemWhatsapp.create({
       data: {
         lojaId, clienteId, vendedoraId: vendId,
-        direcao: 'ENVIADA', status, origem: 'MANUAL', telefone: cliente.telefone,
-        texto: '🎤 Mensagem de voz', tipoMidia: 'AUDIO', midiaUrl,
+        direcao: 'ENVIADA', status: r.status, origem: 'MANUAL', telefone: cliente.telefone,
+        texto: '🎤 Mensagem de voz', tipoMidia: 'AUDIO', midiaUrl, waMessageId: r.waMessageId ?? null,
       },
     })
     await marcarLeadAtendido({ lojaId, clienteId })
     return msg
   })
 
-  // Webhook NORMALIZADO (sem auth) — payload simples {telefone,texto,instancia}. Útil para testes.
+  // ─────────── Webhooks ───────────
+
+  // Webhook NORMALIZADO (sem auth) — payload simples {telefone,texto}. Útil para testes locais.
   app.post('/webhook', async (request, reply) => {
-    const b = webhookSchema.parse(request.body)
+    const b = z.object({ telefone: z.string().optional(), numero: z.string().optional(), texto: z.string().min(1) }).parse(request.body)
     const numero = (b.telefone ?? b.numero ?? '').replace(/\D/g, '')
     if (!numero) return reply.code(400).send({ erro: 'telefone ausente' })
-    return rotearMensagemRecebida({ numero, texto: b.texto, instancia: b.instancia })
+    return rotearMensagemRecebida({ numero, texto: b.texto })
   })
 
-  // Webhook REAL do Evolution API (sem auth; chamado internamente na rede Docker).
-  // Trata QRCODE_UPDATED (guarda o QR), CONNECTION_UPDATE (marca conectado) e MESSAGES_UPSERT (roteia).
-  app.post('/webhook/evolution', async (request) => {
-    const body = request.body as { event?: string; instance?: string; data?: Record<string, unknown> }
-    const evento = (body.event ?? '').toLowerCase()
-    const instancia = body.instance
-    const data = body.data ?? {}
-
-    if (evento === 'qrcode.updated') {
-      const q = data.qrcode as { base64?: string } | undefined
-      const base64 = q?.base64 ?? (data.base64 as string | undefined)
-      if (instancia && base64) await prisma.usuario.updateMany({ where: { waInstancia: instancia }, data: { waQrcode: base64 } })
-      return { ok: true }
+  // Webhook OFICIAL da Meta por tenant: /api/whatsapp/webhook/:redeSlug (sem auth).
+  // GET = verificação (hub.challenge); POST = mensagens recebidas + status (entrega/leitura).
+  app.get('/webhook/:redeSlug', async (request, reply) => {
+    const { redeSlug } = request.params as { redeSlug: string }
+    const q = request.query as Record<string, string>
+    const modo = q['hub.mode']; const token = q['hub.verify_token']; const challenge = q['hub.challenge']
+    const rede = await prisma.rede.findUnique({ where: { slug: redeSlug }, select: { waVerifyToken: true } })
+    if (modo === 'subscribe' && rede?.waVerifyToken && token === rede.waVerifyToken) {
+      return reply.code(200).type('text/plain').send(challenge ?? '')
     }
+    return reply.code(403).send('forbidden')
+  })
 
-    if (evento === 'connection.update') {
-      const estado = (data.state as string | undefined) ?? ''
-      if (instancia && estado === 'open') await prisma.usuario.updateMany({ where: { waInstancia: instancia }, data: { waConectado: true, waQrcode: null } })
-      else if (instancia && estado === 'close') await prisma.usuario.updateMany({ where: { waInstancia: instancia }, data: { waConectado: false } })
-      return { ok: true }
+  app.post('/webhook/:redeSlug', async (request, reply) => {
+    const { redeSlug } = request.params as { redeSlug: string }
+    const rede = await prisma.rede.findUnique({ where: { slug: redeSlug }, select: { id: true } })
+    if (!rede) return reply.code(404).send({ ok: false })
+
+    // NOTA (Fase 1): a validação de X-Hub-Signature-256 (com Rede.waAppSecret) será ligada
+    // quando o raw body do webhook estiver disponível (fastify-raw-body). Por ora confiamos no
+    // verify token + phone_number_id + HTTPS.
+    const body = request.body as { entry?: { changes?: { value?: Record<string, any> }[] }[] }
+    for (const entry of body.entry ?? []) {
+      for (const change of entry.changes ?? []) {
+        const value = change.value ?? {}
+        // mensagens recebidas
+        for (const m of (value.messages ?? []) as Record<string, any>[]) {
+          const numero = String(m.from ?? '').replace(/\D/g, '')
+          const nome = value.contacts?.[0]?.profile?.name as string | undefined
+          if (numero) await rotearMensagemRecebida({ numero, texto: textoMeta(m), redeId: rede.id, nome })
+        }
+        // recibos de status (sent/delivered/read/failed)
+        for (const s of (value.statuses ?? []) as Record<string, any>[]) {
+          const novo = STATUS_META[String(s.status)]
+          if (s.id && novo) await prisma.mensagemWhatsapp.updateMany({ where: { waMessageId: String(s.id) }, data: { status: novo } })
+        }
+      }
     }
-
-    if (evento === 'messages.upsert') {
-      const key = data.key as { remoteJid?: string; fromMe?: boolean } | undefined
-      if (!key || key.fromMe) return { ok: true } // ignora as próprias mensagens (evita duplicar os envios)
-      const jid = key.remoteJid ?? ''
-      if (jid.endsWith('@g.us')) return { ok: true } // ignora grupos
-      const numero = jid.split('@')[0] ?? ''
-      await rotearMensagemRecebida({
-        numero,
-        texto: textoDaMensagem(data.message as Record<string, unknown> | undefined),
-        instancia,
-        nome: data.pushName as string | undefined,
-      })
-      return { ok: true }
-    }
-
-    return { ok: true }
+    return reply.code(200).send({ ok: true })
   })
 }

@@ -96,7 +96,7 @@ export async function clientesRoutes(app: FastifyInstance) {
   })
 
   // R1 — envia o LINK DO CATÁLOGO para os clientes selecionados (roteado pela vendedora dona).
-  // Respeita LGPD; usa a instância WhatsApp de cada vendedora (Evolution; SIMULADA sem config).
+  // Respeita LGPD; envia pelo número OFICIAL da marca (Cloud API; SIMULADA sem config).
   app.post('/enviar-catalogo', { preHandler: [app.authenticate] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const body = z.object({
@@ -104,8 +104,9 @@ export async function clientesRoutes(app: FastifyInstance) {
       mensagem: z.string().max(800).optional(),
     }).parse(request.body)
 
-    const loja = await prisma.loja.findUnique({ where: { id: lojaId }, select: { nome: true, redeId: true, rede: { select: { slug: true, textoDisparoPadrao: true, disparoVendedoraEditavel: true } } } })
+    const loja = await prisma.loja.findUnique({ where: { id: lojaId }, select: { nome: true, redeId: true, rede: { select: { slug: true, textoDisparoPadrao: true, disparoVendedoraEditavel: true, waPhoneNumberId: true, waTokenCifrado: true } } } })
     if (!loja?.rede) return reply.code(422).send({ erro: 'Loja sem marca vinculada' })
+    const redeWA = { waPhoneNumberId: loja.rede.waPhoneNumberId, waTokenCifrado: loja.rede.waTokenCifrado }
 
     // Texto: gestor define um padrão; se a vendedora não pode editar, força o padrão.
     const travada = request.user.role === 'VENDEDORA' && !loja.rede.disparoVendedoraEditavel
@@ -118,7 +119,7 @@ export async function clientesRoutes(app: FastifyInstance) {
     })
 
     const res = { alcance: clientes.length, enviados: 0, simulados: 0, falhas: 0, semConsentimento: 0, semVendedora: 0 }
-    const cache = new Map<string, { link: string; instancia: string | null } | null>() // por vendedoraId
+    const cache = new Map<string, { link: string } | null>() // link do catálogo por vendedoraId
 
     for (const c of clientes) {
       if (!c.consentimentoLgpd) { res.semConsentimento += 1; continue }
@@ -127,12 +128,12 @@ export async function clientesRoutes(app: FastifyInstance) {
       if (!cache.has(c.vendedoraId)) {
         const v = await prisma.usuario.findUnique({
           where: { id: c.vendedoraId },
-          select: { id: true, nome: true, slugCatalogo: true, waInstancia: true },
+          select: { id: true, nome: true, slugCatalogo: true },
         })
         if (!v) cache.set(c.vendedoraId, null)
         else {
           const slug = await garantirSlugCatalogo(v, loja.redeId)
-          cache.set(c.vendedoraId, { link: urlCatalogoPublica(loja.rede.slug, slug), instancia: v.waInstancia })
+          cache.set(c.vendedoraId, { link: urlCatalogoPublica(loja.rede.slug, slug) })
         }
       }
       const dados = cache.get(c.vendedoraId)
@@ -141,9 +142,9 @@ export async function clientesRoutes(app: FastifyInstance) {
       const saud = textoBase
         ? textoBase.replaceAll('{primeiroNome}', c.nome.split(/\s+/)[0]).replaceAll('{nome}', c.nome)
         : `Oi ${c.nome.split(/\s+/)[0]}! Dá uma olhada no nosso catálogo 💛`
-      const status = await enviarWhatsapp({ instancia: dados.instancia, telefone: c.telefone, texto: `${saud}\n\n${dados.link}` })
-      if (status === 'ENVIADA') res.enviados += 1
-      else if (status === 'SIMULADA') res.simulados += 1
+      const r = await enviarWhatsapp({ rede: redeWA, telefone: c.telefone, texto: `${saud}\n\n${dados.link}` })
+      if (r.status === 'ENVIADA') res.enviados += 1
+      else if (r.status === 'SIMULADA') res.simulados += 1
       else res.falhas += 1
     }
     return res

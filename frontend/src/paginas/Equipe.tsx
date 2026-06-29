@@ -13,7 +13,6 @@ interface Membro {
   comissaoPadrao?: string | null
   ativo: boolean
   waNumero?: string | null
-  waConectado?: boolean
   _count?: { carteira: number }
 }
 
@@ -319,9 +318,7 @@ export default function Equipe() {
                       <td>{m.email}</td>
                       <td>{m.role === 'GERENTE' ? 'Gerente de Loja' : 'Vendedora'}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>
-                        {m.waConectado && m.waNumero
-                          ? <span style={{ color: 'var(--ok)' }}>📱 {formatarWhatsapp(m.waNumero)}</span>
-                          : <span style={{ color: 'var(--ink-soft)' }}>{m.waNumero ? formatarWhatsapp(m.waNumero) : '—'}</span>}
+                        <span style={{ color: 'var(--ink-soft)' }}>{m.waNumero ? formatarWhatsapp(m.waNumero) : '—'}</span>
                       </td>
                       <td>{m._count?.carteira ?? 0} clientes</td>
                       <td>{m.role === 'VENDEDORA' && metaLojaData ? `R$ ${metaLojaData.metaVendedora.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}</td>

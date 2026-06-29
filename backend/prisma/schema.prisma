@@ -76,8 +76,10 @@ enum DirecaoMensagem {
 }
 
 enum StatusMensagem {
-  SIMULADA // gerada sem Evolution API configurada (modo dev)
-  ENVIADA // entregue à Evolution API
+  SIMULADA // gerada sem a Cloud API da Meta configurada (modo dev)
+  ENVIADA // aceita pela Cloud API (sent)
+  ENTREGUE // entregue ao aparelho do cliente (delivered)
+  LIDA // lida pelo cliente (read)
   FALHA // erro no envio
   RECEBIDA // mensagem recebida do cliente
 }
@@ -160,6 +162,17 @@ model Rede {
   // disparoVendedoraEditavel = a vendedora pode personalizar o texto (true) ou fica travada (false).
   textoDisparoPadrao       String?
   disparoVendedoraEditavel Boolean  @default(true)
+  // WhatsApp Cloud API (oficial da Meta) — UMA WABA/número por marca. Todas as vendedoras
+  // atendem por este número; a identidade da vendedora vai no conteúdo. Config manual pelo gestor.
+  // Ausência de waPhoneNumberId/token → módulo opera em modo SIMULADO (não envia de verdade).
+  waPhoneNumberId          String? // id do número (Graph API: {phone_number_id}/messages)
+  waWabaId                 String? // id da WhatsApp Business Account
+  waNumeroExibicao         String? // número legível para exibição (ex.: +55 62 9xxxx-xxxx)
+  waTokenCifrado           String? // token permanente (System User), criptografado em repouso (AES-256-GCM)
+  waVerifyToken            String? // token de verificação do webhook (GET hub.verify_token)
+  waAppSecret              String? // segredo do app Meta p/ validar X-Hub-Signature-256 (opcional)
+  waConectado              Boolean  @default(false)
+  waConectadoEm            DateTime?
   // Meta mensal da MARCA (valor total do mês). Distribuída às lojas conforme metaModo:
   // IGUAL = meta da marca ÷ nº de lojas; MANUAL = valor definido em cada Loja.metaMensal.
   // A meta da vendedora é derivada: meta da loja ÷ nº de vendedoras ativas da loja.
@@ -340,11 +353,9 @@ model Usuario {
   slugCatalogo   String?
   metaMensal     Decimal? @db.Decimal(12, 2)
   comissaoPadrao Decimal? @db.Decimal(5, 2) // % padrão da vendedora
-  // WhatsApp da vendedora (Evolution API): uma instância/número por vendedora
-  waInstancia    String?
+  // Número pessoal de contato da vendedora (deep link wa.me no handoff "Falar com a vendedora").
+  // NÃO é mais uma instância de envio: o envio oficial é pelo número da MARCA (Rede.wa*).
   waNumero       String?
-  waConectado    Boolean  @default(false)
-  waQrcode       String? // QR (base64) recebido do Evolution via webhook QRCODE_UPDATED; limpo ao conectar
   ativo          Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -407,6 +418,9 @@ model Cliente {
   // agregados mantidos pelo módulo de vendas e job de segmentação (fase 3)
   totalGasto        Decimal         @default(0) @db.Decimal(12, 2)
   ultimaCompraEm    DateTime?
+  // Última mensagem RECEBIDA do cliente — base da janela de 24h da Cloud API
+  // (texto/mídia livre só até 24h depois; fora disso, só template aprovado).
+  waUltimaEntradaEm DateTime?
   // LGPD: consentimento para campanhas (WhatsApp/Custom Audiences — módulos 4, 10, 16)
   consentimentoLgpd Boolean         @default(false)
   observacoes       String?
@@ -748,6 +762,10 @@ model MensagemWhatsapp {
   // Mídia (ex.: áudio/PTT). tipoMidia null = mensagem de texto pura.
   tipoMidia   String? // 'AUDIO' (futuro: IMAGEM, VIDEO, DOC)
   midiaUrl    String?
+  // Cloud API: id da mensagem na Meta (wamid) para correlacionar os recibos (status);
+  // templateNome preenchido quando o envio foi por template HSM (fora da janela de 24h).
+  waMessageId String?
+  templateNome String?
   createdAt   DateTime        @default(now())
 
   cliente   Cliente?          @relation(fields: [clienteId], references: [id], onDelete: SetNull)
@@ -758,6 +776,7 @@ model MensagemWhatsapp {
   @@index([clienteId, createdAt])
   @@index([lojaId, createdAt])
   @@index([grupoId, createdAt])
+  @@index([waMessageId])
   @@map("mensagens_whatsapp")
 }
 

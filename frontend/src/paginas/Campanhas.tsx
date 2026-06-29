@@ -32,8 +32,6 @@ export default function Campanhas() {
   const gerente = usuario.role !== 'VENDEDORA'
   const ehGestor = usuario.role === 'GESTOR' || usuario.role === 'SUPER_ADMIN'
   const podeDisparar = usuario.role === 'VENDEDORA' || usuario.role === 'GERENTE'
-  // Só quem tem carteira/WhatsApp próprio conecta um número. Gestor/admin não têm WhatsApp pessoal.
-  const podeConectarWa = usuario.role === 'VENDEDORA' || usuario.role === 'GERENTE'
   const escopo = useLojaAtiva()
 
   const [campanhas, setCampanhas] = useState<Campanha[]>([])
@@ -66,58 +64,8 @@ export default function Campanhas() {
     }).catch(() => { /* sem marca/permite editar */ })
   }, [gerente])
 
-  // ── Conexão do WhatsApp (Evolution / QR) ──
-  const [waStatus, setWaStatus] = useState<{ conectado: boolean; qrcode: string | null; estado: string; numero?: string | null } | null>(null)
-  const [conectandoWa, setConectandoWa] = useState(false)
-
-  const carregarWaStatus = useCallback(async () => {
-    if (!escopo.pronto || !podeConectarWa) return null
-    try { const { data } = await api.get('/whatsapp/instancia/status', { params: escopo.params }); setWaStatus(data); return data }
-    catch { return null }
-  }, [escopo.pronto, escopo.params, podeConectarWa])
-
-  useEffect(() => { carregarWaStatus() }, [carregarWaStatus])
-
-  // Enquanto conecta, faz polling do status (QR + conexão).
-  useEffect(() => {
-    if (!conectandoWa) return
-    const id = setInterval(async () => {
-      const s = await carregarWaStatus()
-      if (s?.conectado) setConectandoWa(false)
-    }, 2500)
-    return () => clearInterval(id)
-  }, [conectandoWa, carregarWaStatus])
-
-  async function conectarWhatsapp() {
-    setErro('')
-    try {
-      await api.post('/whatsapp/instancia/conectar', {}, { params: escopo.params })
-      setConectandoWa(true)
-      carregarWaStatus()
-    } catch (e) { setErro(mensagemDeErro(e)) }
-  }
-
-  // Trocar número: desconecta o atual e já dispara um novo QR para escanear outro aparelho.
-  async function trocarNumero() {
-    if (!confirm('Desconectar o número atual e conectar outro? Você vai precisar escanear o QR Code com o novo aparelho.')) return
-    setErro('')
-    try {
-      await api.post('/whatsapp/instancia/desconectar', {}, { params: escopo.params })
-      await carregarWaStatus()
-      await conectarWhatsapp()
-    } catch (e) { setErro(mensagemDeErro(e)) }
-  }
-
-  // Desconectar: encerra a sessão do WhatsApp da vendedora (fica desconectada).
-  async function desconectarWhatsapp() {
-    if (!confirm('Desconectar seu WhatsApp? Você deixará de enviar/receber mensagens por aqui até conectar de novo.')) return
-    setErro('')
-    try {
-      await api.post('/whatsapp/instancia/desconectar', {}, { params: escopo.params })
-      setConectandoWa(false)
-      await carregarWaStatus()
-    } catch (e) { setErro(mensagemDeErro(e)) }
-  }
+  // A conexão do WhatsApp passou a ser por MARCA (número oficial da Meta), configurada pelo
+  // gestor em "WhatsApp oficial". Não há mais conexão por QR por vendedora.
 
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
@@ -222,56 +170,13 @@ export default function Campanhas() {
       {aviso && <div className="sucesso">{aviso}</div>}
       {erro && <div className="alerta">{erro}</div>}
 
-      {/* Conexão do WhatsApp (QR via Evolution) — só para quem tem carteira/WhatsApp próprio */}
-      {!podeConectarWa ? (
-        <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-          📱 <strong>WhatsApp:</strong> cada vendedora conecta o próprio número no login dela (em WhatsApp → “Meu WhatsApp”). O <strong>número oficial da marca</strong> está no roadmap.
-        </div>
-      ) : (
-      <div className="cartao">
-        <h2 className="painel-titulo">Meu WhatsApp</h2>
-        {waStatus?.conectado ? (
-          <div>
-            <div style={{ color: 'var(--ok)', fontWeight: 600 }}>
-              ✅ WhatsApp conectado{waStatus.numero ? ` · ${waStatus.numero}` : ''}
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-              <button className="btn secundario" onClick={trocarNumero} disabled={!escopo.pronto}>🔄 Trocar número</button>
-              <button className="btn secundario" onClick={desconectarWhatsapp} disabled={!escopo.pronto}>🔌 Desconectar</button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
-              Conecte seu WhatsApp para enviar campanhas/links e receber as mensagens dos clientes na sua carteira.
-            </p>
-            {!conectandoWa && (
-              <button className="btn" onClick={conectarWhatsapp} disabled={!escopo.pronto}>📱 Conectar meu WhatsApp</button>
-            )}
-            {conectandoWa && (
-              <div style={{ marginTop: 8 }}>
-                {waStatus?.qrcode ? (
-                  <>
-                    <p style={{ fontSize: 13, margin: '0 0 10px' }}>
-                      No celular: WhatsApp → <strong>Aparelhos conectados</strong> → <strong>Conectar um aparelho</strong> e escaneie:
-                    </p>
-                    <img
-                      src={waStatus.qrcode.startsWith('data:') ? waStatus.qrcode : `data:image/png;base64,${waStatus.qrcode}`}
-                      alt="QR Code do WhatsApp"
-                      style={{ width: 240, height: 240, maxWidth: '100%', background: '#fff', padding: 8, borderRadius: 8, border: '1px solid var(--border)' }}
-                    />
-                    <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 8 }}>Aguardando leitura… o status atualiza sozinho.</p>
-                  </>
-                ) : (
-                  <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Gerando QR Code… aguarde alguns segundos.</p>
-                )}
-                <button className="btn secundario" style={{ marginTop: 8 }} onClick={() => setConectandoWa(false)}>Cancelar</button>
-              </div>
-            )}
-          </>
-        )}
+      {/* Conexão agora é por MARCA (WhatsApp oficial da Meta), configurada pelo gestor. */}
+      <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+        📱 <strong>WhatsApp oficial da marca:</strong> o envio e o recebimento usam o <strong>número oficial da marca</strong> (WhatsApp Cloud API da Meta).
+        {ehGestor
+          ? <> Configure em <strong>WhatsApp oficial</strong> no menu.</>
+          : <> Peça ao gestor para conectar o número da marca em “WhatsApp oficial”.</>}
       </div>
-      )}
 
       {/* Campanhas da marca — o gestor monta e disponibiliza */}
       {ehGestor && (

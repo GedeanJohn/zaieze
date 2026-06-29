@@ -128,11 +128,11 @@ export default function Catalogo() {
         <div className="cat-sub">com <strong>{cat.vendedora.primeiroNome}</strong> · {cat.loja.nome}</div>
       </header>
 
-      {cat.marca.bannerUrl && (
-        <div className="cat-banner">
-          <img src={cat.marca.bannerUrl} alt="" />
-        </div>
-      )}
+      <div className="cat-banner">
+        {cat.marca.bannerUrl
+          ? <img src={cat.marca.bannerUrl} alt="" />
+          : <div className="cat-banner-vazio" />}
+      </div>
 
       {cat.colecoes.length === 0 && <div className="cat-vazio">Em breve, novidades por aqui. ✨</div>}
 
@@ -420,19 +420,20 @@ function Carrinho({ itens, totais, corPrimaria, vendedora, onMudarQtd, onRemover
 function CatalogoEstilos() {
   return (
     <style>{`
-      .cat-root { min-height: 100vh; background: var(--cat-fundo); color: #111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; padding-bottom: 96px; }
+      .cat-root { --cat-creme: #f5f0e6; min-height: 100vh; background: var(--cat-fundo); color: #111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; padding-bottom: 96px; }
       .cat-vazio { min-height: 70vh; display: flex; align-items: center; justify-content: center; color: #777; font-family: sans-serif; padding: 40px; text-align: center; }
       .cat-header { max-width: 1100px; margin: 0 auto; padding: 14px 14px 12px; }
       .cat-header-topo { display: flex; align-items: stretch; gap: 12px; }
-      .cat-avatar { flex: 0 0 auto; width: 104px; height: 104px; border-radius: 12px; overflow: hidden; background: #ececec; display: flex; align-items: center; justify-content: center; }
+      .cat-avatar { flex: 0 0 auto; width: 104px; height: 104px; border-radius: 12px; overflow: hidden; background: var(--cat-creme); display: flex; align-items: center; justify-content: center; }
       .cat-avatar img { width: 100%; height: 100%; object-fit: cover; }
-      .cat-avatar span { font-size: 34px; font-weight: 800; color: var(--cat-primaria, #111); letter-spacing: 1px; }
+      .cat-avatar span { font-size: 34px; font-weight: 800; color: #b6a98e; letter-spacing: 1px; }
       .cat-marca-painel { flex: 1 1 auto; min-width: 0; border-radius: 12px; background: var(--cat-primaria, #111); display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 10px 16px; }
       .cat-logo { max-height: 84px; max-width: 100%; object-fit: contain; }
       .cat-logo-texto { font-size: clamp(22px, 7vw, 38px); font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: #fff; text-align: center; }
       .cat-sub { margin-top: 10px; font-size: 13px; color: #555; }
       .cat-banner { max-width: 1100px; margin: 4px auto 0; padding: 0 14px; }
       .cat-banner img { width: 100%; display: block; border-radius: 12px; object-fit: cover; max-height: 220px; }
+      .cat-banner-vazio { width: 100%; border-radius: 12px; background: var(--cat-creme); height: clamp(90px, 22vw, 150px); }
       .cat-secao { max-width: 1100px; margin: 0 auto; padding: 26px 14px 6px; }
       .cat-secao-titulo { font-size: 18px; font-weight: 700; letter-spacing: .5px; margin: 0 0 2px; text-transform: uppercase; }
       .cat-secao-desc { margin: 0 0 14px; color: #666; font-size: 13px; }

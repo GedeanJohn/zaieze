@@ -4,6 +4,7 @@ import { api, mensagemDeErro } from '../api'
 interface Marca {
   nome: string
   logoUrl: string | null
+  bannerUrl: string | null
   corPrimaria: string
   corSecundaria: string
   slaEntrouMin: number
@@ -21,6 +22,7 @@ export default function Marca() {
   const [erro, setErro] = useState('')
   const [ok, setOk] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const bannerRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { api.get('/marca').then(({ data }) => setMarca(data)) }, [])
 
@@ -62,6 +64,30 @@ export default function Marca() {
     finally { if (fileRef.current) fileRef.current.value = '' }
   }
 
+  async function enviarBanner(e: React.ChangeEvent<HTMLInputElement>) {
+    const arquivo = e.target.files?.[0]
+    if (!arquivo || !marca) return
+    setErro('')
+    const fd = new FormData()
+    fd.append('file', arquivo)
+    try {
+      const { data } = await api.post('/marca/banner', fd, { params: marca.bannerUrl ? { anterior: marca.bannerUrl } : {} })
+      setMarca(data)
+      aviso('Banner atualizado.')
+    } catch (err) { setErro(mensagemDeErro(err)) }
+    finally { if (bannerRef.current) bannerRef.current.value = '' }
+  }
+
+  async function removerBanner() {
+    if (!marca) return
+    setErro('')
+    try {
+      const { data } = await api.delete('/marca/banner')
+      setMarca(data)
+      aviso('Banner removido.')
+    } catch (err) { setErro(mensagemDeErro(err)) }
+  }
+
   if (!marca) return <p style={{ color: 'var(--ink-soft)' }}>Carregando…</p>
 
   return (
@@ -90,6 +116,31 @@ export default function Marca() {
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={enviarLogo} />
             <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 6 }}>PNG, JPG, WEBP ou SVG · até 5&nbsp;MB.</div>
           </div>
+        </div>
+      </div>
+
+      <div className="cartao">
+        <h2 style={{ marginTop: 0 }}>Banner do catálogo</h2>
+        <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
+          Faixa que aparece no topo do <strong>catálogo público</strong>, logo acima dos produtos. Use uma imagem
+          horizontal (ex.: 1200×400). Opcional — sem banner, o catálogo abre direto nos produtos.
+        </p>
+        <div style={{
+          width: '100%', maxWidth: 520, aspectRatio: '3 / 1', borderRadius: 12, background: '#00000010',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #00000022', overflow: 'hidden',
+        }}>
+          {marca.bannerUrl
+            ? <img src={marca.bannerUrl} alt="Banner" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <span style={{ color: '#999', fontSize: 12 }}>sem banner</span>}
+        </div>
+        <div style={{ marginTop: 10, display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input ref={bannerRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={enviarBanner} />
+          {marca.bannerUrl && (
+            <button type="button" onClick={removerBanner}
+              style={{ background: 'none', border: '1px solid #00000033', color: 'var(--ink-soft)', padding: '7px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+              Remover banner
+            </button>
+          )}
         </div>
       </div>
 

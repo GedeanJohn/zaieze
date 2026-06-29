@@ -23,6 +23,7 @@ const RESERVADOS = new Set([
   'login', 'vendas', 'estoque', 'transferencias', 'clientes', 'campanhas', 'caixa', 'radar',
   'ranking', 'mural', 'provador', 'atacado', 'produtos', 'equipe', 'estoquistas', 'planos',
   'colecoes', 'marca', 'leads', 'catalogo', 'cat', 'api', 'assets', 'uploads', 'checkout', 'sucesso', 'entrar', 'convite',
+  'look', // página pública do provador (link da selfie por token)
 ])
 
 /** Gera um slug a partir do nome (sem acento, kebab-case). */
@@ -61,12 +62,12 @@ function whatsappUrl(numero: string | null, texto: string): string | null {
 async function resolverVendedoraPublica(redeSlug: string, vendSlug: string) {
   const rede = await prisma.rede.findUnique({
     where: { slug: redeSlug },
-    select: { id: true, nome: true, plano: true, ativo: true, logoUrl: true, corPrimaria: true, corSecundaria: true, pedidoMinimoAtacado: true, pedidoMinimoInfantil: true },
+    select: { id: true, nome: true, plano: true, ativo: true, logoUrl: true, bannerUrl: true, corPrimaria: true, corSecundaria: true, pedidoMinimoAtacado: true, pedidoMinimoInfantil: true },
   })
   if (!rede || !rede.ativo || !planoInclui(rede.plano, 'portal_cliente')) return null
   const vend = await prisma.usuario.findFirst({
     where: { slugCatalogo: vendSlug, role: 'VENDEDORA', ativo: true, loja: { redeId: rede.id, ativo: true } },
-    select: { id: true, nome: true, waNumero: true, lojaId: true, loja: { select: { id: true, nome: true } } },
+    select: { id: true, nome: true, fotoUrl: true, waNumero: true, lojaId: true, loja: { select: { id: true, nome: true } } },
   })
   if (!vend || !vend.loja) return null
   return { rede, vend }
@@ -184,9 +185,9 @@ export async function catalogoRoutes(app: FastifyInstance) {
       .filter((c) => c.produtos.length > 0)
 
     return {
-      marca: { nome: rede.nome, logoUrl: rede.logoUrl, corPrimaria: rede.corPrimaria, corSecundaria: rede.corSecundaria },
+      marca: { nome: rede.nome, logoUrl: rede.logoUrl, bannerUrl: rede.bannerUrl, corPrimaria: rede.corPrimaria, corSecundaria: rede.corSecundaria },
       loja: { nome: vend.loja!.nome },
-      vendedora: { nome: vend.nome, primeiroNome: vend.nome.trim().split(/\s+/)[0], temWhatsapp: !!vend.waNumero },
+      vendedora: { nome: vend.nome, primeiroNome: vend.nome.trim().split(/\s+/)[0], fotoUrl: vend.fotoUrl, temWhatsapp: !!vend.waNumero },
       pedidoMinimoAtacado: rede.pedidoMinimoAtacado,
       pedidoMinimoInfantil: rede.pedidoMinimoInfantil,
       colecoes: colecoesOut,

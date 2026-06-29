@@ -15,9 +15,9 @@ interface Produto {
 }
 interface Colecao { id: string; nome: string; descricao?: string | null; outlet?: boolean; produtos: Produto[] }
 interface Catalogo {
-  marca: { nome: string; logoUrl: string | null; corPrimaria: string; corSecundaria: string }
+  marca: { nome: string; logoUrl: string | null; bannerUrl: string | null; corPrimaria: string; corSecundaria: string }
   loja: { nome: string }
-  vendedora: { nome: string; primeiroNome: string; temWhatsapp: boolean }
+  vendedora: { nome: string; primeiroNome: string; fotoUrl: string | null; temWhatsapp: boolean }
   pedidoMinimoAtacado?: number
   colecoes: Colecao[]
 }
@@ -30,6 +30,8 @@ interface ItemCarrinho {
 }
 
 const real = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+/** Iniciais (até 2) para o avatar da vendedora quando não há foto. */
+const iniciais = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('')
 const PESO_PADRAO = 300 // g por peça quando o produto não tem peso cadastrado
 const VOLUME_PECA_L = 0.8 // litros estimados por peça dobrada
 
@@ -111,11 +113,26 @@ export default function Catalogo() {
       <CatalogoEstilos />
 
       <header className="cat-header">
-        {cat.marca.logoUrl
-          ? <img className="cat-logo" src={cat.marca.logoUrl} alt={cat.marca.nome} />
-          : <div className="cat-logo-texto">{cat.marca.nome}</div>}
+        <div className="cat-header-topo">
+          <div className="cat-avatar">
+            {cat.vendedora.fotoUrl
+              ? <img src={cat.vendedora.fotoUrl} alt={cat.vendedora.primeiroNome} />
+              : <span>{iniciais(cat.vendedora.nome)}</span>}
+          </div>
+          <div className="cat-marca-painel">
+            {cat.marca.logoUrl
+              ? <img className="cat-logo" src={cat.marca.logoUrl} alt={cat.marca.nome} />
+              : <div className="cat-logo-texto">{cat.marca.nome}</div>}
+          </div>
+        </div>
         <div className="cat-sub">com <strong>{cat.vendedora.primeiroNome}</strong> · {cat.loja.nome}</div>
       </header>
+
+      {cat.marca.bannerUrl && (
+        <div className="cat-banner">
+          <img src={cat.marca.bannerUrl} alt="" />
+        </div>
+      )}
 
       {cat.colecoes.length === 0 && <div className="cat-vazio">Em breve, novidades por aqui. ✨</div>}
 
@@ -405,10 +422,17 @@ function CatalogoEstilos() {
     <style>{`
       .cat-root { min-height: 100vh; background: var(--cat-fundo); color: #111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; padding-bottom: 96px; }
       .cat-vazio { min-height: 70vh; display: flex; align-items: center; justify-content: center; color: #777; font-family: sans-serif; padding: 40px; text-align: center; }
-      .cat-header { padding: 28px 16px 18px; text-align: center; border-bottom: 1px solid #00000010; }
-      .cat-logo { max-height: 64px; max-width: 220px; object-fit: contain; }
-      .cat-logo-texto { font-size: 26px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
-      .cat-sub { margin-top: 8px; font-size: 13px; color: #555; }
+      .cat-header { max-width: 1100px; margin: 0 auto; padding: 14px 14px 12px; }
+      .cat-header-topo { display: flex; align-items: stretch; gap: 12px; }
+      .cat-avatar { flex: 0 0 auto; width: 104px; height: 104px; border-radius: 12px; overflow: hidden; background: #ececec; display: flex; align-items: center; justify-content: center; }
+      .cat-avatar img { width: 100%; height: 100%; object-fit: cover; }
+      .cat-avatar span { font-size: 34px; font-weight: 800; color: var(--cat-primaria, #111); letter-spacing: 1px; }
+      .cat-marca-painel { flex: 1 1 auto; min-width: 0; border-radius: 12px; background: var(--cat-primaria, #111); display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 10px 16px; }
+      .cat-logo { max-height: 84px; max-width: 100%; object-fit: contain; }
+      .cat-logo-texto { font-size: clamp(22px, 7vw, 38px); font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: #fff; text-align: center; }
+      .cat-sub { margin-top: 10px; font-size: 13px; color: #555; }
+      .cat-banner { max-width: 1100px; margin: 4px auto 0; padding: 0 14px; }
+      .cat-banner img { width: 100%; display: block; border-radius: 12px; object-fit: cover; max-height: 220px; }
       .cat-secao { max-width: 1100px; margin: 0 auto; padding: 26px 14px 6px; }
       .cat-secao-titulo { font-size: 18px; font-weight: 700; letter-spacing: .5px; margin: 0 0 2px; text-transform: uppercase; }
       .cat-secao-desc { margin: 0 0 14px; color: #666; font-size: 13px; }

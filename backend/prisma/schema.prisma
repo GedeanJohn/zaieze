@@ -136,6 +136,7 @@ model Rede {
   ativo                    Boolean  @default(true)
   // Identidade visual da marca (usada no catálogo público / Portal do Cliente)
   logoUrl                  String? // caminho do arquivo enviado pelo gestor (servido em /uploads)
+  bannerUrl                String? // banner do topo do catálogo público (faixa antes dos produtos)
   corPrimaria              String   @default("#111111") // cor de destaque (botões/CTA)
   corSecundaria            String   @default("#ffffff") // cor de fundo
   // SLA por etapa do funil (minutos): tempo máximo do ciclo em cada etapa antes de "atrasar".

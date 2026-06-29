@@ -22,10 +22,12 @@ export default function Layout() {
 
   // Aviso global de encerramento de acesso (cancelamento agendado) — todos os papéis, todas as telas
   const [encerraEm, setEncerraEm] = useState<string | null>(null)
+  // 1ª cobrança a caminho (free trial): só vem preenchido quando faltam <= 30 dias
+  const [cobrancaComecaEm, setCobrancaComecaEm] = useState<string | null>(null)
   // Pendência de aceite dos termos (banner) — qualquer usuário da rede vê; o aceite é do gestor
   const [reaceite, setReaceite] = useState<{ pendente: boolean; diasRestantes: number | null } | null>(null)
   useEffect(() => {
-    api.get('/assinaturas/aviso').then(({ data }) => setEncerraEm(data.encerraEm)).catch(() => {})
+    api.get('/assinaturas/aviso').then(({ data }) => { setEncerraEm(data.encerraEm); setCobrancaComecaEm(data.cobrancaComecaEm ?? null) }).catch(() => {})
     api.get('/contrato/status').then(({ data }) => setReaceite(data)).catch(() => {})
   }, [])
 
@@ -130,6 +132,15 @@ export default function Layout() {
               })}
             </strong>
             <span className="aviso-contagem"> · {contagemRegressiva(encerraEm)}</span>. Sem novas cobranças.
+          </div>
+        )}
+        {cobrancaComecaEm && (
+          <div className="aviso-encerramento" style={{ background: '#12233a', color: '#9ec5ff' }}>
+            💳 Sua <strong>primeira cobrança</strong> começa em{' '}
+            <strong>
+              {new Date(cobrancaComecaEm).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+            </strong>
+            <span className="aviso-contagem"> · {contagemRegressiva(cobrancaComecaEm)}</span>. Aproveite o período gratuito. 💛
           </div>
         )}
         <Outlet />

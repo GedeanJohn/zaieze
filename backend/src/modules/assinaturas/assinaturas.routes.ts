@@ -87,6 +87,9 @@ export async function assinaturasRoutes(app: FastifyInstance) {
       if (!diasGratis) return proximoCicloFim()
       const d = new Date(); d.setDate(d.getDate() + diasGratis); return d
     }
+    // Data da 1ª cobrança quando há período grátis (free trial). Sem dias grátis, a
+    // cobrança é no ato (null = não há aviso de "1ª cobrança a caminho").
+    const primeiraCobrancaEm = diasGratis ? (() => { const d = new Date(); d.setDate(d.getDate() + diasGratis); return d })() : null
 
     // Provisiona o tenant. Em modo simulado já nasce ATIVO; em modo real fica inativo
     // até o webhook de pagamento aprovado liberar o acesso.
@@ -112,6 +115,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
           status: simulada ? 'ATIVA' : 'PENDENTE',
           // simulado já entra com ciclo (dias grátis ou 1 mês); no modo real o ciclo começa no webhook
           cicloFimEm: simulada ? inicioCiclo() : null,
+          primeiraCobrancaEm,
         },
       })
       return r
@@ -178,15 +182,24 @@ export async function assinaturasRoutes(app: FastifyInstance) {
   // Aviso de encerramento — QUALQUER usuário logado da rede vê a data/hora do corte de acesso
   app.get('/aviso', { preHandler: [app.authenticate] }, async (request) => {
     const redeId = request.user.redeId
-    if (!redeId) return { encerraEm: null }
+    if (!redeId) return { encerraEm: null, cobrancaComecaEm: null }
     const a = await prisma.assinatura.findUnique({
       where: { redeId },
-      select: { status: true, cancelamentoSolicitadoEm: true, cicloFimEm: true },
+      select: { status: true, cancelamentoSolicitadoEm: true, cicloFimEm: true, primeiraCobrancaEm: true },
     })
-    if (a && a.status !== 'CANCELADA' && a.cancelamentoSolicitadoEm && a.cicloFimEm) {
-      return { encerraEm: a.cicloFimEm }
+    if (!a || a.status === 'CANCELADA') return { encerraEm: null, cobrancaComecaEm: null }
+
+    // Encerramento agendado (cancelamento): acesso garantido até o fim do ciclo.
+    const encerraEm = a.cancelamentoSolicitadoEm && a.cicloFimEm ? a.cicloFimEm : null
+
+    // 1ª cobrança a caminho (free trial): avisa quando faltam <= 30 dias corridos.
+    // Não exibe se já há um cancelamento agendado (a cobrança não vai ocorrer).
+    let cobrancaComecaEm: Date | null = null
+    if (a.primeiraCobrancaEm && !a.cancelamentoSolicitadoEm) {
+      const faltamMs = a.primeiraCobrancaEm.getTime() - Date.now()
+      if (faltamMs > 0 && faltamMs <= 30 * 86_400_000) cobrancaComecaEm = a.primeiraCobrancaEm
     }
-    return { encerraEm: null }
+    return { encerraEm, cobrancaComecaEm }
   })
 
   // Assinatura da rede logada

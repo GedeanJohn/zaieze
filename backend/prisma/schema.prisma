@@ -213,6 +213,9 @@ model Assinatura {
   valor                    Decimal          @db.Decimal(12, 2)
   mpPreapprovalId          String? // id da assinatura no Mercado Pago (preapproval); null em modo simulado
   simulada                 Boolean          @default(false)
+  // Data da 1ª cobrança quando há período grátis (free trial): o MP não cobra antes disso.
+  // Usada para avisar o lojista (banner) quando faltam <= 30 dias. Null = sem free trial.
+  primeiraCobrancaEm       DateTime?
   // Política de cancelamento por FIM DE CICLO (vale p/ MP, lojista e admin):
   cicloFimEm               DateTime? // acesso garantido até o fim do ciclo pago vigente
   cancelamentoSolicitadoEm DateTime? // quando o cancelamento foi pedido (null = renovando normalmente)

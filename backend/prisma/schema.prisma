@@ -226,6 +226,9 @@ model Assinatura {
   valor                    Decimal          @db.Decimal(12, 2)
   mpPreapprovalId          String? // id da assinatura no Mercado Pago (preapproval); null em modo simulado
   simulada                 Boolean          @default(false)
+  // Reajustes anuais (IGP-M) já aplicados a ESTE contrato. O próximo aniversário a reajustar é
+  // createdAt + (reajustesAplicados + 1) anos. Usado pelo job de reajuste por aniversário.
+  reajustesAplicados       Int              @default(0)
   // Data da 1ª cobrança quando há período grátis (free trial): o MP não cobra antes disso.
   // Usada para avisar o lojista (banner) quando faltam <= 30 dias. Null = sem free trial.
   primeiraCobrancaEm       DateTime?
@@ -261,6 +264,38 @@ model ReajusteHistorico {
   aplicadoEm  DateTime @default(now())
 
   @@map("reajustes_historico")
+}
+
+/// Tabela de IGP-M acumulado (12 meses) por mês de referência, lançada pelo SUPER_ADMIN.
+/// No aniversário de cada contrato, o sistema aplica a taxa do MÊS ANTERIOR ao aniversário
+/// (= o 12º mês do contrato): ex. contrato de jun/2026 reajusta em jun/2027 com o índice de mai/2027.
+model IndiceIgpm {
+  id            String   @id @default(cuid())
+  ano           Int // ano de referência (ex.: 2027)
+  mes           Int // mês de referência 1..12 (ex.: 5 = maio)
+  percentual    Decimal  @db.Decimal(6, 3) // IGP-M acumulado 12m (%) — pode ser negativo (deflação)
+  registradoPor String? // nome do admin
+  createdAt     DateTime @default(now())
+
+  @@unique([ano, mes])
+  @@map("indices_igpm")
+}
+
+/// Auditoria dos reajustes anuais aplicados a cada assinatura (por aniversário).
+model ReajusteAssinatura {
+  id          String   @id @default(cuid())
+  redeId      String // rede reajustada (sem relação: registro de auditoria, sobrevive à rede)
+  redeNome    String // snapshot do nome da marca
+  ano         Int // mês de referência do índice aplicado
+  mes         Int
+  percentual  Decimal  @db.Decimal(6, 3)
+  valorAntes  Decimal  @db.Decimal(12, 2)
+  valorDepois Decimal  @db.Decimal(12, 2)
+  aplicadoEm  DateTime @default(now())
+
+  @@index([redeId])
+  @@index([aplicadoEm])
+  @@map("reajustes_assinatura")
 }
 
 enum TipoPromocao {

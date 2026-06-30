@@ -81,6 +81,26 @@ export async function cancelarPreapproval(id: string): Promise<void> {
 }
 
 /**
+ * Atualiza o valor da recorrência (preapproval) no Mercado Pago — usado no reajuste anual
+ * por IGP-M. No-op em modo simulado (sem token). O novo valor passa a valer nas próximas cobranças.
+ */
+export async function atualizarValorPreapproval(id: string, valor: number): Promise<void> {
+  if (!env.MERCADOPAGO_ACCESS_TOKEN) return
+  const resp = await fetch(`https://api.mercadopago.com/preapproval/${id}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${env.MERCADOPAGO_ACCESS_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ auto_recurring: { transaction_amount: valor, currency_id: 'BRL' } }),
+  })
+  if (!resp.ok) {
+    const txt = await resp.text()
+    throw Object.assign(new Error(`Mercado Pago respondeu ${resp.status}: ${txt}`), { statusCode: 502 })
+  }
+}
+
+/**
  * Consulta o status de uma assinatura (preapproval) no Mercado Pago.
  * Status possíveis: 'pending' | 'authorized' | 'paused' | 'cancelled'.
  * Usado no webhook para NÃO confiar cegamente na notificação recebida.

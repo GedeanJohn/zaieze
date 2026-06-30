@@ -4,6 +4,7 @@ import { segmentarTodasAsLojas } from './modules/clientes/segmentacao'
 import { redistribuirAtrasados } from './modules/leads/leads.service'
 import { limparMidiaExpirada, limparAudiosAntigos } from './modules/midia/limpeza.service'
 import { encerrarAssinaturasVencidas } from './modules/assinaturas/assinatura.service'
+import { aplicarReajustesIgpm } from './modules/assinaturas/igpm.service'
 import { aplicarDistratoTermos } from './modules/contrato/contrato.service'
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000
@@ -45,6 +46,14 @@ async function main() {
       .catch((err) => app.log.error({ err }, 'Falha no job de termos/assinaturas'))
     aplicarTermos()
     setInterval(aplicarTermos, UM_DIA_MS).unref()
+
+    // Reajuste anual por IGP-M nos contratos existentes: no aniversário de cada contrato aplica
+    // a taxa do mês anterior (12º mês do contrato), se já lançada na tabela. Boot + 24h.
+    const reajustarIgpm = () => aplicarReajustesIgpm()
+      .then((n) => { if (n > 0) app.log.info(`Reajustes IGP-M aplicados (aniversário): ${n}`) })
+      .catch((err) => app.log.error({ err }, 'Falha no reajuste IGP-M por aniversário'))
+    reajustarIgpm()
+    setInterval(reajustarIgpm, UM_DIA_MS).unref()
 
     // Segmentação automática: em produção roda via agendamento diário (cron).
     // No boot só roda se SEGMENTAR_BOOT=true — assim, em dev/demo, o recálculo

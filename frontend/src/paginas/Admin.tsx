@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { api, formataReal, mensagemDeErro, type Plano } from '../api'
 
 interface PlanoAdmin { plano: Plano; nome: string; limite: string; resumo: string; preco: number }
-interface Reajuste { id: string; indice: string; percentual: string; detalhe: Record<string, { de: number; para: number }> | null; aplicadoPor: string | null; aplicadoEm: string }
 interface RedeAdmin {
   id: string; nome: string; slug: string; plano: Plano; ativo: boolean; criadoEm: string; lojas: number; usuarios: number
   assinatura: { plano: Plano; status: string; valor: number; cicloFimEm: string | null; cancelamentoAgendado: boolean; simulada: boolean } | null
@@ -14,10 +13,8 @@ const fmtData = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(
 export default function Admin() {
   const [planos, setPlanos] = useState<PlanoAdmin[]>([])
   const [precos, setPrecos] = useState<Record<string, string>>({})
-  const [reajustes, setReajustes] = useState<Reajuste[]>([])
   const [redes, setRedes] = useState<RedeAdmin[]>([])
   const [promos, setPromos] = useState<Promo[]>([])
-  const [pct, setPct] = useState('')
   const [msg, setMsg] = useState('')
   const [erro, setErro] = useState('')
   const [ocupado, setOcupado] = useState(false)
@@ -27,7 +24,6 @@ export default function Admin() {
       setPlanos(data.planos)
       setPrecos(Object.fromEntries(data.planos.map((p: PlanoAdmin) => [p.plano, String(p.preco)])))
     }).catch((e) => setErro(mensagemDeErro(e)))
-    api.get('/admin/reajustes').then(({ data }) => setReajustes(data.reajustes)).catch(() => {})
     api.get('/admin/redes').then(({ data }) => setRedes(data.redes)).catch(() => {})
     api.get('/admin/promos').then(({ data }) => setPromos(data.promos)).catch(() => {})
   }
@@ -39,19 +35,6 @@ export default function Admin() {
       const corpo = Object.fromEntries(Object.entries(precos).map(([k, v]) => [k, Number(v)]))
       await api.put('/admin/planos', { precos: corpo })
       setMsg('Preços salvos. Valem para novas assinaturas e trocas de plano.')
-      carregar()
-    } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
-  }
-
-  async function aplicarReajuste() {
-    const p = Number(pct)
-    if (!p || p <= 0) { setErro('Informe o IGP-M acumulado (%).'); return }
-    if (!window.confirm(`Reajustar TODOS os planos em ${p}% (IGP-M)? Vale só para novas assinaturas.`)) return
-    setOcupado(true); setMsg(''); setErro('')
-    try {
-      await api.post('/admin/reajuste', { percentual: p })
-      setMsg(`Reajuste de ${p}% aplicado.`)
-      setPct('')
       carregar()
     } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
   }
@@ -77,23 +60,10 @@ export default function Admin() {
           ))}
         </div>
         <div style={{ marginTop: 8 }}><button className="btn" onClick={salvarPrecos} disabled={ocupado}>Salvar preços</button></div>
-
-        <div style={{ borderTop: '1px solid var(--border)', marginTop: 16, paddingTop: 14 }}>
-          <h3 style={{ margin: '0 0 8px' }}>📈 Reajuste por inflação (IGP-M)</h3>
-          <div className="linha-campos" style={{ alignItems: 'end' }}>
-            <div className="campo">
-              <label>IGP-M acumulado (12 meses) %</label>
-              <input type="number" step="0.001" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="ex.: 4.5" />
-            </div>
-            <div><button className="btn secundario" onClick={aplicarReajuste} disabled={ocupado}>Aplicar a todos os planos</button></div>
-          </div>
-          {pct && Number(pct) > 0 && (
-            <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 8 }}>
-              Prévia: {planos.map((p) => `${p.nome} ${formataReal(p.preco)} → ${formataReal(Math.round(p.preco * (1 + Number(pct) / 100) * 100) / 100)}`).join(' · ')}
-            </div>
-          )}
-        </div>
       </div>
+
+      {/* ── Reajuste anual por IGP-M (contratos existentes, por aniversário) ── */}
+      <IgpmSection />
 
       {/* ── Códigos promocionais ── */}
       <PromoSection promos={promos} onChange={carregar} />
@@ -124,29 +94,98 @@ export default function Admin() {
         </table>
       </div>
 
-      {/* ── Histórico de reajustes ── */}
-      {reajustes.length > 0 && (
-        <div className="cartao">
-          <h2 style={{ marginTop: 0 }}>🗂️ Histórico de reajustes</h2>
+    </>
+  )
+}
+
+// ── Reajuste anual por IGP-M (tabela mensal + log dos reajustes por aniversário) ──
+const MESES = ['', 'jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+interface IndiceIgpm { id: string; ano: number; mes: number; percentual: string; registradoPor: string | null }
+interface ReajusteAniv { id: string; redeNome: string; ano: number; mes: number; percentual: string; valorAntes: string; valorDepois: string; aplicadoEm: string }
+
+function IgpmSection() {
+  const agora = new Date()
+  const [indices, setIndices] = useState<IndiceIgpm[]>([])
+  const [log, setLog] = useState<ReajusteAniv[]>([])
+  const [ano, setAno] = useState(String(agora.getFullYear()))
+  const [mes, setMes] = useState(String(agora.getMonth() + 1))
+  const [taxa, setTaxa] = useState('')
+  const [erro, setErro] = useState('')
+  const [ocupado, setOcupado] = useState(false)
+
+  function carregar() {
+    api.get('/admin/igpm').then(({ data }) => setIndices(data.indices)).catch(() => {})
+    api.get('/admin/reajustes-aniversario').then(({ data }) => setLog(data.reajustes)).catch(() => {})
+  }
+  useEffect(() => { carregar() }, [])
+
+  async function salvar(e: React.FormEvent) {
+    e.preventDefault(); setErro(''); setOcupado(true)
+    try {
+      await api.put('/admin/igpm', { ano: Number(ano), mes: Number(mes), percentual: Number(taxa) })
+      setTaxa(''); carregar()
+    } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setOcupado(false) }
+  }
+  async function remover(i: IndiceIgpm) {
+    if (!window.confirm(`Excluir a taxa de ${MESES[i.mes]}/${i.ano}?`)) return
+    await api.delete(`/admin/igpm/${i.ano}/${i.mes}`).catch(() => {}); carregar()
+  }
+
+  return (
+    <div className="cartao">
+      <h2 style={{ marginTop: 0 }}>📈 Reajuste anual por IGP-M</h2>
+      <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
+        Lance o <strong>IGP-M acumulado (12 meses)</strong> de cada mês. No <strong>aniversário de cada contrato</strong>, o sistema
+        aplica automaticamente a taxa do <strong>mês anterior ao aniversário</strong> (o 12º mês do contrato) — ex.: contrato de
+        jun/2026 reajusta em jun/2027 com o índice de mai/2027. Se a taxa do mês ainda não foi lançada, ele aguarda e aplica quando você lançar.
+      </div>
+      <form onSubmit={salvar} className="linha-campos" style={{ alignItems: 'end' }}>
+        <div className="campo"><label>Mês</label>
+          <select value={mes} onChange={(e) => setMes(e.target.value)}>
+            {MESES.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+          </select>
+        </div>
+        <div className="campo"><label>Ano</label><input type="number" min="2020" max="2100" value={ano} onChange={(e) => setAno(e.target.value)} /></div>
+        <div className="campo"><label>IGP-M 12m (%)</label><input type="number" step="0.001" value={taxa} onChange={(e) => setTaxa(e.target.value)} placeholder="ex.: 4.5" required /></div>
+        <div><button className="btn" disabled={ocupado}>Lançar taxa</button></div>
+      </form>
+      {erro && <div className="alerta" style={{ marginTop: 8 }}>{erro}</div>}
+
+      <table style={{ marginTop: 12 }}>
+        <thead><tr><th>Mês/Ano</th><th>IGP-M 12m</th><th>Por</th><th></th></tr></thead>
+        <tbody>
+          {indices.map((i) => (
+            <tr key={i.id}>
+              <td style={{ whiteSpace: 'nowrap' }}>{MESES[i.mes]}/{i.ano}</td>
+              <td>{Number(i.percentual)}%</td>
+              <td style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{i.registradoPor ?? '—'}</td>
+              <td><a href="#" onClick={(e) => { e.preventDefault(); remover(i) }}>excluir</a></td>
+            </tr>
+          ))}
+          {indices.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--ink-soft)' }}>Nenhuma taxa lançada ainda.</td></tr>}
+        </tbody>
+      </table>
+
+      {log.length > 0 && (
+        <>
+          <h3 style={{ margin: '16px 0 6px' }}>🗂️ Reajustes aplicados (por aniversário)</h3>
           <table>
-            <thead><tr><th>Data</th><th>Índice</th><th>%</th><th>Por</th><th>Detalhe</th></tr></thead>
+            <thead><tr><th>Data</th><th>Marca</th><th>Índice</th><th>%</th><th>Valor</th></tr></thead>
             <tbody>
-              {reajustes.map((r) => (
+              {log.map((r) => (
                 <tr key={r.id}>
                   <td style={{ whiteSpace: 'nowrap' }}>{fmtData(r.aplicadoEm)}</td>
-                  <td>{r.indice}</td>
+                  <td>{r.redeNome}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{MESES[r.mes]}/{r.ano}</td>
                   <td>{Number(r.percentual)}%</td>
-                  <td>{r.aplicadoPor ?? '—'}</td>
-                  <td style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
-                    {r.detalhe ? Object.entries(r.detalhe).map(([pl, v]) => `${pl}: ${formataReal(v.de)}→${formataReal(v.para)}`).join(' · ') : '—'}
-                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{formataReal(Number(r.valorAntes))} → {formataReal(Number(r.valorDepois))}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </>
       )}
-    </>
+    </div>
   )
 }
 

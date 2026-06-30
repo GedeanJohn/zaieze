@@ -31,6 +31,37 @@ export async function adminRoutes(app: FastifyInstance) {
   })
   app.get('/reajustes', async () => ({ reajustes: await listarReajustes() }))
 
+  // ── Tabela do IGP-M (acumulado 12m por mês) — base do reajuste anual por aniversário ──
+  app.get('/igpm', async () => ({
+    indices: await prisma.indiceIgpm.findMany({ orderBy: [{ ano: 'desc' }, { mes: 'desc' }] }),
+  }))
+
+  const igpmSchema = z.object({
+    ano: z.coerce.number().int().min(2020).max(2100),
+    mes: z.coerce.number().int().min(1).max(12),
+    percentual: z.coerce.number().min(-50).max(100),
+  })
+  // Lança/atualiza a taxa de um mês (idempotente por ano+mês).
+  app.put('/igpm', async (request) => {
+    const b = igpmSchema.parse(request.body)
+    const indice = await prisma.indiceIgpm.upsert({
+      where: { ano_mes: { ano: b.ano, mes: b.mes } },
+      create: { ano: b.ano, mes: b.mes, percentual: b.percentual, registradoPor: request.user.nome },
+      update: { percentual: b.percentual, registradoPor: request.user.nome },
+    })
+    return { ok: true, indice }
+  })
+  app.delete('/igpm/:ano/:mes', async (request) => {
+    const { ano, mes } = request.params as { ano: string; mes: string }
+    await prisma.indiceIgpm.deleteMany({ where: { ano: Number(ano), mes: Number(mes) } })
+    return { ok: true }
+  })
+
+  // Histórico dos reajustes aplicados por aniversário (auditoria).
+  app.get('/reajustes-aniversario', async () => ({
+    reajustes: await prisma.reajusteAssinatura.findMany({ orderBy: { aplicadoEm: 'desc' }, take: 100 }),
+  }))
+
   // ── Visão multi-tenant: todas as redes (clientes do SaaS) ──
   app.get('/redes', async () => {
     const redes = await prisma.rede.findMany({

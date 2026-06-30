@@ -42,6 +42,8 @@ export default function Campanhas() {
   const [modelos, setModelos] = useState<Modelo[]>([])
   const [mNome, setMNome] = useState('')
   const [mMsg, setMMsg] = useState('')
+  const [mTemplateId, setMTemplateId] = useState('')
+  const [templates, setTemplates] = useState<{ id: string; nome: string; corpo: string; status: string }[]>([])
   const [mSeg, setMSeg] = useState('')
   const [mImg, setMImg] = useState('')
   const [mSalvando, setMSalvando] = useState(false)
@@ -63,6 +65,18 @@ export default function Campanhas() {
       setDisparoTravado(!gerente && data?.disparoVendedoraEditavel === false)
     }).catch(() => { /* sem marca/permite editar */ })
   }, [gerente])
+
+  // Templates HSM aprovados (só o gestor monta as campanhas da marca com template).
+  useEffect(() => {
+    if (!ehGestor) return
+    api.get('/whatsapp/templates').then(({ data }) => setTemplates(data.filter((t: { status: string }) => t.status === 'APROVADO'))).catch(() => {})
+  }, [ehGestor])
+
+  function escolherTemplate(id: string) {
+    setMTemplateId(id)
+    const t = templates.find((x) => x.id === id)
+    if (t) setMMsg(t.corpo)
+  }
 
   // A conexão do WhatsApp passou a ser por MARCA (número oficial da Meta), configurada pelo
   // gestor em "WhatsApp oficial". Não há mais conexão por QR por vendedora.
@@ -110,8 +124,8 @@ export default function Campanhas() {
     e.preventDefault()
     setMSalvando(true); setErro(''); setAviso('')
     try {
-      await api.post('/campanhas/modelos', { nome: mNome, mensagemTemplate: mMsg, segmento: mSeg || null, imagemUrl: mImg || null }, { params: escopo.params })
-      setMNome(''); setMMsg(''); setMSeg(''); setMImg('')
+      await api.post('/campanhas/modelos', { nome: mNome, mensagemTemplate: mMsg, segmento: mSeg || null, imagemUrl: mImg || null, templateId: mTemplateId || null }, { params: escopo.params })
+      setMNome(''); setMMsg(''); setMSeg(''); setMImg(''); setMTemplateId('')
       setAviso('Campanha da marca publicada — já disponível para as vendedoras.')
       carregar()
     } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setMSalvando(false) }
@@ -192,7 +206,14 @@ export default function Campanhas() {
                 {SEGMENTOS.map((s) => <option key={s} value={s}>{s || 'Carteira toda'}</option>)}
               </select>
             </div>
-            <div className="campo"><label>Mensagem</label><textarea value={mMsg} onChange={(e) => setMMsg(e.target.value)} required rows={4} placeholder="Use {primeiroNome}, {loja}, {link}…" /></div>
+            <div className="campo"><label>Template aprovado</label>
+              <select value={mTemplateId} onChange={(e) => escolherTemplate(e.target.value)}>
+                <option value="">— sem template (texto livre, só dentro da janela de 24h) —</option>
+                {templates.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
+              </select>
+              <small style={{ color: 'var(--ink-soft)' }}>Crie templates em “WhatsApp oficial”. Fora da janela de 24h a Meta só entrega via template aprovado.</small>
+            </div>
+            <div className="campo"><label>Mensagem</label><textarea value={mMsg} onChange={(e) => setMMsg(e.target.value)} required rows={4} readOnly={!!mTemplateId} placeholder="Use {primeiroNome}, {loja}, {link}…" /></div>
             <div className="campo"><label>Banner (opcional)</label>
               <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarImagemModelo(f); e.target.value = '' }} />
               {mImg && <img src={mImg} alt="" style={{ marginTop: 8, maxHeight: 120, borderRadius: 8, display: 'block' }} />}

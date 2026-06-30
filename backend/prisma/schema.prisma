@@ -742,6 +742,7 @@ model Campanha {
   nome             String
   segmentoAlvo     SegmentoCliente? // null = lista manual de clientes
   mensagemTemplate String
+  templateId       String? // template HSM (Cloud API) usado no disparo; null = texto livre (janela 24h)
   // contadores do disparo
   enviados         Int              @default(0)
   simulados        Int              @default(0)
@@ -768,6 +769,7 @@ model CampanhaModelo {
   criadaPorId      String
   nome             String
   mensagemTemplate String
+  templateId       String? // template HSM (Cloud API) vinculado à campanha da marca
   segmentoAlvo     SegmentoCliente? // segmento sugerido (null = carteira toda)
   imagemUrl        String? // peça/banner (exibida no catálogo; envio pelo WhatsApp na migração oficial)
   ativa            Boolean          @default(true) // disponível para as vendedoras dispararem
@@ -780,6 +782,38 @@ model CampanhaModelo {
 
   @@index([redeId, ativa])
   @@map("campanhas_modelo")
+}
+
+// Situação de um template HSM no ciclo de aprovação da Meta.
+enum StatusTemplate {
+  RASCUNHO // criado no painel, ainda não enviado à Meta
+  PENDENTE // submetido à Meta, aguardando aprovação
+  APROVADO // aprovado — pode ser usado em campanhas (e fora da janela de 24h)
+  REJEITADO // recusado pela Meta (ver motivoRejeicao)
+  PAUSADO // pausado pela Meta (queda de qualidade)
+}
+
+/// Template de mensagem (HSM) por marca para a WhatsApp Cloud API. O gestor escreve o corpo
+/// com placeholders nomeados ({primeiroNome}, {loja}, {link}...); convertemos para {{1}},{{2}}
+/// na Meta e guardamos a ORDEM das variáveis para montar os parâmetros no envio.
+model TemplateWhatsapp {
+  id             String         @id @default(cuid())
+  redeId         String
+  nome           String // nome de exibição (ex.: "Novidades da semana")
+  metaNome       String // nome na Meta (minúsculas_com_underscore) — identificador do template
+  idioma         String         @default("pt_BR")
+  categoria      String         @default("MARKETING") // MARKETING | UTILITY
+  corpo          String // texto com placeholders nomeados
+  variaveis      Json // ordem dos placeholders → {{1}},{{2}}... ex.: ["primeiroNome","loja","link"]
+  status         StatusTemplate @default(RASCUNHO)
+  metaId         String? // id do template na Meta
+  motivoRejeicao String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([redeId, metaNome, idioma])
+  @@index([redeId, status])
+  @@map("templates_whatsapp")
 }
 
 model MensagemWhatsapp {

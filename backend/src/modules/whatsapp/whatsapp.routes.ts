@@ -6,7 +6,7 @@ import { env } from '../../env'
 import { lojaIdDe, redeIdDe } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
 import { enviarWhatsapp, enviarWhatsappAudio } from './whatsapp.service'
-import { metaConfigurado, cifrar, decifrar, podeCifrar, verificarNumero, enviarTexto } from './meta.service'
+import { metaConfigurado, cifrar, decifrar, podeCifrar, verificarNumero, enviarTexto, criarTemplateMeta, consultarTemplatesMeta, placeholdersDoCorpo, corpoParaMeta, mapearStatusTemplate } from './meta.service'
 import { marcarLeadAtendido, garantirCicloAberto } from '../leads/leads.service'
 import { transcodificarAudioOpus, salvarUploadLocal } from '../midia/midia.routes'
 import { enviarParaR2 } from '../midia/r2.service'
@@ -163,6 +163,81 @@ export async function whatsappRoutes(app: FastifyInstance) {
     const r = await enviarTexto({ rede, telefone, texto: 'Mensagem de teste do ZAIEZE ✅ (WhatsApp oficial conectado).' })
     if (r.status === 'FALHA') return reply.code(502).send({ erro: r.erro ?? 'Falha ao enviar.' })
     return { ok: true, status: r.status, waMessageId: r.waMessageId ?? null }
+  })
+
+  // ─────────── Templates HSM (mensagens aprovadas p/ campanhas fora da janela de 24h) ───────────
+
+  // Exemplos por placeholder (a Meta exige um exemplo por parâmetro {{n}} ao submeter).
+  const EXEMPLO: Record<string, string> = {
+    primeiroNome: 'Maria', nome: 'Maria Silva', loja: 'Loja Exemplo', vendedora: 'Ana',
+    link: 'https://loja.zaieze.com/ana', diasSemCompra: '30', totalGasto: 'R$ 250,00', segmento: 'VIP',
+  }
+  const exemploDe = (v: string) => EXEMPLO[v] ?? 'exemplo'
+  const slugMeta = (nome: string) =>
+    nome.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'template'
+
+  const templateSchema = z.object({
+    nome: z.string().min(2).max(60),
+    categoria: z.enum(['MARKETING', 'UTILITY']).default('MARKETING'),
+    corpo: z.string().min(5).max(1024),
+    idioma: z.string().default('pt_BR'),
+  })
+
+  app.get('/templates', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request) => {
+    const redeId = redeIdDe(request)
+    return prisma.templateWhatsapp.findMany({ where: { redeId }, orderBy: { createdAt: 'desc' } })
+  })
+
+  app.post('/templates', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
+    const redeId = redeIdDe(request)
+    const b = templateSchema.parse(request.body)
+    const variaveis = placeholdersDoCorpo(b.corpo)
+    const metaNome = slugMeta(b.nome)
+    const rede = await prisma.rede.findUniqueOrThrow({ where: { id: redeId }, select: { waWabaId: true, waTokenCifrado: true } })
+    const configurado = !!(rede.waWabaId && rede.waTokenCifrado)
+
+    // Sem WABA conectada (modo simulado) → já entra APROVADO para permitir testar campanhas.
+    // Com WABA → submete à Meta e fica com o status retornado (geralmente PENDENTE).
+    let status: 'RASCUNHO' | 'PENDENTE' | 'APROVADO' | 'REJEITADO' | 'PAUSADO' = 'APROVADO'
+    let metaId: string | null = null
+    if (configurado) {
+      const r = await criarTemplateMeta({
+        wabaId: rede.waWabaId!, token: decifrar(rede.waTokenCifrado!), metaNome, idioma: b.idioma,
+        categoria: b.categoria, corpoMeta: corpoParaMeta(b.corpo, variaveis), exemplos: variaveis.map(exemploDe),
+      })
+      if (!r.ok) return reply.code(502).send({ erro: r.erro ?? 'Falha ao submeter o template à Meta.' })
+      status = mapearStatusTemplate(r.status); metaId = r.metaId ?? null
+    }
+    try {
+      const t = await prisma.templateWhatsapp.create({
+        data: { redeId, nome: b.nome, metaNome, idioma: b.idioma, categoria: b.categoria, corpo: b.corpo, variaveis, status, metaId },
+      })
+      return reply.code(201).send(t)
+    } catch {
+      return reply.code(409).send({ erro: 'Já existe um template com esse nome. Escolha outro.' })
+    }
+  })
+
+  // Sincroniza o status dos templates com a Meta (aprovado/rejeitado/pausado).
+  app.post('/templates/sync', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
+    const redeId = redeIdDe(request)
+    const rede = await prisma.rede.findUniqueOrThrow({ where: { id: redeId }, select: { waWabaId: true, waTokenCifrado: true } })
+    if (!(rede.waWabaId && rede.waTokenCifrado)) return reply.code(422).send({ erro: 'Conecte a WABA antes de sincronizar.' })
+    const remotos = await consultarTemplatesMeta(rede.waWabaId, decifrar(rede.waTokenCifrado))
+    let n = 0
+    for (const r of remotos) {
+      const upd = await prisma.templateWhatsapp.updateMany({ where: { redeId, metaNome: r.name }, data: { status: mapearStatusTemplate(r.status), metaId: r.id } })
+      n += upd.count
+    }
+    return { ok: true, sincronizados: n }
+  })
+
+  app.delete('/templates/:id', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request) => {
+    const redeId = redeIdDe(request)
+    const { id } = request.params as { id: string }
+    await prisma.templateWhatsapp.deleteMany({ where: { id, redeId } })
+    return { ok: true }
   })
 
   // ─────────── Caixa de entrada / conversas ───────────

@@ -19,6 +19,7 @@ const criarSchema = z.object({
   segmento: z.enum(SEGMENTOS).optional(),
   clienteIds: z.array(z.string()).optional(),
   mensagemTemplate: z.string().min(5),
+  templateId: z.string().optional(),
 })
 
 const sugerirSchema = z.object({ segmento: z.enum(SEGMENTOS).optional(), contexto: z.string().optional() })
@@ -29,7 +30,14 @@ const modeloSchema = z.object({
   segmento: z.enum(SEGMENTOS).nullish(),
   imagemUrl: z.string().nullish(),
   ativa: z.boolean().optional(),
+  templateId: z.string().nullish(),
 })
+
+/** Valida que o template existe na rede e está APROVADO (pré-requisito para disparo fora da janela). */
+async function templateAprovado(redeId: string, templateId: string | null | undefined) {
+  if (!templateId) return null
+  return prisma.templateWhatsapp.findFirst({ where: { id: templateId, redeId, status: 'APROVADO' }, select: { id: true, corpo: true } })
+}
 
 /** Vendedora só age sobre a própria carteira; gerente/gestor sobre toda a loja. */
 function filtroCarteira(request: FastifyRequest, lojaId: string): Prisma.ClienteWhereInput {
@@ -125,8 +133,11 @@ export async function campanhasRoutes(app: FastifyInstance) {
   app.post('/modelos', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
     const redeId = redeIdDe(request)
     const b = modeloSchema.parse(request.body)
+    if (b.templateId && !(await templateAprovado(redeId, b.templateId))) {
+      return reply.code(422).send({ erro: 'Template inválido ou ainda não aprovado pela Meta.' })
+    }
     const m = await prisma.campanhaModelo.create({
-      data: { redeId, criadaPorId: request.user.sub, nome: b.nome, mensagemTemplate: b.mensagemTemplate, segmentoAlvo: b.segmento ?? null, imagemUrl: b.imagemUrl ?? null, ativa: b.ativa ?? true },
+      data: { redeId, criadaPorId: request.user.sub, nome: b.nome, mensagemTemplate: b.mensagemTemplate, segmentoAlvo: b.segmento ?? null, imagemUrl: b.imagemUrl ?? null, ativa: b.ativa ?? true, templateId: b.templateId ?? null },
       select: { id: true },
     })
     return reply.code(201).send(m)
@@ -147,6 +158,7 @@ export async function campanhasRoutes(app: FastifyInstance) {
         ...(b.segmento !== undefined ? { segmentoAlvo: b.segmento ?? null } : {}),
         ...(b.imagemUrl !== undefined ? { imagemUrl: b.imagemUrl ?? null } : {}),
         ...(b.ativa !== undefined ? { ativa: b.ativa } : {}),
+        ...(b.templateId !== undefined ? { templateId: b.templateId ?? null } : {}),
       },
     })
     return { ok: true }
@@ -178,11 +190,11 @@ export async function campanhasRoutes(app: FastifyInstance) {
     if (clientes.length === 0) return reply.code(422).send({ erro: 'Nenhum cliente no público-alvo' })
 
     const campanha = await prisma.campanha.create({
-      data: { lojaId, criadaPorId: request.user.sub, modeloId: modelo.id, nome: modelo.nome, segmentoAlvo: seg ?? null, mensagemTemplate: modelo.mensagemTemplate },
+      data: { lojaId, criadaPorId: request.user.sub, modeloId: modelo.id, nome: modelo.nome, segmentoAlvo: seg ?? null, mensagemTemplate: modelo.mensagemTemplate, templateId: modelo.templateId ?? null },
     })
     const res = await dispararParaClientes({
       lojaId, template: modelo.mensagemTemplate, origem: 'CAMPANHA',
-      campanhaId: campanha.id, clientes, vendedoraFallbackId: request.user.sub,
+      campanhaId: campanha.id, templateId: modelo.templateId ?? undefined, clientes, vendedoraFallbackId: request.user.sub,
     })
     await prisma.campanha.update({ where: { id: campanha.id }, data: { enviados: res.enviados, simulados: res.simulados, falhas: res.falhas, semConsentimento: res.semConsentimento } })
     return reply.code(201).send({ campanhaId: campanha.id, ...res })
@@ -201,20 +213,29 @@ export async function campanhasRoutes(app: FastifyInstance) {
     if (clientes.length === 0) return reply.code(422).send({ erro: 'Nenhum cliente no público-alvo selecionado' })
 
     // Regra do gestor: se a vendedora não pode editar o disparo, força o texto padrão da marca.
-    const rede = await prisma.loja.findUnique({
+    const loja = await prisma.loja.findUnique({
       where: { id: lojaId },
-      select: { rede: { select: { textoDisparoPadrao: true, disparoVendedoraEditavel: true } } },
+      select: { redeId: true, rede: { select: { textoDisparoPadrao: true, disparoVendedoraEditavel: true } } },
     })
-    const travada = request.user.role === 'VENDEDORA' && rede?.rede && !rede.rede.disparoVendedoraEditavel
-    const template = travada && rede?.rede?.textoDisparoPadrao ? rede.rede.textoDisparoPadrao : body.mensagemTemplate
+
+    // Template HSM (opcional): valida que está aprovado; com template, ignora a trava de texto.
+    let templateId: string | undefined
+    if (body.templateId) {
+      const t = await templateAprovado(loja!.redeId, body.templateId)
+      if (!t) return reply.code(422).send({ erro: 'Template inválido ou ainda não aprovado pela Meta.' })
+      templateId = t.id
+    }
+
+    const travada = !templateId && request.user.role === 'VENDEDORA' && loja?.rede && !loja.rede.disparoVendedoraEditavel
+    const template = travada && loja?.rede?.textoDisparoPadrao ? loja.rede.textoDisparoPadrao : body.mensagemTemplate
 
     const campanha = await prisma.campanha.create({
-      data: { lojaId, criadaPorId: request.user.sub, nome: body.nome, segmentoAlvo: body.segmento ?? null, mensagemTemplate: template },
+      data: { lojaId, criadaPorId: request.user.sub, nome: body.nome, segmentoAlvo: body.segmento ?? null, mensagemTemplate: template, templateId: templateId ?? null },
     })
 
     const res = await dispararParaClientes({
       lojaId, template, origem: 'CAMPANHA',
-      campanhaId: campanha.id, clientes, vendedoraFallbackId: request.user.sub,
+      campanhaId: campanha.id, templateId, clientes, vendedoraFallbackId: request.user.sub,
     })
 
     await prisma.campanha.update({

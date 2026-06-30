@@ -169,6 +169,107 @@ export default function WhatsApp() {
         </div>
         {!cfg.conectado && <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 6 }}>Conecte o número antes de testar.</p>}
       </div>
+
+      <TemplatesSection conectado={cfg.conectado} />
     </>
+  )
+}
+
+// ── Templates HSM (mensagens aprovadas p/ campanhas fora da janela de 24h) ──
+const PLACEHOLDERS = ['{primeiroNome}', '{nome}', '{loja}', '{vendedora}', '{link}', '{diasSemCompra}', '{totalGasto}', '{segmento}']
+interface Template { id: string; nome: string; metaNome: string; categoria: string; corpo: string; status: string; motivoRejeicao: string | null }
+const seloStatus: Record<string, string> = { APROVADO: 'ok', PENDENTE: 'ATACADO', REJEITADO: 'baixo', PAUSADO: 'baixo', RASCUNHO: 'ATACADO' }
+
+function TemplatesSection({ conectado }: { conectado: boolean }) {
+  const [lista, setLista] = useState<Template[]>([])
+  const [nome, setNome] = useState('')
+  const [categoria, setCategoria] = useState('MARKETING')
+  const [corpo, setCorpo] = useState('')
+  const [erro, setErro] = useState('')
+  const [ok, setOk] = useState('')
+  const [ocupado, setOcupado] = useState(false)
+
+  function carregar() { api.get('/whatsapp/templates').then(({ data }) => setLista(data)).catch(() => {}) }
+  useEffect(() => { carregar() }, [])
+  function aviso(m: string) { setOk(m); setTimeout(() => setOk(''), 3000) }
+
+  async function sugerir() {
+    setErro('')
+    try { const { data } = await api.post('/campanhas/sugerir', {}); setCorpo(data.texto) }
+    catch (e) { setErro(mensagemDeErro(e)) }
+  }
+  async function criar(e: React.FormEvent) {
+    e.preventDefault(); setErro(''); setOcupado(true)
+    try {
+      await api.post('/whatsapp/templates', { nome, categoria, corpo })
+      setNome(''); setCorpo(''); carregar()
+      aviso(conectado ? 'Template enviado à Meta para aprovação.' : 'Template criado (aprovado no modo simulado).')
+    } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setOcupado(false) }
+  }
+  async function sincronizar() {
+    setErro('')
+    try { const { data } = await api.post('/whatsapp/templates/sync'); aviso(`Sincronizados: ${data.sincronizados}.`); carregar() }
+    catch (e) { setErro(mensagemDeErro(e)) }
+  }
+  async function remover(t: Template) {
+    if (!window.confirm(`Excluir o template "${t.nome}"?`)) return
+    await api.delete(`/whatsapp/templates/${t.id}`).catch(() => {}); carregar()
+  }
+
+  return (
+    <div className="cartao">
+      <h2 style={{ marginTop: 0 }}>📝 Templates de mensagem</h2>
+      <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
+        Campanhas e réguas vão para clientes <strong>fora da janela de 24h</strong> → a Meta só entrega via <strong>template aprovado</strong>.
+        Escreva o corpo com os placeholders abaixo; convertemos e submetemos à Meta automaticamente.
+        {!conectado && <> <em>Sem a WABA conectada, o template entra como aprovado (modo simulado) para você testar.</em></>}
+      </div>
+
+      {erro && <div className="alerta">{erro}</div>}
+      {ok && <div className="sucesso">{ok}</div>}
+
+      <form onSubmit={criar}>
+        <div className="linha-campos">
+          <div className="campo"><label>Nome do template</label><input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Novidades da semana" required minLength={2} /></div>
+          <div className="campo"><label>Categoria</label>
+            <select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+              <option value="MARKETING">Marketing</option>
+              <option value="UTILITY">Utilidade</option>
+            </select>
+          </div>
+        </div>
+        <div className="campo">
+          <label>Corpo da mensagem</label>
+          <textarea rows={3} value={corpo} onChange={(e) => setCorpo(e.target.value)} placeholder="Oi {primeiroNome}! 😍 Novidades na {loja}. Veja: {link}" required minLength={5} />
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 8 }}>
+          Placeholders: {PLACEHOLDERS.map((p) => <code key={p} style={{ marginRight: 6 }}>{p}</code>)}
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" className="btn secundario" onClick={sugerir}>✨ Sugerir com IA</button>
+          <button className="btn" disabled={ocupado}>{ocupado ? 'Enviando…' : 'Criar template'}</button>
+        </div>
+      </form>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
+        <h3 style={{ margin: 0 }}>Templates ({lista.length})</h3>
+        <button type="button" className="btn secundario" onClick={sincronizar} disabled={!conectado} title={conectado ? '' : 'Conecte a WABA'}>Sincronizar status</button>
+      </div>
+      <table style={{ marginTop: 8 }}>
+        <thead><tr><th>Nome</th><th>Categoria</th><th>Status</th><th>Corpo</th><th></th></tr></thead>
+        <tbody>
+          {lista.map((t) => (
+            <tr key={t.id}>
+              <td>{t.nome}<div style={{ fontSize: 11, color: 'var(--ink-soft)' }}>{t.metaNome}</div></td>
+              <td>{t.categoria === 'MARKETING' ? 'Marketing' : 'Utilidade'}</td>
+              <td><span className={`selo ${seloStatus[t.status] ?? 'ATACADO'}`}>{t.status}</span>{t.motivoRejeicao ? <div style={{ fontSize: 11, color: 'var(--erro, #c62828)' }}>{t.motivoRejeicao}</div> : null}</td>
+              <td style={{ fontSize: 12, color: 'var(--ink-soft)', maxWidth: 320 }}>{t.corpo}</td>
+              <td><a href="#" onClick={(e) => { e.preventDefault(); remover(t) }}>excluir</a></td>
+            </tr>
+          ))}
+          {lista.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--ink-soft)' }}>Nenhum template ainda.</td></tr>}
+        </tbody>
+      </table>
+    </div>
   )
 }

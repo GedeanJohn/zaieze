@@ -1,6 +1,7 @@
 import type { OrigemMensagem } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { aplicarTemplate, enviarWhatsapp } from './whatsapp.service'
+import { enviarTemplate } from './meta.service'
 import { garantirSlugCatalogo, urlCatalogoPublica } from '../catalogo/catalogo.routes'
 import { planoInclui } from '../../plugins/planos'
 
@@ -37,6 +38,7 @@ export async function dispararParaClientes(opts: {
   origem: OrigemMensagem
   campanhaId?: string
   grupoId?: string
+  templateId?: string // template HSM (Cloud API): envia por template aprovado (fora da janela de 24h)
   clientes: ClienteAlvo[]
   vendedoraFallbackId?: string
 }): Promise<ResultadoDisparo> {
@@ -46,6 +48,14 @@ export async function dispararParaClientes(opts: {
   })
   // Número oficial da marca (Cloud API). Sem config → envio SIMULADO.
   const redeWA = { waPhoneNumberId: loja.rede.waPhoneNumberId, waTokenCifrado: loja.rede.waTokenCifrado }
+
+  // Template HSM (quando informado): usa o corpo do template e envia por template (params posicionais).
+  const tpl = opts.templateId
+    ? await prisma.templateWhatsapp.findUnique({ where: { id: opts.templateId }, select: { metaNome: true, idioma: true, corpo: true, variaveis: true } })
+    : null
+  const variaveis = Array.isArray(tpl?.variaveis) ? (tpl!.variaveis as string[]) : []
+  const corpoBase = tpl?.corpo ?? opts.template
+
   const res: ResultadoDisparo = { alcance: opts.clientes.length, enviados: 0, simulados: 0, falhas: 0, semConsentimento: 0, semVendedora: 0 }
 
   const ids = [...new Set(opts.clientes.map((c) => c.vendedoraId ?? opts.vendedoraFallbackId).filter((v): v is string => !!v))]
@@ -77,20 +87,16 @@ export async function dispararParaClientes(opts: {
 
     const dias = c.ultimaCompraEm ? Math.floor((Date.now() - c.ultimaCompraEm.getTime()) / 86_400_000) : null
     const link = links.get(vend.id) ?? ''
-    let texto = aplicarTemplate(opts.template, {
-      nome: c.nome,
-      loja: loja.nome,
-      vendedora: vend.nome,
-      totalGasto: num(c.totalGasto),
-      diasSemCompra: dias,
-      segmento: c.segmento,
-      link,
-    })
-    // Garante que o link da vendedora vá na mensagem mesmo quando o template não usa {link}.
-    if (link && !opts.template.includes('{link}')) texto = `${texto}\n\n👉 Veja o catálogo: ${link}`
-    // Fase 1: envio por texto (Cloud API). Campanhas estão fora da janela de 24h → a Meta só
-    // entregará via TEMPLATE aprovado (Fase 2); até lá, sem config = SIMULADA, com config = FALHA.
-    const r = await enviarWhatsapp({ rede: redeWA, telefone: c.telefone, texto })
+    const dados = { nome: c.nome, loja: loja.nome, vendedora: vend.nome, totalGasto: num(c.totalGasto), diasSemCompra: dias, segmento: c.segmento, link }
+    let texto = aplicarTemplate(corpoBase, dados)
+    // Sem template: garante o link na mensagem mesmo quando o corpo não usa {link} (texto livre).
+    if (!tpl && link && !corpoBase.includes('{link}')) texto = `${texto}\n\n👉 Veja o catálogo: ${link}`
+
+    // Com template HSM → envia por template (params posicionais na ordem das variáveis); entrega
+    // fora da janela de 24h. Sem template → texto livre (só entrega dentro da janela; senão SIMULADA/FALHA).
+    const r = tpl
+      ? await enviarTemplate({ rede: redeWA, telefone: c.telefone, templateNome: tpl.metaNome, idioma: tpl.idioma, params: variaveis.map((v) => ({ texto: aplicarTemplate(`{${v}}`, dados) })) })
+      : await enviarWhatsapp({ rede: redeWA, telefone: c.telefone, texto })
     const status = r.status
 
     await prisma.mensagemWhatsapp.create({
@@ -106,6 +112,7 @@ export async function dispararParaClientes(opts: {
         telefone: c.telefone,
         texto,
         waMessageId: r.waMessageId ?? null,
+        templateNome: tpl?.metaNome ?? null,
       },
     })
 

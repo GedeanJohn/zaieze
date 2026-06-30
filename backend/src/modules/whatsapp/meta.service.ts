@@ -137,6 +137,86 @@ export async function enviarTemplate(opts: {
   })
 }
 
+// ─────────────────────────── Templates HSM ───────────────────────────
+
+/** Extrai os placeholders nomeados do corpo, na ordem de 1ª aparição (distintos). */
+export function placeholdersDoCorpo(corpo: string): string[] {
+  const ordem: string[] = []
+  for (const m of corpo.matchAll(/\{(\w+)\}/g)) {
+    const nome = m[1]
+    if (!ordem.includes(nome)) ordem.push(nome)
+  }
+  return ordem
+}
+
+/** Converte o corpo com placeholders nomeados para o formato da Meta ({{1}},{{2}}...). */
+export function corpoParaMeta(corpo: string, variaveis: string[]): string {
+  let out = corpo
+  variaveis.forEach((v, i) => { out = out.replaceAll(`{${v}}`, `{{${i + 1}}}`) })
+  return out
+}
+
+/** Mapeia o status do template da Meta para o nosso enum. */
+export function mapearStatusTemplate(s: string | undefined): 'APROVADO' | 'PENDENTE' | 'REJEITADO' | 'PAUSADO' {
+  switch ((s ?? '').toUpperCase()) {
+    case 'APPROVED': return 'APROVADO'
+    case 'REJECTED': return 'REJEITADO'
+    case 'PAUSED':
+    case 'DISABLED': return 'PAUSADO'
+    default: return 'PENDENTE'
+  }
+}
+
+/** Submete um template à Meta para aprovação. Retorna o id e o status iniciais. */
+export async function criarTemplateMeta(opts: {
+  wabaId: string
+  token: string
+  metaNome: string
+  idioma: string
+  categoria: string
+  corpoMeta: string
+  exemplos: string[] // 1 exemplo por parâmetro {{n}}
+}): Promise<{ ok: boolean; metaId?: string; status?: string; erro?: string }> {
+  const body: Record<string, unknown> = {
+    name: opts.metaNome,
+    language: opts.idioma,
+    category: opts.categoria,
+    components: [
+      {
+        type: 'BODY',
+        text: opts.corpoMeta,
+        ...(opts.exemplos.length > 0 ? { example: { body_text: [opts.exemplos] } } : {}),
+      },
+    ],
+  }
+  try {
+    const resp = await fetch(graphUrl(`${opts.wabaId}/message_templates`), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${opts.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = (await resp.json().catch(() => ({}))) as { id?: string; status?: string; error?: { message?: string } }
+    if (!resp.ok) return { ok: false, erro: data.error?.message ?? `HTTP ${resp.status}` }
+    return { ok: true, metaId: data.id, status: data.status }
+  } catch (e) {
+    return { ok: false, erro: String(e) }
+  }
+}
+
+/** Lista os templates da WABA na Meta (nome + status) — usado para sincronizar o status. */
+export async function consultarTemplatesMeta(wabaId: string, token: string): Promise<{ name: string; status: string; id: string }[]> {
+  try {
+    const resp = await fetch(graphUrl(`${wabaId}/message_templates?fields=name,status,id&limit=200`), {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!resp.ok) return []
+    const data = (await resp.json()) as { data?: { name: string; status: string; id: string }[] }
+    return data.data ?? []
+  } catch {
+    return []
+  }
+}
+
 /**
  * Confere se o número/token estão válidos (usado ao salvar a config). Faz um GET no número.
  * Retorna o display_phone_number quando ok.

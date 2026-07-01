@@ -90,9 +90,9 @@ export type Plano = 'START' | 'PRO' | 'ELITE'
 const ORDEM_PLANO: Record<Plano, number> = { START: 0, PRO: 1, ELITE: 2 }
 
 export const FEATURE_MIN: Record<string, Plano> = {
-  vendas: 'START', produtos: 'START', estoque: 'START', clientes: 'START', dashboard: 'START', forma_recebimento: 'START', whatsapp: 'START', multi_loja: 'START', funil: 'START', atacado: 'START',
+  vendas: 'START', produtos: 'START', estoque: 'START', clientes: 'START', dashboard: 'START', forma_recebimento: 'START', whatsapp: 'START', multi_loja: 'START', funil: 'START', atacado: 'START', portal_cliente: 'START',
   crm_segmentacao: 'PRO', gamificacao: 'PRO',
-  radar: 'ELITE', estoque_inteligente: 'ELITE', ia_avancada: 'ELITE', portal_cliente: 'ELITE',
+  radar: 'ELITE', estoque_inteligente: 'ELITE', ia_avancada: 'ELITE',
 }
 
 // Rótulos amigáveis das funcionalidades (tela de Planos/Upgrade)

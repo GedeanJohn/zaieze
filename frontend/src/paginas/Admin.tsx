@@ -29,6 +29,16 @@ export default function Admin() {
   }
   useEffect(() => { carregar() }, [])
 
+  async function ativarCortesia(r: RedeAdmin) {
+    if (!window.confirm(`Ativar ${r.nome} em modo CORTESIA (grátis)? Destrava o acesso e cancela qualquer cobrança pendente no Mercado Pago.`)) return
+    setOcupado(true); setMsg(''); setErro('')
+    try {
+      await api.post(`/admin/redes/${r.id}/ativar-cortesia`)
+      setMsg(`${r.nome} ativada (cortesia). O lojista já pode acessar.`)
+      carregar()
+    } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
+  }
+
   async function salvarPrecos() {
     setOcupado(true); setMsg(''); setErro('')
     try {
@@ -72,7 +82,7 @@ export default function Admin() {
       <div className="cartao">
         <h2 style={{ marginTop: 0 }}>🏢 Redes (clientes) · {redes.length}</h2>
         <table>
-          <thead><tr><th>Marca</th><th>Endereço</th><th>Plano</th><th>Assinatura</th><th>Lojas</th><th>Usuários</th><th>Desde</th></tr></thead>
+          <thead><tr><th>Marca</th><th>Endereço</th><th>Plano</th><th>Assinatura</th><th>Lojas</th><th>Usuários</th><th>Desde</th><th>Ações</th></tr></thead>
           <tbody>
             {redes.map((r) => (
               <tr key={r.id} style={{ opacity: r.ativo ? 1 : 0.5 }}>
@@ -87,9 +97,14 @@ export default function Admin() {
                 <td>{r.lojas}</td>
                 <td>{r.usuarios}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{fmtData(r.criadoEm)}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {(!r.ativo || r.assinatura?.status === 'PENDENTE')
+                    ? <a href="#" onClick={(e) => { e.preventDefault(); ativarCortesia(r) }} style={{ color: '#16a34a', fontWeight: 600 }}>Ativar (cortesia)</a>
+                    : <span style={{ color: 'var(--ink-soft)' }}>—</span>}
+                </td>
               </tr>
             ))}
-            {redes.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--ink-soft)' }}>Nenhuma rede ainda.</td></tr>}
+            {redes.length === 0 && <tr><td colSpan={8} style={{ color: 'var(--ink-soft)' }}>Nenhuma rede ainda.</td></tr>}
           </tbody>
         </table>
       </div>

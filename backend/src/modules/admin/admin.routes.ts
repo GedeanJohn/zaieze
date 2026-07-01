@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { aplicarReajuste, definirPrecos, listarPlanos, listarReajustes } from '../planos/planos.service'
 import { normalizarCodigo } from '../promo/promo.service'
+import { cancelarPreapproval, mpConfigurado } from '../assinaturas/mercadopago.service'
 
 const num = (v: unknown) => Number(v ?? 0)
 
@@ -84,6 +85,34 @@ export async function adminRoutes(app: FastifyInstance) {
           : null,
       })),
     }
+  })
+
+  // Ativa uma rede em modo CORTESIA (grátis): destrava assinaturas presas em PENDENTE — ex.: adesão
+  // que não concluiu o pagamento, ou cupom que deixou o valor zerado. Marca simulada/valor 0 e
+  // cancela (best-effort) qualquer preapproval pendente no Mercado Pago.
+  app.post('/redes/:id/ativar-cortesia', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const rede = await prisma.rede.findUnique({ where: { id }, include: { assinatura: true } })
+    if (!rede) return reply.code(404).send({ erro: 'Rede não encontrada' })
+
+    if (rede.assinatura?.mpPreapprovalId && mpConfigurado()) {
+      await cancelarPreapproval(rede.assinatura.mpPreapprovalId).catch(() => { /* pendente/sem efeito */ })
+    }
+
+    await prisma.$transaction([
+      prisma.rede.update({ where: { id }, data: { ativo: true } }),
+      ...(rede.assinatura
+        ? [prisma.assinatura.update({
+            where: { redeId: id },
+            data: {
+              status: 'ATIVA', simulada: true, valor: 0, mpPreapprovalId: null,
+              cancelamentoSolicitadoEm: null, cancelamentoOrigem: null,
+              cicloFimEm: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+            },
+          })]
+        : []),
+    ])
+    return { ok: true }
   })
 
   // ── Códigos promocionais ──

@@ -16,7 +16,8 @@ export default function Checkout() {
   const [dominio, setDominio] = useState('zaieze.com')
   const [planos, setPlanos] = useState<PlanoInfo[]>([])
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checando' | 'ok' | 'indisponivel'>('idle')
-  const [codigoPromo, setCodigoPromo] = useState('')
+  // Pré-preenche o cupom pela URL (?cupom= ou ?codigo=) — permite compartilhar um link já com o cupom.
+  const [codigoPromo, setCodigoPromo] = useState((params.get('cupom') || params.get('codigo') || '').toUpperCase())
   const [promo, setPromo] = useState<PromoInfo | null>(null)
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)

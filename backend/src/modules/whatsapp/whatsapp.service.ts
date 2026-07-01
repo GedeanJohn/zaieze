@@ -1,4 +1,4 @@
-import { enviarTexto, type EnvioResultado, type RedeWA } from './meta.service'
+import { enviarTexto, uploadMidia, enviarMidia, type EnvioResultado, type RedeWA } from './meta.service'
 
 export interface DadosTemplate {
   nome: string
@@ -39,9 +39,11 @@ export async function enviarWhatsapp(opts: { rede: RedeWA; telefone: string; tex
 }
 
 /**
- * Mensagem de voz (PTT) — na Cloud API exige upload de mídia + tipo audio (Fase 3).
- * Por ora registra como SIMULADA (não envia o áudio de verdade).
+ * Mensagem de voz (PTT) pela Cloud API: sobe o áudio (OGG/Opus) como mídia e envia (tipo audio).
+ * Só dentro da janela de 24h (áudio é mensagem de sessão). Sem config → SIMULADA.
  */
-export async function enviarWhatsappAudio(_opts: { rede: RedeWA; telefone: string; audioUrl: string }): Promise<EnvioResultado> {
-  return { status: 'SIMULADA' }
+export async function enviarWhatsappAudio(opts: { rede: RedeWA; telefone: string; buffer: Buffer }): Promise<EnvioResultado> {
+  const mediaId = await uploadMidia({ rede: opts.rede, buffer: opts.buffer, mime: 'audio/ogg', filename: 'audio.ogg' })
+  if (!mediaId) return { status: 'SIMULADA' } // sem WABA (ou upload indisponível) → registra simulado
+  return enviarMidia({ rede: opts.rede, telefone: opts.telefone, tipo: 'audio', mediaId })
 }

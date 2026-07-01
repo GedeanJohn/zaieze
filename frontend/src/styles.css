@@ -578,6 +578,8 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 @keyframes cz-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
 /* Player de áudio dentro da bolha */
 .cz-audio { width: 220px; max-width: 100%; height: 40px; display: block; }
+.cz-img { max-width: 240px; max-height: 260px; border-radius: 10px; display: block; }
+.cz-bolha:has(.cz-img) { padding: 4px; }
 /* Balão de áudio compacto, em superfície escura (player nativo integra melhor que sobre o gradiente). */
 .cz-bolha:has(.cz-audio) { padding: 6px; max-width: 240px; }
 .cz-bolha.saida:has(.cz-audio) { background: #241f33; color: #ece9f5; }

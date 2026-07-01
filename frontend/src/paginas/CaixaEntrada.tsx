@@ -36,6 +36,18 @@ function hora(iso: string): string {
   return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
+/** Recibo de entrega (WhatsApp): ✓ enviada, ✓✓ entregue/lida (lida = azul, tratado no estilo). */
+function recibo(status: string): string {
+  switch (status) {
+    case 'ENVIADA': return '✓'
+    case 'ENTREGUE': return '✓✓'
+    case 'LIDA': return '✓✓'
+    case 'FALHA': return 'falhou'
+    case 'SIMULADA': return 'simulada'
+    default: return status.toLowerCase()
+  }
+}
+
 /** Segundos → mm:ss (cronômetro da gravação). */
 function mmss(s: number): string {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
@@ -375,8 +387,13 @@ export default function CaixaEntrada() {
                   <div key={m.id} className={`cz-bolha ${m.direcao === 'ENVIADA' ? 'saida' : 'entrada'}`}>
                     {m.tipoMidia === 'AUDIO' && m.midiaUrl
                       ? <audio className="cz-audio" src={m.midiaUrl} controls preload="none" />
-                      : <div>{m.texto}</div>}
-                    <span className="cz-meta">{hora(m.createdAt)}{m.direcao === 'ENVIADA' ? ` · ${m.status.toLowerCase()}` : ''}</span>
+                      : m.tipoMidia === 'IMAGEM' && m.midiaUrl
+                        ? <a href={m.midiaUrl} target="_blank" rel="noreferrer"><img className="cz-img" src={m.midiaUrl} alt="" /></a>
+                        : <div>{m.texto}</div>}
+                    <span className="cz-meta">
+                      {hora(m.createdAt)}
+                      {m.direcao === 'ENVIADA' && <> · <span style={m.status === 'LIDA' ? { color: '#53bdeb' } : undefined}>{recibo(m.status)}</span></>}
+                    </span>
                   </div>
                 ))}
                 {thread.length === 0 && <div style={{ color: 'var(--cz-mut)', margin: 'auto' }}>Sem mensagens.</div>}

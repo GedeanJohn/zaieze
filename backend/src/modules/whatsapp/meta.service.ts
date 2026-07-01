@@ -236,3 +236,70 @@ export async function verificarNumero(phoneNumberId: string, token: string): Pro
     return { ok: false, erro: String(e) }
   }
 }
+
+// ─────────────────────────── Mídia (áudio/imagem) ───────────────────────────
+
+/** Extensão a partir do mime (fallback bin). */
+export function extDoMime(mime: string): string {
+  const m = mime.split(';')[0].trim()
+  const mapa: Record<string, string> = {
+    'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/amr': 'amr',
+    'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
+    'video/mp4': 'mp4', 'application/pdf': 'pdf',
+  }
+  return mapa[m] ?? (m.split('/')[1] || 'bin')
+}
+
+/** Sobe um arquivo de mídia para a Meta e devolve o media_id (ou null em simulado/erro). */
+export async function uploadMidia(opts: { rede: RedeWA; buffer: Buffer; mime: string; filename?: string }): Promise<string | null> {
+  if (!metaConfigurado(opts.rede)) return null
+  const token = decifrar(opts.rede.waTokenCifrado!)
+  try {
+    const form = new FormData()
+    form.append('messaging_product', 'whatsapp')
+    form.append('type', opts.mime)
+    form.append('file', new Blob([opts.buffer], { type: opts.mime }), opts.filename ?? `midia.${extDoMime(opts.mime)}`)
+    const resp = await fetch(graphUrl(`${opts.rede.waPhoneNumberId}/media`), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    })
+    if (!resp.ok) return null
+    const data = (await resp.json()) as { id?: string }
+    return data.id ?? null
+  } catch {
+    return null
+  }
+}
+
+/** Envia uma mídia já subida (media_id) — tipo 'audio' | 'image'. */
+export async function enviarMidia(opts: { rede: RedeWA; telefone: string; tipo: 'audio' | 'image'; mediaId: string; caption?: string }): Promise<EnvioResultado> {
+  if (!metaConfigurado(opts.rede)) return { status: 'SIMULADA' }
+  const token = decifrar(opts.rede.waTokenCifrado!)
+  const midia: Record<string, unknown> = { id: opts.mediaId }
+  if (opts.tipo === 'image' && opts.caption) midia.caption = opts.caption
+  return chamarMensagens(opts.rede.waPhoneNumberId!, token, {
+    messaging_product: 'whatsapp',
+    to: normalizarNumero(opts.telefone),
+    type: opts.tipo,
+    [opts.tipo]: midia,
+  })
+}
+
+/** Baixa uma mídia recebida (media_id) da Meta: resolve a URL temporária e busca os bytes. */
+export async function baixarMidia(opts: { rede: RedeWA; mediaId: string }): Promise<{ buffer: Buffer; mime: string } | null> {
+  if (!metaConfigurado(opts.rede)) return null
+  const token = decifrar(opts.rede.waTokenCifrado!)
+  try {
+    const meta = await fetch(graphUrl(opts.mediaId), { headers: { Authorization: `Bearer ${token}` } })
+    if (!meta.ok) return null
+    const info = (await meta.json()) as { url?: string; mime_type?: string }
+    if (!info.url) return null
+    const bin = await fetch(info.url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!bin.ok) return null
+    const buffer = Buffer.from(await bin.arrayBuffer())
+    return { buffer, mime: info.mime_type ?? 'application/octet-stream' }
+  } catch {
+    return null
+  }
+}

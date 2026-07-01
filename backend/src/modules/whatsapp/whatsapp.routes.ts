@@ -6,7 +6,7 @@ import { env } from '../../env'
 import { lojaIdDe, redeIdDe } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
 import { enviarWhatsapp, enviarWhatsappAudio } from './whatsapp.service'
-import { metaConfigurado, cifrar, decifrar, podeCifrar, verificarNumero, enviarTexto, criarTemplateMeta, consultarTemplatesMeta, placeholdersDoCorpo, corpoParaMeta, mapearStatusTemplate } from './meta.service'
+import { metaConfigurado, cifrar, decifrar, podeCifrar, verificarNumero, enviarTexto, criarTemplateMeta, consultarTemplatesMeta, placeholdersDoCorpo, corpoParaMeta, mapearStatusTemplate, baixarMidia, extDoMime } from './meta.service'
 import { marcarLeadAtendido, garantirCicloAberto } from '../leads/leads.service'
 import { transcodificarAudioOpus, salvarUploadLocal } from '../midia/midia.routes'
 import { enviarParaR2 } from '../midia/r2.service'
@@ -61,7 +61,15 @@ async function rotearMensagemRecebida(params: { numero: string; texto: string; r
       direcao: 'RECEBIDA', status: 'RECEBIDA', origem: 'ENTRADA', telefone: numero, texto: params.texto,
     },
   })
-  return { roteado: true, mensagemId: msg.id, novoLead: ciclo.novo }
+  return { roteado: true, mensagemId: msg.id, lojaId: cliente.lojaId, novoLead: ciclo.novo }
+}
+
+/** Extrai id/tipo de mídia de uma mensagem recebida da Cloud API (imagem/áudio/vídeo/doc). */
+function midiaDaMensagem(m: Record<string, any>): { id: string; tipoMidia: string; pasta: 'fotos' | 'audio' | 'videos' } | null {
+  if (m.type === 'image' && m.image?.id) return { id: m.image.id, tipoMidia: 'IMAGEM', pasta: 'fotos' }
+  if (m.type === 'audio' && m.audio?.id) return { id: m.audio.id, tipoMidia: 'AUDIO', pasta: 'audio' }
+  if (m.type === 'video' && m.video?.id) return { id: m.video.id, tipoMidia: 'VIDEO', pasta: 'videos' }
+  return null
 }
 
 /** Extrai um texto exibível de uma mensagem da Cloud API (vários tipos). */
@@ -318,8 +326,8 @@ export async function whatsappRoutes(app: FastifyInstance) {
     return msg
   })
 
-  // Responder com MENSAGEM DE VOZ (PTT): grava o áudio (R2/local). O envio real do áudio pela
-  // Cloud API entra na Fase 3 (upload de mídia); por ora registra como SIMULADA.
+  // Responder com MENSAGEM DE VOZ (PTT): grava o áudio (R2/local p/ o chat) e envia pela Cloud API
+  // (upload de mídia + tipo audio). Sem WABA conectada → registra SIMULADA.
   app.post('/conversas/:clienteId/audio', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { clienteId } = request.params as { clienteId: string }
@@ -338,8 +346,9 @@ export async function whatsappRoutes(app: FastifyInstance) {
     if (!vendId) return reply.code(422).send({ erro: 'Cliente sem vendedora responsável — defina a carteira primeiro.' })
 
     let midiaUrl: string
+    let ogg: Buffer
     try {
-      const ogg = await transcodificarAudioOpus(await arquivo.toBuffer())
+      ogg = await transcodificarAudioOpus(await arquivo.toBuffer())
       midiaUrl = (await enviarParaR2({ buffer: ogg, contentType: 'audio/ogg', ext: 'ogg', lojaId, pasta: 'audio' })) ?? (await salvarUploadLocal(ogg, 'ogg'))
     } catch (e) {
       request.log.error({ err: e }, 'falha ao processar áudio')
@@ -347,7 +356,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
     }
 
     const rede = await redeDaLoja(lojaId)
-    const r = rede ? await enviarWhatsappAudio({ rede, telefone: cliente.telefone, audioUrl: midiaUrl }) : { status: 'SIMULADA' as StatusMensagem }
+    const r = rede ? await enviarWhatsappAudio({ rede, telefone: cliente.telefone, buffer: ogg }) : { status: 'SIMULADA' as StatusMensagem }
     const msg = await prisma.mensagemWhatsapp.create({
       data: {
         lojaId, clienteId, vendedoraId: vendId,
@@ -384,12 +393,11 @@ export async function whatsappRoutes(app: FastifyInstance) {
 
   app.post('/webhook/:redeSlug', async (request, reply) => {
     const { redeSlug } = request.params as { redeSlug: string }
-    const rede = await prisma.rede.findUnique({ where: { slug: redeSlug }, select: { id: true } })
+    const rede = await prisma.rede.findUnique({ where: { slug: redeSlug }, select: { id: true, waPhoneNumberId: true, waTokenCifrado: true } })
     if (!rede) return reply.code(404).send({ ok: false })
 
-    // NOTA (Fase 1): a validação de X-Hub-Signature-256 (com Rede.waAppSecret) será ligada
-    // quando o raw body do webhook estiver disponível (fastify-raw-body). Por ora confiamos no
-    // verify token + phone_number_id + HTTPS.
+    // NOTA: a validação de X-Hub-Signature-256 (com Rede.waAppSecret) entra na Fase 4 (raw body).
+    // Por ora confiamos no verify token + phone_number_id + HTTPS.
     const body = request.body as { entry?: { changes?: { value?: Record<string, any> }[] }[] }
     for (const entry of body.entry ?? []) {
       for (const change of entry.changes ?? []) {
@@ -398,7 +406,18 @@ export async function whatsappRoutes(app: FastifyInstance) {
         for (const m of (value.messages ?? []) as Record<string, any>[]) {
           const numero = String(m.from ?? '').replace(/\D/g, '')
           const nome = value.contacts?.[0]?.profile?.name as string | undefined
-          if (numero) await rotearMensagemRecebida({ numero, texto: textoMeta(m), redeId: rede.id, nome })
+          if (!numero) continue
+          const rot = await rotearMensagemRecebida({ numero, texto: textoMeta(m), redeId: rede.id, nome })
+
+          // Mídia recebida: baixa da Meta → guarda no R2 → anexa à mensagem já registrada.
+          const midia = midiaDaMensagem(m)
+          if (rot.roteado && rot.mensagemId && rot.lojaId && midia && metaConfigurado(rede)) {
+            const dl = await baixarMidia({ rede, mediaId: midia.id })
+            if (dl) {
+              const url = await enviarParaR2({ buffer: dl.buffer, contentType: dl.mime, ext: extDoMime(dl.mime), lojaId: rot.lojaId, pasta: midia.pasta })
+              if (url) await prisma.mensagemWhatsapp.update({ where: { id: rot.mensagemId }, data: { tipoMidia: midia.tipoMidia, midiaUrl: url } })
+            }
+          }
         }
         // recibos de status (sent/delivered/read/failed)
         for (const s of (value.statuses ?? []) as Record<string, any>[]) {

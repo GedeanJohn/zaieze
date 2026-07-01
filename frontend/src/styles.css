@@ -326,6 +326,8 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   min-height: 100vh; background: var(--zz-bg); color: #fff;
   font-family: var(--leitura); letter-spacing: 0.01em;
   --lema-size: 30px; /* tamanho da fonte do lema (hero h1); a logo deriva daqui */
+  /* Não permitir selecionar/copiar o conteúdo do site (campos de formulário liberados abaixo). */
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
 .site h1, .site h2, .site h3 { font-family: var(--leitura); font-weight: 600; letter-spacing: 0.02em; }
 
@@ -428,7 +430,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 /* Checkout / Entrar / Sucesso (tema escuro) */
 .checkout-wrap, .entrar-wrap, .sucesso-wrap { display: flex; flex-direction: column; }
 .site .campo label { color: var(--zz-mut); letter-spacing: 0.06em; text-transform: uppercase; font-size: 12px; }
-.site input, .site select, .site textarea { background: #111; color: #fff; border: 1px solid var(--zz-line); }
+.site input, .site select, .site textarea { background: #111; color: #fff; border: 1px solid var(--zz-line); -webkit-user-select: text; user-select: text; }
 .site input:focus, .site select:focus, .site textarea:focus { outline: none; border-color: #fff; }
 .checkout-card {
   display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 0; max-width: 900px; margin: 20px auto 70px;
@@ -465,6 +467,15 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   .site-logo-img { height: 28px; }
   .hero h1 { letter-spacing: 0.16em; }
   .checkout-card { grid-template-columns: 1fr; }
+  /* Cabeçalho: encolhe padding/gap/fonte para o "Entrar" não ser cortado no mobile. */
+  .site-top { padding: 16px 5vw; }
+  .site-top nav { gap: 14px; }
+  .site-top nav a { font-size: 11px; letter-spacing: 0.05em; }
+  .site-top .btn { font-size: 11px; padding: 9px 13px; }
+}
+/* Telas bem estreitas: mantém só a logo + Entrar (evita qualquer corte). */
+@media (max-width: 440px) {
+  .site-top nav a:not(.btn) { display: none; }
 }
 
 /* ───────────────────────── Caixa de entrada (WhatsApp) ───────────────────────── */

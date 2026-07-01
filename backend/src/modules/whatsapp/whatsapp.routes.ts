@@ -6,7 +6,7 @@ import { env } from '../../env'
 import { lojaIdDe, redeIdDe } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
 import { enviarWhatsapp, enviarWhatsappAudio } from './whatsapp.service'
-import { metaConfigurado, cifrar, decifrar, podeCifrar, verificarNumero, enviarTexto, criarTemplateMeta, consultarTemplatesMeta, placeholdersDoCorpo, corpoParaMeta, mapearStatusTemplate, baixarMidia, extDoMime } from './meta.service'
+import { metaConfigurado, cifrar, decifrar, podeCifrar, verificarNumero, enviarTexto, criarTemplateMeta, consultarTemplatesMeta, placeholdersDoCorpo, corpoParaMeta, mapearStatusTemplate, baixarMidia, extDoMime, assinaturaValida } from './meta.service'
 import { marcarLeadAtendido, garantirCicloAberto } from '../leads/leads.service'
 import { transcodificarAudioOpus, salvarUploadLocal } from '../midia/midia.routes'
 import { enviarParaR2 } from '../midia/r2.service'
@@ -42,10 +42,31 @@ async function rotearMensagemRecebida(params: { numero: string; texto: string; r
   const numero = params.numero.replace(/\D/g, '')
   if (!numero) return { roteado: false }
 
-  const cliente = await prisma.cliente.findFirst({
+  const sel = { id: true, lojaId: true, vendedoraId: true, loja: { select: { redeId: true } } } as const
+  let cliente = await prisma.cliente.findFirst({
     where: { telefone: numero, ...(params.redeId ? { loja: { redeId: params.redeId } } : {}) },
-    select: { id: true, lojaId: true, vendedoraId: true, loja: { select: { redeId: true } } },
+    select: sel,
   })
+
+  // Handoff do catálogo pelo número da marca: se não casou por telefone, usa o marcador
+  // (ref:<slug>) da mensagem para achar a vendedora dona do link e criar o cliente na carteira dela.
+  if ((!cliente || !cliente.vendedoraId) && params.redeId) {
+    const ref = params.texto.match(/\(ref:\s*([a-z0-9-]+)\)/i)?.[1]
+    if (ref) {
+      const vend = await prisma.usuario.findFirst({
+        where: { slugCatalogo: ref, role: 'VENDEDORA', ativo: true, loja: { redeId: params.redeId } },
+        select: { id: true, lojaId: true },
+      })
+      if (vend?.lojaId) {
+        cliente = await prisma.cliente.upsert({
+          where: { lojaId_telefone: { lojaId: vend.lojaId, telefone: numero } },
+          create: { lojaId: vend.lojaId, telefone: numero, nome: params.nome?.trim() || 'Cliente do WhatsApp', vendedoraId: vend.id, consentimentoLgpd: true, observacoes: 'Entrou pelo WhatsApp (handoff do catálogo)' },
+          update: {},
+          select: sel,
+        })
+      }
+    }
+  }
   if (!cliente || !cliente.vendedoraId) return { roteado: false }
 
   // Janela de 24h: marca o instante da última entrada do cliente.
@@ -101,6 +122,13 @@ const configSchema = z.object({
 })
 
 export async function whatsappRoutes(app: FastifyInstance) {
+  // Mantém o corpo CRU (rawBody) além do JSON parseado — necessário para validar a assinatura
+  // X-Hub-Signature-256 do webhook oficial da Meta. Escopo encapsulado: só as rotas deste plugin.
+  app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, done) => {
+    ;(req as unknown as { rawBody?: Buffer }).rawBody = body as Buffer
+    try { done(null, JSON.parse((body as Buffer).toString('utf8') || '{}')) } catch (e) { done(e as Error, undefined) }
+  })
+
   // ─────────── Configuração da WABA (número oficial por marca) — GESTOR ───────────
 
   // Lê a config atual (sem expor o token). Inclui a URL do webhook a configurar na Meta.
@@ -393,11 +421,19 @@ export async function whatsappRoutes(app: FastifyInstance) {
 
   app.post('/webhook/:redeSlug', async (request, reply) => {
     const { redeSlug } = request.params as { redeSlug: string }
-    const rede = await prisma.rede.findUnique({ where: { slug: redeSlug }, select: { id: true, waPhoneNumberId: true, waTokenCifrado: true } })
+    const rede = await prisma.rede.findUnique({ where: { slug: redeSlug }, select: { id: true, waPhoneNumberId: true, waTokenCifrado: true, waAppSecret: true } })
     if (!rede) return reply.code(404).send({ ok: false })
 
-    // NOTA: a validação de X-Hub-Signature-256 (com Rede.waAppSecret) entra na Fase 4 (raw body).
-    // Por ora confiamos no verify token + phone_number_id + HTTPS.
+    // Valida a assinatura X-Hub-Signature-256 quando a marca configurou o App Secret.
+    // Sem App Secret, confiamos no verify token + phone_number_id + HTTPS.
+    if (rede.waAppSecret) {
+      const raw = (request as unknown as { rawBody?: Buffer }).rawBody
+      const assinatura = request.headers['x-hub-signature-256'] as string | undefined
+      if (!raw || !assinaturaValida(rede.waAppSecret, raw, assinatura)) {
+        return reply.code(401).send({ ok: false })
+      }
+    }
+
     const body = request.body as { entry?: { changes?: { value?: Record<string, any> }[] }[] }
     for (const entry of body.entry ?? []) {
       for (const change of entry.changes ?? []) {

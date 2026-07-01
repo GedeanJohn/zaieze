@@ -62,7 +62,7 @@ function whatsappUrl(numero: string | null, texto: string): string | null {
 async function resolverVendedoraPublica(redeSlug: string, vendSlug: string) {
   const rede = await prisma.rede.findUnique({
     where: { slug: redeSlug },
-    select: { id: true, nome: true, plano: true, ativo: true, logoUrl: true, bannerUrl: true, corPrimaria: true, corSecundaria: true, pedidoMinimoAtacado: true, pedidoMinimoInfantil: true },
+    select: { id: true, nome: true, plano: true, ativo: true, logoUrl: true, bannerUrl: true, corPrimaria: true, corSecundaria: true, pedidoMinimoAtacado: true, pedidoMinimoInfantil: true, waPhoneNumberId: true, waNumeroExibicao: true },
   })
   if (!rede || !rede.ativo || !planoInclui(rede.plano, 'portal_cliente')) return null
   const vend = await prisma.usuario.findFirst({
@@ -202,11 +202,17 @@ export async function catalogoRoutes(app: FastifyInstance) {
     if (!ctx) return reply.code(404).send({ erro: 'Catálogo indisponível' })
     const { rede, vend } = ctx
 
-    const texto = body.resumo?.trim() || `Olá ${vend.nome.split(/\s+/)[0]}! Vim pelo catálogo e quero saber mais. 😊`
-    const url = whatsappUrl(vend.waNumero, texto)
+    // Handoff pelo número OFICIAL da marca (a conversa entra no CRM, roteada pela carteira).
+    // Quando a marca ainda não conectou a WABA, cai no número pessoal da vendedora (fallback).
+    const marcaConectada = !!(rede.waPhoneNumberId && rede.waNumeroExibicao)
+    const base = body.resumo?.trim() || `Olá ${vend.nome.split(/\s+/)[0]}! Vim pelo catálogo e quero saber mais. 😊`
+    // Marcador de atribuição: se a mensagem chegar ao número da marca sem casar por telefone,
+    // o webhook usa o (ref:<slug>) para achar a vendedora dona do link.
+    const texto = marcaConectada ? `${base}\n\n(ref: ${vendSlug})` : base
+    const url = whatsappUrl(marcaConectada ? rede.waNumeroExibicao : vend.waNumero, texto)
 
-    // Sem telefone não dá para materializar o cliente; ainda assim devolve o WhatsApp
-    // (em produção, o webhook da Evolution cria o lead quando a mensagem chegar).
+    // Sem telefone não dá para materializar o cliente aqui; ainda assim devolve o WhatsApp
+    // (ao mandar a mensagem, o webhook cria o lead — por telefone ou pelo marcador (ref:)).
     const telefone = body.telefone?.replace(/\D/g, '')
     if (!telefone) return { whatsappUrl: url }
 

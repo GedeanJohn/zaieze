@@ -81,6 +81,10 @@ export async function assinaturasRoutes(app: FastifyInstance) {
 
     const senhaHash = await bcrypt.hash(body.senha, 10)
     const simulada = !mpConfigurado()
+    // 100% de desconto (valor zerado) → não há o que cobrar: ativa na hora, SEM passar pelo
+    // Mercado Pago (uma recorrência de R$0 nunca é confirmada e travaria o tenant em PENDENTE).
+    const gratuito = valor <= 0
+    const semCobranca = simulada || gratuito
 
     // Início do 1º ciclo: com dias grátis, o acesso vai até now+dias (depois cobra).
     const inicioCiclo = () => {
@@ -94,7 +98,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     // Provisiona o tenant. Em modo simulado já nasce ATIVO; em modo real fica inativo
     // até o webhook de pagamento aprovado liberar o acesso.
     const rede = await prisma.$transaction(async (tx) => {
-      const r = await tx.rede.create({ data: { nome: body.redeNome, slug, plano: body.plano, ativo: simulada } })
+      const r = await tx.rede.create({ data: { nome: body.redeNome, slug, plano: body.plano, ativo: semCobranca } })
       await tx.usuario.create({
         data: { redeId: r.id, nome: body.gestorNome, email, senhaHash, role: 'GESTOR' },
       })
@@ -111,24 +115,26 @@ export async function assinaturasRoutes(app: FastifyInstance) {
       })
       await tx.assinatura.create({
         data: {
-          redeId: r.id, plano: body.plano, valor, simulada,
-          status: simulada ? 'ATIVA' : 'PENDENTE',
-          // simulado já entra com ciclo (dias grátis ou 1 mês); no modo real o ciclo começa no webhook
-          cicloFimEm: simulada ? inicioCiclo() : null,
+          redeId: r.id, plano: body.plano, valor, simulada: semCobranca,
+          status: semCobranca ? 'ATIVA' : 'PENDENTE',
+          // sem cobrança (simulado ou 100% off) já entra com ciclo; no modo pago o ciclo começa no webhook
+          cicloFimEm: semCobranca ? inicioCiclo() : null,
           primeiraCobrancaEm,
         },
       })
       return r
     })
 
-    if (simulada) {
+    if (semCobranca) {
       if (promo) await consumirCodigo(promo.id)
       return reply.code(201).send({
         simulado: true,
         plano: body.plano,
         slug,
         redirect: `${urlTenant(slug)}/login`,
-        mensagem: 'Assinatura simulada ativada — seu painel já está no ar.',
+        mensagem: gratuito && !simulada
+          ? 'Assinatura ativada com 100% de desconto — seu painel já está no ar.'
+          : 'Assinatura simulada ativada — seu painel já está no ar.',
       })
     }
 

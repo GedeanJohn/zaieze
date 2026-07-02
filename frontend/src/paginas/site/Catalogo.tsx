@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useParams } from 'react-router-dom'
 import { api } from '../../api'
 import { HOST } from '../../host'
@@ -17,7 +17,7 @@ interface Colecao { id: string; nome: string; descricao?: string | null; outlet?
 interface Catalogo {
   marca: { nome: string; logoUrl: string | null; bannerUrl: string | null; corPrimaria: string; corSecundaria: string }
   loja: { nome: string }
-  vendedora: { nome: string; primeiroNome: string; fotoUrl: string | null; temWhatsapp: boolean }
+  vendedora: { nome: string; primeiroNome: string; fotoUrl: string | null; bio: string | null; temWhatsapp: boolean }
   pedidoMinimoAtacado?: number
   colecoes: Colecao[]
 }
@@ -44,6 +44,8 @@ export default function Catalogo() {
   const [carrinho, setCarrinho] = useState<ItemCarrinho[]>([])
   const [verCarrinho, setVerCarrinho] = useState(false)
   const [agente, setAgente] = useState<{ produtoId?: string; produtoNome?: string; resumo?: string } | null>(null)
+  const produtosRef = useRef<HTMLDivElement>(null)
+  const irProdutos = () => produtosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
   useEffect(() => {
     if (!redeSlug || !vendSlug) { setErro('Catálogo não encontrado.'); return }
@@ -112,28 +114,36 @@ export default function Catalogo() {
     <div className="cat-root" style={{ '--cat-primaria': primaria, '--cat-fundo': fundo } as CSSProperties}>
       <CatalogoEstilos />
 
-      <header className="cat-header">
-        <div className="cat-header-topo">
-          <div className="cat-avatar">
-            {cat.vendedora.fotoUrl
-              ? <img src={cat.vendedora.fotoUrl} alt={cat.vendedora.primeiroNome} />
-              : <span>{iniciais(cat.vendedora.nome)}</span>}
-          </div>
-          <div className="cat-marca-painel">
-            {cat.marca.logoUrl
-              ? <img className="cat-logo" src={cat.marca.logoUrl} alt={cat.marca.nome} />
-              : <div className="cat-logo-texto">{cat.marca.nome}</div>}
+      <header className="cat-perfil">
+        {/* Capa (banner da marca; sem banner, mostra a logo/nome sobre a cor da marca) */}
+        <div className="cat-capa">
+          {cat.marca.bannerUrl
+            ? <img src={cat.marca.bannerUrl} alt="" />
+            : <div className="cat-capa-marca">
+                {cat.marca.logoUrl ? <img src={cat.marca.logoUrl} alt={cat.marca.nome} /> : <span>{cat.marca.nome}</span>}
+              </div>}
+        </div>
+
+        {/* Foto da vendedora, redonda e sobreposta */}
+        <div className="cat-avatar-perfil">
+          {cat.vendedora.fotoUrl
+            ? <img src={cat.vendedora.fotoUrl} alt={cat.vendedora.primeiroNome} />
+            : <span>{iniciais(cat.vendedora.nome)}</span>}
+        </div>
+
+        {/* Cartão de perfil: nome + bio + atalhos */}
+        <div className="cat-cartao">
+          <h1 className="cat-nome-perfil">{cat.vendedora.nome} <span className="cat-sep">|</span> {cat.marca.nome}</h1>
+          {cat.vendedora.bio && <p className="cat-bio">{cat.vendedora.bio}</p>}
+          <div className="cat-atalhos">
+            <button type="button" className="cat-atalho" onClick={irProdutos}>✨ Novidades</button>
+            <button type="button" className="cat-atalho" onClick={irProdutos}>👗 Coleções</button>
+            <button type="button" className="cat-atalho cat-atalho-full" onClick={() => setAgente({})}>💬 Falar com {cat.vendedora.primeiroNome}</button>
           </div>
         </div>
-        <div className="cat-sub">com <strong>{cat.vendedora.primeiroNome}</strong> · {cat.loja.nome}</div>
       </header>
 
-      <div className="cat-banner">
-        {cat.marca.bannerUrl
-          ? <img src={cat.marca.bannerUrl} alt="" />
-          : <div className="cat-banner-vazio" />}
-      </div>
-
+      <div ref={produtosRef} />
       {cat.colecoes.length === 0 && <div className="cat-vazio">Em breve, novidades por aqui. ✨</div>}
 
       {cat.colecoes.map((c) => (
@@ -422,18 +432,25 @@ function CatalogoEstilos() {
     <style>{`
       .cat-root { --cat-creme: #f5f0e6; min-height: 100vh; background: var(--cat-fundo); color: #111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; padding-bottom: 96px; }
       .cat-vazio { min-height: 70vh; display: flex; align-items: center; justify-content: center; color: #777; font-family: sans-serif; padding: 40px; text-align: center; }
-      .cat-header { max-width: 1100px; margin: 0 auto; padding: 14px 14px 12px; }
-      .cat-header-topo { display: flex; align-items: stretch; gap: 12px; }
-      .cat-avatar { flex: 0 0 auto; width: 104px; height: 104px; border-radius: 12px; overflow: hidden; background: var(--cat-creme); display: flex; align-items: center; justify-content: center; }
-      .cat-avatar img { width: 100%; height: 100%; object-fit: cover; }
-      .cat-avatar span { font-size: 34px; font-weight: 800; color: #b6a98e; letter-spacing: 1px; }
-      .cat-marca-painel { flex: 1 1 auto; min-width: 0; border-radius: 12px; background: var(--cat-primaria, #111); display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 10px 16px; }
-      .cat-logo { max-height: 84px; max-width: 100%; object-fit: contain; }
-      .cat-logo-texto { font-size: clamp(22px, 7vw, 38px); font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: #fff; text-align: center; }
-      .cat-sub { margin-top: 10px; font-size: 13px; color: #555; }
-      .cat-banner { max-width: 1100px; margin: 4px auto 0; padding: 0 14px; }
-      .cat-banner img { width: 100%; display: block; border-radius: 12px; object-fit: cover; max-height: 220px; }
-      .cat-banner-vazio { width: 100%; border-radius: 12px; background: var(--cat-creme); height: clamp(90px, 22vw, 150px); }
+      /* Cabeçalho estilo perfil: capa (banner) + foto redonda sobreposta + cartão */
+      .cat-perfil { max-width: 680px; margin: 0 auto; }
+      .cat-capa { position: relative; width: 100%; aspect-ratio: 16 / 7; overflow: hidden; background: var(--cat-primaria, #111); }
+      .cat-capa > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .cat-capa-marca { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+      .cat-capa-marca img { max-height: 70%; max-width: 80%; object-fit: contain; }
+      .cat-capa-marca span { color: #fff; font-size: clamp(22px, 7vw, 40px); font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+      .cat-avatar-perfil { width: 108px; height: 108px; border-radius: 50%; overflow: hidden; margin: -54px auto 0; position: relative; z-index: 2; border: 4px solid var(--cat-fundo, #fff); background: var(--cat-creme); box-shadow: 0 4px 14px #0000002e; display: flex; align-items: center; justify-content: center; }
+      .cat-avatar-perfil img { width: 100%; height: 100%; object-fit: cover; }
+      .cat-avatar-perfil span { font-size: 36px; font-weight: 800; color: #b6a98e; }
+      .cat-cartao { background: var(--cat-fundo, #fff); margin: 10px 14px 0; border-radius: 16px; padding: 14px 18px 18px; text-align: center; box-shadow: 0 6px 20px #0000000f; }
+      .cat-nome-perfil { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: .3px; }
+      .cat-sep { color: var(--cat-primaria, #111); font-weight: 400; opacity: .55; margin: 0 2px; }
+      .cat-bio { margin: 8px auto 0; max-width: 460px; font-size: 13.5px; line-height: 1.5; color: #555; white-space: pre-line; }
+      .cat-atalhos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+      .cat-atalho { padding: 11px 12px; border: 1px solid #00000014; background: #00000006; border-radius: 10px; font-size: 13px; font-weight: 600; color: #222; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+      .cat-atalho:hover { background: #0000000d; }
+      .cat-atalho-full { grid-column: 1 / -1; background: var(--cat-primaria, #111); color: #fff; border-color: transparent; }
+      .cat-atalho-full:hover { filter: brightness(1.08); }
       .cat-secao { max-width: 1100px; margin: 0 auto; padding: 26px 14px 6px; }
       .cat-secao-titulo { font-size: 18px; font-weight: 700; letter-spacing: .5px; margin: 0 0 2px; text-transform: uppercase; }
       .cat-secao-desc { margin: 0 0 14px; color: #666; font-size: 13px; }

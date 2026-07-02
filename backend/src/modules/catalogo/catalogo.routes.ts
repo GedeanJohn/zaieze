@@ -67,7 +67,7 @@ async function resolverVendedoraPublica(redeSlug: string, vendSlug: string) {
   if (!rede || !rede.ativo || !planoInclui(rede.plano, 'portal_cliente')) return null
   const vend = await prisma.usuario.findFirst({
     where: { slugCatalogo: vendSlug, role: 'VENDEDORA', ativo: true, loja: { redeId: rede.id, ativo: true } },
-    select: { id: true, nome: true, fotoUrl: true, waNumero: true, lojaId: true, loja: { select: { id: true, nome: true } } },
+    select: { id: true, nome: true, fotoUrl: true, bioCatalogo: true, waNumero: true, lojaId: true, loja: { select: { id: true, nome: true } } },
   })
   if (!vend || !vend.loja) return null
   return { rede, vend }
@@ -187,7 +187,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
     return {
       marca: { nome: rede.nome, logoUrl: rede.logoUrl, bannerUrl: rede.bannerUrl, corPrimaria: rede.corPrimaria, corSecundaria: rede.corSecundaria },
       loja: { nome: vend.loja!.nome },
-      vendedora: { nome: vend.nome, primeiroNome: vend.nome.trim().split(/\s+/)[0], fotoUrl: vend.fotoUrl, temWhatsapp: !!vend.waNumero },
+      vendedora: { nome: vend.nome, primeiroNome: vend.nome.trim().split(/\s+/)[0], fotoUrl: vend.fotoUrl, bio: vend.bioCatalogo, temWhatsapp: !!vend.waNumero },
       pedidoMinimoAtacado: rede.pedidoMinimoAtacado,
       pedidoMinimoInfantil: rede.pedidoMinimoInfantil,
       colecoes: colecoesOut,

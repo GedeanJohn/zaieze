@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, mensagemDeErro, usuarioLogado, atualizarUsuarioLocal } from '../api'
 
 /** Iniciais do nome para o avatar. */
@@ -17,6 +17,15 @@ export default function Conta() {
   const [erro, setErro] = useState('')
   const [ok, setOk] = useState('')
   const [salvando, setSalvando] = useState(false)
+
+  // Bio do catálogo (só a vendedora tem loja pública). Carrega o valor atual do servidor.
+  const ehVendedora = u.role === 'VENDEDORA'
+  const [bio, setBio] = useState('')
+  const [bioOrig, setBioOrig] = useState('')
+  useEffect(() => {
+    if (!ehVendedora) return
+    api.get('/usuarios/me').then(({ data }) => { setBio(data.bioCatalogo ?? ''); setBioOrig(data.bioCatalogo ?? '') }).catch(() => {})
+  }, [ehVendedora])
 
   // Foto de perfil (exibida no topo do app e no Chat)
   const [fotoUrl, setFotoUrl] = useState<string | null>(u.fotoUrl ?? null)
@@ -52,8 +61,10 @@ export default function Conta() {
       if (nome && nome !== u.nome) corpo.nome = nome
       if (email && email !== u.email) corpo.email = email
       if (senha) corpo.senha = senha
+      if (ehVendedora && bio !== bioOrig) corpo.bioCatalogo = bio
       if (Object.keys(corpo).length === 0) { setOk('Nada para alterar.'); return }
       const { data } = await api.patch('/usuarios/me', corpo)
+      if ('bioCatalogo' in corpo) setBioOrig(bio)
       const atual = usuarioLogado()
       if (atual) localStorage.setItem('modacrm_usuario', JSON.stringify({ ...atual, nome: data.nome, email: data.email }))
       setSenha('')
@@ -91,6 +102,13 @@ export default function Conta() {
         <div className="campo"><label>Nome</label><input value={nome} onChange={(e) => setNome(e.target.value)} required /></div>
         <div className="campo"><label>E-mail (seu login)</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
         <div className="campo"><label>Nova senha (deixe vazio para manter)</label><input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} minLength={6} placeholder="mínimo 6 caracteres" /></div>
+        {ehVendedora && (
+          <div className="campo">
+            <label>Bio da sua loja (catálogo)</label>
+            <textarea rows={3} value={bio} onChange={(e) => setBio(e.target.value.slice(0, 280))} placeholder="Ex.: ✨ Apaixonada por moda! Coleções exclusivas e atendimento personalizado 💖 Vem comigo!" />
+            <small style={{ color: 'var(--ink-soft)' }}>{bio.length}/280 · aparece no cabeçalho da sua loja (o link do catálogo que você compartilha).</small>
+          </div>
+        )}
         <div className="acoes"><button className="btn" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar'}</button></div>
       </form>
     </>

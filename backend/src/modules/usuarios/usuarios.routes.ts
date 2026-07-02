@@ -46,11 +46,22 @@ export async function usuariosRoutes(app: FastifyInstance) {
     })
   })
 
+  // Perfil próprio (para pré-preencher a tela "Minha conta", incl. a bio do catálogo).
+  app.get('/me', { preHandler: [app.authenticate] }, async (request) => {
+    return prisma.usuario.findUniqueOrThrow({
+      where: { id: request.user.sub },
+      select: { id: true, nome: true, email: true, role: true, fotoUrl: true, bioCatalogo: true, slugCatalogo: true },
+    })
+  })
+
   // Minha conta: QUALQUER papel (inclusive GESTOR/super-admin) edita os próprios dados.
   // É o que permite transferir a titularidade quando a marca é vendida (troca nome+email+senha).
   app.patch('/me', { preHandler: [app.authenticate] }, async (request, reply) => {
     const meId = request.user.sub
-    const body = z.object({ nome: z.string().min(2).optional(), email: z.string().email().optional(), senha: z.string().min(6).optional() }).parse(request.body)
+    const body = z.object({
+      nome: z.string().min(2).optional(), email: z.string().email().optional(), senha: z.string().min(6).optional(),
+      bioCatalogo: z.string().max(280).nullish(),
+    }).parse(request.body)
     if (body.email) {
       const email = body.email.toLowerCase()
       if (await prisma.usuario.findFirst({ where: { email, id: { not: meId } }, select: { id: true } })) {
@@ -63,8 +74,9 @@ export async function usuariosRoutes(app: FastifyInstance) {
         ...(body.nome ? { nome: body.nome } : {}),
         ...(body.email ? { email: body.email.toLowerCase() } : {}),
         ...(body.senha ? { senhaHash: await bcrypt.hash(body.senha, 10) } : {}),
+        ...(body.bioCatalogo !== undefined ? { bioCatalogo: body.bioCatalogo?.trim() || null } : {}),
       },
-      select: { id: true, nome: true, email: true, role: true },
+      select: { id: true, nome: true, email: true, role: true, bioCatalogo: true },
     })
   })
 

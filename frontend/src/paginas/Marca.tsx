@@ -17,14 +17,73 @@ interface Marca {
   disparoVendedoraEditavel: boolean
 }
 
+interface Sugestao { cor: string; origem: 'logo' | 'banner' }
+
+/** Extrai as cores dominantes de uma imagem (arquivo local ou URL) usando canvas — roda no navegador, sem custo de IA.
+ *  Para URL de outra origem (ex.: CDN), depende do servidor liberar CORS; se não liberar, falha em silêncio (recurso opcional). */
+async function extrairCoresDominantes(origem: File | string, max = 5): Promise<string[]> {
+  const url = typeof origem === 'string' ? origem : URL.createObjectURL(origem)
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image()
+      if (typeof origem === 'string') el.crossOrigin = 'anonymous'
+      el.onload = () => resolve(el)
+      el.onerror = reject
+      el.src = url
+    })
+    const tam = 60
+    const canvas = document.createElement('canvas')
+    canvas.width = tam; canvas.height = tam
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return []
+    ctx.drawImage(img, 0, 0, tam, tam)
+    const { data } = ctx.getImageData(0, 0, tam, tam)
+    const passo = 24
+    const contagem = new Map<string, number>()
+    for (let i = 0; i < data.length; i += 4) {
+      const [r, g, b, a] = [data[i], data[i + 1], data[i + 2], data[i + 3]]
+      if (a < 200) continue
+      const maxC = Math.max(r, g, b), minC = Math.min(r, g, b)
+      if (maxC > 245 && minC > 235) continue // quase branco (fundo comum em logo)
+      if (maxC < 20) continue // quase preto
+      const chave = [r, g, b].map((v) => Math.round(v / passo) * passo).join(',')
+      contagem.set(chave, (contagem.get(chave) ?? 0) + 1)
+    }
+    return [...contagem.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, max)
+      .map(([chave]) => '#' + chave.split(',').map((v) => Math.min(255, Number(v)).toString(16).padStart(2, '0')).join(''))
+  } catch {
+    return []
+  } finally {
+    if (typeof origem !== 'string') URL.revokeObjectURL(url)
+  }
+}
+
 export default function Marca() {
   const [marca, setMarca] = useState<Marca | null>(null)
   const [erro, setErro] = useState('')
   const [ok, setOk] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const bannerRef = useRef<HTMLInputElement>(null)
+  const [sugestoes, setSugestoes] = useState<Sugestao[]>([])
+  const [alvoCor, setAlvoCor] = useState<'corPrimaria' | 'corSecundaria'>('corPrimaria')
 
-  useEffect(() => { api.get('/marca').then(({ data }) => setMarca(data)) }, [])
+  function aplicarSugestoes(origem: 'logo' | 'banner', cores: string[]) {
+    setSugestoes((prev) => {
+      const resto = prev.filter((s) => s.origem !== origem)
+      const novas = cores.map((cor) => ({ cor, origem }))
+      return origem === 'logo' ? [...novas, ...resto] : [...resto, ...novas]
+    })
+  }
+
+  useEffect(() => {
+    api.get('/marca').then(({ data }) => {
+      setMarca(data)
+      if (data.logoUrl) extrairCoresDominantes(data.logoUrl).then((cores) => aplicarSugestoes('logo', cores))
+      if (data.bannerUrl) extrairCoresDominantes(data.bannerUrl).then((cores) => aplicarSugestoes('banner', cores))
+    })
+  }, [])
 
   function aviso(msg: string) { setOk(msg); setTimeout(() => setOk(''), 2500) }
 
@@ -54,6 +113,7 @@ export default function Marca() {
     const arquivo = e.target.files?.[0]
     if (!arquivo || !marca) return
     setErro('')
+    extrairCoresDominantes(arquivo).then((cores) => aplicarSugestoes('logo', cores))
     const fd = new FormData()
     fd.append('file', arquivo)
     try {
@@ -68,6 +128,7 @@ export default function Marca() {
     const arquivo = e.target.files?.[0]
     if (!arquivo || !marca) return
     setErro('')
+    extrairCoresDominantes(arquivo).then((cores) => aplicarSugestoes('banner', cores))
     const fd = new FormData()
     fd.append('file', arquivo)
     try {
@@ -156,6 +217,34 @@ export default function Marca() {
             <input type="color" value={marca.corSecundaria} onChange={(e) => setMarca({ ...marca, corSecundaria: e.target.value })} style={{ height: 42, padding: 4 }} />
           </div>
         </div>
+
+        {sugestoes.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Sugestões extraídas da sua logo/banner — clique para aplicar em:</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button type="button" onClick={() => setAlvoCor('corPrimaria')}
+                  style={{ fontSize: 11, padding: '3px 10px', borderRadius: 999, border: '1px solid #0000002a', cursor: 'pointer', background: alvoCor === 'corPrimaria' ? '#0a0a0b' : 'transparent', color: alvoCor === 'corPrimaria' ? '#fff' : '#0a0a0b' }}>
+                  Cor primária
+                </button>
+                <button type="button" onClick={() => setAlvoCor('corSecundaria')}
+                  style={{ fontSize: 11, padding: '3px 10px', borderRadius: 999, border: '1px solid #0000002a', cursor: 'pointer', background: alvoCor === 'corSecundaria' ? '#0a0a0b' : 'transparent', color: alvoCor === 'corSecundaria' ? '#fff' : '#0a0a0b' }}>
+                  Cor de fundo
+                </button>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {sugestoes.map((s, i) => (
+                <button key={s.origem + s.cor + i} type="button" title={s.cor} onClick={() => setMarca({ ...marca, [alvoCor]: s.cor })}
+                  style={{
+                    width: 34, height: 34, borderRadius: 9, background: s.cor, cursor: 'pointer', padding: 0,
+                    border: marca[alvoCor] === s.cor ? '2px solid #0a0a0b' : '1px solid #00000022',
+                  }} />
+              ))}
+            </div>
+          </div>
+        )}
+
         <h3 style={{ margin: '8px 0 4px' }}>SLA por etapa do funil (minutos)</h3>
         <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 0 }}>
           Tempo máximo do ciclo em cada etapa antes de aparecer como <strong>atrasado</strong>.

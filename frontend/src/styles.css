@@ -696,7 +696,8 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   .cz-meta-anel svg { width: 28px; height: 28px; }
   .cz-meta-pct { font-size: 9.5px; }
   .cz-marca { font-size: 24px; padding: 12px 26px; }
-  .chatz { grid-template-columns: 1fr; height: calc(100dvh - 110px - var(--zz-navh) - var(--zz-strip)); padding: 8px; gap: 8px; }
+  .chatz { grid-template-columns: 1fr; height: calc(100dvh - 110px - var(--zz-navh) - var(--zz-strip)); padding: 0; gap: 0; margin: 0 -16px; }
+  .cz-lista, .cz-conversa { border-radius: 0; }
 
   /* Dashboard ("Meu desempenho"): cards de KPI compactos e centralizados no celular */
   .grade-cards { gap: 8px; }
@@ -704,7 +705,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   .kpi .rotulo { font-size: 11px; }
   .kpi .valor { font-size: 18px; margin-top: 1px; }
   .cz-pagina.zen { padding-top: 8px; }
-  .cz-pagina.zen .chatz { height: calc(100dvh - 30px); padding: 6px; }
+  .cz-pagina.zen .chatz { height: calc(100dvh - 30px); padding: 0; margin: 0 -16px; }
   .chatz:not(.tem-sel) .cz-conversa { display: none; }
   .chatz.tem-sel .cz-lista { display: none; }
   .cz-voltar { display: inline-flex; }

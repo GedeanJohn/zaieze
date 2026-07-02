@@ -31,10 +31,11 @@ export default function Admin() {
 
   async function ativarCortesia(r: RedeAdmin) {
     if (!window.confirm(`Ativar ${r.nome} em modo CORTESIA (grátis)? Destrava o acesso e cancela qualquer cobrança pendente no Mercado Pago.`)) return
+    const codigoPromo = window.prompt('Foi combinado algum código promocional com o lojista? Deixe vazio se não.')?.trim() || undefined
     setOcupado(true); setMsg(''); setErro('')
     try {
-      await api.post(`/admin/redes/${r.id}/ativar-cortesia`)
-      setMsg(`${r.nome} ativada (cortesia). O lojista já pode acessar.`)
+      await api.post(`/admin/redes/${r.id}/ativar-cortesia`, { codigoPromo })
+      setMsg(`${r.nome} ativada (cortesia).` + (codigoPromo ? ` Uso do cupom ${codigoPromo.toUpperCase()} contabilizado.` : ' O lojista já pode acessar.'))
       carregar()
     } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
   }

@@ -92,8 +92,17 @@ export async function adminRoutes(app: FastifyInstance) {
   // cancela (best-effort) qualquer preapproval pendente no Mercado Pago.
   app.post('/redes/:id/ativar-cortesia', async (request, reply) => {
     const { id } = request.params as { id: string }
+    const body = z.object({ codigoPromo: z.string().trim().optional() }).parse(request.body ?? {})
     const rede = await prisma.rede.findUnique({ where: { id }, include: { assinatura: true } })
     if (!rede) return reply.code(404).send({ erro: 'Rede não encontrada' })
+
+    // Ativação manual não passa pelo checkout normal, então o cupom (se o gestor combinou um)
+    // não é consumido sozinho — o admin informa aqui para o contador de usos refletir a realidade.
+    let promo = null
+    if (body.codigoPromo) {
+      promo = await prisma.codigoPromocional.findUnique({ where: { codigo: normalizarCodigo(body.codigoPromo) } })
+      if (!promo) return reply.code(422).send({ erro: 'Código promocional não encontrado' })
+    }
 
     if (rede.assinatura?.mpPreapprovalId && mpConfigurado()) {
       await cancelarPreapproval(rede.assinatura.mpPreapprovalId).catch(() => { /* pendente/sem efeito */ })
@@ -111,6 +120,7 @@ export async function adminRoutes(app: FastifyInstance) {
             },
           })]
         : []),
+      ...(promo ? [prisma.codigoPromocional.update({ where: { id: promo.id }, data: { usos: { increment: 1 } } })] : []),
     ])
     return { ok: true }
   })

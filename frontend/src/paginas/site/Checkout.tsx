@@ -6,6 +6,8 @@ const NOME: Record<Plano, string> = { START: 'Start', PRO: 'Pro', ELITE: 'Elite'
 
 interface PlanoInfo { plano: Plano; nome: string; preco: number }
 interface PromoInfo { valido: boolean; beneficio?: string; tipo?: 'DIAS_GRATIS' | 'PERCENTUAL'; dias?: number | null; percentual?: string | null; plano?: Plano | null }
+interface Clausula { n: number; titulo: string; paragrafos: string[] }
+interface ContratoMontado { titulo: string; qualificacao: string[]; clausulas: Clausula[] }
 
 export default function Checkout() {
   const [params] = useSearchParams()
@@ -22,9 +24,13 @@ export default function Checkout() {
   const [promo, setPromo] = useState<PromoInfo | null>(null)
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [aceiteContrato, setAceiteContrato] = useState(false)
+  const [contrato, setContrato] = useState<ContratoMontado | null>(null)
+  const [contratoAberto, setContratoAberto] = useState(false)
 
   useEffect(() => {
     api.get('/assinaturas/planos').then(({ data }) => { setDominio(data.dominioBase); setPlanos(data.planos) }).catch(() => {})
+    api.get('/contrato/termos').then(({ data }) => setContrato(data.contrato)).catch(() => {})
   }, [])
 
   const info = planos.find((p) => p.plano === plano)
@@ -72,8 +78,8 @@ export default function Checkout() {
   }, [codigoPromo])
 
   const podeEnviar = useMemo(
-    () => form.redeNome && form.slug.length >= 3 && form.gestorNome && form.email && form.senha.length >= 6 && slugStatus !== 'indisponivel',
-    [form, slugStatus],
+    () => form.redeNome && form.slug.length >= 3 && form.gestorNome && form.email && form.senha.length >= 6 && slugStatus !== 'indisponivel' && aceiteContrato,
+    [form, slugStatus, aceiteContrato],
   )
 
   async function assinar(e: React.FormEvent) {
@@ -158,6 +164,18 @@ export default function Checkout() {
             )}
           </div>
 
+          <div className="campo">
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', fontWeight: 400 }}>
+              <input type="checkbox" checked={aceiteContrato} onChange={(e) => setAceiteContrato(e.target.checked)} style={{ width: 'auto', marginTop: 3 }} required />
+              <span>
+                Li e aceito o{' '}
+                <a href="#" onClick={(e) => { e.preventDefault(); setContratoAberto(true) }} style={{ color: '#fff', textDecoration: 'underline' }}>
+                  Contrato de Licença de Uso e Prestação de Serviços
+                </a>.
+              </span>
+            </label>
+          </div>
+
           <button className="btn grande" style={{ width: '100%' }} disabled={!podeEnviar || enviando}>
             {enviando ? 'Processando…' : 'Ir para o pagamento'}
           </button>
@@ -166,6 +184,32 @@ export default function Checkout() {
           </small>
         </form>
       </div>
+
+      {contratoAberto && contrato && (
+        <div className="modal-fundo" onClick={() => setContratoAberto(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 94vw)' }}>
+            <h2>{contrato.titulo}</h2>
+            <div style={{ maxHeight: '55vh', overflowY: 'auto', lineHeight: 1.65, fontSize: 14 }}>
+              {contrato.qualificacao.map((p, i) => (
+                <p key={`q${i}`} style={{ textAlign: 'justify' }}>{p}</p>
+              ))}
+              {contrato.clausulas.map((cl) => (
+                <div key={cl.n} style={{ marginTop: 14 }}>
+                  <h3 style={{ margin: '0 0 4px', fontSize: 15 }}>CLÁUSULA {cl.n}ª — {cl.titulo}</h3>
+                  {cl.paragrafos.map((p, i) => (
+                    <p key={i} style={{ textAlign: 'justify', margin: '4px 0' }}>
+                      <span style={{ color: 'var(--ink-soft)' }}>{cl.n}.{i + 1}.</span> {p}
+                    </p>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="acoes">
+              <button type="button" className="btn" onClick={() => { setAceiteContrato(true); setContratoAberto(false) }}>Li e aceito</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

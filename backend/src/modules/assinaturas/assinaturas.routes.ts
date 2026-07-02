@@ -40,7 +40,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     const { codigo } = request.query as { codigo?: string }
     const c = await validarCodigo(codigo)
     if (!c) return { valido: false }
-    return { valido: true, beneficio: descricaoBeneficio(c), tipo: c.tipo, dias: c.dias, percentual: c.percentual }
+    return { valido: true, beneficio: descricaoBeneficio(c), tipo: c.tipo, dias: c.dias, percentual: c.percentual, plano: c.plano }
   })
 
   // Verifica disponibilidade do endereço (slug) — usado pela landing em tempo real
@@ -73,7 +73,9 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     if (body.codigoPromo && body.codigoPromo.trim() && !promo) {
       return reply.code(422).send({ erro: 'Código promocional inválido ou expirado.' })
     }
-    let valor = await precoDoPlano(body.plano)
+    // Cupom pode FIXAR o plano da oferta (link só ?cupom=): quando definido, ele manda no plano.
+    const plano = promo?.plano ?? body.plano
+    let valor = await precoDoPlano(plano)
     if (promo?.tipo === 'PERCENTUAL' && promo.percentual) {
       valor = arred2(valor * (1 - Number(promo.percentual) / 100))
     }
@@ -98,7 +100,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     // Provisiona o tenant. Em modo simulado já nasce ATIVO; em modo real fica inativo
     // até o webhook de pagamento aprovado liberar o acesso.
     const rede = await prisma.$transaction(async (tx) => {
-      const r = await tx.rede.create({ data: { nome: body.redeNome, slug, plano: body.plano, ativo: semCobranca } })
+      const r = await tx.rede.create({ data: { nome: body.redeNome, slug, plano, ativo: semCobranca } })
       await tx.usuario.create({
         data: { redeId: r.id, nome: body.gestorNome, email, senhaHash, role: 'GESTOR' },
       })
@@ -115,7 +117,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
       })
       await tx.assinatura.create({
         data: {
-          redeId: r.id, plano: body.plano, valor, simulada: semCobranca,
+          redeId: r.id, plano, valor, simulada: semCobranca,
           status: semCobranca ? 'ATIVA' : 'PENDENTE',
           // sem cobrança (simulado ou 100% off) já entra com ciclo; no modo pago o ciclo começa no webhook
           cicloFimEm: semCobranca ? inicioCiclo() : null,
@@ -129,7 +131,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
       if (promo) await consumirCodigo(promo.id)
       return reply.code(201).send({
         simulado: true,
-        plano: body.plano,
+        plano,
         slug,
         redirect: `${urlTenant(slug)}/login`,
         mensagem: gratuito && !simulada
@@ -141,7 +143,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     // Mercado Pago real: cria a assinatura recorrente e devolve o checkout
     try {
       const pre = await criarPreapproval({
-        plano: body.plano,
+        plano,
         valor,
         email,
         redeSlug: slug,
@@ -150,7 +152,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
       })
       await prisma.assinatura.update({ where: { redeId: rede.id }, data: { mpPreapprovalId: pre.id } })
       if (promo) await consumirCodigo(promo.id)
-      return reply.code(201).send({ simulado: false, plano: body.plano, slug, initPoint: pre.initPoint })
+      return reply.code(201).send({ simulado: false, plano, slug, initPoint: pre.initPoint })
     } catch (e) {
       // Desfaz o provisionamento se o Mercado Pago falhar
       await prisma.rede.delete({ where: { id: rede.id } })

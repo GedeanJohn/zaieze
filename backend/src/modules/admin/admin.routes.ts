@@ -123,6 +123,7 @@ export async function adminRoutes(app: FastifyInstance) {
   const promoSchema = z.object({
     codigo: z.string().min(2).max(40),
     tipo: z.enum(['DIAS_GRATIS', 'PERCENTUAL']),
+    plano: z.enum(['START', 'PRO', 'ELITE']).nullish(), // fixa o plano da oferta (null = qualquer)
     dias: z.coerce.number().int().positive().optional(),
     percentual: z.coerce.number().positive().max(100).optional(),
     descricao: z.string().max(140).optional(),
@@ -140,6 +141,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const promo = await prisma.codigoPromocional.create({
       data: {
         codigo, tipo: b.tipo,
+        plano: b.plano ?? null,
         dias: b.tipo === 'DIAS_GRATIS' ? b.dias : null,
         percentual: b.tipo === 'PERCENTUAL' ? b.percentual : null,
         descricao: b.descricao ?? null,

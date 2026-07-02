@@ -308,6 +308,8 @@ model CodigoPromocional {
   id          String       @id @default(cuid())
   codigo      String       @unique
   tipo        TipoPromocao
+  // Plano ao qual o cupom se aplica (oferta completa: o link fica só ?cupom=). Null = qualquer plano.
+  plano       Plano?
   dias        Int? // DIAS_GRATIS: dias grátis antes da 1ª cobrança
   percentual  Decimal?     @db.Decimal(5, 2) // PERCENTUAL: % de desconto na mensalidade
   descricao   String?

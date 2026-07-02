@@ -5,12 +5,13 @@ import { api, formataReal, mensagemDeErro, type Plano } from '../../api'
 const NOME: Record<Plano, string> = { START: 'Start', PRO: 'Pro', ELITE: 'Elite' }
 
 interface PlanoInfo { plano: Plano; nome: string; preco: number }
-interface PromoInfo { valido: boolean; beneficio?: string; tipo?: 'DIAS_GRATIS' | 'PERCENTUAL'; dias?: number | null; percentual?: string | null }
+interface PromoInfo { valido: boolean; beneficio?: string; tipo?: 'DIAS_GRATIS' | 'PERCENTUAL'; dias?: number | null; percentual?: string | null; plano?: Plano | null }
 
 export default function Checkout() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
-  const plano = (params.get('plano') as Plano) || 'PRO'
+  // Plano é estado: um cupom com plano definido troca/trava o plano (link fica só ?cupom=).
+  const [plano, setPlano] = useState<Plano>((params.get('plano') as Plano) || 'PRO')
 
   const [form, setForm] = useState({ redeNome: '', slug: '', gestorNome: '', email: '', senha: '' })
   const [dominio, setDominio] = useState('zaieze.com')
@@ -64,6 +65,7 @@ export default function Checkout() {
       try {
         const { data } = await api.get('/assinaturas/codigo-promo', { params: { codigo: c } })
         setPromo(data)
+        if (data.valido && data.plano) setPlano(data.plano) // cupom fixa o plano da oferta
       } catch { setPromo({ valido: false }) }
     }, 400)
     return () => clearTimeout(t)

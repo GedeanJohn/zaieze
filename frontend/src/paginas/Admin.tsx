@@ -6,7 +6,7 @@ interface RedeAdmin {
   id: string; nome: string; slug: string; plano: Plano; ativo: boolean; criadoEm: string; lojas: number; usuarios: number
   assinatura: { plano: Plano; status: string; valor: number; cicloFimEm: string | null; cancelamentoAgendado: boolean; simulada: boolean } | null
 }
-interface Promo { id: string; codigo: string; tipo: 'DIAS_GRATIS' | 'PERCENTUAL'; dias: number | null; percentual: string | null; descricao: string | null; validadeAte: string | null; maxUsos: number | null; usos: number; ativo: boolean }
+interface Promo { id: string; codigo: string; tipo: 'DIAS_GRATIS' | 'PERCENTUAL'; plano: string | null; dias: number | null; percentual: string | null; descricao: string | null; validadeAte: string | null; maxUsos: number | null; usos: number; ativo: boolean }
 
 const fmtData = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—')
 
@@ -208,6 +208,7 @@ function IgpmSection() {
 function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => void }) {
   const [codigo, setCodigo] = useState('')
   const [tipo, setTipo] = useState<'DIAS_GRATIS' | 'PERCENTUAL'>('DIAS_GRATIS')
+  const [plano, setPlano] = useState('')
   const [dias, setDias] = useState('90')
   const [percentual, setPercentual] = useState('')
   const [descricao, setDescricao] = useState('')
@@ -221,19 +222,26 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
     try {
       await api.post('/admin/promos', {
         codigo, tipo,
+        plano: plano || undefined,
         dias: tipo === 'DIAS_GRATIS' ? Number(dias) : undefined,
         percentual: tipo === 'PERCENTUAL' ? Number(percentual) : undefined,
         descricao: descricao || undefined,
         validadeAte: validadeAte || undefined,
         maxUsos: maxUsos ? Number(maxUsos) : undefined,
       })
-      setCodigo(''); setDescricao(''); setValidadeAte(''); setMaxUsos(''); setPercentual('')
+      setCodigo(''); setDescricao(''); setValidadeAte(''); setMaxUsos(''); setPercentual(''); setPlano('')
       onChange()
     } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setOcupado(false) }
   }
 
   async function alternar(p: Promo) { await api.patch(`/admin/promos/${p.id}`, { ativo: !p.ativo }).catch(() => {}); onChange() }
   async function remover(p: Promo) { if (window.confirm(`Excluir o código ${p.codigo}?`)) { await api.delete(`/admin/promos/${p.id}`).catch(() => {}); onChange() } }
+  function copiarLink(p: Promo) {
+    // Cupom com plano → link completo (só ?cupom=). Sem plano → checkout abre no plano padrão.
+    const url = `https://zaieze.com/checkout?cupom=${encodeURIComponent(p.codigo)}`
+    navigator.clipboard?.writeText(url).catch(() => {})
+    window.alert(`Link do cupom copiado:\n${url}`)
+  }
 
   return (
     <div className="cartao">
@@ -251,6 +259,15 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
           <select value={tipo} onChange={(e) => setTipo(e.target.value as 'DIAS_GRATIS' | 'PERCENTUAL')}>
             <option value="DIAS_GRATIS">Dias grátis</option>
             <option value="PERCENTUAL">% de desconto</option>
+          </select>
+        </div>
+        <div className="campo">
+          <label>Plano (opcional)</label>
+          <select value={plano} onChange={(e) => setPlano(e.target.value)}>
+            <option value="">Qualquer plano</option>
+            <option value="START">Start</option>
+            <option value="PRO">Pro</option>
+            <option value="ELITE">Elite</option>
           </select>
         </div>
         {tipo === 'DIAS_GRATIS'
@@ -271,13 +288,14 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
         <tbody>
           {promos.map((p) => (
             <tr key={p.id} style={{ opacity: p.ativo ? 1 : 0.5 }}>
-              <td><strong>{p.codigo}</strong></td>
+              <td><strong>{p.codigo}</strong>{p.plano ? <span className="selo ATACADO" style={{ marginLeft: 6 }}>{p.plano}</span> : null}</td>
               <td>{p.tipo === 'DIAS_GRATIS' ? `${p.dias} dias grátis` : `${Number(p.percentual)}% off`}{p.descricao ? ` · ${p.descricao}` : ''}</td>
               <td style={{ whiteSpace: 'nowrap' }}>{fmtData(p.validadeAte)}</td>
               <td>{p.usos}{p.maxUsos ? `/${p.maxUsos}` : ''}</td>
               <td><span className={`selo ${p.ativo ? 'ok' : 'baixo'}`}>{p.ativo ? 'ativo' : 'inativo'}</span></td>
               <td style={{ whiteSpace: 'nowrap' }}>
-                <a href="#" onClick={(e) => { e.preventDefault(); alternar(p) }}>{p.ativo ? 'desativar' : 'ativar'}</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); copiarLink(p) }}>copiar link</a>
+                {' · '}<a href="#" onClick={(e) => { e.preventDefault(); alternar(p) }}>{p.ativo ? 'desativar' : 'ativar'}</a>
                 {' · '}<a href="#" onClick={(e) => { e.preventDefault(); remover(p) }}>excluir</a>
               </td>
             </tr>

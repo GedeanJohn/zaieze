@@ -30,7 +30,7 @@ export async function criarPreapproval(opts: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      reason: `ModaCRM AI — Plano ${opts.plano}`,
+      reason: `ZAIEZE — Plano ${opts.plano}`,
       external_reference: opts.redeSlug,
       payer_email: opts.email,
       back_url: opts.backUrl,

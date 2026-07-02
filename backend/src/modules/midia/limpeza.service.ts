@@ -9,7 +9,7 @@ import { excluirDoR2 } from './r2.service'
 export const RETENCAO_AUDIO_DIAS = 7
 
 /** Remove um upload local (dev), se a URL for do /api/uploads. Ignora URLs do R2. */
-async function removerUploadLocal(url: string): Promise<void> {
+export async function removerUploadLocal(url: string): Promise<void> {
   const marca = '/api/uploads/'
   const i = url.indexOf(marca)
   if (i === -1) return

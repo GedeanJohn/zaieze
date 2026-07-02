@@ -40,6 +40,20 @@ export default function Admin() {
     } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
   }
 
+  async function excluirRede(r: RedeAdmin) {
+    const digitado = window.prompt(
+      `Isso apaga a marca "${r.nome}" PERMANENTEMENTE — lojas, usuários, clientes, produtos, vendas, mensagens, mídias e qualquer cobrança futura no Mercado Pago. Não tem volta.\n\nPara confirmar, digite exatamente o nome da marca:`,
+    )
+    if (digitado === null) return
+    if (digitado.trim() !== r.nome) { setErro('Nome não confere. Nada foi excluído.'); return }
+    setOcupado(true); setMsg(''); setErro('')
+    try {
+      await api.delete(`/admin/redes/${r.id}`, { data: { confirmarNome: digitado.trim() } })
+      setMsg(`${r.nome} excluída permanentemente.`)
+      carregar()
+    } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
+  }
+
   async function salvarPrecos() {
     setOcupado(true); setMsg(''); setErro('')
     try {
@@ -99,9 +113,11 @@ export default function Admin() {
                 <td>{r.usuarios}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{fmtData(r.criadoEm)}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  {(!r.ativo || r.assinatura?.status === 'PENDENTE')
-                    ? <a href="#" onClick={(e) => { e.preventDefault(); ativarCortesia(r) }} style={{ color: '#16a34a', fontWeight: 600 }}>Ativar (cortesia)</a>
-                    : <span style={{ color: 'var(--ink-soft)' }}>—</span>}
+                  {(!r.ativo || r.assinatura?.status === 'PENDENTE') && (
+                    <a href="#" onClick={(e) => { e.preventDefault(); ativarCortesia(r) }} style={{ color: '#16a34a', fontWeight: 600 }}>Ativar (cortesia)</a>
+                  )}
+                  {(!r.ativo || r.assinatura?.status === 'PENDENTE') && ' · '}
+                  <a href="#" onClick={(e) => { e.preventDefault(); excluirRede(r) }} style={{ color: 'var(--danger)', fontWeight: 600 }}>Excluir loja</a>
                 </td>
               </tr>
             ))}

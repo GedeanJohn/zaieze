@@ -4,6 +4,8 @@ import { prisma } from '../../lib/prisma'
 import { aplicarReajuste, definirPrecos, listarPlanos, listarReajustes } from '../planos/planos.service'
 import { normalizarCodigo } from '../promo/promo.service'
 import { cancelarPreapproval, mpConfigurado } from '../assinaturas/mercadopago.service'
+import { excluirDoR2 } from '../midia/r2.service'
+import { removerUploadLocal } from '../midia/limpeza.service'
 
 const num = (v: unknown) => Number(v ?? 0)
 
@@ -122,6 +124,46 @@ export async function adminRoutes(app: FastifyInstance) {
         : []),
       ...(promo ? [prisma.codigoPromocional.update({ where: { id: promo.id }, data: { usos: { increment: 1 } } })] : []),
     ])
+    return { ok: true }
+  })
+
+  // Exclui uma rede DEFINITIVAMENTE (loja de teste, por ex.) — como se nunca tivesse existido.
+  // Cancela qualquer cobrança futura no Mercado Pago, apaga as mídias no R2/local e então apaga
+  // a rede: o schema cascateia (lojas, usuários, clientes, produtos, vendas, mensagens etc.).
+  app.delete('/redes/:id', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const body = z.object({ confirmarNome: z.string() }).parse(request.body)
+    const rede = await prisma.rede.findUnique({ where: { id }, include: { assinatura: true } })
+    if (!rede) return reply.code(404).send({ erro: 'Rede não encontrada' })
+    if (body.confirmarNome.trim() !== rede.nome) {
+      return reply.code(422).send({ erro: 'O nome digitado não confere com o nome da marca. Nada foi excluído.' })
+    }
+
+    if (rede.assinatura?.mpPreapprovalId && mpConfigurado()) {
+      await cancelarPreapproval(rede.assinatura.mpPreapprovalId).catch(() => { /* pendente/sem efeito */ })
+    }
+
+    const lojas = await prisma.loja.findMany({ where: { redeId: id }, select: { id: true } })
+    const lojaIds = lojas.map((l) => l.id)
+    const [usuarios, produtos, campanhasModelo, mensagens, posts] = await Promise.all([
+      prisma.usuario.findMany({ where: { OR: [{ redeId: id }, { lojaId: { in: lojaIds } }] }, select: { fotoUrl: true } }),
+      prisma.produto.findMany({ where: { redeId: id }, select: { fotos: true, videos: true } }),
+      prisma.campanhaModelo.findMany({ where: { redeId: id }, select: { imagemUrl: true } }),
+      prisma.mensagemWhatsapp.findMany({ where: { lojaId: { in: lojaIds } }, select: { midiaUrl: true } }),
+      prisma.postMural.findMany({ where: { lojaId: { in: lojaIds } }, select: { imagemUrl: true } }),
+    ])
+    const urls = [
+      rede.logoUrl, rede.bannerUrl,
+      ...usuarios.map((u) => u.fotoUrl),
+      ...produtos.flatMap((p) => [...p.fotos, ...p.videos]),
+      ...campanhasModelo.map((c) => c.imagemUrl),
+      ...mensagens.map((m) => m.midiaUrl),
+      ...posts.map((p) => p.imagemUrl),
+    ].filter((u): u is string => !!u)
+    await excluirDoR2(urls).catch(() => { /* best-effort — não bloqueia a exclusão */ })
+    await Promise.all(urls.map((u) => removerUploadLocal(u)))
+
+    await prisma.rede.delete({ where: { id } })
     return { ok: true }
   })
 

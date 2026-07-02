@@ -98,7 +98,7 @@ export default function Layout() {
         {podeSeparacao && <NavLink to="/separacao" className={cls}><ClipboardCheck {...ICON} /><span>Pedidos a separar</span></NavLink>}
         {podeEquipe && <NavLink to="/equipe" className={cls}><UsersRound {...ICON} /><span>Equipe</span></NavLink>}
         {ehDonoRede && temFeature('whatsapp') && <NavLink to="/whatsapp-config" className={cls}><Smartphone {...ICON} /><span>WhatsApp oficial</span></NavLink>}
-        {ehDonoRede && temFeature('portal_cliente') && <NavLink to="/marca" className={cls}><Palette {...ICON} /><span>Marca</span></NavLink>}
+        {ehDonoRede && temFeature('portal_cliente') && <NavLink to="/marca" className={cls}><Palette {...ICON} /><span>Minha Loja</span></NavLink>}
         {ehDonoRede && <NavLink to="/manual" className={cls}><BookOpen {...ICON} /><span>Manual</span></NavLink>}
         {ehDonoRede && <NavLink to="/planos" className={cls}><CreditCard {...ICON} /><span>Planos</span></NavLink>}
         {ehDonoRede && <NavLink to="/contrato" className={cls}><FileText {...ICON} /><span>Contrato</span></NavLink>}

@@ -7,6 +7,7 @@ interface Marca {
   nome: string
   logoUrl: string | null
   bannerUrl: string | null
+  descricaoPublica: string | null
   corPrimaria: string
   corSecundaria: string
   slaEntrouMin: number
@@ -92,6 +93,7 @@ export default function Marca() {
     if (!marca) return
     try {
       const { data } = await api.patch('/marca', {
+        descricaoPublica: marca.descricaoPublica?.trim() || null,
         corPrimaria: marca.corPrimaria,
         corSecundaria: marca.corSecundaria,
         slaEntrouMin: marca.slaEntrouMin,
@@ -203,6 +205,21 @@ export default function Marca() {
 
       <form className="cartao" onSubmit={salvar}>
         <h2 style={{ marginTop: 0 }}>Cores e atendimento</h2>
+
+        <div className="campo">
+          <label>Descrição da loja (buscadores e IA)</label>
+          <textarea
+            rows={3} maxLength={500}
+            value={marca.descricaoPublica ?? ''}
+            onChange={(e) => setMarca({ ...marca, descricaoPublica: e.target.value })}
+            placeholder="Ex.: Moda feminina autoral em Goiânia — vestidos, alfaiataria e peças exclusivas para o dia a dia e ocasiões especiais."
+          />
+          <small style={{ color: 'var(--ink-soft)' }}>
+            {(marca.descricaoPublica ?? '').length}/500 · usada como resumo da sua loja no Google e em respostas de IA
+            (ex.: ChatGPT) quando alguém pesquisa por ela.
+          </small>
+        </div>
+
         <div className="linha-campos">
           <div className="campo">
             <label>Cor primária (CTA/botões)</label>

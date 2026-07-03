@@ -16,6 +16,7 @@ const HEX = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
 const TIPOS_LOGO: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/svg+xml': 'svg' }
 
 const atualizarSchema = z.object({
+  descricaoPublica: z.string().max(500).nullish(),
   corPrimaria: z.string().regex(HEX).optional(),
   corSecundaria: z.string().regex(HEX).optional(),
   slaEntrouMin: z.coerce.number().int().min(1).max(10080).optional(),
@@ -29,7 +30,7 @@ const atualizarSchema = z.object({
 })
 
 const selectMarca = {
-  id: true, nome: true, slug: true, logoUrl: true, bannerUrl: true, corPrimaria: true, corSecundaria: true,
+  id: true, nome: true, slug: true, logoUrl: true, bannerUrl: true, descricaoPublica: true, corPrimaria: true, corSecundaria: true,
   slaEntrouMin: true, slaAtendidoMin: true, slaNegociandoMin: true, slaApertadoPct: true, slaAutoRedistribuir: true,
   pedidoMinimoAtacado: true,
   textoDisparoPadrao: true, disparoVendedoraEditavel: true,

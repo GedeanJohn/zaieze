@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { api } from '../../api'
 import { HOST } from '../../host'
 import AgenteLoja from './AgenteLoja'
+import { useMetaTags } from '../../lib/useMetaTags'
 
 interface Variacao { cor: string; estampa: string; tamanho: string; estoque: number }
 interface Produto {
@@ -15,7 +16,7 @@ interface Produto {
 }
 interface Colecao { id: string; nome: string; descricao?: string | null; outlet?: boolean; produtos: Produto[] }
 interface Catalogo {
-  marca: { nome: string; logoUrl: string | null; bannerUrl: string | null; corPrimaria: string; corSecundaria: string }
+  marca: { nome: string; logoUrl: string | null; bannerUrl: string | null; descricaoPublica: string | null; corPrimaria: string; corSecundaria: string }
   loja: { nome: string }
   vendedora: { nome: string; primeiroNome: string; fotoUrl: string | null; bio: string | null; temWhatsapp: boolean }
   pedidoMinimoAtacado?: number
@@ -53,6 +54,22 @@ export default function Catalogo() {
       .then(({ data }) => setCat(data))
       .catch(() => setErro('Este catálogo não está disponível.'))
   }, [redeSlug, vendSlug])
+
+  const descricaoLoja = cat?.marca.descricaoPublica
+    || (cat ? `Catálogo de ${cat.marca.nome} — moda direto da vendedora ${cat.vendedora.primeiroNome} pelo WhatsApp.` : '')
+  useMetaTags({
+    titulo: cat ? `${cat.vendedora.nome} | ${cat.marca.nome}` : 'Catálogo',
+    descricao: descricaoLoja,
+    imagem: cat?.marca.logoUrl ?? undefined,
+    jsonLd: cat ? {
+      '@context': 'https://schema.org',
+      '@type': 'Store',
+      name: `${cat.marca.nome} — ${cat.vendedora.nome}`,
+      description: descricaoLoja,
+      image: cat.marca.logoUrl ?? undefined,
+      url: typeof window !== 'undefined' ? window.location.href : undefined,
+    } : undefined,
+  })
 
   function adicionar(item: ItemCarrinho) {
     setCarrinho((cur) => {

@@ -62,7 +62,7 @@ function whatsappUrl(numero: string | null, texto: string): string | null {
 async function resolverVendedoraPublica(redeSlug: string, vendSlug: string) {
   const rede = await prisma.rede.findUnique({
     where: { slug: redeSlug },
-    select: { id: true, nome: true, plano: true, ativo: true, logoUrl: true, bannerUrl: true, corPrimaria: true, corSecundaria: true, pedidoMinimoAtacado: true, pedidoMinimoInfantil: true, waPhoneNumberId: true, waNumeroExibicao: true },
+    select: { id: true, nome: true, plano: true, ativo: true, logoUrl: true, bannerUrl: true, descricaoPublica: true, corPrimaria: true, corSecundaria: true, pedidoMinimoAtacado: true, pedidoMinimoInfantil: true, waPhoneNumberId: true, waNumeroExibicao: true },
   })
   if (!rede || !rede.ativo || !planoInclui(rede.plano, 'portal_cliente')) return null
   const vend = await prisma.usuario.findFirst({
@@ -185,7 +185,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
       .filter((c) => c.produtos.length > 0)
 
     return {
-      marca: { nome: rede.nome, logoUrl: rede.logoUrl, bannerUrl: rede.bannerUrl, corPrimaria: rede.corPrimaria, corSecundaria: rede.corSecundaria },
+      marca: { nome: rede.nome, logoUrl: rede.logoUrl, bannerUrl: rede.bannerUrl, descricaoPublica: rede.descricaoPublica, corPrimaria: rede.corPrimaria, corSecundaria: rede.corSecundaria },
       loja: { nome: vend.loja!.nome },
       vendedora: { nome: vend.nome, primeiroNome: vend.nome.trim().split(/\s+/)[0], fotoUrl: vend.fotoUrl, bio: vend.bioCatalogo, temWhatsapp: !!vend.waNumero },
       pedidoMinimoAtacado: rede.pedidoMinimoAtacado,

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, formataReal, rotuloFeature, FEATURE_MIN, type Plano } from '../../api'
 import AgenteZaieze from './AgenteZaieze'
+import { useMetaTags } from '../../lib/useMetaTags'
 
 interface PlanoCatalogo {
   plano: Plano
@@ -32,6 +33,12 @@ export default function Landing() {
   const [planos, setPlanos] = useState<PlanoCatalogo[]>([])
   const [chatAberto, setChatAberto] = useState(false)
   const navigate = useNavigate()
+
+  useMetaTags({
+    titulo: 'ZAIEZE — Sistemas Inteligentes para a Moda',
+    descricao: 'Sistema de gestão, estoque e CRM para lojas de moda (varejo e atacado) com atendimento pelo WhatsApp organizado por vendedora e IA que recupera clientes e gira o estoque parado.',
+    url: 'https://zaieze.com/',
+  })
 
   useEffect(() => {
     api.get('/assinaturas/planos').then(({ data }) => setPlanos(data.planos)).catch(() => {})

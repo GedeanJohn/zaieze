@@ -1,0 +1,39 @@
+# ZAIEZE
+
+> Sistema de gestão de vendas, estoque e relacionamento (CRM) para lojas de moda —
+> varejo e atacado — com atendimento pelo WhatsApp organizado por vendedora e
+> Inteligência Artificial para recuperar clientes e girar o estoque parado.
+
+A ZAIEZE é um SaaS brasileiro focado no mercado da moda (confecções, atacadistas,
+distribuidores e lojistas). Cada marca (rede) tem seu próprio painel em
+`<slug>.zaieze.com`, com lojas e vendedoras ilimitadas em todos os planos —
+a diferença entre planos é por funcionalidade, não por quantidade.
+
+## O que o sistema faz
+
+- Organiza a "venda online" pelo WhatsApp: cada vendedora atende a própria carteira
+  de clientes, com histórico e roteamento automático das mensagens recebidas.
+- Estoque em grade (cor/tamanho) compartilhado entre lojas, com alertas de estoque
+  crítico e peças paradas/encalhadas.
+- Funil de vendas (leads) com SLA por etapa e redistribuição automática de
+  atendimentos atrasados.
+- Radar de Oportunidades: cruza estoque parado com o perfil de compra dos clientes e
+  sugere campanhas de recuperação com um clique.
+- Provador Virtual (IA): gera fotos do cliente vestindo a peça a partir de uma selfie.
+- Portal do Cliente: catálogo público por vendedora, com carrinho, pedido mínimo de
+  atacado e checkout assistido por um agente de IA.
+- Atacado e varejo no mesmo catálogo, com preços e regras por perfil de comprador.
+- Integração oficial com a WhatsApp Cloud API (Meta) — um número por marca.
+- Comissão, ranking e gamificação para equipes de vendas.
+
+## Planos
+
+Start, Pro e Elite — todos com lojas e vendedoras ilimitadas; a diferenciação é por
+funcionalidade (ex.: Radar, Provador Virtual e Atacado avançado no Elite).
+
+## Links
+
+- Site: https://zaieze.com
+- Planos: https://zaieze.com/#planos
+- Quem somos: https://zaieze.com/quem-somos
+- Política de privacidade (LGPD): https://zaieze.com/lgpd

@@ -1,0 +1,42 @@
+# ZAIEZE — Sistemas Inteligentes para a Moda
+# Libera buscadores tradicionais e crawlers de IA (GEO). As áreas do painel exigem
+# login, então não há conteúdo sensível para restringir aqui.
+
+User-agent: *
+Allow: /
+
+# Crawlers de IA / motores de resposta generativa
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+Sitemap: https://zaieze.com/sitemap.xml

@@ -65,7 +65,7 @@ export default function Layout() {
             ? <img src={usuario.fotoUrl} alt="" />
             : <span className="topbar-ini">{iniciais(usuario.nome)}</span>}
         </button>
-        <button className="topbar-busca" onClick={() => navigate('/clientes')} aria-label="Pesquisar">
+        <button className="topbar-busca" onClick={() => navigate('/clientes', { state: { focarBusca: Date.now() } })} aria-label="Pesquisar">
           <Search size={17} strokeWidth={2} /><span>Pesquisar</span>
         </button>
         {podeVendasClientes && temFeature('whatsapp') && (

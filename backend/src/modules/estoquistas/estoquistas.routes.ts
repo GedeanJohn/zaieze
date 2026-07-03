@@ -9,7 +9,8 @@ const criarSchema = z.object({
   nome: z.string().min(2),
   email: z.string().email(),
   senha: z.string().min(6),
-  telefone: z.string().optional(),
+  // Obrigatório: é pra onde vai a senha provisória do "esqueci minha senha".
+  telefone: z.string().min(8, 'Informe o WhatsApp com DDD'),
 })
 
 const atualizarSchema = z.object({

@@ -1,17 +1,45 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { aplicarReajuste, definirPrecos, listarPlanos, listarReajustes } from '../planos/planos.service'
 import { normalizarCodigo } from '../promo/promo.service'
 import { cancelarPreapproval, mpConfigurado } from '../assinaturas/mercadopago.service'
 import { excluirDoR2 } from '../midia/r2.service'
 import { removerUploadLocal } from '../midia/limpeza.service'
+import { gerarSenhaProvisoria } from '../auth/senha-provisoria'
 
 const num = (v: unknown) => Number(v ?? 0)
 
 /** Painel do Admin (operador do SaaS — SUPER_ADMIN): preços, reajuste IGP-M, redes e códigos promocionais. */
 export async function adminRoutes(app: FastifyInstance) {
   app.addHook('onRequest', app.authorize('SUPER_ADMIN'))
+
+  // Solicitações de "esqueci minha senha" de GESTORES sem WhatsApp cadastrado — as dos demais
+  // papéis (equipe da marca) caem para o GESTOR da própria rede (ver /usuarios/solicitacoes-senha).
+  app.get('/solicitacoes-senha', async () => ({
+    solicitacoes: await prisma.solicitacaoSenha.findMany({
+      where: { atendidaEm: null, usuario: { role: 'GESTOR' } },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, createdAt: true, usuario: { select: { id: true, nome: true, email: true } } },
+    }),
+  }))
+
+  app.post('/solicitacoes-senha/:id/gerar', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const solicitacao = await prisma.solicitacaoSenha.findFirst({
+      where: { id, atendidaEm: null, usuario: { role: 'GESTOR' } },
+      select: { id: true, usuarioId: true },
+    })
+    if (!solicitacao) return reply.code(404).send({ erro: 'Solicitação não encontrada' })
+
+    const senha = gerarSenhaProvisoria()
+    await prisma.$transaction([
+      prisma.usuario.update({ where: { id: solicitacao.usuarioId }, data: { senhaHash: await bcrypt.hash(senha, 10) } }),
+      prisma.solicitacaoSenha.update({ where: { id: solicitacao.id }, data: { atendidaEm: new Date() } }),
+    ])
+    return { senha }
+  })
 
   // ── Planos & Preços ──
   app.get('/planos', async () => ({ planos: await listarPlanos() }))

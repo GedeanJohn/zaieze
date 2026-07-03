@@ -20,6 +20,12 @@ const envSchema = z.object({
   // Chave para criptografar o token permanente da WABA em repouso (AES-256-GCM).
   // Obrigatória para SALVAR um token; ausente → o /whatsapp/config recusa gravar token.
   WA_TOKEN_SECRET: z.string().optional(),
+  // Número OFICIAL da própria ZAIEZE (não o de cada marca) — usado só p/ mensagens de sistema
+  // (ex.: senha provisória do "esqueci minha senha"), que não dependem da marca ter WABA própria.
+  // Requer um template de autenticação aprovado 1x pela Meta. Ausente → cai no fluxo manual.
+  ZAIEZE_WA_PHONE_NUMBER_ID: z.string().optional(),
+  ZAIEZE_WA_TOKEN: z.string().optional(),
+  ZAIEZE_WA_TEMPLATE_SENHA: z.string().default('senha_provisoria'),
   ANTHROPIC_API_KEY: z.string().optional(),
   // Mercado Pago (Assinaturas/preapproval) — sem token o checkout opera em modo simulado
   MERCADOPAGO_ACCESS_TOKEN: z.string().optional(),

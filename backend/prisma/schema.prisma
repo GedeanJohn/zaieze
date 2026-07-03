@@ -410,10 +410,26 @@ model Usuario {
   postsMural        PostMural[]
   leads             Lead[]             @relation("LeadsVendedora")
   gruposTransmissao GrupoTransmissao[] @relation("GruposVendedora")
+  solicitacoesSenha SolicitacaoSenha[]
 
   @@unique([lojaId, slugCatalogo])
   @@index([lojaId, role])
   @@map("usuarios")
+}
+
+// "Esqueci minha senha" quando o usuário não tem WhatsApp cadastrado (o caminho automático
+// manda uma senha provisória pelo WhatsApp). Fica pendente até um humano atender: se quem
+// pediu é GESTOR, aparece pro SUPER_ADMIN; senão, aparece pro GESTOR da própria rede.
+model SolicitacaoSenha {
+  id         String    @id @default(cuid())
+  usuarioId  String
+  atendidaEm DateTime?
+  createdAt  DateTime  @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, atendidaEm])
+  @@map("solicitacoes_senha")
 }
 
 // Convite por link: o gestor/gerente (ou super admin) convida uma pessoa; ela abre o link e

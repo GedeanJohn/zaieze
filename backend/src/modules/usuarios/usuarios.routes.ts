@@ -1,12 +1,14 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
+import crypto from 'node:crypto'
 import sharp from 'sharp'
 import { prisma } from '../../lib/prisma'
-import { lojaIdDe } from '../../plugins/auth'
+import { lojaIdDe, redeIdDeQualquer } from '../../plugins/auth'
 import { ETAPAS_ABERTAS } from '../leads/leads.service'
 import { enviarParaR2 } from '../midia/r2.service'
 import { salvarUploadLocal } from '../midia/midia.routes'
+import { gerarSenhaProvisoria } from '../auth/senha-provisoria'
 
 const TIPOS_IMG = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/avif'])
 
@@ -16,7 +18,8 @@ const criarUsuarioSchema = z.object({
   senha: z.string().min(6),
   role: z.enum(['GERENTE', 'VENDEDORA']).default('VENDEDORA'),
   equipeId: z.string().optional(),
-  telefone: z.string().optional(),
+  // Obrigatório: é pra onde vai a senha provisória do "esqueci minha senha".
+  telefone: z.string().min(8, 'Informe o WhatsApp com DDD'),
   slugCatalogo: z.string().regex(/^[a-z0-9-]+$/).optional(),
   metaMensal: z.coerce.number().nonnegative().optional(),
   comissaoPadrao: z.coerce.number().min(0).max(100).optional(),
@@ -52,6 +55,36 @@ export async function usuariosRoutes(app: FastifyInstance) {
       where: { id: request.user.sub },
       select: { id: true, nome: true, email: true, role: true, fotoUrl: true, bioCatalogo: true, slugCatalogo: true },
     })
+  })
+
+  // Solicitações de "esqueci minha senha" da própria equipe (quem pediu não tinha WhatsApp
+  // cadastrado). GESTOR vê a rede toda; GERENTE só a própria loja.
+  app.get('/solicitacoes-senha', { preHandler: [app.authorize('GESTOR', 'GERENTE')] }, async (request) => {
+    const redeId = await redeIdDeQualquer(request)
+    return prisma.solicitacaoSenha.findMany({
+      where: { atendidaEm: null, usuario: { role: { not: 'GESTOR' }, OR: [{ redeId }, { loja: { redeId } }] } },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, createdAt: true, usuario: { select: { id: true, nome: true, email: true, role: true } } },
+    })
+  })
+
+  // Gera uma senha provisória para quem solicitou e marca a solicitação como atendida.
+  // A senha é devolvida na resposta — o gestor/gerente repassa por WhatsApp manualmente.
+  app.post('/solicitacoes-senha/:id/gerar', { preHandler: [app.authorize('GESTOR', 'GERENTE')] }, async (request, reply) => {
+    const redeId = await redeIdDeQualquer(request)
+    const { id } = request.params as { id: string }
+    const solicitacao = await prisma.solicitacaoSenha.findFirst({
+      where: { id, atendidaEm: null, usuario: { role: { not: 'GESTOR' }, OR: [{ redeId }, { loja: { redeId } }] } },
+      select: { id: true, usuarioId: true },
+    })
+    if (!solicitacao) return reply.code(404).send({ erro: 'Solicitação não encontrada' })
+
+    const senha = gerarSenhaProvisoria()
+    await prisma.$transaction([
+      prisma.usuario.update({ where: { id: solicitacao.usuarioId }, data: { senhaHash: await bcrypt.hash(senha, 10) } }),
+      prisma.solicitacaoSenha.update({ where: { id: solicitacao.id }, data: { atendidaEm: new Date() } }),
+    ])
+    return { senha }
   })
 
   // Minha conta: QUALQUER papel (inclusive GESTOR/super-admin) edita os próprios dados.

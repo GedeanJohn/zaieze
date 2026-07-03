@@ -137,6 +137,29 @@ export async function enviarTemplate(opts: {
   })
 }
 
+/**
+ * Envia um template pelo número OFICIAL DA PRÓPRIA ZAIEZE (não o de cada marca) — usado para
+ * mensagens de sistema (ex.: senha provisória do "esqueci minha senha"), que não podem depender
+ * de a marca ter configurado a WABA dela. Sem ZAIEZE_WA_* configurada → modo SIMULADO.
+ */
+export async function enviarTemplatePlataforma(opts: {
+  telefone: string
+  templateNome: string
+  idioma?: string
+  params?: ParametroTemplate[]
+}): Promise<EnvioResultado> {
+  if (!env.ZAIEZE_WA_PHONE_NUMBER_ID || !env.ZAIEZE_WA_TOKEN) return { status: 'SIMULADA' }
+  const components = opts.params && opts.params.length > 0
+    ? [{ type: 'body', parameters: opts.params.map((p) => ({ type: 'text', text: p.texto })) }]
+    : []
+  return chamarMensagens(env.ZAIEZE_WA_PHONE_NUMBER_ID, env.ZAIEZE_WA_TOKEN, {
+    messaging_product: 'whatsapp',
+    to: normalizarNumero(opts.telefone),
+    type: 'template',
+    template: { name: opts.templateNome, language: { code: opts.idioma ?? 'pt_BR' }, components },
+  })
+}
+
 // ─────────────────────────── Templates HSM ───────────────────────────
 
 /** Extrai os placeholders nomeados do corpo, na ordem de 1ª aparição (distintos). */

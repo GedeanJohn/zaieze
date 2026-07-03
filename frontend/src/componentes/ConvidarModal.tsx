@@ -68,8 +68,8 @@ export default function ConvidarModal({ papeis, lojas, onClose }: Props) {
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <div className="campo">
-                <label>WhatsApp (com DDD)</label>
-                <input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="5562999990011" inputMode="tel" />
+                <label>WhatsApp (com DDD)*</label>
+                <input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="5562999990011" inputMode="tel" required />
               </div>
             </div>
             <div className="linha-campos">

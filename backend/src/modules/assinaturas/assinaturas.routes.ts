@@ -18,6 +18,8 @@ const checkoutSchema = z.object({
   redeNome: z.string().min(2),
   slug: z.string().min(3).regex(/^[a-z0-9-]+$/, 'O endereço aceita apenas letras minúsculas, números e hífens'),
   gestorNome: z.string().min(2),
+  // Obrigatório: é pra onde vai a senha provisória do "esqueci minha senha".
+  telefone: z.string().min(8, 'Informe o WhatsApp com DDD'),
   email: z.string().email(),
   senha: z.string().min(6),
   codigoPromo: z.string().optional(),
@@ -102,7 +104,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     const rede = await prisma.$transaction(async (tx) => {
       const r = await tx.rede.create({ data: { nome: body.redeNome, slug, plano, ativo: semCobranca } })
       await tx.usuario.create({
-        data: { redeId: r.id, nome: body.gestorNome, email, senhaHash, role: 'GESTOR' },
+        data: { redeId: r.id, nome: body.gestorNome, email, senhaHash, role: 'GESTOR', telefone: body.telefone },
       })
       // Aceite eletrônico da versão vigente do contrato, firmado no ato da adesão.
       await tx.aceiteContrato.create({

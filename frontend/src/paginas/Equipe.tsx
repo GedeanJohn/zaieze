@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, mensagemDeErro, temFeature, usuarioLogado } from '../api'
+import { api, mensagemDeErro, rotuloPapel, temFeature, usuarioLogado } from '../api'
 import ConvidarModal from '../componentes/ConvidarModal'
 
 interface Membro {
@@ -54,7 +54,7 @@ interface FormLoja {
   slug: string
   cnpj?: string
   telefone?: string
-  gerente: { nome: string; email: string; senha: string }
+  gerente: { nome: string; email: string; senha: string; telefone: string }
 }
 
 interface Estoquista {
@@ -260,7 +260,7 @@ export default function Equipe() {
           </div>
         )}
         {aba === 'lojas' && (
-          <button className="btn" onClick={() => setFormLoja({ nome: '', slug: '', gerente: { nome: '', email: '', senha: '' } })}>+ Nova loja</button>
+          <button className="btn" onClick={() => setFormLoja({ nome: '', slug: '', gerente: { nome: '', email: '', senha: '', telefone: '' } })}>+ Nova loja</button>
         )}
         {aba === 'estoque' && (
           <div style={{ display: 'flex', gap: 10 }}>
@@ -269,6 +269,8 @@ export default function Equipe() {
           </div>
         )}
       </header>
+
+      {(usuario.role === 'GESTOR' || usuario.role === 'GERENTE') && <SolicitacoesSenhaSection />}
 
       {/* Abas (só fazem sentido para o gestor com multi-loja) */}
       {(mostraLojas || mostraEstoque) && (
@@ -502,8 +504,8 @@ export default function Equipe() {
                 <input type="password" value={form.senha ?? ''} onChange={(e) => setForm({ ...form, senha: e.target.value })} required={!form.id} minLength={6} />
               </div>
               <div className="campo">
-                <label>Telefone/WhatsApp</label>
-                <input value={form.telefone ?? ''} onChange={(e) => setForm({ ...form, telefone: e.target.value })} />
+                <label>{form.id ? 'Telefone/WhatsApp' : 'Telefone/WhatsApp*'}</label>
+                <input value={form.telefone ?? ''} onChange={(e) => setForm({ ...form, telefone: e.target.value })} required={!form.id} />
               </div>
             </div>
             <div className="linha-campos">
@@ -567,6 +569,11 @@ export default function Equipe() {
                 <input type="password" value={formLoja.gerente.senha} onChange={(e) => setFormLoja({ ...formLoja, gerente: { ...formLoja.gerente, senha: e.target.value } })} minLength={6} required />
               </div>
             </div>
+            <div className="campo">
+              <label>WhatsApp do gerente (com DDD)*</label>
+              <input value={formLoja.gerente.telefone} onChange={(e) => setFormLoja({ ...formLoja, gerente: { ...formLoja.gerente, telefone: e.target.value } })} placeholder="5562999990011" inputMode="tel" required />
+              <small style={{ color: 'var(--ink-soft)' }}>É pra onde vai a senha, caso o gerente a esqueça.</small>
+            </div>
             <div className="acoes">
               <button type="button" className="btn secundario" onClick={() => setFormLoja(null)}>Cancelar</button>
               <button className="btn">Criar loja</button>
@@ -624,8 +631,8 @@ export default function Equipe() {
                 <input type="email" value={formE.email} onChange={(e) => setFormE({ ...formE, email: e.target.value })} required />
               </div>
               <div className="campo">
-                <label>Telefone</label>
-                <input value={formE.telefone ?? ''} onChange={(e) => setFormE({ ...formE, telefone: e.target.value })} placeholder="5562999990011" />
+                <label>{formE.id ? 'Telefone' : 'Telefone*'}</label>
+                <input value={formE.telefone ?? ''} onChange={(e) => setFormE({ ...formE, telefone: e.target.value })} placeholder="5562999990011" required={!formE.id} />
               </div>
             </div>
             <div className="campo">
@@ -735,6 +742,60 @@ function MetasConfig({ onSalvo }: { onSalvo: () => void }) {
           Os valores "por vendedora" atualizam após salvar.
         </span>
       </div>
+    </div>
+  )
+}
+
+// ── Solicitações de "esqueci minha senha" da equipe (sem WhatsApp cadastrado) ──
+interface SolicitacaoSenha { id: string; createdAt: string; usuario: { id: string; nome: string; email: string; role: string } }
+
+function SolicitacoesSenhaSection() {
+  const [lista, setLista] = useState<SolicitacaoSenha[]>([])
+  const [gerada, setGerada] = useState<{ nome: string; senha: string } | null>(null)
+  const [erro, setErro] = useState('')
+
+  function carregar() {
+    api.get('/usuarios/solicitacoes-senha').then(({ data }) => setLista(data)).catch(() => {})
+  }
+  useEffect(() => { carregar() }, [])
+
+  async function gerar(s: SolicitacaoSenha) {
+    setErro('')
+    try {
+      const { data } = await api.post(`/usuarios/solicitacoes-senha/${s.id}/gerar`)
+      setGerada({ nome: s.usuario.nome, senha: data.senha })
+      carregar()
+    } catch (e) { setErro(mensagemDeErro(e)) }
+  }
+
+  if (lista.length === 0) return null
+
+  return (
+    <div className="cartao" style={{ borderLeft: '4px solid var(--accent)' }}>
+      <h2 style={{ marginTop: 0, fontSize: 16 }}>🔑 Pedidos de redefinição de senha ({lista.length})</h2>
+      <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
+        Sem WhatsApp cadastrado, essas pessoas não recebem a senha provisória sozinhas. Gere uma senha e repasse por WhatsApp.
+      </p>
+      {erro && <div className="alerta">{erro}</div>}
+      {gerada && (
+        <div className="sucesso" style={{ marginBottom: 10 }}>
+          Senha provisória de <strong>{gerada.nome}</strong>: <strong>{gerada.senha}</strong> — copie e envie por WhatsApp.
+        </div>
+      )}
+      <table>
+        <thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Pedido em</th><th></th></tr></thead>
+        <tbody>
+          {lista.map((s) => (
+            <tr key={s.id}>
+              <td>{s.usuario.nome}</td>
+              <td>{s.usuario.email}</td>
+              <td>{rotuloPapel[s.usuario.role as keyof typeof rotuloPapel] ?? s.usuario.role}</td>
+              <td>{new Date(s.createdAt).toLocaleString('pt-BR')}</td>
+              <td><a href="#" onClick={(e) => { e.preventDefault(); gerar(s) }}>gerar senha</a></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

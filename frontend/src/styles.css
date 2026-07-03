@@ -175,6 +175,8 @@ label { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 
 .login-card input { background: #111; color: #fff; border-color: var(--zz-line); }
 .login-card input:focus { outline: none; border-color: #fff; }
 .login-card .btn { background: #fff; color: #000; }
+.login-card .btn-link { color: var(--zz-mut); }
+.login-card .btn-link:hover { color: #fff; }
 .login-card .btn:hover { filter: none; background: #e6e6e6; }
 
 .modal-fundo {

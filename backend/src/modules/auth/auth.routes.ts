@@ -2,7 +2,10 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
+import { env } from '../../env'
 import { aplicarFimDeCiclo } from '../assinaturas/assinatura.service'
+import { enviarTemplatePlataforma } from '../whatsapp/meta.service'
+import { gerarSenhaProvisoria } from './senha-provisoria'
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -69,6 +72,30 @@ export async function authRoutes(app: FastifyInstance) {
         loja: usuario.loja ? { id: usuario.loja.id, nome: usuario.loja.nome, slug: usuario.loja.slug } : null,
       },
     }
+  })
+
+  // "Esqueci minha senha": com WhatsApp cadastrado, gera e manda uma senha provisória na hora
+  // (número oficial da própria ZAIEZE, não o da marca — não depende de a marca ter WABA própria).
+  // Sem WhatsApp, fica pendente para um humano atender (GESTOR da rede, ou o SUPER_ADMIN quando
+  // quem pediu é o próprio GESTOR) — ver GET /usuarios/solicitacoes-senha e /admin/solicitacoes-senha.
+  app.post('/esqueci-senha', { config: { rateLimit: { max: 5, timeWindow: '10 minutes' } } }, async (request) => {
+    const body = z.object({ email: z.string().email() }).parse(request.body)
+    const usuario = await prisma.usuario.findUnique({ where: { email: body.email.toLowerCase() } })
+    if (!usuario || !usuario.ativo) return { ok: true, via: 'nao-encontrado' as const }
+
+    if (usuario.telefone) {
+      const senha = gerarSenhaProvisoria()
+      await prisma.usuario.update({ where: { id: usuario.id }, data: { senhaHash: await bcrypt.hash(senha, 10) } })
+      await enviarTemplatePlataforma({
+        telefone: usuario.telefone,
+        templateNome: env.ZAIEZE_WA_TEMPLATE_SENHA,
+        params: [{ texto: senha }],
+      })
+      return { ok: true, via: 'whatsapp' as const }
+    }
+
+    await prisma.solicitacaoSenha.create({ data: { usuarioId: usuario.id } })
+    return { ok: true, via: 'pendente' as const }
   })
 
   app.get('/me', { preHandler: [app.authenticate] }, async (request) => {

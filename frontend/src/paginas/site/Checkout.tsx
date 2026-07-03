@@ -15,7 +15,7 @@ export default function Checkout() {
   // Plano é estado: um cupom com plano definido troca/trava o plano (link fica só ?cupom=).
   const [plano, setPlano] = useState<Plano>((params.get('plano') as Plano) || 'PRO')
 
-  const [form, setForm] = useState({ redeNome: '', slug: '', gestorNome: '', email: '', senha: '' })
+  const [form, setForm] = useState({ redeNome: '', slug: '', gestorNome: '', telefone: '', email: '', senha: '' })
   const [dominio, setDominio] = useState('zaieze.com')
   const [planos, setPlanos] = useState<PlanoInfo[]>([])
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checando' | 'ok' | 'indisponivel'>('idle')
@@ -78,7 +78,7 @@ export default function Checkout() {
   }, [codigoPromo])
 
   const podeEnviar = useMemo(
-    () => form.redeNome && form.slug.length >= 3 && form.gestorNome && form.email && form.senha.length >= 6 && slugStatus !== 'indisponivel' && aceiteContrato,
+    () => form.redeNome && form.slug.length >= 3 && form.gestorNome && form.telefone.length >= 8 && form.email && form.senha.length >= 6 && slugStatus !== 'indisponivel' && aceiteContrato,
     [form, slugStatus, aceiteContrato],
   )
 
@@ -144,6 +144,11 @@ export default function Checkout() {
           <div className="campo">
             <label>Seu nome (gestor)*</label>
             <input value={form.gestorNome} onChange={(e) => setForm({ ...form, gestorNome: e.target.value })} required />
+          </div>
+          <div className="campo">
+            <label>Seu WhatsApp (com DDD)*</label>
+            <input value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} placeholder="5562999990011" inputMode="tel" required />
+            <small className="dica">É pra onde mandamos a senha, caso você a esqueça.</small>
           </div>
           <div className="campo">
             <label>E-mail de acesso*</label>

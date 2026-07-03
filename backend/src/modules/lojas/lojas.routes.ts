@@ -14,6 +14,8 @@ const criarLojaSchema = z.object({
     nome: z.string().min(2),
     email: z.string().email(),
     senha: z.string().min(6),
+    // Obrigatório: é pra onde vai a senha provisória do "esqueci minha senha".
+    telefone: z.string().min(8, 'Informe o WhatsApp do gerente com DDD'),
   }),
 })
 
@@ -61,6 +63,7 @@ export async function lojasRoutes(app: FastifyInstance) {
             nome: body.gerente.nome,
             email: body.gerente.email.toLowerCase(),
             senhaHash: await bcrypt.hash(body.gerente.senha, 10),
+            telefone: body.gerente.telefone,
             role: 'GERENTE',
           },
         },

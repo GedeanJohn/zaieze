@@ -70,6 +70,9 @@ export default function Admin() {
       {erro && <div className="alerta">{erro}</div>}
       {msg && <div className="sucesso">{msg}</div>}
 
+      {/* ── Pedidos de redefinição de senha (gestores sem WhatsApp cadastrado) ── */}
+      <SolicitacoesSenhaSection />
+
       {/* ── Preços & Reajuste ── */}
       <div className="cartao">
         <h2 style={{ marginTop: 0 }}>💳 Planos & Preços</h2>
@@ -127,6 +130,59 @@ export default function Admin() {
       </div>
 
     </>
+  )
+}
+
+// ── Pedidos de redefinição de senha de GESTORES sem WhatsApp cadastrado ──
+interface SolicitacaoSenha { id: string; createdAt: string; usuario: { id: string; nome: string; email: string } }
+
+function SolicitacoesSenhaSection() {
+  const [lista, setLista] = useState<SolicitacaoSenha[]>([])
+  const [gerada, setGerada] = useState<{ nome: string; senha: string } | null>(null)
+  const [erro, setErro] = useState('')
+
+  function carregar() {
+    api.get('/admin/solicitacoes-senha').then(({ data }) => setLista(data.solicitacoes)).catch(() => {})
+  }
+  useEffect(() => { carregar() }, [])
+
+  async function gerar(s: SolicitacaoSenha) {
+    setErro('')
+    try {
+      const { data } = await api.post(`/admin/solicitacoes-senha/${s.id}/gerar`)
+      setGerada({ nome: s.usuario.nome, senha: data.senha })
+      carregar()
+    } catch (e) { setErro(mensagemDeErro(e)) }
+  }
+
+  if (lista.length === 0) return null
+
+  return (
+    <div className="cartao" style={{ borderLeft: '4px solid var(--accent)' }}>
+      <h2 style={{ marginTop: 0, fontSize: 16 }}>🔑 Pedidos de redefinição de senha ({lista.length})</h2>
+      <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
+        Gestores sem WhatsApp cadastrado que pediram "esqueci minha senha". Gere uma senha provisória e repasse manualmente.
+      </p>
+      {erro && <div className="alerta">{erro}</div>}
+      {gerada && (
+        <div className="sucesso" style={{ marginBottom: 10 }}>
+          Senha provisória de <strong>{gerada.nome}</strong>: <strong>{gerada.senha}</strong> — copie e envie por WhatsApp.
+        </div>
+      )}
+      <table>
+        <thead><tr><th>Nome</th><th>E-mail</th><th>Pedido em</th><th></th></tr></thead>
+        <tbody>
+          {lista.map((s) => (
+            <tr key={s.id}>
+              <td>{s.usuario.nome}</td>
+              <td>{s.usuario.email}</td>
+              <td>{new Date(s.createdAt).toLocaleString('pt-BR')}</td>
+              <td><a href="#" onClick={(e) => { e.preventDefault(); gerar(s) }}>gerar senha</a></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 

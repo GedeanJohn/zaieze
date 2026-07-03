@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, mensagemDeErro, usuarioLogado, atualizarUsuarioLocal } from '../api'
+import { useToast } from '../componentes/Toast'
 
 /** Iniciais do nome para o avatar. */
 function iniciais(nome: string): string {
@@ -14,8 +15,7 @@ export default function Conta() {
   const [nome, setNome] = useState(u.nome)
   const [email, setEmail] = useState(u.email)
   const [senha, setSenha] = useState('')
-  const [erro, setErro] = useState('')
-  const [ok, setOk] = useState('')
+  const avisar = useToast()
   const [salvando, setSalvando] = useState(false)
 
   // Bio do catálogo (só a vendedora tem loja pública). Carrega o valor atual do servidor.
@@ -33,43 +33,43 @@ export default function Conta() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function enviarFoto(arquivo: File) {
-    setEnviandoFoto(true); setErro('')
+    setEnviandoFoto(true)
     try {
       const fd = new FormData()
       fd.append('file', arquivo)
       const { data } = await api.post('/usuarios/me/foto', fd)
       setFotoUrl(data.fotoUrl)
       atualizarUsuarioLocal({ fotoUrl: data.fotoUrl })
-    } catch (err) { setErro(mensagemDeErro(err)) }
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') }
     finally { setEnviandoFoto(false) }
   }
   async function removerFoto() {
-    setEnviandoFoto(true); setErro('')
+    setEnviandoFoto(true)
     try {
       await api.delete('/usuarios/me/foto')
       setFotoUrl(null)
       atualizarUsuarioLocal({ fotoUrl: null })
-    } catch (err) { setErro(mensagemDeErro(err)) }
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') }
     finally { setEnviandoFoto(false) }
   }
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault()
-    setErro(''); setOk(''); setSalvando(true)
+    setSalvando(true)
     try {
       const corpo: Record<string, unknown> = {}
       if (nome && nome !== u.nome) corpo.nome = nome
       if (email && email !== u.email) corpo.email = email
       if (senha) corpo.senha = senha
       if (ehVendedora && bio !== bioOrig) corpo.bioCatalogo = bio
-      if (Object.keys(corpo).length === 0) { setOk('Nada para alterar.'); return }
+      if (Object.keys(corpo).length === 0) { avisar('Nada para alterar.'); return }
       const { data } = await api.patch('/usuarios/me', corpo)
       if ('bioCatalogo' in corpo) setBioOrig(bio)
       const atual = usuarioLogado()
       if (atual) localStorage.setItem('modacrm_usuario', JSON.stringify({ ...atual, nome: data.nome, email: data.email }))
       setSenha('')
-      setOk('Dados atualizados.' + (corpo.email ? ' Use o novo e-mail no próximo login.' : ''))
-    } catch (err) { setErro(mensagemDeErro(err)) }
+      avisar('Dados atualizados.' + (corpo.email ? ' Use o novo e-mail no próximo login.' : ''))
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') }
     finally { setSalvando(false) }
   }
 
@@ -97,8 +97,6 @@ export default function Conta() {
         {u.role === 'GESTOR' && 'Se a marca mudar de dono, troque aqui o nome, o e-mail e a senha para transferir a titularidade — todos os dados da rede são mantidos.'}
       </div>
       <form className="cartao" onSubmit={salvar} style={{ maxWidth: 520 }}>
-        {erro && <div className="alerta">{erro}</div>}
-        {ok && <div className="sucesso">{ok}</div>}
         <div className="campo"><label>Nome</label><input value={nome} onChange={(e) => setNome(e.target.value)} required /></div>
         <div className="campo"><label>E-mail (seu login)</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
         <div className="campo"><label>Nova senha (deixe vazio para manter)</label><input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} minLength={6} placeholder="mínimo 6 caracteres" /></div>

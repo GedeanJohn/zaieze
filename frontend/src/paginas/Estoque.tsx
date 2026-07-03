@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, formataReal, mensagemDeErro, rotuloMovimento } from '../api'
 import { useLojaAtiva } from '../componentes/SeletorLoja'
+import { useToast } from '../componentes/Toast'
 
 // Estoque central (único da fábrica/marca) — não há mais estoque por loja nem transferências.
 interface DashEstoque {
@@ -60,7 +61,7 @@ export default function Estoque() {
   const [ajuste, setAjuste] = useState<FormAjuste | null>(null)
   const [reserva, setReserva] = useState<FormReserva | null>(null)
   const [erro, setErro] = useState('')
-  const [aviso, setAviso] = useState('')
+  const avisar = useToast()
 
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
@@ -86,19 +87,19 @@ export default function Estoque() {
   }
 
   async function abrirEntrada() {
-    setErro(''); setAviso('')
+    setErro('')
     await carregarProdutos()
     setEntrada({ nota: '', observacao: '', itens: [{ ...LINHA }] })
   }
 
   async function abrirAjuste() {
-    setErro(''); setAviso('')
+    setErro('')
     await carregarProdutos()
     setAjuste({ produtoId: '', variacaoId: '', novaQuantidade: '', motivo: '' })
   }
 
   async function abrirReserva() {
-    setErro(''); setAviso('')
+    setErro('')
     await carregarProdutos()
     setReserva({ produtoId: '', variacaoId: '', quantidadeVarejo: '' })
   }
@@ -113,7 +114,7 @@ export default function Estoque() {
     try {
       const { data } = await api.post('/estoque/reserva-varejo', { variacaoId: reserva.variacaoId, quantidadeVarejo: Number(reserva.quantidadeVarejo) }, { params: escopo.params })
       setReserva(null)
-      setAviso(`Reserva de varejo definida: ${data.estoqueVarejo} p/ varejo · ${data.estoqueAtacado} p/ atacado.`)
+      avisar(`Reserva de varejo definida: ${data.estoqueVarejo} p/ varejo · ${data.estoqueAtacado} p/ atacado.`)
       carregar(); carregarDash()
     } catch (err) { setErro(mensagemDeErro(err)) }
   }
@@ -148,7 +149,7 @@ export default function Estoque() {
     try {
       const { data } = await api.post('/estoque/entrada', corpo, { params: escopo.params })
       setEntrada(null)
-      setAviso(`Entrada registrada: ${data.totalPecas} peça(s) em ${data.itens} item(ns).`)
+      avisar(`Entrada registrada: ${data.totalPecas} peça(s) em ${data.itens} item(ns).`)
       carregar(); carregarDash()
     } catch (err) {
       setErro(mensagemDeErro(err))
@@ -165,7 +166,7 @@ export default function Estoque() {
     try {
       const { data } = await api.post('/estoque/ajuste', { variacaoId: ajuste.variacaoId, novaQuantidade: Number(ajuste.novaQuantidade), motivo: ajuste.motivo }, { params: escopo.params })
       setAjuste(null)
-      setAviso(data.delta === 0 ? 'Sem diferença: estoque já estava correto.' : `Ajuste aplicado (${data.delta > 0 ? '+' : ''}${data.delta}).`)
+      avisar(data.delta === 0 ? 'Sem diferença: estoque já estava correto.' : `Ajuste aplicado (${data.delta > 0 ? '+' : ''}${data.delta}).`)
       carregar(); carregarDash()
     } catch (err) {
       setErro(mensagemDeErro(err))
@@ -185,7 +186,6 @@ export default function Estoque() {
         </div>
       </header>
 
-      {aviso && <div className="sucesso">{aviso}</div>}
       {erro && !entrada && !ajuste && !reserva && <div className="alerta">{erro}</div>}
 
       {/* Estoque central da fábrica/marca (único — sem split por loja) */}

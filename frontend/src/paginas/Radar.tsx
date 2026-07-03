@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, formataReal, mensagemDeErro } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
+import { useToast } from '../componentes/Toast'
 
 interface Oportunidade {
   produtoId: string
@@ -19,7 +20,7 @@ export default function Radar() {
   const [ops, setOps] = useState<Oportunidade[]>([])
   const [disparo, setDisparo] = useState<{ op: Oportunidade; texto: string } | null>(null)
   const [erro, setErro] = useState('')
-  const [aviso, setAviso] = useState('')
+  const avisar = useToast()
   const [enviando, setEnviando] = useState(false)
 
   const carregar = useCallback(async () => {
@@ -41,7 +42,7 @@ export default function Radar() {
       }, { params: escopo.params })
       const partes = [`${data.enviados} enviada(s)`, data.simulados ? `${data.simulados} simulada(s)` : '', data.semConsentimento ? `${data.semConsentimento} sem LGPD` : '']
       setDisparo(null)
-      setAviso(`Campanha do Radar disparada para ${data.alcance} cliente(s): ${partes.filter(Boolean).join(' · ')}.`)
+      avisar(`Campanha do Radar disparada para ${data.alcance} cliente(s): ${partes.filter(Boolean).join(' · ')}.`)
     } catch (e) {
       setErro(mensagemDeErro(e))
     } finally {
@@ -60,7 +61,6 @@ export default function Radar() {
         Cruza <strong>estoque parado</strong> (sem venda há 60 dias) com o <strong>perfil dos clientes</strong> (quem já comprou aquela categoria) e sugere a campanha. Dispare em 1 clique — respeitando consentimento LGPD e roteando pela vendedora de cada cliente.
       </div>
 
-      {aviso && <div className="sucesso">{aviso}</div>}
       {erro && !disparo && <div className="alerta">{erro}</div>}
 
       <div className="grade-cards">

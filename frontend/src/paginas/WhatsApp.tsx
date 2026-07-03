@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, mensagemDeErro } from '../api'
+import { useToast } from '../componentes/Toast'
 
 interface Config {
   waPhoneNumberId: string | null
@@ -16,8 +17,7 @@ interface Config {
 
 export default function WhatsApp() {
   const [cfg, setCfg] = useState<Config | null>(null)
-  const [erro, setErro] = useState('')
-  const [ok, setOk] = useState('')
+  const avisar = useToast()
   const [salvando, setSalvando] = useState(false)
 
   // campos editáveis
@@ -40,13 +40,11 @@ export default function WhatsApp() {
     setAppSecret('')
   }
 
-  useEffect(() => { api.get('/whatsapp/config').then(({ data }) => aplicar(data)).catch((e) => setErro(mensagemDeErro(e))) }, [])
-
-  function aviso(msg: string) { setOk(msg); setTimeout(() => setOk(''), 3500) }
+  useEffect(() => { api.get('/whatsapp/config').then(({ data }) => aplicar(data)).catch((e) => avisar(mensagemDeErro(e), 'erro')) }, [])
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault()
-    setErro(''); setSalvando(true)
+    setSalvando(true)
     try {
       const { data } = await api.put('/whatsapp/config', {
         waPhoneNumberId: phoneId.trim(),
@@ -59,22 +57,22 @@ export default function WhatsApp() {
       // recarrega para refletir conectado/temToken
       const { data: c } = await api.get('/whatsapp/config')
       aplicar(c)
-      aviso(data.conectado ? `Conectado ✅ ${data.numero ? `· ${data.numero}` : ''}` : `Salvo. Conexão não confirmada: ${data.erro ?? 'verifique número/token.'}`)
-    } catch (err) { setErro(mensagemDeErro(err)) }
+      avisar(data.conectado ? `Conectado ✅ ${data.numero ? `· ${data.numero}` : ''}` : `Salvo. Conexão não confirmada: ${data.erro ?? 'verifique número/token.'}`)
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') }
     finally { setSalvando(false) }
   }
 
   async function testar() {
     if (!telTeste.trim()) return
-    setErro(''); setTestando(true)
+    setTestando(true)
     try {
       const { data } = await api.post('/whatsapp/testar', { telefone: telTeste.trim() })
-      aviso(`Teste ${data.status === 'ENVIADA' ? 'enviado ✅' : data.status}.`)
-    } catch (err) { setErro(mensagemDeErro(err)) }
+      avisar(`Teste ${data.status === 'ENVIADA' ? 'enviado ✅' : data.status}.`)
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') }
     finally { setTestando(false) }
   }
 
-  function copiar(txt: string) { navigator.clipboard?.writeText(txt).then(() => aviso('Copiado.')).catch(() => {}) }
+  function copiar(txt: string) { navigator.clipboard?.writeText(txt).then(() => avisar('Copiado.')).catch(() => {}) }
 
   if (!cfg) return <p style={{ color: 'var(--ink-soft)' }}>Carregando…</p>
 
@@ -85,9 +83,6 @@ export default function WhatsApp() {
         Conecte o <strong>número oficial da sua marca</strong> (WhatsApp Cloud API da Meta). Todas as vendedoras atendem por
         este número; a identidade da vendedora vai no conteúdo. As mensagens recebidas continuam roteadas pela carteira.
       </div>
-
-      {erro && <div className="alerta">{erro}</div>}
-      {ok && <div className="cartao" style={{ background: '#1f3d2b', color: '#b9f5cf' }}>{ok}</div>}
 
       <div className="cartao">
         <h2 style={{ marginTop: 0 }}>
@@ -185,31 +180,27 @@ function TemplatesSection({ conectado }: { conectado: boolean }) {
   const [nome, setNome] = useState('')
   const [categoria, setCategoria] = useState('MARKETING')
   const [corpo, setCorpo] = useState('')
-  const [erro, setErro] = useState('')
-  const [ok, setOk] = useState('')
+  const avisar = useToast()
   const [ocupado, setOcupado] = useState(false)
 
   function carregar() { api.get('/whatsapp/templates').then(({ data }) => setLista(data)).catch(() => {}) }
   useEffect(() => { carregar() }, [])
-  function aviso(m: string) { setOk(m); setTimeout(() => setOk(''), 3000) }
 
   async function sugerir() {
-    setErro('')
     try { const { data } = await api.post('/campanhas/sugerir', {}); setCorpo(data.texto) }
-    catch (e) { setErro(mensagemDeErro(e)) }
+    catch (e) { avisar(mensagemDeErro(e), 'erro') }
   }
   async function criar(e: React.FormEvent) {
-    e.preventDefault(); setErro(''); setOcupado(true)
+    e.preventDefault(); setOcupado(true)
     try {
       await api.post('/whatsapp/templates', { nome, categoria, corpo })
       setNome(''); setCorpo(''); carregar()
-      aviso(conectado ? 'Template enviado à Meta para aprovação.' : 'Template criado (aprovado no modo simulado).')
-    } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setOcupado(false) }
+      avisar(conectado ? 'Template enviado à Meta para aprovação.' : 'Template criado (aprovado no modo simulado).')
+    } catch (e2) { avisar(mensagemDeErro(e2), 'erro') } finally { setOcupado(false) }
   }
   async function sincronizar() {
-    setErro('')
-    try { const { data } = await api.post('/whatsapp/templates/sync'); aviso(`Sincronizados: ${data.sincronizados}.`); carregar() }
-    catch (e) { setErro(mensagemDeErro(e)) }
+    try { const { data } = await api.post('/whatsapp/templates/sync'); avisar(`Sincronizados: ${data.sincronizados}.`); carregar() }
+    catch (e) { avisar(mensagemDeErro(e), 'erro') }
   }
   async function remover(t: Template) {
     if (!window.confirm(`Excluir o template "${t.nome}"?`)) return
@@ -224,9 +215,6 @@ function TemplatesSection({ conectado }: { conectado: boolean }) {
         Escreva o corpo com os placeholders abaixo; convertemos e submetemos à Meta automaticamente.
         {!conectado && <> <em>Sem a WABA conectada, o template entra como aprovado (modo simulado) para você testar.</em></>}
       </div>
-
-      {erro && <div className="alerta">{erro}</div>}
-      {ok && <div className="sucesso">{ok}</div>}
 
       <form onSubmit={criar}>
         <div className="linha-campos">

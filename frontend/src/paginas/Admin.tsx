@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, formataReal, mensagemDeErro, type Plano } from '../api'
+import { useToast } from '../componentes/Toast'
 
 interface PlanoAdmin { plano: Plano; nome: string; limite: string; resumo: string; preco: number }
 interface RedeAdmin {
@@ -15,15 +16,14 @@ export default function Admin() {
   const [precos, setPrecos] = useState<Record<string, string>>({})
   const [redes, setRedes] = useState<RedeAdmin[]>([])
   const [promos, setPromos] = useState<Promo[]>([])
-  const [msg, setMsg] = useState('')
-  const [erro, setErro] = useState('')
   const [ocupado, setOcupado] = useState(false)
+  const avisar = useToast()
 
   function carregar() {
     api.get('/admin/planos').then(({ data }) => {
       setPlanos(data.planos)
       setPrecos(Object.fromEntries(data.planos.map((p: PlanoAdmin) => [p.plano, String(p.preco)])))
-    }).catch((e) => setErro(mensagemDeErro(e)))
+    }).catch((e) => avisar(mensagemDeErro(e), 'erro'))
     api.get('/admin/redes').then(({ data }) => setRedes(data.redes)).catch(() => {})
     api.get('/admin/promos').then(({ data }) => setPromos(data.promos)).catch(() => {})
   }
@@ -32,12 +32,12 @@ export default function Admin() {
   async function ativarCortesia(r: RedeAdmin) {
     if (!window.confirm(`Ativar ${r.nome} em modo CORTESIA (grátis)? Destrava o acesso e cancela qualquer cobrança pendente no Mercado Pago.`)) return
     const codigoPromo = window.prompt('Foi combinado algum código promocional com o lojista? Deixe vazio se não.')?.trim() || undefined
-    setOcupado(true); setMsg(''); setErro('')
+    setOcupado(true)
     try {
       await api.post(`/admin/redes/${r.id}/ativar-cortesia`, { codigoPromo })
-      setMsg(`${r.nome} ativada (cortesia).` + (codigoPromo ? ` Uso do cupom ${codigoPromo.toUpperCase()} contabilizado.` : ' O lojista já pode acessar.'))
+      avisar(`${r.nome} ativada (cortesia).` + (codigoPromo ? ` Uso do cupom ${codigoPromo.toUpperCase()} contabilizado.` : ' O lojista já pode acessar.'))
       carregar()
-    } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
   }
 
   async function excluirRede(r: RedeAdmin) {
@@ -45,30 +45,28 @@ export default function Admin() {
       `Isso apaga a marca "${r.nome}" PERMANENTEMENTE — lojas, usuários, clientes, produtos, vendas, mensagens, mídias e qualquer cobrança futura no Mercado Pago. Não tem volta.\n\nPara confirmar, digite exatamente o nome da marca:`,
     )
     if (digitado === null) return
-    if (digitado.trim() !== r.nome) { setErro('Nome não confere. Nada foi excluído.'); return }
-    setOcupado(true); setMsg(''); setErro('')
+    if (digitado.trim() !== r.nome) { avisar('Nome não confere. Nada foi excluído.', 'erro'); return }
+    setOcupado(true)
     try {
       await api.delete(`/admin/redes/${r.id}`, { data: { confirmarNome: digitado.trim() } })
-      setMsg(`${r.nome} excluída permanentemente.`)
+      avisar(`${r.nome} excluída permanentemente.`)
       carregar()
-    } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
   }
 
   async function salvarPrecos() {
-    setOcupado(true); setMsg(''); setErro('')
+    setOcupado(true)
     try {
       const corpo = Object.fromEntries(Object.entries(precos).map(([k, v]) => [k, Number(v)]))
       await api.put('/admin/planos', { precos: corpo })
-      setMsg('Preços salvos. Valem para novas assinaturas e trocas de plano.')
+      avisar('Preços salvos. Valem para novas assinaturas e trocas de plano.')
       carregar()
-    } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
   }
 
   return (
     <>
       <header><h1>🛠️ Painel do Admin</h1><span style={{ color: 'var(--ink-soft)', fontSize: 13 }}>Operação do SaaS</span></header>
-      {erro && <div className="alerta">{erro}</div>}
-      {msg && <div className="sucesso">{msg}</div>}
 
       {/* ── Pedidos de redefinição de senha (gestores sem WhatsApp cadastrado) ── */}
       <SolicitacoesSenhaSection />

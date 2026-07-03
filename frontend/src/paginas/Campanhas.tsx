@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, mensagemDeErro, usuarioLogado } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
+import { useToast } from '../componentes/Toast'
 
 interface Campanha {
   id: string
@@ -51,8 +52,7 @@ export default function Campanhas() {
   const [nome, setNome] = useState('Novidades da semana')
   const [segmento, setSegmento] = useState('')
   const [template, setTemplate] = useState('Oi {primeiroNome}! 😍 Chegaram novidades na {loja} pensando em você. Quer ver? — {vendedora}')
-  const [erro, setErro] = useState('')
-  const [aviso, setAviso] = useState('')
+  const avisar = useToast()
   const [enviando, setEnviando] = useState(false)
   const [sugerindo, setSugerindo] = useState(false)
   const [processando, setProcessando] = useState(false)
@@ -93,27 +93,27 @@ export default function Campanhas() {
   useEffect(() => { carregar() }, [carregar])
 
   async function sugerir() {
-    setSugerindo(true); setErro('')
+    setSugerindo(true)
     try {
       const { data } = await api.post('/campanhas/sugerir', { segmento: segmento || undefined }, { params: escopo.params })
       setTemplate(data.texto)
-      setAviso(data.viaIa ? 'Mensagem gerada pela IA. ✨' : 'Mensagem-modelo (configure ANTHROPIC_API_KEY para usar a IA).')
+      avisar(data.viaIa ? 'Mensagem gerada pela IA. ✨' : 'Mensagem-modelo (configure ANTHROPIC_API_KEY para usar a IA).')
     } catch (e) {
-      setErro(mensagemDeErro(e))
+      avisar(mensagemDeErro(e), 'erro')
     } finally {
       setSugerindo(false)
     }
   }
 
   async function enviar() {
-    setEnviando(true); setErro(''); setAviso('')
+    setEnviando(true)
     try {
       const { data } = await api.post('/campanhas', { nome, segmento: segmento || undefined, mensagemTemplate: template }, { params: escopo.params })
       const partes = [`${data.enviados} enviada(s)`, data.simulados ? `${data.simulados} simulada(s)` : '', data.falhas ? `${data.falhas} falha(s)` : '', data.semConsentimento ? `${data.semConsentimento} sem consentimento LGPD` : '']
-      setAviso(`Campanha disparada para ${data.alcance} cliente(s): ${partes.filter(Boolean).join(' · ')}.`)
+      avisar(`Campanha disparada para ${data.alcance} cliente(s): ${partes.filter(Boolean).join(' · ')}.`)
       carregar()
     } catch (e) {
-      setErro(mensagemDeErro(e))
+      avisar(mensagemDeErro(e), 'erro')
     } finally {
       setEnviando(false)
     }
@@ -122,53 +122,52 @@ export default function Campanhas() {
   // ── Catálogo de campanhas da marca ──
   async function criarModelo(e: React.FormEvent) {
     e.preventDefault()
-    setMSalvando(true); setErro(''); setAviso('')
+    setMSalvando(true)
     try {
       await api.post('/campanhas/modelos', { nome: mNome, mensagemTemplate: mMsg, segmento: mSeg || null, imagemUrl: mImg || null, templateId: mTemplateId || null }, { params: escopo.params })
       setMNome(''); setMMsg(''); setMSeg(''); setMImg(''); setMTemplateId('')
-      setAviso('Campanha da marca publicada — já disponível para as vendedoras.')
+      avisar('Campanha da marca publicada — já disponível para as vendedoras.')
       carregar()
-    } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setMSalvando(false) }
+    } catch (e2) { avisar(mensagemDeErro(e2), 'erro') } finally { setMSalvando(false) }
   }
   async function enviarImagemModelo(arquivo: File) {
-    setErro('')
     try {
       const fd = new FormData(); fd.append('file', arquivo)
       const { data } = await api.post('/midia/imagem', fd, { params: escopo.params })
       setMImg(data.url)
-    } catch (e2) { setErro(mensagemDeErro(e2)) }
+    } catch (e2) { avisar(mensagemDeErro(e2), 'erro') }
   }
   async function alternarModelo(m: Modelo) {
     try { await api.patch(`/campanhas/modelos/${m.id}`, { ativa: !m.ativa }, { params: escopo.params }); carregar() }
-    catch (e2) { setErro(mensagemDeErro(e2)) }
+    catch (e2) { avisar(mensagemDeErro(e2), 'erro') }
   }
   async function excluirModelo(id: string) {
     if (!confirm('Excluir esta campanha da marca? Os disparos já feitos são mantidos no histórico.')) return
     try { await api.delete(`/campanhas/modelos/${id}`, { params: escopo.params }); carregar() }
-    catch (e2) { setErro(mensagemDeErro(e2)) }
+    catch (e2) { avisar(mensagemDeErro(e2), 'erro') }
   }
   async function dispararModelo(m: Modelo) {
-    setEnviando(true); setErro(''); setAviso('')
+    setEnviando(true)
     try {
       const seg = dispSeg[m.id] || undefined
       const { data } = await api.post(`/campanhas/modelos/${m.id}/disparar`, { segmento: seg }, { params: escopo.params })
       const partes = [`${data.enviados} enviada(s)`, data.simulados ? `${data.simulados} simulada(s)` : '', data.falhas ? `${data.falhas} falha(s)` : '', data.semConsentimento ? `${data.semConsentimento} sem LGPD` : '']
-      setAviso(`"${m.nome}" disparada para ${data.alcance} cliente(s): ${partes.filter(Boolean).join(' · ')}.`)
+      avisar(`"${m.nome}" disparada para ${data.alcance} cliente(s): ${partes.filter(Boolean).join(' · ')}.`)
       carregar()
-    } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setEnviando(false) }
+    } catch (e2) { avisar(mensagemDeErro(e2), 'erro') } finally { setEnviando(false) }
   }
 
   async function processarReguas() {
-    setProcessando(true); setErro(''); setAviso('')
+    setProcessando(true)
     try {
       const { data } = await api.post('/reguas/processar', {}, { params: escopo.params })
       const total = (data.reguas as { enviados: number; simulados: number; alcance: number }[]).reduce(
         (a, r) => ({ alcance: a.alcance + r.alcance, enviados: a.enviados + r.enviados, simulados: a.simulados + r.simulados }),
         { alcance: 0, enviados: 0, simulados: 0 },
       )
-      setAviso(`Réguas processadas: ${total.alcance} cliente(s) alcançado(s) (${total.enviados} enviadas, ${total.simulados} simuladas).`)
+      avisar(`Réguas processadas: ${total.alcance} cliente(s) alcançado(s) (${total.enviados} enviadas, ${total.simulados} simuladas).`)
     } catch (e) {
-      setErro(mensagemDeErro(e))
+      avisar(mensagemDeErro(e), 'erro')
     } finally {
       setProcessando(false)
     }
@@ -181,8 +180,6 @@ export default function Campanhas() {
         <SeletorLoja escopo={escopo} />
       </header>
 
-      {aviso && <div className="sucesso">{aviso}</div>}
-      {erro && <div className="alerta">{erro}</div>}
 
       {/* Conexão agora é por MARCA (WhatsApp oficial da Meta), configurada pelo gestor. */}
       <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>

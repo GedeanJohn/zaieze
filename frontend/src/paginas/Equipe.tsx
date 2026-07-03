@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, mensagemDeErro, rotuloPapel, temFeature, usuarioLogado } from '../api'
 import ConvidarModal from '../componentes/ConvidarModal'
+import { useToast } from '../componentes/Toast'
 
 interface Membro {
   id: string
@@ -663,8 +664,7 @@ function MetasConfig({ onSalvo }: { onSalvo: () => void }) {
   const [meta, setMeta] = useState('')
   const [modo, setModo] = useState<'IGUAL' | 'MANUAL'>('IGUAL')
   const [porLoja, setPorLoja] = useState<Record<string, string>>({})
-  const [msg, setMsg] = useState('')
-  const [erro, setErro] = useState('')
+  const avisar = useToast()
   const [ocupado, setOcupado] = useState(false)
 
   const carregar = useCallback(() => {
@@ -679,7 +679,7 @@ function MetasConfig({ onSalvo }: { onSalvo: () => void }) {
   useEffect(() => { carregar() }, [carregar])
 
   async function salvar() {
-    setOcupado(true); setMsg(''); setErro('')
+    setOcupado(true)
     try {
       await api.put('/metas', {
         metaMensal: meta ? Number(meta) : 0,
@@ -688,10 +688,10 @@ function MetasConfig({ onSalvo }: { onSalvo: () => void }) {
           ? Object.fromEntries(Object.entries(porLoja).map(([k, v]) => [k, v ? Number(v) : 0]))
           : undefined,
       })
-      setMsg('Metas salvas.')
+      avisar('Metas salvas.')
       carregar()
       onSalvo()
-    } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
   }
 
   if (!cfg) return null
@@ -734,8 +734,6 @@ function MetasConfig({ onSalvo }: { onSalvo: () => void }) {
           {cfg.lojas.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--ink-soft)' }}>Cadastre uma loja primeiro.</td></tr>}
         </tbody>
       </table>
-      {erro && <div className="alerta" style={{ marginTop: 8 }}>{erro}</div>}
-      {msg && <div className="sucesso" style={{ marginTop: 8 }}>{msg}</div>}
       <div style={{ marginTop: 10 }}>
         <button className="btn" onClick={salvar} disabled={ocupado}>{ocupado ? 'Salvando…' : 'Salvar metas'}</button>
         <span style={{ fontSize: 12, color: 'var(--ink-soft)', marginLeft: 10 }}>

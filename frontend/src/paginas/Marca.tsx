@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, mensagemDeErro } from '../api'
 import PreviewLoja from '../componentes/PreviewLoja'
+import { useToast } from '../componentes/Toast'
 
 interface Marca {
   nome: string
@@ -63,8 +64,7 @@ async function extrairCoresDominantes(origem: File | string, max = 5): Promise<s
 
 export default function Marca() {
   const [marca, setMarca] = useState<Marca | null>(null)
-  const [erro, setErro] = useState('')
-  const [ok, setOk] = useState('')
+  const avisar = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
   const bannerRef = useRef<HTMLInputElement>(null)
   const [sugestoes, setSugestoes] = useState<Sugestao[]>([])
@@ -87,12 +87,9 @@ export default function Marca() {
     })
   }, [])
 
-  function aviso(msg: string) { setOk(msg); setTimeout(() => setOk(''), 2500) }
-
   async function salvar(e: React.FormEvent) {
     e.preventDefault()
     if (!marca) return
-    setErro('')
     try {
       const { data } = await api.patch('/marca', {
         corPrimaria: marca.corPrimaria,
@@ -107,48 +104,45 @@ export default function Marca() {
         disparoVendedoraEditavel: marca.disparoVendedoraEditavel,
       })
       setMarca(data)
-      aviso('Identidade da marca salva.')
-    } catch (err) { setErro(mensagemDeErro(err)) }
+      avisar('Identidade da marca salva.')
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') }
   }
 
   async function enviarLogo(e: React.ChangeEvent<HTMLInputElement>) {
     const arquivo = e.target.files?.[0]
     if (!arquivo || !marca) return
-    setErro('')
     extrairCoresDominantes(arquivo).then((cores) => aplicarSugestoes('logo', cores))
     const fd = new FormData()
     fd.append('file', arquivo)
     try {
       const { data } = await api.post('/marca/logo', fd, { params: marca.logoUrl ? { anterior: marca.logoUrl } : {} })
       setMarca(data)
-      aviso('Logo atualizada.')
-    } catch (err) { setErro(mensagemDeErro(err)) }
+      avisar('Logo atualizada.')
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') }
     finally { if (fileRef.current) fileRef.current.value = '' }
   }
 
   async function enviarBanner(e: React.ChangeEvent<HTMLInputElement>) {
     const arquivo = e.target.files?.[0]
     if (!arquivo || !marca) return
-    setErro('')
     extrairCoresDominantes(arquivo).then((cores) => aplicarSugestoes('banner', cores))
     const fd = new FormData()
     fd.append('file', arquivo)
     try {
       const { data } = await api.post('/marca/banner', fd, { params: marca.bannerUrl ? { anterior: marca.bannerUrl } : {} })
       setMarca(data)
-      aviso('Banner atualizado.')
-    } catch (err) { setErro(mensagemDeErro(err)) }
+      avisar('Banner atualizado.')
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') }
     finally { if (bannerRef.current) bannerRef.current.value = '' }
   }
 
   async function removerBanner() {
     if (!marca) return
-    setErro('')
     try {
       const { data } = await api.delete('/marca/banner')
       setMarca(data)
-      aviso('Banner removido.')
-    } catch (err) { setErro(mensagemDeErro(err)) }
+      avisar('Banner removido.')
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') }
   }
 
   if (!marca) return <p style={{ color: 'var(--ink-soft)' }}>Carregando…</p>
@@ -163,9 +157,6 @@ export default function Marca() {
         A logo e as cores aparecem no <strong>catálogo público</strong> (Portal do Cliente) que as vendedoras compartilham.
         O SLA define em quanto tempo a vendedora precisa responder um lead antes da redistribuição.
       </div>
-
-      {erro && <div className="alerta">{erro}</div>}
-      {ok && <div className="cartao" style={{ background: '#1f3d2b', color: '#b9f5cf' }}>{ok}</div>}
 
       <div className="cartao">
         <h2 style={{ marginTop: 0 }}>Logo</h2>

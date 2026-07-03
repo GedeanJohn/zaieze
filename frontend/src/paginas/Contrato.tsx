@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, mensagemDeErro } from '../api'
+import { useToast } from '../componentes/Toast'
 
 interface Clausula { n: number; titulo: string; paragrafos: string[] }
 interface ContratoMontado {
@@ -26,7 +27,7 @@ function fmt(iso: string | null): string {
 export default function Contrato() {
   const [dados, setDados] = useState<RespostaContrato | null>(null)
   const [erro, setErro] = useState('')
-  const [msg, setMsg] = useState('')
+  const avisar = useToast()
   const [ocupado, setOcupado] = useState(false)
 
   function carregar() {
@@ -35,13 +36,13 @@ export default function Contrato() {
   useEffect(() => { carregar() }, [])
 
   async function aceitar() {
-    setErro(''); setMsg(''); setOcupado(true)
+    setOcupado(true)
     try {
       await api.post('/contrato/aceitar', {})
-      setMsg('Aceite registrado com sucesso.')
+      avisar('Aceite registrado com sucesso.')
       carregar()
     } catch (e) {
-      setErro(mensagemDeErro(e))
+      avisar(mensagemDeErro(e), 'erro')
     } finally {
       setOcupado(false)
     }
@@ -60,9 +61,6 @@ export default function Contrato() {
           {dados.aceito ? '✓ Aceito' : 'Pendente de aceite'}
         </span>
       </header>
-
-      {erro && <div className="alerta">{erro}</div>}
-      {msg && <div className="sucesso">{msg}</div>}
 
       {!dados.aceito && dados.pendente && (
         <div className="cartao" style={{ borderLeft: '4px solid var(--danger)' }}>

@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './styles.css'
 import { usuarioLogado } from './api'
 import { HOST } from './host'
+import { ToastProvider } from './componentes/Toast'
 import Login from './paginas/Login'
 import Layout from './paginas/Layout'
 import Dashboard from './paginas/Dashboard'
@@ -101,6 +102,8 @@ function CrmApp() {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>{HOST.tipo === 'landing' ? <SiteApp /> : <CrmApp />}</BrowserRouter>
+    <ToastProvider>
+      <BrowserRouter>{HOST.tipo === 'landing' ? <SiteApp /> : <CrmApp />}</BrowserRouter>
+    </ToastProvider>
   </React.StrictMode>,
 )

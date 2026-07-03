@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, formataReal, mensagemDeErro, usuarioLogado } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
+import { useToast } from '../componentes/Toast'
 
 interface Cliente {
   id: string
@@ -75,7 +76,7 @@ export default function Clientes() {
   const [editando, setEditando] = useState<Partial<Cliente> | null>(null)
   const [detalhe, setDetalhe] = useState<ClienteDetalhe | null>(null)
   const [erro, setErro] = useState('')
-  const [aviso, setAviso] = useState('')
+  const avisar = useToast()
   const [segmentando, setSegmentando] = useState(false)
   const [cepBuscando, setCepBuscando] = useState(false)
 
@@ -111,29 +112,27 @@ export default function Clientes() {
 
   async function recalcular() {
     setSegmentando(true)
-    setAviso('')
     try {
       const { data } = await api.post('/clientes/segmentar', {}, { params: escopo.params })
       const d = data.distribuicao as Distribuicao
-      setAviso(
+      avisar(
         `Segmentação recalculada — ${data.atualizados} cliente(s) reclassificado(s). ` +
           `VIP ${d.VIP} · Frequente ${d.FREQUENTE} · Inativo ${d.INATIVO} · Atacado ${d.ATACADO} · Novo ${d.NOVO}.`,
       )
       await carregar()
     } catch (err) {
-      setErro(mensagemDeErro(err))
+      avisar(mensagemDeErro(err), 'erro')
     } finally {
       setSegmentando(false)
     }
   }
 
   async function abrirDetalhe(id: string) {
-    setErro('')
     try {
       const { data } = await api.get(`/clientes/${id}`, { params: escopo.params })
       setDetalhe(data)
     } catch (err) {
-      setErro(mensagemDeErro(err))
+      avisar(mensagemDeErro(err), 'erro')
     }
   }
 
@@ -188,7 +187,7 @@ export default function Clientes() {
     const ids = [...selecao]
     if (ids.length === 0) return
     if (!confirm(`Enviar o link do catálogo para ${ids.length} cliente(s) selecionado(s)?`)) return
-    setEnviando(true); setErro(''); setAviso('')
+    setEnviando(true)
     try {
       const { data } = await api.post('/clientes/enviar-catalogo', { clienteIds: ids }, { params: escopo.params })
       const partes = [`${data.enviados} enviado(s)`]
@@ -196,9 +195,9 @@ export default function Clientes() {
       if (data.falhas) partes.push(`${data.falhas} falha(s)`)
       if (data.semConsentimento) partes.push(`${data.semConsentimento} sem consentimento LGPD`)
       if (data.semVendedora) partes.push(`${data.semVendedora} sem vendedora/instância`)
-      setAviso(`Disparo concluído: ${partes.join(' · ')}.`)
+      avisar(`Disparo concluído: ${partes.join(' · ')}.`)
       setSelecao(new Set())
-    } catch (err) { setErro(mensagemDeErro(err)) }
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') }
     finally { setEnviando(false) }
   }
 
@@ -219,8 +218,6 @@ export default function Clientes() {
         </div>
       </header>
 
-      {aviso && <div className="sucesso">{aviso}</div>}
-      {erro && <div className="alerta">{erro}</div>}
 
       {/* Distribuição da carteira por segmento (clicável = filtro) */}
       <div className="cartao" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>

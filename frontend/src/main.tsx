@@ -36,6 +36,7 @@ import Sucesso from './paginas/site/Sucesso'
 import Entrar from './paginas/site/Entrar'
 import Catalogo from './paginas/site/Catalogo'
 import QuemSomos from './paginas/site/QuemSomos'
+import Lgpd from './paginas/site/Lgpd'
 
 function Protegida({ children }: { children: React.ReactElement }) {
   return usuarioLogado() ? children : <Navigate to="/login" replace />
@@ -50,6 +51,7 @@ function SiteApp() {
       <Route path="/sucesso" element={<Sucesso />} />
       <Route path="/entrar" element={<Entrar />} />
       <Route path="/quem-somos" element={<QuemSomos />} />
+      <Route path="/lgpd" element={<Lgpd />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

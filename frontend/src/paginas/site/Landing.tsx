@@ -105,7 +105,7 @@ export default function Landing() {
 
       <footer className="site-rodape">
         <div>CNPJ: 43.391.734/0001-51 · ZAIEZE · Sistemas Inteligentes para a Moda © {new Date().getFullYear()}</div>
-        <div><Link to="/quem-somos">Quem Somos</Link> · Pagamento seguro via Mercado Pago</div>
+        <div><Link to="/quem-somos">Quem Somos</Link> · <Link to="/lgpd">LGPD</Link> · Pagamento seguro via Mercado Pago</div>
       </footer>
     </div>
   )

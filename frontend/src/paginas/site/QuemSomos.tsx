@@ -12,7 +12,7 @@ export default function QuemSomos() {
         </nav>
       </header>
 
-      <section className="quem-somos">
+      <section className="pagina-texto">
         <h1>Quem Somos</h1>
         <p>
           O mercado da moda mudou. O consumidor espera respostas imediatas, atendimento personalizado e uma
@@ -62,7 +62,7 @@ export default function QuemSomos() {
           <li>Transparência e confiança.</li>
         </ul>
 
-        <div className="quem-somos-lema">
+        <div className="pagina-texto-lema">
           <strong>Zaieze</strong>
           <span>Conectando sua marca ao futuro. Transformando tecnologia em vendas.</span>
         </div>
@@ -70,7 +70,7 @@ export default function QuemSomos() {
 
       <footer className="site-rodape">
         <div>CNPJ: 43.391.734/0001-51 · ZAIEZE · Sistemas Inteligentes para a Moda © {new Date().getFullYear()}</div>
-        <div><Link to="/quem-somos">Quem Somos</Link></div>
+        <div><Link to="/quem-somos">Quem Somos</Link> · <Link to="/lgpd">LGPD</Link></div>
       </footer>
     </div>
   )

@@ -35,6 +35,7 @@ import Checkout from './paginas/site/Checkout'
 import Sucesso from './paginas/site/Sucesso'
 import Entrar from './paginas/site/Entrar'
 import Catalogo from './paginas/site/Catalogo'
+import QuemSomos from './paginas/site/QuemSomos'
 
 function Protegida({ children }: { children: React.ReactElement }) {
   return usuarioLogado() ? children : <Navigate to="/login" replace />
@@ -48,6 +49,7 @@ function SiteApp() {
       <Route path="/checkout" element={<Checkout />} />
       <Route path="/sucesso" element={<Sucesso />} />
       <Route path="/entrar" element={<Entrar />} />
+      <Route path="/quem-somos" element={<QuemSomos />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

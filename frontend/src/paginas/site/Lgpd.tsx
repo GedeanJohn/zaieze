@@ -13,7 +13,7 @@ export default function Lgpd() {
       </header>
 
       <section className="pagina-texto">
-        <h1>LGPD — Política de Privacidade</h1>
+        <h1>LGPD</h1>
         <p>
           A Zaieze leva a sério a proteção dos dados pessoais de quem usa a nossa plataforma — lojistas, suas
           equipes e os clientes finais atendidos por eles. Esta política explica, em linguagem simples, quais
@@ -92,7 +92,7 @@ export default function Lgpd() {
 
       <footer className="site-rodape">
         <div>CNPJ: 43.391.734/0001-51 · ZAIEZE · Sistemas Inteligentes para a Moda © {new Date().getFullYear()}</div>
-        <div><Link to="/quem-somos">Quem Somos</Link> · <Link to="/lgpd">LGPD</Link></div>
+        <div><Link to="/quem-somos">Quem Somos</Link> · <Link to="/lgpd">LGPD</Link> · <Link to="/privacidade">Política de Privacidade</Link></div>
       </footer>
     </div>
   )

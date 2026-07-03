@@ -399,16 +399,18 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .site-rodape a { color: var(--zz-mut); text-decoration: underline; }
 .site-rodape a:hover { color: #fff; }
 
-/* Páginas institucionais (Quem Somos, LGPD) — texto longo, mesmo tema escuro do site */
+/* Páginas institucionais (Quem Somos, LGPD, Política de Privacidade) — texto longo, tema escuro */
 .pagina-texto { padding: 40px 8vw 90px; max-width: 760px; margin: 0 auto; }
 .pagina-texto h1 {
   font-family: var(--marca); font-size: 32px; text-transform: uppercase; letter-spacing: 0.14em;
   font-weight: 400; margin: 0 0 30px; text-align: center;
 }
 .pagina-texto h2 { font-size: 20px; text-transform: uppercase; letter-spacing: 0.06em; margin: 40px 0 14px; }
+.pagina-texto h3 { font-size: 16px; color: #fff; letter-spacing: 0.02em; margin: 26px 0 8px; }
 .pagina-texto p { font-size: 16px; line-height: 1.8; color: var(--zz-mut); margin: 0 0 18px; }
-.pagina-texto ul { margin: 0; padding-left: 22px; }
+.pagina-texto ul { margin: 0 0 18px; padding-left: 22px; }
 .pagina-texto li { font-size: 16px; line-height: 1.9; color: var(--zz-mut); margin: 0 0 6px; }
+.pagina-texto li strong { color: #fff; }
 .pagina-texto a { color: #fff; text-decoration: underline; }
 .pagina-texto-lema {
   margin-top: 50px; padding-top: 30px; border-top: 1px solid var(--zz-line);

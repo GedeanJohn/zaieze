@@ -70,7 +70,7 @@ export default function QuemSomos() {
 
       <footer className="site-rodape">
         <div>CNPJ: 43.391.734/0001-51 · ZAIEZE · Sistemas Inteligentes para a Moda © {new Date().getFullYear()}</div>
-        <div><Link to="/quem-somos">Quem Somos</Link> · <Link to="/lgpd">LGPD</Link></div>
+        <div><Link to="/quem-somos">Quem Somos</Link> · <Link to="/lgpd">LGPD</Link> · <Link to="/privacidade">Política de Privacidade</Link></div>
       </footer>
     </div>
   )

@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
   Megaphone, Package, Tag, Layers, Boxes, UsersRound,
-  Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Search, Wrench, Smartphone,
+  Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Wrench, Smartphone,
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
 
@@ -64,9 +64,6 @@ export default function Layout() {
           {usuario.fotoUrl
             ? <img src={usuario.fotoUrl} alt="" />
             : <span className="topbar-ini">{iniciais(usuario.nome)}</span>}
-        </button>
-        <button className="topbar-busca" onClick={() => navigate('/clientes', { state: { focarBusca: Date.now() } })} aria-label="Pesquisar">
-          <Search size={17} strokeWidth={2} /><span>Pesquisar</span>
         </button>
         {podeVendasClientes && temFeature('whatsapp') && (
           <button className="topbar-chat" onClick={() => navigate('/caixa')} title="Chat Zaieze" aria-label="Chat">

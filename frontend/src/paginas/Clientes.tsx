@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
 import { api, formataReal, mensagemDeErro, usuarioLogado } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
@@ -66,12 +65,6 @@ export default function Clientes() {
   const [distribuicao, setDistribuicao] = useState<Distribuicao>({})
   const [vendedoras, setVendedoras] = useState<Vendedora[]>([])
   const [busca, setBusca] = useState('')
-  const buscaRef = useRef<HTMLInputElement>(null)
-  const location = useLocation()
-  // Vindo do atalho de busca do topo (Layout): foca o campo de busca desta tela.
-  useEffect(() => {
-    if (location.state?.focarBusca) buscaRef.current?.focus()
-  }, [location.state])
   const [segmento, setSegmento] = useState('')
   const [cidade, setCidade] = useState('')
   const [uf, setUf] = useState('')
@@ -250,7 +243,7 @@ export default function Clientes() {
         <div className="linha-campos">
           <div className="campo">
             <label>Buscar (nome ou telefone)</label>
-            <input ref={buscaRef} value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Ex.: Ana" />
+            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Ex.: Ana" />
           </div>
           <div className="campo">
             <label>Classificação</label>

@@ -55,22 +55,16 @@ a { color: var(--accent); text-decoration: none; }
 .topbar-ini { display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #fff; background: linear-gradient(135deg, #a855f7, #ec4899); }
 .topbar-nome { color: #f0e9e3; font-size: 14px; font-weight: 600; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Topbar estilo app (LinkedIn): avatar à esquerda · busca · ícone de chat à direita */
+/* Topbar estilo app (LinkedIn): avatar à esquerda · ícone de chat à direita */
 :root { --zz-navh: 58px; --zz-strip: 74px; }
 .topbar-avatar { display: flex; align-items: center; justify-content: center; background: none; border: none; cursor: pointer; padding: 0; flex-shrink: 0; }
 .topbar-avatar img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; display: block; }
-.topbar-busca {
-  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; cursor: pointer;
-  background: rgba(255, 255, 255, 0.08); border: none; border-radius: 999px; padding: 9px 16px;
-  color: #cdc6d8; font-size: 14px; transition: background 0.15s ease;
-}
-.topbar-busca span { color: #9a93a8; }
 .topbar-chat {
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: auto;
   width: 38px; height: 38px; border-radius: 50%; border: none; cursor: pointer;
   background: rgba(255, 255, 255, 0.06); color: #f0e9e3; transition: background 0.15s ease;
 }
-.topbar-busca:hover, .topbar-chat:hover { background: rgba(255, 255, 255, 0.14); }
+.topbar-chat:hover { background: rgba(255, 255, 255, 0.14); }
 
 /* Barra de menu no rodapé — escondida no desktop; aparece no mobile (≤860) */
 .bottom-nav { display: none; }
@@ -251,6 +245,9 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .barra-meta > span { display: block; height: 100%; background: var(--accent); }
 .painel-titulo { font-family: var(--fonte-titulo); font-weight: 600; font-size: 17px; margin: 0 0 12px; }
 .grade-paineis { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+/* Sem isto, o item do grid cresce para caber a tabela inteira (min-width:auto é o padrão do
+   grid) em vez de deixar a tabela rolar dentro dele — tabela "congelada"/cortada no mobile. */
+.grade-paineis > .cartao { min-width: 0; }
 
 /* ───────────────────────── Mobile do CRM (drawer + primitivas) ─────────────────────────
    Em ≤ 860px a sidebar vira um painel deslizante acionado pelo ☰; o desktop fica intacto. */

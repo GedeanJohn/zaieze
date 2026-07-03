@@ -10,7 +10,7 @@ const num = (v: unknown) => Number(v ?? 0)
 export interface ClienteAlvo {
   id: string
   nome: string
-  telefone: string
+  telefone: string | null
   consentimentoLgpd: boolean
   segmento: string
   totalGasto: unknown
@@ -25,6 +25,7 @@ export interface ResultadoDisparo {
   falhas: number
   semConsentimento: number
   semVendedora: number
+  semTelefone: number
 }
 
 /**
@@ -56,7 +57,7 @@ export async function dispararParaClientes(opts: {
   const variaveis = Array.isArray(tpl?.variaveis) ? (tpl!.variaveis as string[]) : []
   const corpoBase = tpl?.corpo ?? opts.template
 
-  const res: ResultadoDisparo = { alcance: opts.clientes.length, enviados: 0, simulados: 0, falhas: 0, semConsentimento: 0, semVendedora: 0 }
+  const res: ResultadoDisparo = { alcance: opts.clientes.length, enviados: 0, simulados: 0, falhas: 0, semConsentimento: 0, semVendedora: 0, semTelefone: 0 }
 
   const ids = [...new Set(opts.clientes.map((c) => c.vendedoraId ?? opts.vendedoraFallbackId).filter((v): v is string => !!v))]
   const vendedoras = new Map(
@@ -82,6 +83,10 @@ export async function dispararParaClientes(opts: {
     const vend = vId ? vendedoras.get(vId) : undefined
     if (!vend) {
       res.semVendedora += 1
+      continue
+    }
+    if (!c.telefone) {
+      res.semTelefone += 1
       continue
     }
 

@@ -292,7 +292,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
     })
 
     const porCliente = new Map<string, {
-      cliente: { id: string; nome: string; telefone: string; segmento: string; vendedoraId: string | null }
+      cliente: { id: string; nome: string; telefone: string | null; segmento: string; vendedoraId: string | null }
       ultimaMensagem: string; ultimaDirecao: string; ultimaEm: Date; mensagens: number; naoLidas: number
     }>()
     for (const m of msgs) {
@@ -333,6 +333,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
     if (request.user.role === 'VENDEDORA' && cliente.vendedoraId !== request.user.sub) {
       return reply.code(403).send({ erro: 'Cliente não está na sua carteira' })
     }
+    if (!cliente.telefone) return reply.code(422).send({ erro: 'Cliente sem WhatsApp cadastrado — atenda pelo canal em que ele entrou (ex.: Instagram).' })
     const vendId = cliente.vendedoraId ?? (request.user.role === 'VENDEDORA' ? request.user.sub : null)
     if (!vendId) return reply.code(422).send({ erro: 'Cliente sem vendedora responsável — defina a carteira primeiro.' })
 
@@ -370,6 +371,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
     if (request.user.role === 'VENDEDORA' && cliente.vendedoraId !== request.user.sub) {
       return reply.code(403).send({ erro: 'Cliente não está na sua carteira' })
     }
+    if (!cliente.telefone) return reply.code(422).send({ erro: 'Cliente sem WhatsApp cadastrado.' })
     const vendId = cliente.vendedoraId ?? (request.user.role === 'VENDEDORA' ? request.user.sub : null)
     if (!vendId) return reply.code(422).send({ erro: 'Cliente sem vendedora responsável — defina a carteira primeiro.' })
 

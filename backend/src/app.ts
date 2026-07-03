@@ -21,6 +21,7 @@ import { estoqueRoutes } from './modules/estoque/estoque.routes'
 import { estoquistasRoutes } from './modules/estoquistas/estoquistas.routes'
 import { convitesRoutes } from './modules/convites/convites.routes'
 import { whatsappRoutes } from './modules/whatsapp/whatsapp.routes'
+import { instagramRoutes } from './modules/instagram/instagram.routes'
 import { gruposRoutes } from './modules/whatsapp/grupos.routes'
 import { campanhasRoutes } from './modules/whatsapp/campanhas.routes'
 import { reguasRoutes } from './modules/whatsapp/reguas.routes'
@@ -93,6 +94,7 @@ export async function buildApp() {
   await app.register(estoquistasRoutes, { prefix: '/api/estoquistas' })
   await app.register(convitesRoutes, { prefix: '/api/convites' })
   await app.register(whatsappRoutes, { prefix: '/api/whatsapp' })
+  await app.register(instagramRoutes, { prefix: '/api/instagram' })
   await app.register(gruposRoutes, { prefix: '/api/whatsapp' })
   await app.register(campanhasRoutes, { prefix: '/api/campanhas' })
   await app.register(reguasRoutes, { prefix: '/api/reguas' })

@@ -10,7 +10,8 @@ import { enviarWhatsapp } from '../whatsapp/whatsapp.service'
 
 const criarClienteSchema = z.object({
   nome: z.string().min(2),
-  telefone: z.string().min(8),
+  // Opcional: cliente que chega só pelo Instagram pode não ter telefone/WhatsApp.
+  telefone: z.string().min(8).optional(),
   email: z.string().email().optional(),
   cpf: z.string().optional(),
   instagram: z.string().optional(),
@@ -32,8 +33,8 @@ const UF_POR_REGIAO: Record<string, string[]> = {
 }
 
 /** Extrai o DDD (2 dígitos) de um telefone brasileiro, ignorando o 55 do país. */
-function dddDoTelefone(telefone: string): string | null {
-  let d = telefone.replace(/\D/g, '')
+function dddDoTelefone(telefone: string | null): string | null {
+  let d = (telefone ?? '').replace(/\D/g, '')
   if (d.startsWith('55') && d.length > 11) d = d.slice(2)
   return d.length >= 10 ? d.slice(0, 2) : null
 }
@@ -118,12 +119,13 @@ export async function clientesRoutes(app: FastifyInstance) {
       select: { id: true, nome: true, telefone: true, consentimentoLgpd: true, vendedoraId: true },
     })
 
-    const res = { alcance: clientes.length, enviados: 0, simulados: 0, falhas: 0, semConsentimento: 0, semVendedora: 0 }
+    const res = { alcance: clientes.length, enviados: 0, simulados: 0, falhas: 0, semConsentimento: 0, semVendedora: 0, semTelefone: 0 }
     const cache = new Map<string, { link: string } | null>() // link do catálogo por vendedoraId
 
     for (const c of clientes) {
       if (!c.consentimentoLgpd) { res.semConsentimento += 1; continue }
       if (!c.vendedoraId) { res.semVendedora += 1; continue }
+      if (!c.telefone) { res.semTelefone += 1; continue }
 
       if (!cache.has(c.vendedoraId)) {
         const v = await prisma.usuario.findUnique({

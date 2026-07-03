@@ -6,7 +6,7 @@ import { useToast } from '../componentes/Toast'
 interface Cliente {
   id: string
   nome: string
-  telefone: string
+  telefone: string | null
   email?: string | null
   instagram?: string | null
   cep?: string | null
@@ -142,7 +142,7 @@ export default function Clientes() {
     setErro('')
     const corpo: Record<string, unknown> = {
       nome: editando.nome,
-      telefone: editando.telefone,
+      telefone: editando.telefone || undefined,
       email: editando.email || undefined,
       instagram: editando.instagram || undefined,
       cep: editando.cep || undefined,
@@ -310,7 +310,7 @@ export default function Clientes() {
                 <tr key={c.id} style={{ background: selecao.has(c.id) ? 'var(--accent-suave, #ffffff10)' : undefined }}>
                   <td><input type="checkbox" checked={selecao.has(c.id)} onChange={() => alternarSelecao(c.id)} /></td>
                   <td><a href="#" onClick={(e) => { e.preventDefault(); abrirDetalhe(c.id) }}>{c.nome}</a></td>
-                  <td>{c.telefone}</td>
+                  <td>{c.telefone || (c.instagram ? `📷 ${c.instagram}` : '—')}</td>
                   <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{c.cidade ? `${c.cidade}${c.uf ? `/${c.uf}` : ''}` : '—'}</td>
                   <td><span className={`selo ${c.segmento}`}>{c.segmento}</span></td>
                   <td>{formataReal(c.totalGasto)}</td>
@@ -354,7 +354,7 @@ export default function Clientes() {
             </div>
 
             <div style={{ fontSize: 13, color: 'var(--ink-soft)', margin: '8px 0 16px' }}>
-              📱 {detalhe.telefone}{detalhe.instagram ? ` · ${detalhe.instagram}` : ''}
+              {detalhe.telefone ? `📱 ${detalhe.telefone}` : ''}{detalhe.instagram ? `${detalhe.telefone ? ' · ' : ''}📷 ${detalhe.instagram}` : ''}
               {detalhe.vendedora ? ` · carteira de ${detalhe.vendedora.nome}` : ''}
               {detalhe.consentimentoLgpd ? ' · ✅ aceita campanhas' : ' · ⚠ sem consentimento LGPD'}
             </div>
@@ -401,8 +401,8 @@ export default function Clientes() {
                 <input value={editando.nome ?? ''} onChange={(e) => setEditando({ ...editando, nome: e.target.value })} required />
               </div>
               <div className="campo">
-                <label>WhatsApp* (com DDI)</label>
-                <input value={editando.telefone ?? ''} onChange={(e) => setEditando({ ...editando, telefone: e.target.value })} placeholder="5562999998888" required />
+                <label>WhatsApp (com DDI)</label>
+                <input value={editando.telefone ?? ''} onChange={(e) => setEditando({ ...editando, telefone: e.target.value })} placeholder="5562999998888" />
               </div>
             </div>
             <div className="linha-campos">

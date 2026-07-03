@@ -176,6 +176,18 @@ model Rede {
   waAppSecret              String? // segredo do app Meta p/ validar X-Hub-Signature-256 (opcional)
   waConectado              Boolean  @default(false)
   waConectadoEm            DateTime?
+  // Instagram Messaging (oficial da Meta) — mesma lógica do WhatsApp: 1 conta por marca,
+  // config manual pelo gestor (Business Account ID + token). Ausência → modo SIMULADO.
+  // Diferente do WhatsApp, não há "template" fora da janela — só se responde a quem já
+  // mandou mensagem, e só dentro de 24h (ver Cliente.igUltimaEntradaEm).
+  igBusinessAccountId      String? // id da conta profissional do Instagram (Graph API)
+  igPageId                 String? // Página do Facebook vinculada (opcional; Instagram Login não exige)
+  igUsername               String? // @ exibido, obtido ao validar a conexão
+  igTokenCifrado           String? // access token, cifrado em repouso (mesmo AES-256-GCM do WhatsApp)
+  igVerifyToken            String? // token de verificação do webhook (GET hub.verify_token)
+  igAppSecret              String? // segredo do app Meta p/ validar X-Hub-Signature-256 (opcional)
+  igConectado              Boolean  @default(false)
+  igConectadoEm            DateTime?
   // Meta mensal da MARCA (valor total do mês). Distribuída às lojas conforme metaModo:
   // IGUAL = meta da marca ÷ nº de lojas; MANUAL = valor definido em cada Loja.metaMensal.
   // A meta da vendedora é derivada: meta da loja ÷ nº de vendedoras ativas da loja.
@@ -408,6 +420,7 @@ model Usuario {
   carteira          Cliente[]          @relation("CarteiraVendedora")
   vendas            Venda[]
   mensagens         MensagemWhatsapp[] @relation("MensagensVendedora")
+  mensagensInstagram MensagemInstagram[] @relation("MensagensInstagramVendedora")
   campanhas         Campanha[]
   campanhasModelo   CampanhaModelo[]   @relation("ModelosCampanhaCriados")
   postsMural        PostMural[]
@@ -463,10 +476,17 @@ model Cliente {
   lojaId            String
   vendedoraId       String? // dona da carteira; null = sem carteira definida
   nome              String
-  telefone          String // WhatsApp — chave de roteamento de conversas
+  // WhatsApp — chave de roteamento de conversas. Opcional: cliente que chega só pelo
+  // Instagram (ver igScopedId) pode não ter telefone.
+  telefone          String?
   email             String?
   cpf               String?
   instagram         String?
+  // Instagram oficial (Meta) — id da pessoa escopado à conta da marca (não é o @handle).
+  // Chave de roteamento de conversas do Instagram, equivalente ao telefone no WhatsApp.
+  igScopedId        String?
+  // Última mensagem RECEBIDA do cliente pelo Instagram — base da janela de 24h da Graph API.
+  igUltimaEntradaEm DateTime?
   // Endereço (para filtros de segmentação geográfica em campanhas/seleção — R1).
   // Preenchidos via CEP (ViaCEP) no cadastro; DDD é derivado do telefone.
   cep               String?
@@ -489,14 +509,16 @@ model Cliente {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
-  loja         Loja               @relation(fields: [lojaId], references: [id], onDelete: Cascade)
-  vendedora    Usuario?           @relation("CarteiraVendedora", fields: [vendedoraId], references: [id], onDelete: SetNull)
-  vendas       Venda[]
-  mensagens    MensagemWhatsapp[]
-  leads        Lead[]
-  gruposMembro GrupoMembro[]
+  loja              Loja                 @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  vendedora         Usuario?             @relation("CarteiraVendedora", fields: [vendedoraId], references: [id], onDelete: SetNull)
+  vendas            Venda[]
+  mensagens         MensagemWhatsapp[]
+  mensagensInstagram MensagemInstagram[]
+  leads             Lead[]
+  gruposMembro      GrupoMembro[]
 
   @@unique([lojaId, telefone])
+  @@unique([lojaId, igScopedId])
   @@index([lojaId, vendedoraId])
   @@index([lojaId, segmento])
   @@map("clientes")
@@ -870,6 +892,32 @@ model MensagemWhatsapp {
   @@index([grupoId, createdAt])
   @@index([waMessageId])
   @@map("mensagens_whatsapp")
+}
+
+/// DMs do Instagram oficial (Meta) — espelha MensagemWhatsapp trocando telefone/waMessageId
+/// por igScopedId/igMessageId. Sem campanha/grupo nesta entrega (só a caixa de entrada 1:1).
+model MensagemInstagram {
+  id          String          @id @default(cuid())
+  lojaId      String
+  clienteId   String?
+  vendedoraId String // dona do atendimento (roteamento por carteira)
+  direcao     DirecaoMensagem
+  status      StatusMensagem
+  origem      OrigemMensagem  @default(MANUAL)
+  igScopedId  String
+  texto       String
+  tipoMidia   String?
+  midiaUrl    String?
+  igMessageId String?
+  createdAt   DateTime        @default(now())
+
+  cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  vendedora Usuario  @relation("MensagensInstagramVendedora", fields: [vendedoraId], references: [id])
+
+  @@index([clienteId, createdAt])
+  @@index([lojaId, createdAt])
+  @@index([igMessageId])
+  @@map("mensagens_instagram")
 }
 
 // ─────────────────────────── Grupos de transmissão (Chat Zaieze) ───────────────────────────

@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
   Megaphone, Package, Tag, Layers, Boxes, UsersRound,
-  Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Wrench, Smartphone,
+  Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Wrench, Smartphone, Camera,
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
 
@@ -95,6 +95,7 @@ export default function Layout() {
         {podeSeparacao && <NavLink to="/separacao" className={cls}><ClipboardCheck {...ICON} /><span>Pedidos a separar</span></NavLink>}
         {podeEquipe && <NavLink to="/equipe" className={cls}><UsersRound {...ICON} /><span>Equipe</span></NavLink>}
         {ehDonoRede && temFeature('whatsapp') && <NavLink to="/whatsapp-config" className={cls}><Smartphone {...ICON} /><span>WhatsApp oficial</span></NavLink>}
+        {ehDonoRede && temFeature('whatsapp') && <NavLink to="/instagram-config" className={cls}><Camera {...ICON} /><span>Instagram oficial</span></NavLink>}
         {ehDonoRede && temFeature('portal_cliente') && <NavLink to="/marca" className={cls}><Palette {...ICON} /><span>Minha Loja</span></NavLink>}
         {ehDonoRede && <NavLink to="/manual" className={cls}><BookOpen {...ICON} /><span>Manual</span></NavLink>}
         {ehDonoRede && <NavLink to="/planos" className={cls}><CreditCard {...ICON} /><span>Planos</span></NavLink>}

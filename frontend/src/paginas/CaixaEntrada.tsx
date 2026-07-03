@@ -3,8 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, mensagemDeErro, formataReal } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 
+type Canal = 'whatsapp' | 'instagram'
+
 interface Conversa {
-  cliente: { id: string; nome: string; telefone: string; segmento: string; vendedoraId: string | null }
+  canal: Canal
+  cliente: { id: string; nome: string; telefone: string | null; segmento: string; vendedoraId: string | null }
   ultimaMensagem: string
   ultimaDirecao: 'ENVIADA' | 'RECEBIDA'
   ultimaEm: string
@@ -26,7 +29,7 @@ interface Mensagem {
 }
 
 interface ChatStats { receitaMes: number; negociosAtivos: number; novosLeads: number; taxaConversao: number; metaMes: number | null; pctMeta: number | null }
-interface ClienteLite { id: string; nome: string; telefone: string; segmento: string }
+interface ClienteLite { id: string; nome: string; telefone: string | null; segmento: string }
 interface Grupo { id: string; nome: string; membros: number; ultimaMensagem: string | null; ultimaEm: string }
 interface Disparo { id: string; texto: string; status: string; createdAt: string }
 interface GrupoDetalhe { id: string; nome: string; membros: ClienteLite[]; disparos: Disparo[] }
@@ -94,8 +97,15 @@ export default function CaixaEntrada() {
 
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
-    const { data } = await api.get('/whatsapp/conversas', { params: escopo.params })
-    setConversas(data)
+    const [wa, ig] = await Promise.all([
+      api.get('/whatsapp/conversas', { params: escopo.params }),
+      api.get('/instagram/conversas', { params: escopo.params }).catch(() => ({ data: [] as Omit<Conversa, 'canal'>[] })),
+    ])
+    const todas: Conversa[] = [
+      ...(wa.data as Omit<Conversa, 'canal'>[]).map((c) => ({ ...c, canal: 'whatsapp' as const })),
+      ...(ig.data as Omit<Conversa, 'canal'>[]).map((c) => ({ ...c, canal: 'instagram' as const })),
+    ].sort((a, b) => new Date(b.ultimaEm).getTime() - new Date(a.ultimaEm).getTime())
+    setConversas(todas)
   }, [escopo.pronto, escopo.params])
 
   const carregarGrupos = useCallback(async () => {
@@ -115,7 +125,7 @@ export default function CaixaEntrada() {
 
   const abrir = useCallback(async (c: Conversa) => {
     setGrupoSel(null); setSel(c); setErro(''); setTexto('')
-    const { data } = await api.get(`/whatsapp/conversas/${c.cliente.id}`, { params: escopo.params })
+    const { data } = await api.get(`/${c.canal}/conversas/${c.cliente.id}`, { params: escopo.params })
     setThread(data)
   }, [escopo.params])
 
@@ -130,12 +140,15 @@ export default function CaixaEntrada() {
       if (existente) { abrir(existente); return }
       try {
         const { data } = await api.get(`/clientes/${id}`, { params: escopo.params })
+        // Sem telefone → só pode ter chegado pelo Instagram.
+        const canal: Canal = data.telefone ? 'whatsapp' : 'instagram'
         setGrupoSel(null); setErro(''); setTexto('')
         setSel({
+          canal,
           cliente: { id: data.id, nome: data.nome, telefone: data.telefone, segmento: data.segmento, vendedoraId: data.vendedoraId ?? null },
           ultimaMensagem: '', ultimaDirecao: 'ENVIADA', ultimaEm: new Date().toISOString(), mensagens: 0, naoLidas: 0,
         })
-        const t = await api.get(`/whatsapp/conversas/${id}`, { params: escopo.params })
+        const t = await api.get(`/${canal}/conversas/${id}`, { params: escopo.params })
         setThread(t.data)
       } catch { /* cliente inacessível nesta loja — ignora */ }
     })()
@@ -152,7 +165,7 @@ export default function CaixaEntrada() {
     if (!sel || !texto.trim()) return
     setEnviando(true); setErro('')
     try {
-      const { data } = await api.post(`/whatsapp/conversas/${sel.cliente.id}/responder`, { texto }, { params: escopo.params })
+      const { data } = await api.post(`/${sel.canal}/conversas/${sel.cliente.id}/responder`, { texto }, { params: escopo.params })
       setThread((t) => [...t, data])
       setTexto('')
       carregar()
@@ -242,7 +255,7 @@ export default function CaixaEntrada() {
     return conversas.filter((c) => {
       if (filtro === 'NAO_LIDAS' && c.naoLidas === 0) return false
       if (!q) return true
-      return c.cliente.nome.toLowerCase().includes(q) || c.cliente.telefone.includes(q)
+      return c.cliente.nome.toLowerCase().includes(q) || (c.cliente.telefone ?? '').includes(q)
     })
   }, [conversas, busca, filtro])
 
@@ -303,10 +316,11 @@ export default function CaixaEntrada() {
           ) : (
             <div className="cz-itens">
               {lista.map((c) => (
-                <button key={c.cliente.id} className={`cz-item${sel?.cliente.id === c.cliente.id ? ' ativo' : ''}`} onClick={() => abrir(c)}>
+                <button key={`${c.canal}-${c.cliente.id}`} className={`cz-item${sel?.cliente.id === c.cliente.id && sel.canal === c.canal ? ' ativo' : ''}`} onClick={() => abrir(c)}>
                   <span className="cz-avatar-wrap">
                     <span className="cz-avatar">{iniciais(c.cliente.nome)}</span>
                     {c.online && <span className="cz-online" />}
+                    <span className={`cz-canal ${c.canal}`} title={c.canal === 'instagram' ? 'Instagram' : 'WhatsApp'}>{c.canal === 'instagram' ? '📷' : '💬'}</span>
                   </span>
                   <span className="cz-item-main">
                     <span className="cz-item-top">
@@ -377,7 +391,7 @@ export default function CaixaEntrada() {
                 <span className="cz-avatar sm">{iniciais(sel.cliente.nome)}</span>
                 <div className="cz-conv-nome">
                   <strong>{sel.cliente.nome}</strong>
-                  <span>{sel.cliente.telefone}</span>
+                  <span>{sel.canal === 'instagram' ? '📷 Instagram' : sel.cliente.telefone}</span>
                 </div>
                 <button className="cz-btn cz-btn-venda" onClick={() => navigate(`/vendas?cliente=${sel.cliente.id}`)} title="Registrar venda">🛒<span className="cz-btn-txt"> Registrar venda</span></button>
               </div>
@@ -409,8 +423,8 @@ export default function CaixaEntrada() {
               ) : (
                 <form className="cz-responder" onSubmit={responder}>
                   <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Digite sua mensagem…" />
-                  {texto.trim()
-                    ? <button className="cz-enviar" disabled={enviando} aria-label="Enviar">{enviando ? '…' : '➤'}</button>
+                  {texto.trim() || sel.canal === 'instagram'
+                    ? <button className="cz-enviar" disabled={enviando || !texto.trim()} aria-label="Enviar">{enviando ? '…' : '➤'}</button>
                     : <button type="button" className="cz-mic" onClick={iniciarGravacao} disabled={enviando} aria-label="Gravar áudio">
                         <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>
                       </button>}
@@ -478,14 +492,14 @@ function ModalCriarGrupo({ escopo, onFechar, onCriado }: { escopo: ReturnType<ty
     (async () => {
       try {
         const { data } = await api.get('/clientes', { params: escopo.params })
-        setClientes((data as Array<{ id: string; nome: string; telefone: string; segmento: string }>).map((c) => ({ id: c.id, nome: c.nome, telefone: c.telefone, segmento: c.segmento })))
+        setClientes((data as Array<{ id: string; nome: string; telefone: string | null; segmento: string }>).map((c) => ({ id: c.id, nome: c.nome, telefone: c.telefone, segmento: c.segmento })))
       } catch (e) { setErro(mensagemDeErro(e)) }
     })()
   }, [escopo.params])
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
-    return q ? clientes.filter((c) => c.nome.toLowerCase().includes(q) || c.telefone.includes(q)) : clientes
+    return q ? clientes.filter((c) => c.nome.toLowerCase().includes(q) || (c.telefone ?? '').includes(q)) : clientes
   }, [clientes, busca])
 
   function alternar(id: string) {
@@ -520,7 +534,7 @@ function ModalCriarGrupo({ escopo, onFechar, onCriado }: { escopo: ReturnType<ty
             <label key={c.id} className={`cz-cliente-op${sel.has(c.id) ? ' sel' : ''}`}>
               <input type="checkbox" checked={sel.has(c.id)} onChange={() => alternar(c.id)} />
               <span className="cz-avatar sm">{iniciais(c.nome)}</span>
-              <span className="cz-cliente-nome"><strong>{c.nome}</strong><span>{c.telefone}</span></span>
+              <span className="cz-cliente-nome"><strong>{c.nome}</strong><span>{c.telefone ?? 'sem WhatsApp'}</span></span>
             </label>
           ))}
           {filtrados.length === 0 && <div className="cz-aviso">Nenhum cliente encontrado.</div>}

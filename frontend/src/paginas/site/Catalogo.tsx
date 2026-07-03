@@ -427,7 +427,7 @@ function Carrinho({ itens, totais, corPrimaria, vendedora, onMudarQtd, onRemover
 }
 
 /** Estética inspirada no emmacloth: claro, minimalista, foto em destaque, sans-serif. */
-function CatalogoEstilos() {
+export function CatalogoEstilos() {
   return (
     <style>{`
       .cat-root { --cat-creme: #f5f0e6; min-height: 100vh; background: var(--cat-fundo); color: #111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; padding-bottom: 96px; }

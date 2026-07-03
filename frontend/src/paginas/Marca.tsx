@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, mensagemDeErro } from '../api'
+import PreviewLoja from '../componentes/PreviewLoja'
 
 interface Marca {
   nome: string
@@ -68,6 +69,7 @@ export default function Marca() {
   const bannerRef = useRef<HTMLInputElement>(null)
   const [sugestoes, setSugestoes] = useState<Sugestao[]>([])
   const [alvoCor, setAlvoCor] = useState<'corPrimaria' | 'corSecundaria'>('corPrimaria')
+  const [preview, setPreview] = useState(false)
 
   function aplicarSugestoes(origem: 'logo' | 'banner', cores: string[]) {
     setSugestoes((prev) => {
@@ -153,7 +155,10 @@ export default function Marca() {
 
   return (
     <>
-      <header><h1>Identidade da marca</h1></header>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+        <h1>Identidade da marca</h1>
+        <button type="button" className="btn secundario" onClick={() => setPreview(true)}>👁️ Visualizar loja</button>
+      </header>
       <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
         A logo e as cores aparecem no <strong>catálogo público</strong> (Portal do Cliente) que as vendedoras compartilham.
         O SLA define em quanto tempo a vendedora precisa responder um lead antes da redistribuição.
@@ -312,6 +317,17 @@ export default function Marca() {
           <button className="btn">Salvar</button>
         </div>
       </form>
+
+      {preview && (
+        <PreviewLoja
+          nome={marca.nome}
+          logoUrl={marca.logoUrl}
+          bannerUrl={marca.bannerUrl}
+          corPrimaria={marca.corPrimaria}
+          corSecundaria={marca.corSecundaria}
+          onClose={() => setPreview(false)}
+        />
+      )}
     </>
   )
 }

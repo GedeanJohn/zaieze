@@ -16,6 +16,7 @@ const HEX = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
 const TIPOS_LOGO: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/svg+xml': 'svg' }
 
 const atualizarSchema = z.object({
+  nome: z.string().trim().min(2).max(80).optional(),
   descricaoPublica: z.string().max(500).nullish(),
   corPrimaria: z.string().regex(HEX).optional(),
   corSecundaria: z.string().regex(HEX).optional(),

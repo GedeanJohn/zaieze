@@ -93,6 +93,7 @@ export default function Marca() {
     if (!marca) return
     try {
       const { data } = await api.patch('/marca', {
+        nome: marca.nome.trim(),
         descricaoPublica: marca.descricaoPublica?.trim() || null,
         corPrimaria: marca.corPrimaria,
         corSecundaria: marca.corSecundaria,
@@ -205,6 +206,21 @@ export default function Marca() {
 
       <form className="cartao" onSubmit={salvar}>
         <h2 style={{ marginTop: 0 }}>Cores e atendimento</h2>
+
+        <div className="campo">
+          <label>Nome da marca (exibido ao público)</label>
+          <input
+            value={marca.nome}
+            minLength={2}
+            maxLength={80}
+            required
+            onChange={(e) => setMarca({ ...marca, nome: e.target.value })}
+            placeholder="Ex.: Zaieze Moda"
+          />
+          <small style={{ color: 'var(--ink-soft)' }}>
+            Aparece no catálogo público, na página da loja e nas mensagens automáticas.
+          </small>
+        </div>
 
         <div className="campo">
           <label>Descrição da loja (buscadores e IA)</label>

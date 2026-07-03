@@ -6,6 +6,16 @@ import { env } from '../../env'
 import { aplicarFimDeCiclo } from '../assinaturas/assinatura.service'
 import { enviarTemplatePlataforma } from '../whatsapp/meta.service'
 import { gerarSenhaProvisoria } from './senha-provisoria'
+import { normalizarTelefone } from '../../lib/telefone'
+
+// "Esqueci minha senha": identifica por TELEFONE (caminho principal) ou por E-MAIL (link
+// "não tenho WhatsApp cadastrado" — pra quem não sabe/não lembra o número). Em ambos os casos,
+// se a conta encontrada tiver telefone cadastrado, a senha provisória vai pro WhatsApp na hora;
+// senão, vira uma solicitação pendente pro humano atender.
+const esqueciSenhaSchema = z.union([
+  z.object({ telefone: z.string().min(8).transform(normalizarTelefone) }),
+  z.object({ email: z.string().email() }),
+])
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -79,9 +89,11 @@ export async function authRoutes(app: FastifyInstance) {
   // Sem WhatsApp, fica pendente para um humano atender (GESTOR da rede, ou o SUPER_ADMIN quando
   // quem pediu é o próprio GESTOR) — ver GET /usuarios/solicitacoes-senha e /admin/solicitacoes-senha.
   app.post('/esqueci-senha', { config: { rateLimit: { max: 5, timeWindow: '10 minutes' } } }, async (request) => {
-    const body = z.object({ email: z.string().email() }).parse(request.body)
-    const usuario = await prisma.usuario.findUnique({ where: { email: body.email.toLowerCase() } })
-    if (!usuario || !usuario.ativo) return { ok: true, via: 'nao-encontrado' as const }
+    const body = esqueciSenhaSchema.parse(request.body)
+    const usuario = 'telefone' in body
+      ? await prisma.usuario.findFirst({ where: { telefone: body.telefone, ativo: true } })
+      : await prisma.usuario.findFirst({ where: { email: body.email.toLowerCase(), ativo: true } })
+    if (!usuario) return { ok: true, via: 'nao-encontrado' as const }
 
     if (usuario.telefone) {
       const senha = gerarSenhaProvisoria()

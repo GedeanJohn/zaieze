@@ -27,7 +27,7 @@ export default function Login() {
     }
   }
 
-  if (esqueci) return <EsqueciSenha email={email} onVoltar={() => setEsqueci(false)} />
+  if (esqueci) return <EsqueciSenha onVoltar={() => setEsqueci(false)} />
 
   return (
     <div className="login-wrap">
@@ -54,8 +54,10 @@ export default function Login() {
   )
 }
 
-function EsqueciSenha({ email: emailInicial, onVoltar }: { email: string; onVoltar: () => void }) {
-  const [email, setEmail] = useState(emailInicial)
+function EsqueciSenha({ onVoltar }: { onVoltar: () => void }) {
+  const [modo, setModo] = useState<'telefone' | 'email'>('telefone')
+  const [telefone, setTelefone] = useState('')
+  const [email, setEmail] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [resultado, setResultado] = useState<'whatsapp' | 'pendente' | 'nao-encontrado' | null>(null)
 
@@ -63,7 +65,7 @@ function EsqueciSenha({ email: emailInicial, onVoltar }: { email: string; onVolt
     e.preventDefault()
     setEnviando(true)
     try {
-      const { data } = await api.post('/auth/esqueci-senha', { email })
+      const { data } = await api.post('/auth/esqueci-senha', modo === 'telefone' ? { telefone } : { email })
       setResultado(data.via)
     } catch {
       setResultado('nao-encontrado')
@@ -78,23 +80,38 @@ function EsqueciSenha({ email: emailInicial, onVoltar }: { email: string; onVolt
         <h1>Zaieze</h1>
         {!resultado ? (
           <form onSubmit={enviar}>
-            <p>Informe seu e-mail de acesso. Se você tiver WhatsApp cadastrado, mandamos uma senha provisória por lá na hora.</p>
-            <div className="campo">
-              <label>E-mail</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
-            </div>
+            {modo === 'telefone' ? (
+              <>
+                <p>Informe o WhatsApp cadastrado na sua conta. Mandamos uma senha provisória por lá na hora.</p>
+                <div className="campo">
+                  <label>WhatsApp (com DDD)</label>
+                  <input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="5562999990011" inputMode="tel" required autoFocus />
+                </div>
+              </>
+            ) : (
+              <>
+                <p>Informe seu e-mail de acesso. Avisamos quem pode redefinir sua senha manualmente.</p>
+                <div className="campo">
+                  <label>E-mail</label>
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+                </div>
+              </>
+            )}
             <button className="btn" style={{ width: '100%' }} disabled={enviando}>
               {enviando ? 'Enviando…' : 'Redefinir senha'}
             </button>
-            <button type="button" className="btn-link" style={{ display: 'block', margin: '14px auto 0' }} onClick={onVoltar}>
+            <button type="button" className="btn-link" style={{ display: 'block', margin: '14px auto 0' }} onClick={() => setModo(modo === 'telefone' ? 'email' : 'telefone')}>
+              {modo === 'telefone' ? 'Não tenho WhatsApp cadastrado' : 'Tenho WhatsApp cadastrado'}
+            </button>
+            <button type="button" className="btn-link" style={{ display: 'block', margin: '6px auto 0' }} onClick={onVoltar}>
               Voltar para o login
             </button>
           </form>
         ) : (
           <div style={{ textAlign: 'center' }}>
             {resultado === 'whatsapp' && <p>✅ Mandamos uma senha provisória para o seu WhatsApp cadastrado. Troque assim que entrar.</p>}
-            {resultado === 'pendente' && <p>Você ainda não tem WhatsApp cadastrado. Avisamos quem pode redefinir sua senha (o gestor da sua loja, ou o suporte Zaieze) — você será contatado(a) em breve.</p>}
-            {resultado === 'nao-encontrado' && <p>Não encontramos uma conta ativa com esse e-mail.</p>}
+            {resultado === 'pendente' && <p>Avisamos quem pode redefinir sua senha (o gestor da sua loja, ou o suporte Zaieze) — você será contatado(a) em breve.</p>}
+            {resultado === 'nao-encontrado' && <p>Não encontramos uma conta ativa com {modo === 'telefone' ? 'esse WhatsApp' : 'esse e-mail'}.</p>}
             <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={onVoltar}>Voltar para o login</button>
           </div>
         )}

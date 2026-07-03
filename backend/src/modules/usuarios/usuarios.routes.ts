@@ -9,6 +9,7 @@ import { ETAPAS_ABERTAS } from '../leads/leads.service'
 import { enviarParaR2 } from '../midia/r2.service'
 import { salvarUploadLocal } from '../midia/midia.routes'
 import { gerarSenhaProvisoria } from '../auth/senha-provisoria'
+import { normalizarTelefone } from '../../lib/telefone'
 
 const TIPOS_IMG = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/avif'])
 
@@ -18,8 +19,9 @@ const criarUsuarioSchema = z.object({
   senha: z.string().min(6),
   role: z.enum(['GERENTE', 'VENDEDORA']).default('VENDEDORA'),
   equipeId: z.string().optional(),
-  // Obrigatório: é pra onde vai a senha provisória do "esqueci minha senha".
-  telefone: z.string().min(8, 'Informe o WhatsApp com DDD'),
+  // Obrigatório: é pra onde vai a senha provisória do "esqueci minha senha". Normalizado (só
+  // dígitos) pra permitir busca exata nessa tela.
+  telefone: z.string().min(8, 'Informe o WhatsApp com DDD').transform(normalizarTelefone),
   slugCatalogo: z.string().regex(/^[a-z0-9-]+$/).optional(),
   metaMensal: z.coerce.number().nonnegative().optional(),
   comissaoPadrao: z.coerce.number().min(0).max(100).optional(),

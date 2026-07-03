@@ -4,20 +4,21 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { redeIdDe } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
+import { normalizarTelefone } from '../../lib/telefone'
 
 const criarSchema = z.object({
   nome: z.string().min(2),
   email: z.string().email(),
   senha: z.string().min(6),
   // Obrigatório: é pra onde vai a senha provisória do "esqueci minha senha".
-  telefone: z.string().min(8, 'Informe o WhatsApp com DDD'),
+  telefone: z.string().min(8, 'Informe o WhatsApp com DDD').transform(normalizarTelefone),
 })
 
 const atualizarSchema = z.object({
   nome: z.string().min(2).optional(),
   email: z.string().email().optional(),
   senha: z.string().min(6).optional(),
-  telefone: z.string().nullish(),
+  telefone: z.string().nullish().transform((v) => (v ? normalizarTelefone(v) : v)),
   ativo: z.boolean().optional(),
 })
 

@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs'
 import type { Prisma, Role } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
+import { normalizarTelefone } from '../../lib/telefone'
 
 /**
  * Convites por link (onboarding). Quem convida gera um link; a pessoa abre, CRIA A PRÓPRIA SENHA
@@ -23,7 +24,7 @@ const criarSchema = z.object({
   nome: z.string().min(2),
   email: z.string().email(),
   // Obrigatório: é pra onde vai a senha provisória do "esqueci minha senha".
-  telefone: z.string().min(8, 'Informe o WhatsApp com DDD'),
+  telefone: z.string().min(8, 'Informe o WhatsApp com DDD').transform(normalizarTelefone),
   role: z.enum(['GESTOR', 'ESTOQUISTA', 'GERENTE', 'VENDEDORA']),
   lojaId: z.string().optional(),
   equipeId: z.string().optional(),
@@ -69,8 +70,7 @@ export async function convitesRoutes(app: FastifyInstance) {
     const link = `${env.TENANT_SCHEME}://${rede?.slug}.${env.DOMINIO_BASE}/convite/${token}`
     const primeiro = body.nome.trim().split(/\s+/)[0]
     const msg = `Olá ${primeiro}! Você foi convidado(a) para o ${rede?.nome ?? 'sistema'} (ModaCRM). Crie seu acesso aqui: ${link}`
-    const tel = body.telefone.replace(/\D/g, '')
-    const whatsappUrl = `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`
+    const whatsappUrl = `https://wa.me/${body.telefone}?text=${encodeURIComponent(msg)}`
     return reply.code(201).send({ link, whatsappUrl, expiraEm, nome: body.nome, role: body.role })
   })
 

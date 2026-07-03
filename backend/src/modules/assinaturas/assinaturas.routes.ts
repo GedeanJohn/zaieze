@@ -10,6 +10,7 @@ import { listarPlanos, precoDoPlano } from '../planos/planos.service'
 import { consumirCodigo, descricaoBeneficio, validarCodigo } from '../promo/promo.service'
 import { CONTRATO_VERSAO } from '../contrato/contrato.template'
 import { temAceiteVigente } from '../contrato/contrato.service'
+import { normalizarTelefone } from '../../lib/telefone'
 
 const arred2 = (n: number) => Math.round(n * 100) / 100
 
@@ -19,7 +20,7 @@ const checkoutSchema = z.object({
   slug: z.string().min(3).regex(/^[a-z0-9-]+$/, 'O endereço aceita apenas letras minúsculas, números e hífens'),
   gestorNome: z.string().min(2),
   // Obrigatório: é pra onde vai a senha provisória do "esqueci minha senha".
-  telefone: z.string().min(8, 'Informe o WhatsApp com DDD'),
+  telefone: z.string().min(8, 'Informe o WhatsApp com DDD').transform(normalizarTelefone),
   email: z.string().email(),
   senha: z.string().min(6),
   codigoPromo: z.string().optional(),

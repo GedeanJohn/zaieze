@@ -3,6 +3,7 @@ import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { redeIdDe } from '../../plugins/auth'
+import { normalizarTelefone } from '../../lib/telefone'
 
 const criarLojaSchema = z.object({
   nome: z.string().min(2),
@@ -15,7 +16,7 @@ const criarLojaSchema = z.object({
     email: z.string().email(),
     senha: z.string().min(6),
     // Obrigatório: é pra onde vai a senha provisória do "esqueci minha senha".
-    telefone: z.string().min(8, 'Informe o WhatsApp do gerente com DDD'),
+    telefone: z.string().min(8, 'Informe o WhatsApp do gerente com DDD').transform(normalizarTelefone),
   }),
 })
 

@@ -38,6 +38,7 @@ interface CriarAfiliadoInput {
   email: string
   telefone?: string
   percentualComissao?: number
+  taxStatus?: string
 }
 
 /** Cria o Usuario(role=AFILIADO) + Afiliado numa transação. Gera senha provisória (retornada 1x). */
@@ -59,6 +60,7 @@ export async function criarAfiliado(input: CriarAfiliadoInput) {
         usuarioId: usuario.id,
         codigo,
         percentualComissao: input.percentualComissao ?? null,
+        taxStatus: input.taxStatus ?? null,
       },
       include: { usuario: { select: { id: true, nome: true, email: true, telefone: true, ativo: true } } },
     })

@@ -273,6 +273,7 @@ export async function adminRoutes(app: FastifyInstance) {
           id: a.id, codigo: a.codigo, percentualComissao: a.percentualComissao ? num(a.percentualComissao) : null,
           cliques: a.cliques, redesIndicadas: a._count.redesIndicadas,
           pendente: num(pendente), paga: num(paga),
+          taxStatus: a.taxStatus, statusFiscal: a.statusFiscal, statusFiscalVerificadoEm: a.statusFiscalVerificadoEm,
           usuario: a.usuario,
         }
       }),
@@ -284,6 +285,7 @@ export async function adminRoutes(app: FastifyInstance) {
     email: z.string().email(),
     telefone: z.string().trim().optional(),
     percentualComissao: z.coerce.number().positive().max(100).optional(),
+    taxStatus: z.enum(['PF', 'PJ', 'MEI']).optional(),
   })
   app.post('/afiliados', async (request, reply) => {
     const b = criarAfiliadoSchema.parse(request.body)
@@ -296,6 +298,9 @@ export async function adminRoutes(app: FastifyInstance) {
     telefone: z.string().trim().nullable().optional(),
     percentualComissao: z.coerce.number().positive().max(100).nullable().optional(),
     ativo: z.boolean().optional(),
+    taxStatus: z.enum(['PF', 'PJ', 'MEI']).nullable().optional(),
+    // Saúde fiscal (compliance LC 214/2025): verificação do admin, não autodeclarada pelo afiliado.
+    statusFiscal: z.enum(['EM_DIA', 'IRREGULAR', 'NAO_VERIFICADO']).optional(),
   })
   app.patch('/afiliados/:id', async (request, reply) => {
     const { id } = request.params as { id: string }
@@ -306,7 +311,11 @@ export async function adminRoutes(app: FastifyInstance) {
     await prisma.$transaction([
       prisma.afiliado.update({
         where: { id },
-        data: { ...(b.percentualComissao !== undefined ? { percentualComissao: b.percentualComissao } : {}) },
+        data: {
+          ...(b.percentualComissao !== undefined ? { percentualComissao: b.percentualComissao } : {}),
+          ...(b.taxStatus !== undefined ? { taxStatus: b.taxStatus } : {}),
+          ...(b.statusFiscal !== undefined ? { statusFiscal: b.statusFiscal, statusFiscalVerificadoEm: new Date() } : {}),
+        },
       }),
       prisma.usuario.update({
         where: { id: afiliado.usuarioId },
@@ -343,27 +352,37 @@ export async function adminRoutes(app: FastifyInstance) {
       },
       orderBy: { createdAt: 'desc' },
       take: 300,
-      include: { afiliado: { select: { codigo: true, usuario: { select: { nome: true } } } } },
+      include: { afiliado: { select: { codigo: true, statusFiscal: true, usuario: { select: { nome: true } } } } },
     })
     return {
       comissoes: comissoes.map((c) => ({
         id: c.id, redeNome: c.redeNome, cicloEm: c.cicloEm,
         valorBaseAssinatura: num(c.valorBaseAssinatura), percentualComissao: num(c.percentualComissao),
         valorComissao: num(c.valorComissao), status: c.status, pagoEm: c.pagoEm,
-        afiliadoCodigo: c.afiliado.codigo, afiliadoNome: c.afiliado.usuario.nome,
+        valorRetencaoFiscal: c.valorRetencaoFiscal != null ? num(c.valorRetencaoFiscal) : null,
+        afiliadoCodigo: c.afiliado.codigo, afiliadoNome: c.afiliado.usuario.nome, afiliadoStatusFiscal: c.afiliado.statusFiscal,
       })),
     }
   })
 
+  const pagarComissaoSchema = z.object({
+    observacaoPagamento: z.string().max(300).optional(),
+    // Retenção de IBS/CBS registrada no repasse (informativo — sem cálculo automático de alíquota).
+    valorRetencaoFiscal: z.coerce.number().nonnegative().optional(),
+  })
   app.post('/afiliados/comissoes/:id/pagar', async (request, reply) => {
     const { id } = request.params as { id: string }
-    const { observacaoPagamento } = z.object({ observacaoPagamento: z.string().max(300).optional() }).parse(request.body ?? {})
+    const b = pagarComissaoSchema.parse(request.body ?? {})
     const comissao = await prisma.comissaoAfiliado.findUnique({ where: { id } })
     if (!comissao) return reply.code(404).send({ erro: 'Comissão não encontrada' })
     if (comissao.status === 'PAGA') return reply.code(422).send({ erro: 'Esta comissão já está marcada como paga.' })
     return prisma.comissaoAfiliado.update({
       where: { id },
-      data: { status: 'PAGA', pagoEm: new Date(), pagoPorId: request.user.sub, observacaoPagamento: observacaoPagamento ?? null },
+      data: {
+        status: 'PAGA', pagoEm: new Date(), pagoPorId: request.user.sub,
+        observacaoPagamento: b.observacaoPagamento ?? null,
+        ...(b.valorRetencaoFiscal !== undefined ? { valorRetencaoFiscal: b.valorRetencaoFiscal } : {}),
+      },
     })
   })
 }

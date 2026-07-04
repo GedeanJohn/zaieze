@@ -386,6 +386,9 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
 interface AfiliadoAdmin {
   id: string; codigo: string; percentualComissao: number | null; cliques: number; redesIndicadas: number
   pendente: number; paga: number
+  taxStatus: 'PF' | 'PJ' | 'MEI' | null
+  statusFiscal: 'EM_DIA' | 'IRREGULAR' | 'NAO_VERIFICADO'
+  statusFiscalVerificadoEm: string | null
   usuario: { id: string; nome: string; email: string; telefone: string | null; ativo: boolean }
 }
 
@@ -396,6 +399,7 @@ function AfiliadosSection() {
   const [email, setEmail] = useState('')
   const [telefone, setTelefone] = useState('')
   const [percentual, setPercentual] = useState('')
+  const [taxStatus, setTaxStatus] = useState('')
   const [erro, setErro] = useState('')
   const [ocupado, setOcupado] = useState(false)
   const [gerado, setGerado] = useState<{ nome: string; codigo: string; senha: string } | null>(null)
@@ -412,15 +416,21 @@ function AfiliadosSection() {
       const { data } = await api.post('/admin/afiliados', {
         nome, email, telefone: telefone || undefined,
         percentualComissao: percentual ? Number(percentual) : undefined,
+        taxStatus: taxStatus || undefined,
       })
       setGerado({ nome, codigo: data.afiliado.codigo, senha: data.senha })
-      setNome(''); setEmail(''); setTelefone(''); setPercentual('')
+      setNome(''); setEmail(''); setTelefone(''); setPercentual(''); setTaxStatus('')
       carregar()
     } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setOcupado(false) }
   }
 
   async function alternarAtivo(a: AfiliadoAdmin) {
     await api.patch(`/admin/afiliados/${a.id}`, { ativo: !a.usuario.ativo }).catch(() => {})
+    carregar()
+  }
+
+  async function definirStatusFiscal(a: AfiliadoAdmin, statusFiscal: string) {
+    await api.patch(`/admin/afiliados/${a.id}`, { statusFiscal }).catch(() => {})
     carregar()
   }
 
@@ -443,7 +453,9 @@ function AfiliadosSection() {
       <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
         Comissão <strong>vitalícia</strong> sobre o valor recorrente das assinaturas vendidas pelo link do afiliado.
         O repasse é <strong>manual</strong> (Pix por fora, marcado como pago aqui) — o Mercado Pago não tem split
-        automático para esse tipo de assinatura.
+        automático para esse tipo de assinatura. O campo <strong>Fiscal</strong> é a verificação manual de saúde
+        fiscal do afiliado (Reforma Tributária/LC 214-2025) — a plataforma pode ser corresponsabilizada se um
+        parceiro irregular não emitir nota; marque <strong>Irregular</strong> pra ser avisado antes de pagar.
       </div>
 
       <div className="linha-campos" style={{ alignItems: 'end', marginBottom: 14 }}>
@@ -459,6 +471,15 @@ function AfiliadosSection() {
         <div className="campo"><label>E-mail</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
         <div className="campo"><label>Telefone (opcional)</label><input value={telefone} onChange={(e) => setTelefone(e.target.value)} /></div>
         <div className="campo" style={{ maxWidth: 160 }}><label>% (opcional, senão usa o padrão)</label><input type="number" min="0" max="100" step="0.01" value={percentual} onChange={(e) => setPercentual(e.target.value)} /></div>
+        <div className="campo" style={{ maxWidth: 140 }}>
+          <label>Enquadramento (opcional)</label>
+          <select value={taxStatus} onChange={(e) => setTaxStatus(e.target.value)}>
+            <option value="">—</option>
+            <option value="PF">Pessoa física</option>
+            <option value="PJ">PJ</option>
+            <option value="MEI">MEI</option>
+          </select>
+        </div>
         <div><button className="btn" disabled={ocupado}>Criar afiliado</button></div>
       </form>
       {erro && <div className="alerta" style={{ marginTop: 8 }}>{erro}</div>}
@@ -469,7 +490,7 @@ function AfiliadosSection() {
       )}
 
       <table style={{ marginTop: 12 }}>
-        <thead><tr><th>Nome</th><th>Código</th><th>%</th><th>Cliques</th><th>Redes</th><th>Pendente</th><th>Pago</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Nome</th><th>Código</th><th>%</th><th>Cliques</th><th>Redes</th><th>Pendente</th><th>Pago</th><th>Status</th><th>Fiscal</th><th></th></tr></thead>
         <tbody>
           {afiliados.map((a) => (
             <tr key={a.id} style={{ opacity: a.usuario.ativo ? 1 : 0.5 }}>
@@ -482,12 +503,25 @@ function AfiliadosSection() {
               <td>{formataReal(a.paga)}</td>
               <td><span className={`selo ${a.usuario.ativo ? 'ok' : 'baixo'}`}>{a.usuario.ativo ? 'ativo' : 'inativo'}</span></td>
               <td style={{ whiteSpace: 'nowrap' }}>
+                {a.taxStatus ?? <span style={{ color: 'var(--ink-soft)' }}>—</span>}
+                {' · '}
+                <select
+                  value={a.statusFiscal}
+                  onChange={(e) => definirStatusFiscal(a, e.target.value)}
+                  style={{ fontSize: 11, padding: '2px 4px' }}
+                >
+                  <option value="NAO_VERIFICADO">não verificado</option>
+                  <option value="EM_DIA">em dia</option>
+                  <option value="IRREGULAR">irregular</option>
+                </select>
+              </td>
+              <td style={{ whiteSpace: 'nowrap' }}>
                 <a href="#" onClick={(e) => { e.preventDefault(); copiarLink(a.codigo) }}>copiar link</a>
                 {' · '}<a href="#" onClick={(e) => { e.preventDefault(); alternarAtivo(a) }}>{a.usuario.ativo ? 'desativar' : 'ativar'}</a>
               </td>
             </tr>
           ))}
-          {afiliados.length === 0 && <tr><td colSpan={9} style={{ color: 'var(--ink-soft)' }}>Nenhum afiliado ainda.</td></tr>}
+          {afiliados.length === 0 && <tr><td colSpan={10} style={{ color: 'var(--ink-soft)' }}>Nenhum afiliado ainda.</td></tr>}
         </tbody>
       </table>
     </div>
@@ -497,6 +531,7 @@ function AfiliadosSection() {
 interface ComissaoAdmin {
   id: string; redeNome: string; cicloEm: string; valorBaseAssinatura: number; percentualComissao: number
   valorComissao: number; status: 'PENDENTE' | 'PAGA'; pagoEm: string | null; afiliadoCodigo: string; afiliadoNome: string
+  valorRetencaoFiscal: number | null; afiliadoStatusFiscal: 'EM_DIA' | 'IRREGULAR' | 'NAO_VERIFICADO'
 }
 
 function ComissoesAfiliadoSection() {
@@ -511,10 +546,18 @@ function ComissoesAfiliadoSection() {
   useEffect(() => { carregar() }, [filtro])
 
   async function marcarPaga(c: ComissaoAdmin) {
+    if (c.afiliadoStatusFiscal === 'IRREGULAR') {
+      if (!window.confirm(`⚠️ ${c.afiliadoNome} está marcado como IRREGULAR (saúde fiscal). Pagar mesmo assim?`)) return
+    }
     const obs = window.prompt(`Marcar a comissão de ${formataReal(c.valorComissao)} (${c.afiliadoNome}) como paga?\nObservação (opcional, ex.: comprovante/data do Pix):`)
     if (obs === null) return
+    const retStr = window.prompt('Reteve algum valor de IBS/CBS nesse repasse? Deixe vazio se não.')
+    if (retStr === null) return
     try {
-      await api.post(`/admin/afiliados/comissoes/${c.id}/pagar`, { observacaoPagamento: obs || undefined })
+      await api.post(`/admin/afiliados/comissoes/${c.id}/pagar`, {
+        observacaoPagamento: obs || undefined,
+        valorRetencaoFiscal: retStr.trim() ? Number(retStr.replace(',', '.')) : undefined,
+      })
       avisar('Comissão marcada como paga.')
       carregar()
     } catch (e) { avisar(mensagemDeErro(e), 'erro') }
@@ -534,21 +577,25 @@ function ComissoesAfiliadoSection() {
         </div>
       </div>
       <table>
-        <thead><tr><th>Afiliado</th><th>Rede</th><th>Ciclo</th><th>Base</th><th>%</th><th>Comissão</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Afiliado</th><th>Rede</th><th>Ciclo</th><th>Base</th><th>%</th><th>Comissão</th><th>Retenção fiscal</th><th>Status</th><th></th></tr></thead>
         <tbody>
           {comissoes.map((c) => (
             <tr key={c.id}>
-              <td>{c.afiliadoNome} <span style={{ color: 'var(--ink-soft)' }}>({c.afiliadoCodigo})</span></td>
+              <td>
+                {c.afiliadoNome} <span style={{ color: 'var(--ink-soft)' }}>({c.afiliadoCodigo})</span>
+                {c.afiliadoStatusFiscal === 'IRREGULAR' && <span title="Saúde fiscal irregular" style={{ marginLeft: 6 }}>⚠️</span>}
+              </td>
               <td>{c.redeNome}</td>
               <td>{fmtData(c.cicloEm)}</td>
               <td>{formataReal(c.valorBaseAssinatura)}</td>
               <td>{c.percentualComissao}%</td>
               <td><strong>{formataReal(c.valorComissao)}</strong></td>
+              <td>{c.valorRetencaoFiscal != null ? formataReal(c.valorRetencaoFiscal) : <span style={{ color: 'var(--ink-soft)' }}>—</span>}</td>
               <td><span className={`selo ${c.status === 'PAGA' ? 'ok' : 'ATACADO'}`}>{c.status}</span></td>
               <td>{c.status === 'PENDENTE' && <a href="#" onClick={(e) => { e.preventDefault(); marcarPaga(c) }}>marcar paga</a>}</td>
             </tr>
           ))}
-          {comissoes.length === 0 && <tr><td colSpan={8} style={{ color: 'var(--ink-soft)' }}>Nenhuma comissão aqui.</td></tr>}
+          {comissoes.length === 0 && <tr><td colSpan={9} style={{ color: 'var(--ink-soft)' }}>Nenhuma comissão aqui.</td></tr>}
         </tbody>
       </table>
     </div>

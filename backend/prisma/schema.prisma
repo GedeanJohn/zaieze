@@ -1031,8 +1031,18 @@ model Afiliado {
   aceiteTermosVersao String?
   aceiteTermosEm     DateTime?
   aceiteTermosIp     String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  // Enquadramento fiscal (autodeclarado pelo afiliado) — sinaliza a regra de retenção de IR/INSS
+  // por tipo de parceiro; a regra em si (quanto/quando reter) precisa ser validada com contador
+  // antes de virar automação — ver referências do Programa de Afiliados na memória do projeto.
+  taxStatus String? // PF | PJ | MEI
+  // Saúde fiscal do afiliado p/ compliance da Reforma Tributária (LC 214/2025): a plataforma pode
+  // ser corresponsabilizada pelo recolhimento de IBS/CBS se o parceiro não emitir nota ou estiver
+  // irregular. Hoje é um status MANUAL (o admin verifica e marca) — não há integração de NFS-e
+  // automática ainda (Focus NFe é um bloqueador futuro, não implementado).
+  statusFiscal             String    @default("NAO_VERIFICADO") // EM_DIA | IRREGULAR | NAO_VERIFICADO
+  statusFiscalVerificadoEm DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   usuario        Usuario            @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   redesIndicadas Rede[]
@@ -1057,6 +1067,10 @@ model ComissaoAfiliado {
   pagoEm              DateTime?
   pagoPorId           String? // id do SUPER_ADMIN que confirmou o repasse manual (Pix por fora)
   observacaoPagamento String?
+  // Retenção de IBS/CBS (Reforma Tributária, LC 214/2025) registrada no repasse — informativo,
+  // preenchido manualmente pelo admin quando aplicável. NÃO há cálculo automático de alíquota
+  // aqui (2026 é ano de teste; regra real precisa ser validada com contador antes de automatizar).
+  valorRetencaoFiscal Decimal?       @db.Decimal(12, 2)
   createdAt           DateTime       @default(now())
 
   afiliado Afiliado @relation(fields: [afiliadoId], references: [id], onDelete: Cascade)

@@ -30,6 +30,7 @@ export async function afiliadosRoutes(app: FastifyInstance) {
       link: `${env.TENANT_SCHEME}://${env.DOMINIO_BASE}/?ref=${afiliado.codigo}`,
       chavePixTipo: afiliado.chavePixTipo,
       chavePix: afiliado.chavePix,
+      taxStatus: afiliado.taxStatus,
       aceiteTermosVersao: afiliado.aceiteTermosVersao,
       termosVigentes: TERMOS_AFILIADO_VERSAO,
       aceitouVersaoVigente: afiliado.aceiteTermosVersao === TERMOS_AFILIADO_VERSAO,
@@ -44,6 +45,15 @@ export async function afiliadosRoutes(app: FastifyInstance) {
     const afiliado = await afiliadoDoUsuario(request.user.sub)
     const b = pixSchema.parse(request.body)
     return prisma.afiliado.update({ where: { id: afiliado.id }, data: { chavePixTipo: b.tipo, chavePix: b.chave } })
+  })
+
+  // Enquadramento fiscal (PF/PJ/MEI) — autodeclarado pelo próprio afiliado (só ele/contador sabe).
+  // Sinaliza a regra de retenção de IR/INSS; a regra em si é validada com contador antes de automatizar.
+  const fiscalSchema = z.object({ taxStatus: z.enum(['PF', 'PJ', 'MEI']) })
+  app.patch('/minha/fiscal', async (request) => {
+    const afiliado = await afiliadoDoUsuario(request.user.sub)
+    const b = fiscalSchema.parse(request.body)
+    return prisma.afiliado.update({ where: { id: afiliado.id }, data: { taxStatus: b.taxStatus } })
   })
 
   app.post('/minha/aceite-termos', async (request) => {

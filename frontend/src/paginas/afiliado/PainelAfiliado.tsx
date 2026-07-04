@@ -7,6 +7,7 @@ interface Perfil {
   link: string
   chavePixTipo: string | null
   chavePix: string | null
+  taxStatus: 'PF' | 'PJ' | 'MEI' | null
   aceiteTermosVersao: string | null
   termosVigentes: string
   aceitouVersaoVigente: boolean
@@ -29,13 +30,16 @@ export default function PainelAfiliado() {
   const [comissoes, setComissoes] = useState<Comissao[]>([])
   const [tipoPix, setTipoPix] = useState<'EMAIL' | 'CPF' | 'TELEFONE' | 'ALEATORIA'>('EMAIL')
   const [chavePix, setChavePix] = useState('')
+  const [taxStatus, setTaxStatus] = useState('')
   const [salvando, setSalvando] = useState(false)
+  const [salvandoFiscal, setSalvandoFiscal] = useState(false)
 
   function carregar() {
     api.get('/afiliados/minha').then(({ data }) => {
       setPerfil(data)
       setTipoPix(data.chavePixTipo ?? 'EMAIL')
       setChavePix(data.chavePix ?? '')
+      setTaxStatus(data.taxStatus ?? '')
     }).catch((e) => avisar(mensagemDeErro(e), 'erro'))
     api.get('/afiliados/minha/metricas').then(({ data }) => setMetricas(data)).catch(() => {})
     api.get('/afiliados/minha/comissoes').then(({ data }) => setComissoes(data.comissoes)).catch(() => {})
@@ -54,6 +58,15 @@ export default function PainelAfiliado() {
       avisar('Chave Pix salva.')
       carregar()
     } catch (e2) { avisar(mensagemDeErro(e2), 'erro') } finally { setSalvando(false) }
+  }
+
+  async function salvarFiscal(e: React.FormEvent) {
+    e.preventDefault(); setSalvandoFiscal(true)
+    try {
+      await api.patch('/afiliados/minha/fiscal', { taxStatus })
+      avisar('Enquadramento salvo.')
+      carregar()
+    } catch (e2) { avisar(mensagemDeErro(e2), 'erro') } finally { setSalvandoFiscal(false) }
   }
 
   async function aceitarTermos() {
@@ -173,6 +186,28 @@ export default function PainelAfiliado() {
               </div>
               <div className="acoes">
                 <button className="btn" disabled={salvando}>Salvar</button>
+              </div>
+            </form>
+          )}
+
+          {aba === 'pix' && (
+            <form className="cartao" onSubmit={salvarFiscal}>
+              <h2 style={{ marginTop: 0 }}>Enquadramento fiscal</h2>
+              <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
+                Informe se você recebe como pessoa física, PJ ou MEI — isso ajuda a definir a retenção
+                de imposto (se aplicável) na hora do repasse. Consulte seu contador em caso de dúvida.
+              </p>
+              <div className="campo" style={{ maxWidth: 220 }}>
+                <label>Enquadramento</label>
+                <select value={taxStatus} onChange={(e) => setTaxStatus(e.target.value)} required>
+                  <option value="" disabled>Selecione</option>
+                  <option value="PF">Pessoa física</option>
+                  <option value="PJ">PJ</option>
+                  <option value="MEI">MEI</option>
+                </select>
+              </div>
+              <div className="acoes">
+                <button className="btn" disabled={salvandoFiscal}>Salvar</button>
               </div>
             </form>
           )}

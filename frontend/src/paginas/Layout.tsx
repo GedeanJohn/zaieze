@@ -83,7 +83,7 @@ export default function Layout() {
         {podeVendasClientes && <NavLink to="/vendas" className={cls}><ShoppingBag {...ICON} /><span>Vendas</span></NavLink>}
         {podeVendasClientes && <NavLink to="/clientes" className={cls}><Users {...ICON} /><span>Clientes</span></NavLink>}
         {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/caixa" className={cls}><Inbox {...ICON} /><span>Chat Zaieze</span></NavLink>}
-        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/campanhas" className={cls}><MessageCircle {...ICON} /><span>WhatsApp</span></NavLink>}
+        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/campanhas" className={cls}><MessageCircle {...ICON} /><span>Campanhas</span></NavLink>}
         {podeVendasClientes && temFeature('funil') && <NavLink to="/funil" className={cls}><Filter {...ICON} /><span>Funil de vendas</span></NavLink>}
         {podeVendasClientes && temFeature('radar') && <NavLink to="/radar" className={cls}><Radar {...ICON} /><span>Radar</span></NavLink>}
         {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/ranking" className={cls}><Trophy {...ICON} /><span>Ranking</span></NavLink>}

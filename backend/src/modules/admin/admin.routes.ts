@@ -8,6 +8,7 @@ import { cancelarPreapproval, mpConfigurado } from '../assinaturas/mercadopago.s
 import { excluirDoR2 } from '../midia/r2.service'
 import { removerUploadLocal } from '../midia/limpeza.service'
 import { gerarSenhaProvisoria } from '../auth/senha-provisoria'
+import { criarAfiliado } from '../afiliados/afiliado.service'
 
 const num = (v: unknown) => Number(v ?? 0)
 
@@ -249,5 +250,120 @@ export async function adminRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     await prisma.codigoPromocional.delete({ where: { id } })
     return { ok: true }
+  })
+
+  // ── Programa de Afiliados ──
+  app.get('/afiliados', async () => {
+    const afiliados = await prisma.afiliado.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        usuario: { select: { id: true, nome: true, email: true, telefone: true, ativo: true } },
+        _count: { select: { redesIndicadas: true } },
+      },
+    })
+    const somas = await prisma.comissaoAfiliado.groupBy({
+      by: ['afiliadoId', 'status'],
+      _sum: { valorComissao: true },
+    })
+    return {
+      afiliados: afiliados.map((a) => {
+        const pendente = somas.find((s) => s.afiliadoId === a.id && s.status === 'PENDENTE')?._sum.valorComissao
+        const paga = somas.find((s) => s.afiliadoId === a.id && s.status === 'PAGA')?._sum.valorComissao
+        return {
+          id: a.id, codigo: a.codigo, percentualComissao: a.percentualComissao ? num(a.percentualComissao) : null,
+          cliques: a.cliques, redesIndicadas: a._count.redesIndicadas,
+          pendente: num(pendente), paga: num(paga),
+          usuario: a.usuario,
+        }
+      }),
+    }
+  })
+
+  const criarAfiliadoSchema = z.object({
+    nome: z.string().min(2),
+    email: z.string().email(),
+    telefone: z.string().trim().optional(),
+    percentualComissao: z.coerce.number().positive().max(100).optional(),
+  })
+  app.post('/afiliados', async (request, reply) => {
+    const b = criarAfiliadoSchema.parse(request.body)
+    const { afiliado, senha } = await criarAfiliado(b)
+    return reply.code(201).send({ afiliado, senha })
+  })
+
+  const editarAfiliadoSchema = z.object({
+    nome: z.string().min(2).optional(),
+    telefone: z.string().trim().nullable().optional(),
+    percentualComissao: z.coerce.number().positive().max(100).nullable().optional(),
+    ativo: z.boolean().optional(),
+  })
+  app.patch('/afiliados/:id', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const b = editarAfiliadoSchema.parse(request.body)
+    const afiliado = await prisma.afiliado.findUnique({ where: { id } })
+    if (!afiliado) return reply.code(404).send({ erro: 'Afiliado não encontrado' })
+
+    await prisma.$transaction([
+      prisma.afiliado.update({
+        where: { id },
+        data: { ...(b.percentualComissao !== undefined ? { percentualComissao: b.percentualComissao } : {}) },
+      }),
+      prisma.usuario.update({
+        where: { id: afiliado.usuarioId },
+        data: {
+          ...(b.nome !== undefined ? { nome: b.nome } : {}),
+          ...(b.telefone !== undefined ? { telefone: b.telefone } : {}),
+          ...(b.ativo !== undefined ? { ativo: b.ativo } : {}),
+        },
+      }),
+    ])
+    return { ok: true }
+  })
+
+  app.get('/afiliados/config', async () => {
+    const config = await prisma.configAfiliados.upsert({
+      where: { id: 1 }, create: { id: 1 }, update: {},
+    })
+    return { percentualPadrao: num(config.percentualPadrao) }
+  })
+  app.put('/afiliados/config', async (request) => {
+    const { percentualPadrao } = z.object({ percentualPadrao: z.coerce.number().positive().max(100) }).parse(request.body)
+    const config = await prisma.configAfiliados.upsert({
+      where: { id: 1 }, create: { id: 1, percentualPadrao }, update: { percentualPadrao },
+    })
+    return { percentualPadrao: num(config.percentualPadrao) }
+  })
+
+  app.get('/afiliados/comissoes', async (request) => {
+    const { status, afiliadoId } = request.query as { status?: string; afiliadoId?: string }
+    const comissoes = await prisma.comissaoAfiliado.findMany({
+      where: {
+        ...(status === 'PENDENTE' || status === 'PAGA' ? { status } : {}),
+        ...(afiliadoId ? { afiliadoId } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 300,
+      include: { afiliado: { select: { codigo: true, usuario: { select: { nome: true } } } } },
+    })
+    return {
+      comissoes: comissoes.map((c) => ({
+        id: c.id, redeNome: c.redeNome, cicloEm: c.cicloEm,
+        valorBaseAssinatura: num(c.valorBaseAssinatura), percentualComissao: num(c.percentualComissao),
+        valorComissao: num(c.valorComissao), status: c.status, pagoEm: c.pagoEm,
+        afiliadoCodigo: c.afiliado.codigo, afiliadoNome: c.afiliado.usuario.nome,
+      })),
+    }
+  })
+
+  app.post('/afiliados/comissoes/:id/pagar', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const { observacaoPagamento } = z.object({ observacaoPagamento: z.string().max(300).optional() }).parse(request.body ?? {})
+    const comissao = await prisma.comissaoAfiliado.findUnique({ where: { id } })
+    if (!comissao) return reply.code(404).send({ erro: 'Comissão não encontrada' })
+    if (comissao.status === 'PAGA') return reply.code(422).send({ erro: 'Esta comissão já está marcada como paga.' })
+    return prisma.comissaoAfiliado.update({
+      where: { id },
+      data: { status: 'PAGA', pagoEm: new Date(), pagoPorId: request.user.sub, observacaoPagamento: observacaoPagamento ?? null },
+    })
   })
 }

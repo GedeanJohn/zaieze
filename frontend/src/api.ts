@@ -20,7 +20,7 @@ api.interceptors.response.use(
   },
 )
 
-export type Papel = 'SUPER_ADMIN' | 'GESTOR' | 'ESTOQUISTA' | 'GERENTE' | 'VENDEDORA' | 'CLIENTE'
+export type Papel = 'SUPER_ADMIN' | 'GESTOR' | 'ESTOQUISTA' | 'GERENTE' | 'VENDEDORA' | 'CLIENTE' | 'AFILIADO'
 
 export interface Usuario {
   id: string
@@ -53,6 +53,7 @@ export const rotuloPapel: Record<Papel, string> = {
   GERENTE: 'Gerente de Loja',
   VENDEDORA: 'Vendedora',
   CLIENTE: 'Cliente',
+  AFILIADO: 'Afiliado',
 }
 
 export const rotuloMovimento: Record<string, string> = {

@@ -94,6 +94,10 @@ export default function Admin() {
       {/* ── Códigos promocionais ── */}
       <PromoSection promos={promos} onChange={carregar} />
 
+      {/* ── Programa de Afiliados ── */}
+      <AfiliadosSection />
+      <ComissoesAfiliadoSection />
+
       {/* ── Redes (clientes) ── */}
       <div className="cartao">
         <h2 style={{ marginTop: 0 }}>🏢 Redes (clientes) · {redes.length}</h2>
@@ -372,6 +376,179 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
             </tr>
           ))}
           {promos.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--ink-soft)' }}>Nenhum código ainda.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Programa de Afiliados ──
+interface AfiliadoAdmin {
+  id: string; codigo: string; percentualComissao: number | null; cliques: number; redesIndicadas: number
+  pendente: number; paga: number
+  usuario: { id: string; nome: string; email: string; telefone: string | null; ativo: boolean }
+}
+
+function AfiliadosSection() {
+  const [afiliados, setAfiliados] = useState<AfiliadoAdmin[]>([])
+  const [percentualPadrao, setPercentualPadrao] = useState('10')
+  const [nome, setNome] = useState('')
+  const [email, setEmail] = useState('')
+  const [telefone, setTelefone] = useState('')
+  const [percentual, setPercentual] = useState('')
+  const [erro, setErro] = useState('')
+  const [ocupado, setOcupado] = useState(false)
+  const [gerado, setGerado] = useState<{ nome: string; codigo: string; senha: string } | null>(null)
+
+  function carregar() {
+    api.get('/admin/afiliados').then(({ data }) => setAfiliados(data.afiliados)).catch(() => {})
+    api.get('/admin/afiliados/config').then(({ data }) => setPercentualPadrao(String(data.percentualPadrao))).catch(() => {})
+  }
+  useEffect(() => { carregar() }, [])
+
+  async function criar(e: React.FormEvent) {
+    e.preventDefault(); setErro(''); setOcupado(true)
+    try {
+      const { data } = await api.post('/admin/afiliados', {
+        nome, email, telefone: telefone || undefined,
+        percentualComissao: percentual ? Number(percentual) : undefined,
+      })
+      setGerado({ nome, codigo: data.afiliado.codigo, senha: data.senha })
+      setNome(''); setEmail(''); setTelefone(''); setPercentual('')
+      carregar()
+    } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setOcupado(false) }
+  }
+
+  async function alternarAtivo(a: AfiliadoAdmin) {
+    await api.patch(`/admin/afiliados/${a.id}`, { ativo: !a.usuario.ativo }).catch(() => {})
+    carregar()
+  }
+
+  async function salvarPercentualPadrao() {
+    setOcupado(true)
+    try {
+      await api.put('/admin/afiliados/config', { percentualPadrao: Number(percentualPadrao) })
+    } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
+  }
+
+  function copiarLink(codigo: string) {
+    const url = `https://zaieze.com/?ref=${codigo}`
+    navigator.clipboard?.writeText(url).catch(() => {})
+    window.alert(`Link do afiliado copiado:\n${url}`)
+  }
+
+  return (
+    <div className="cartao">
+      <h2 style={{ marginTop: 0 }}>🤝 Programa de Afiliados</h2>
+      <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
+        Comissão <strong>vitalícia</strong> sobre o valor recorrente das assinaturas vendidas pelo link do afiliado.
+        O repasse é <strong>manual</strong> (Pix por fora, marcado como pago aqui) — o Mercado Pago não tem split
+        automático para esse tipo de assinatura.
+      </div>
+
+      <div className="linha-campos" style={{ alignItems: 'end', marginBottom: 14 }}>
+        <div className="campo" style={{ maxWidth: 160 }}>
+          <label>% padrão de comissão</label>
+          <input type="number" min="0" max="100" step="0.01" value={percentualPadrao} onChange={(e) => setPercentualPadrao(e.target.value)} />
+        </div>
+        <div><button type="button" className="btn secundario" onClick={salvarPercentualPadrao} disabled={ocupado}>Salvar %</button></div>
+      </div>
+
+      <form onSubmit={criar} className="linha-campos" style={{ alignItems: 'end' }}>
+        <div className="campo"><label>Nome</label><input value={nome} onChange={(e) => setNome(e.target.value)} required /></div>
+        <div className="campo"><label>E-mail</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
+        <div className="campo"><label>Telefone (opcional)</label><input value={telefone} onChange={(e) => setTelefone(e.target.value)} /></div>
+        <div className="campo" style={{ maxWidth: 160 }}><label>% (opcional, senão usa o padrão)</label><input type="number" min="0" max="100" step="0.01" value={percentual} onChange={(e) => setPercentual(e.target.value)} /></div>
+        <div><button className="btn" disabled={ocupado}>Criar afiliado</button></div>
+      </form>
+      {erro && <div className="alerta" style={{ marginTop: 8 }}>{erro}</div>}
+      {gerado && (
+        <div className="sucesso" style={{ marginTop: 10 }}>
+          Afiliado <strong>{gerado.nome}</strong> criado — código <strong>{gerado.codigo}</strong>, senha provisória <strong>{gerado.senha}</strong>. Copie e envie a ele.
+        </div>
+      )}
+
+      <table style={{ marginTop: 12 }}>
+        <thead><tr><th>Nome</th><th>Código</th><th>%</th><th>Cliques</th><th>Redes</th><th>Pendente</th><th>Pago</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          {afiliados.map((a) => (
+            <tr key={a.id} style={{ opacity: a.usuario.ativo ? 1 : 0.5 }}>
+              <td>{a.usuario.nome}</td>
+              <td><strong>{a.codigo}</strong></td>
+              <td>{a.percentualComissao != null ? `${a.percentualComissao}%` : <span style={{ color: 'var(--ink-soft)' }}>padrão</span>}</td>
+              <td>{a.cliques}</td>
+              <td>{a.redesIndicadas}</td>
+              <td>{formataReal(a.pendente)}</td>
+              <td>{formataReal(a.paga)}</td>
+              <td><span className={`selo ${a.usuario.ativo ? 'ok' : 'baixo'}`}>{a.usuario.ativo ? 'ativo' : 'inativo'}</span></td>
+              <td style={{ whiteSpace: 'nowrap' }}>
+                <a href="#" onClick={(e) => { e.preventDefault(); copiarLink(a.codigo) }}>copiar link</a>
+                {' · '}<a href="#" onClick={(e) => { e.preventDefault(); alternarAtivo(a) }}>{a.usuario.ativo ? 'desativar' : 'ativar'}</a>
+              </td>
+            </tr>
+          ))}
+          {afiliados.length === 0 && <tr><td colSpan={9} style={{ color: 'var(--ink-soft)' }}>Nenhum afiliado ainda.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+interface ComissaoAdmin {
+  id: string; redeNome: string; cicloEm: string; valorBaseAssinatura: number; percentualComissao: number
+  valorComissao: number; status: 'PENDENTE' | 'PAGA'; pagoEm: string | null; afiliadoCodigo: string; afiliadoNome: string
+}
+
+function ComissoesAfiliadoSection() {
+  const [comissoes, setComissoes] = useState<ComissaoAdmin[]>([])
+  const [filtro, setFiltro] = useState<'' | 'PENDENTE' | 'PAGA'>('PENDENTE')
+  const avisar = useToast()
+
+  function carregar() {
+    api.get('/admin/afiliados/comissoes', { params: filtro ? { status: filtro } : {} })
+      .then(({ data }) => setComissoes(data.comissoes)).catch(() => {})
+  }
+  useEffect(() => { carregar() }, [filtro])
+
+  async function marcarPaga(c: ComissaoAdmin) {
+    const obs = window.prompt(`Marcar a comissão de ${formataReal(c.valorComissao)} (${c.afiliadoNome}) como paga?\nObservação (opcional, ex.: comprovante/data do Pix):`)
+    if (obs === null) return
+    try {
+      await api.post(`/admin/afiliados/comissoes/${c.id}/pagar`, { observacaoPagamento: obs || undefined })
+      avisar('Comissão marcada como paga.')
+      carregar()
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') }
+  }
+
+  return (
+    <div className="cartao">
+      <h2 style={{ marginTop: 0 }}>💸 Comissões de afiliados</h2>
+      <div className="linha-campos" style={{ marginBottom: 10 }}>
+        <div className="campo" style={{ maxWidth: 200 }}>
+          <label>Status</label>
+          <select value={filtro} onChange={(e) => setFiltro(e.target.value as typeof filtro)}>
+            <option value="PENDENTE">Pendentes</option>
+            <option value="PAGA">Pagas</option>
+            <option value="">Todas</option>
+          </select>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Afiliado</th><th>Rede</th><th>Ciclo</th><th>Base</th><th>%</th><th>Comissão</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          {comissoes.map((c) => (
+            <tr key={c.id}>
+              <td>{c.afiliadoNome} <span style={{ color: 'var(--ink-soft)' }}>({c.afiliadoCodigo})</span></td>
+              <td>{c.redeNome}</td>
+              <td>{fmtData(c.cicloEm)}</td>
+              <td>{formataReal(c.valorBaseAssinatura)}</td>
+              <td>{c.percentualComissao}%</td>
+              <td><strong>{formataReal(c.valorComissao)}</strong></td>
+              <td><span className={`selo ${c.status === 'PAGA' ? 'ok' : 'ATACADO'}`}>{c.status}</span></td>
+              <td>{c.status === 'PENDENTE' && <a href="#" onClick={(e) => { e.preventDefault(); marcarPaga(c) }}>marcar paga</a>}</td>
+            </tr>
+          ))}
+          {comissoes.length === 0 && <tr><td colSpan={8} style={{ color: 'var(--ink-soft)' }}>Nenhuma comissão aqui.</td></tr>}
         </tbody>
       </table>
     </div>

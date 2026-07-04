@@ -41,6 +41,7 @@ import { marcaRoutes } from './modules/marca/marca.routes'
 import { leadsRoutes } from './modules/leads/leads.routes'
 import { catalogoRoutes } from './modules/catalogo/catalogo.routes'
 import { midiaRoutes } from './modules/midia/midia.routes'
+import { afiliadosRoutes } from './modules/afiliados/afiliados.routes'
 
 export async function buildApp() {
   // trustProxy: lê o IP real do cliente via X-Forwarded-For (atrás do nginx) — necessário p/ rate limit por IP
@@ -114,6 +115,7 @@ export async function buildApp() {
   await app.register(leadsRoutes, { prefix: '/api/leads' })
   await app.register(catalogoRoutes, { prefix: '/api/catalogo' })
   await app.register(midiaRoutes, { prefix: '/api/midia' })
+  await app.register(afiliadosRoutes, { prefix: '/api/afiliados' })
 
   return app
 }

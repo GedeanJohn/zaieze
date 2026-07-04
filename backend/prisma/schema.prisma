@@ -32,6 +32,12 @@ enum Role {
   GERENTE // gerencia uma loja: constrói equipes e vendedoras
   VENDEDORA // atende a própria carteira; vê só o próprio relatório
   CLIENTE // portal do cliente (fase 7)
+  AFILIADO // parceiro comercial: renda recorrente por indicação, sem rede/loja
+}
+
+enum StatusComissao {
+  PENDENTE // ciclo confirmado, aguardando repasse manual (Pix) pelo admin
+  PAGA
 }
 
 enum SegmentoCliente {
@@ -193,6 +199,9 @@ model Rede {
   // A meta da vendedora é derivada: meta da loja ÷ nº de vendedoras ativas da loja.
   metaMensal               Decimal? @db.Decimal(12, 2)
   metaModo                 String   @default("IGUAL") // IGUAL | MANUAL
+  // Programa de Afiliados: qual afiliado indicou esta rede (se veio por um link ?ref=).
+  // Base do cálculo de comissão vitalícia — gravado no ato do checkout, não muda depois.
+  afiliadoId               String?
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
@@ -207,6 +216,7 @@ model Rede {
   marcas     Marca[]
   campanhasModelo CampanhaModelo[]
   aceitesContrato AceiteContrato[]
+  afiliadoOrigem Afiliado? @relation(fields: [afiliadoId], references: [id], onDelete: SetNull)
 
   @@map("redes")
 }
@@ -427,6 +437,7 @@ model Usuario {
   leads             Lead[]             @relation("LeadsVendedora")
   gruposTransmissao GrupoTransmissao[] @relation("GruposVendedora")
   solicitacoesSenha SolicitacaoSenha[]
+  afiliado          Afiliado?
 
   @@unique([lojaId, slugCatalogo])
   @@index([lojaId, role])
@@ -1001,4 +1012,65 @@ model PostMural {
 
   @@index([lojaId, createdAt])
   @@map("posts_mural")
+}
+
+// ─────────────────────────── Programa de Afiliados ───────────────────────────
+// Parceiro comercial (renda recorrente por indicação). Não pertence a nenhuma Rede/Loja —
+// mesmo padrão do SUPER_ADMIN: existe só no nível da plataforma. O repasse da comissão é
+// MANUAL (Pix por fora, sem integração com o Mercado Pago) — ver ComissaoAfiliado.
+
+/// Perfil de Afiliado — 1:1 com Usuario(role=AFILIADO).
+model Afiliado {
+  id                 String    @id @default(cuid())
+  usuarioId          String    @unique
+  codigo             String    @unique // código de indicação, usado no link ?ref=<codigo>
+  percentualComissao Decimal?  @db.Decimal(5, 2) // null = usa ConfigAfiliados.percentualPadrao
+  chavePixTipo       String? // EMAIL | CPF | TELEFONE | ALEATORIA
+  chavePix           String?
+  cliques            Int       @default(0) // contador de cliques no link (não deduplicado por visitante)
+  aceiteTermosVersao String?
+  aceiteTermosEm     DateTime?
+  aceiteTermosIp     String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  usuario        Usuario            @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  redesIndicadas Rede[]
+  comissoes      ComissaoAfiliado[]
+
+  @@map("afiliados")
+}
+
+/// Comissão por CICLO PAGO — registro persistido e auditável (dinheiro real a repassar),
+/// gerado a cada ciclo confirmado da assinatura da rede indicada. Comissão vitalícia:
+/// enquanto a rede continuar pagando, todo ciclo gera uma linha nova aqui.
+model ComissaoAfiliado {
+  id                  String         @id @default(cuid())
+  afiliadoId          String
+  redeId              String // rede (cliente indicado) que gerou este ciclo pago
+  redeNome            String // snapshot do nome da marca (sobrevive se a rede for excluída depois)
+  cicloEm             DateTime // chave de idempotência: cicloFimEm vigente ANTES da confirmação
+  valorBaseAssinatura Decimal        @db.Decimal(12, 2)
+  percentualComissao  Decimal        @db.Decimal(5, 2) // snapshot do % efetivo no momento
+  valorComissao       Decimal        @db.Decimal(12, 2)
+  status              StatusComissao @default(PENDENTE)
+  pagoEm              DateTime?
+  pagoPorId           String? // id do SUPER_ADMIN que confirmou o repasse manual (Pix por fora)
+  observacaoPagamento String?
+  createdAt           DateTime       @default(now())
+
+  afiliado Afiliado @relation(fields: [afiliadoId], references: [id], onDelete: Cascade)
+
+  @@unique([redeId, cicloEm])
+  @@index([afiliadoId, status])
+  @@map("comissoes_afiliado")
+}
+
+/// Percentual padrão de comissão (editável pelo SUPER_ADMIN, sem deploy). Uma linha só (id=1).
+model ConfigAfiliados {
+  id               Int      @id @default(1)
+  percentualPadrao Decimal  @default(10) @db.Decimal(5, 2)
+  updatedAt        DateTime @updatedAt
+
+  @@map("config_afiliados")
 }

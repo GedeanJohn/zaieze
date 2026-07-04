@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api, formataReal, rotuloFeature, FEATURE_MIN, type Plano } from '../../api'
 import AgenteZaieze from './AgenteZaieze'
 import { useMetaTags } from '../../lib/useMetaTags'
+import { capturarRefAfiliado } from '../../lib/afiliado'
 
 interface PlanoCatalogo {
   plano: Plano
@@ -43,6 +44,8 @@ export default function Landing() {
   useEffect(() => {
     api.get('/assinaturas/planos').then(({ data }) => setPlanos(data.planos)).catch(() => {})
   }, [])
+
+  useEffect(() => { capturarRefAfiliado() }, [])
 
   return (
     <div className="site">

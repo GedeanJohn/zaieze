@@ -60,8 +60,8 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     // Isolamento por subdomínio (wildcard): a conta só entra no seu próprio tenant.
-    // SUPER_ADMIN (operador do SaaS) acessa de qualquer endereço.
-    if (body.redeSlug && usuario.role !== 'SUPER_ADMIN' && rede?.slug !== body.redeSlug) {
+    // SUPER_ADMIN (operador do SaaS) e AFILIADO (sem rede — acessa por /painel) acessam de qualquer endereço.
+    if (body.redeSlug && usuario.role !== 'SUPER_ADMIN' && usuario.role !== 'AFILIADO' && rede?.slug !== body.redeSlug) {
       return reply.code(403).send({ erro: 'Esta conta não pertence a este endereço.' })
     }
 

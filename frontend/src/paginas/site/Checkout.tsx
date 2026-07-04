@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, formataReal, mensagemDeErro, type Plano } from '../../api'
+import { capturarRefAfiliado, refAfiliadoAtivo } from '../../lib/afiliado'
 
 const NOME: Record<Plano, string> = { START: 'Start', PRO: 'Pro', ELITE: 'Elite' }
 
@@ -31,6 +32,7 @@ export default function Checkout() {
   useEffect(() => {
     api.get('/assinaturas/planos').then(({ data }) => { setDominio(data.dominioBase); setPlanos(data.planos) }).catch(() => {})
     api.get('/contrato/termos').then(({ data }) => setContrato(data.contrato)).catch(() => {})
+    capturarRefAfiliado()
   }, [])
 
   const info = planos.find((p) => p.plano === plano)
@@ -89,6 +91,7 @@ export default function Checkout() {
       const { data } = await api.post('/assinaturas/checkout', {
         plano, ...form, slug: form.slug.toLowerCase(),
         codigoPromo: codigoPromo.trim() || undefined,
+        refAfiliado: refAfiliadoAtivo(),
       })
       if (data.simulado) navigate(`/sucesso?slug=${data.slug}&plano=${plano}&simulado=1`)
       else if (data.initPoint) window.location.href = data.initPoint

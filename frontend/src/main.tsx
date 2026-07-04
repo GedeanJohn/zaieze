@@ -29,6 +29,7 @@ import Contrato from './paginas/Contrato'
 import Admin from './paginas/Admin'
 import WhatsAppOficial from './paginas/WhatsApp'
 import InstagramOficial from './paginas/Instagram'
+import PainelAfiliado from './paginas/afiliado/PainelAfiliado'
 import Conta from './paginas/Conta'
 import Convite from './paginas/Convite'
 import Pedido from './paginas/Pedido'
@@ -43,6 +44,11 @@ import PoliticaPrivacidade from './paginas/site/PoliticaPrivacidade'
 
 function Protegida({ children }: { children: React.ReactElement }) {
   return usuarioLogado() ? children : <Navigate to="/login" replace />
+}
+
+// AFILIADO não pertence a nenhuma Rede/Loja — tem um painel próprio, sem o shell/menu do CRM.
+function Raiz() {
+  return usuarioLogado()?.role === 'AFILIADO' ? <PainelAfiliado /> : <Layout />
 }
 
 // Site público (www.zaieze.com / zaieze.com): landing comercial + checkout
@@ -70,7 +76,7 @@ function CrmApp() {
       <Route path="/pedido/:id" element={<Protegida><Pedido /></Protegida>} />
       {/* Comprovante público do pedido (sem login): link enviado ao cliente */}
       <Route path="/pedido/publico/:token" element={<Pedido />} />
-      <Route path="/" element={<Protegida><Layout /></Protegida>}>
+      <Route path="/" element={<Protegida><Raiz /></Protegida>}>
         <Route index element={<Dashboard />} />
         <Route path="vendas" element={<Vendas />} />
         <Route path="estoque" element={<Estoque />} />

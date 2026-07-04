@@ -5,12 +5,13 @@ import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
 import { redeIdDe } from '../../plugins/auth'
 import { consultarPreapproval, criarPreapproval, mpConfigurado } from './mercadopago.service'
-import { confirmarCiclo, proximoCicloFim, reativarAssinatura, solicitarCancelamento } from './assinatura.service'
+import { proximoCicloFim, reativarAssinatura, solicitarCancelamento } from './assinatura.service'
 import { listarPlanos, precoDoPlano } from '../planos/planos.service'
 import { consumirCodigo, descricaoBeneficio, validarCodigo } from '../promo/promo.service'
 import { CONTRATO_VERSAO } from '../contrato/contrato.template'
 import { temAceiteVigente } from '../contrato/contrato.service'
 import { normalizarTelefone } from '../../lib/telefone'
+import { confirmarCicloEComissionar, gerarComissaoDoCiclo, normalizarCodigo as normalizarCodigoAfiliado } from '../afiliados/afiliado.service'
 
 const arred2 = (n: number) => Math.round(n * 100) / 100
 
@@ -24,6 +25,8 @@ const checkoutSchema = z.object({
   email: z.string().email(),
   senha: z.string().min(6),
   codigoPromo: z.string().optional(),
+  // Programa de Afiliados: código do link de indicação (?ref=), capturado pela landing/checkout.
+  refAfiliado: z.string().trim().optional(),
 })
 
 // Subdomínios que não podem virar slug de tenant (colidem com o SaaS)
@@ -84,6 +87,15 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     }
     const diasGratis = promo?.tipo === 'DIAS_GRATIS' ? promo.dias ?? 0 : 0
 
+    // Programa de Afiliados: vincula a rede ao afiliado do link (?ref=), se o código existir e o
+    // afiliado estiver ativo. Gravado no ato — base do cálculo de comissão vitalícia.
+    const afiliado = body.refAfiliado
+      ? await prisma.afiliado.findFirst({
+          where: { codigo: normalizarCodigoAfiliado(body.refAfiliado), usuario: { ativo: true } },
+          select: { id: true },
+        })
+      : null
+
     const senhaHash = await bcrypt.hash(body.senha, 10)
     const simulada = !mpConfigurado()
     // 100% de desconto (valor zerado) → não há o que cobrar: ativa na hora, SEM passar pelo
@@ -99,11 +111,14 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     // Data da 1ª cobrança quando há período grátis (free trial). Sem dias grátis, a
     // cobrança é no ato (null = não há aviso de "1ª cobrança a caminho").
     const primeiraCobrancaEm = diasGratis ? (() => { const d = new Date(); d.setDate(d.getDate() + diasGratis); return d })() : null
+    // Calculado uma única vez (fora da transação) e reaproveitado como cicloEm da comissão do
+    // afiliado abaixo — evita qualquer drift entre o valor gravado e o usado no cálculo.
+    const cicloFimEmInicial = semCobranca ? inicioCiclo() : null
 
     // Provisiona o tenant. Em modo simulado já nasce ATIVO; em modo real fica inativo
     // até o webhook de pagamento aprovado liberar o acesso.
     const rede = await prisma.$transaction(async (tx) => {
-      const r = await tx.rede.create({ data: { nome: body.redeNome, slug, plano, ativo: semCobranca } })
+      const r = await tx.rede.create({ data: { nome: body.redeNome, slug, plano, ativo: semCobranca, afiliadoId: afiliado?.id ?? null } })
       await tx.usuario.create({
         data: { redeId: r.id, nome: body.gestorNome, email, senhaHash, role: 'GESTOR', telefone: body.telefone },
       })
@@ -123,7 +138,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
           redeId: r.id, plano, valor, simulada: semCobranca,
           status: semCobranca ? 'ATIVA' : 'PENDENTE',
           // sem cobrança (simulado ou 100% off) já entra com ciclo; no modo pago o ciclo começa no webhook
-          cicloFimEm: semCobranca ? inicioCiclo() : null,
+          cicloFimEm: cicloFimEmInicial,
           primeiraCobrancaEm,
         },
       })
@@ -132,6 +147,11 @@ export async function assinaturasRoutes(app: FastifyInstance) {
 
     if (semCobranca) {
       if (promo) await consumirCodigo(promo.id)
+      // Ativação instantânea (simulado/100% off) não passa pelo webhook — gera a comissão do
+      // 1º ciclo aqui, direto (se houver afiliado de origem e valor a comissionar).
+      if (afiliado && valor > 0) {
+        await gerarComissaoDoCiclo({ redeId: rede.id, cicloEm: cicloFimEmInicial ?? new Date(), valorBaseAssinatura: valor })
+      }
       return reply.code(201).send({
         simulado: true,
         plano,
@@ -180,7 +200,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     // NÃO confia na notificação: consulta o status real no Mercado Pago
     const status = await consultarPreapproval(id)
     if (status === 'authorized') {
-      await confirmarCiclo(assinatura.redeId) // ativa/renova + estende o ciclo +1 mês
+      await confirmarCicloEComissionar(assinatura.redeId) // ativa/renova + estende o ciclo +1 mês + comissão do afiliado
     } else if (status === 'cancelled' || status === 'paused') {
       // mesmo vindo do MP: cancela por FIM DE CICLO (mantém acesso até o ciclo pago vencer)
       await solicitarCancelamento(assinatura.redeId, 'MERCADO_PAGO')
@@ -281,7 +301,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
 
     // Modo simulado: reativa direto (equivale ao webhook de pagamento aprovado).
     if (!mpConfigurado()) {
-      await confirmarCiclo(redeId)
+      await confirmarCicloEComissionar(redeId)
       return { simulado: true, redirect: `${urlTenant(rede.slug)}/login` }
     }
 
@@ -307,7 +327,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     const { slug } = request.params as { slug: string }
     const rede = await prisma.rede.findUnique({ where: { slug }, include: { assinatura: true } })
     if (!rede?.assinatura) return reply.code(404).send({ erro: 'Assinatura não encontrada' })
-    await confirmarCiclo(rede.id)
+    await confirmarCicloEComissionar(rede.id)
     return { ok: true, redirect: `${urlTenant(slug)}/login` }
   })
 }

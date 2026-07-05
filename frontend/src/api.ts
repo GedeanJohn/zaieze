@@ -28,6 +28,7 @@ export interface Usuario {
   email: string
   role: Papel
   fotoUrl?: string | null
+  idioma?: string
   rede: { id: string; nome: string; plano: string } | null
   loja: { id: string; nome: string; slug: string } | null
 }

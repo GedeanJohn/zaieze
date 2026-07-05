@@ -436,6 +436,9 @@ model Usuario {
   // Número pessoal de contato da vendedora (deep link wa.me no handoff "Falar com a vendedora").
   // NÃO é mais uma instância de envio: o envio oficial é pelo número da MARCA (Rede.wa*).
   waNumero       String?
+  // Idioma preferencial da interface (pt | en | es). Escolhido no cadastro (checkout do GESTOR)
+  // e editável depois em "Minha conta". Só afeta a UI — não traduz dados do usuário/catálogo.
+  idioma         String   @default("pt")
   ativo          Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

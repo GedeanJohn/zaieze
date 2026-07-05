@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, mensagemDeErro, usuarioLogado, atualizarUsuarioLocal } from '../api'
 import { useToast } from '../componentes/Toast'
+import { useIdioma, type Idioma } from '../lib/i18n'
 
 /** Iniciais do nome para o avatar. */
 function iniciais(nome: string): string {
@@ -17,6 +18,18 @@ export default function Conta() {
   const [senha, setSenha] = useState('')
   const avisar = useToast()
   const [salvando, setSalvando] = useState(false)
+  const { idioma, setIdioma } = useIdioma()
+  const [salvandoIdioma, setSalvandoIdioma] = useState(false)
+
+  async function salvarIdioma(novo: Idioma) {
+    setSalvandoIdioma(true)
+    try {
+      await api.patch('/usuarios/me', { idioma: novo })
+      setIdioma(novo)
+      atualizarUsuarioLocal({ idioma: novo })
+      avisar('Idioma atualizado.')
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') } finally { setSalvandoIdioma(false) }
+  }
 
   // Bio do catálogo (só a vendedora tem loja pública). Carrega o valor atual do servidor.
   const ehVendedora = u.role === 'VENDEDORA'
@@ -90,6 +103,15 @@ export default function Conta() {
           </div>
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarFoto(f); e.target.value = '' }} />
         </div>
+      </div>
+
+      <div className="cartao" style={{ maxWidth: 520 }}>
+        <div style={{ fontWeight: 600, marginBottom: 8 }}>Idioma</div>
+        <select value={idioma} onChange={(e) => salvarIdioma(e.target.value as Idioma)} disabled={salvandoIdioma} style={{ maxWidth: 220 }}>
+          <option value="pt">🇧🇷 Português</option>
+          <option value="en">🇺🇸 English</option>
+          <option value="es">🇪🇸 Español</option>
+        </select>
       </div>
 
       <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>

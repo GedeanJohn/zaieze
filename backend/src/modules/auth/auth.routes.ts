@@ -78,6 +78,7 @@ export async function authRoutes(app: FastifyInstance) {
         email: usuario.email,
         role: usuario.role,
         fotoUrl: usuario.fotoUrl,
+        idioma: usuario.idioma,
         rede: rede ? { id: rede.id, nome: rede.nome, plano: rede.plano } : null,
         loja: usuario.loja ? { id: usuario.loja.id, nome: usuario.loja.nome, slug: usuario.loja.slug } : null,
       },
@@ -114,7 +115,7 @@ export async function authRoutes(app: FastifyInstance) {
     return prisma.usuario.findUniqueOrThrow({
       where: { id: request.user.sub },
       select: {
-        id: true, nome: true, email: true, role: true, telefone: true, fotoUrl: true,
+        id: true, nome: true, email: true, role: true, telefone: true, fotoUrl: true, idioma: true,
         metaMensal: true, comissaoPadrao: true,
         equipe: { select: { id: true, nome: true } },
         rede: { select: { id: true, nome: true, plano: true } },

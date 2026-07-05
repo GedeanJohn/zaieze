@@ -28,6 +28,8 @@ const checkoutSchema = z.object({
   // Programa de Afiliados: código do link de indicação (?ref=), capturado pela landing/checkout.
   refAfiliado: z.string().trim().optional(),
   periodicidade: z.enum(['MENSAL', 'ANUAL']).default('MENSAL'),
+  // Idioma preferencial escolhido no cadastro (só afeta a UI do gestor; editável depois em "Minha conta").
+  idioma: z.enum(['pt', 'en', 'es']).default('pt'),
 })
 
 // Subdomínios que não podem virar slug de tenant (colidem com o SaaS)
@@ -127,7 +129,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     const rede = await prisma.$transaction(async (tx) => {
       const r = await tx.rede.create({ data: { nome: body.redeNome, slug, plano, ativo: semCobranca, afiliadoId: afiliado?.id ?? null } })
       await tx.usuario.create({
-        data: { redeId: r.id, nome: body.gestorNome, email, senhaHash, role: 'GESTOR', telefone: body.telefone },
+        data: { redeId: r.id, nome: body.gestorNome, email, senhaHash, role: 'GESTOR', telefone: body.telefone, idioma: body.idioma },
       })
       // Aceite eletrônico da versão vigente do contrato, firmado no ato da adesão.
       await tx.aceiteContrato.create({

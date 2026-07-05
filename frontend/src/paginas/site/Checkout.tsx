@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, formataReal, mensagemDeErro, type Plano } from '../../api'
 import { capturarRefAfiliado, refAfiliadoAtivo } from '../../lib/afiliado'
 import SeletorPeriodicidade, { type Periodicidade } from '../../componentes/SeletorPeriodicidade'
+import SeletorIdioma from '../../componentes/SeletorIdioma'
+import { useIdioma } from '../../lib/i18n'
 
 const NOME: Record<Plano, string> = { START: 'Start', PRO: 'Pro', ELITE: 'Elite' }
 
@@ -17,6 +19,7 @@ export default function Checkout() {
   // Plano é estado: um cupom com plano definido troca/trava o plano (link fica só ?cupom=).
   const [plano, setPlano] = useState<Plano>((params.get('plano') as Plano) || 'PRO')
   const [periodicidade, setPeriodicidade] = useState<Periodicidade>((params.get('periodicidade') as Periodicidade) || 'MENSAL')
+  const { idioma } = useIdioma()
 
   const [form, setForm] = useState({ redeNome: '', slug: '', gestorNome: '', telefone: '', email: '', senha: '' })
   const [dominio, setDominio] = useState('zaieze.com')
@@ -98,6 +101,7 @@ export default function Checkout() {
         codigoPromo: codigoPromo.trim() || undefined,
         refAfiliado: refAfiliadoAtivo(),
         periodicidade,
+        idioma,
       })
       if (data.simulado) navigate(`/sucesso?slug=${data.slug}&plano=${plano}&simulado=1`)
       else if (data.initPoint) window.location.href = data.initPoint
@@ -110,7 +114,10 @@ export default function Checkout() {
 
   return (
     <div className="site checkout-wrap">
-      <Link to="/" className="voltar">← Voltar</Link>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Link to="/" className="voltar">← Voltar</Link>
+        <SeletorIdioma />
+      </div>
       <div className="checkout-card">
         <div className="checkout-resumo">
           <h2>Plano {nome}</h2>

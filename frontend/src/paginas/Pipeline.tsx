@@ -7,6 +7,7 @@ import {
 import { api, mensagemDeErro, usuarioLogado } from '../api'
 import { urlCatalogo } from '../host'
 import { useLojaAtiva, SeletorLoja } from '../componentes/SeletorLoja'
+import { useIdioma } from '../lib/i18n'
 
 type Etapa = 'ENTROU' | 'ATENDIDO' | 'NEGOCIANDO' | 'CONVERTIDO' | 'PERDIDO'
 type SituacaoChave =
@@ -27,7 +28,8 @@ interface Pipeline { colunas: Record<Etapa, Card[]>; metricas: Metricas }
 interface LinkVend { id: string; nome: string; slug: string; redeSlug: string; path: string; temWhatsapp: boolean }
 
 const ETAPAS: Etapa[] = ['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'CONVERTIDO', 'PERDIDO']
-const rotuloEtapa: Record<Etapa, string> = { ENTROU: 'Entrou', ATENDIDO: 'Atendido', NEGOCIANDO: 'Negociando', CONVERTIDO: 'Convertido', PERDIDO: 'Perdido' }
+const CHAVE_ETAPA: Record<Etapa, string> = { ENTROU: 'entrou', ATENDIDO: 'atendido', NEGOCIANDO: 'negociando', CONVERTIDO: 'convertido', PERDIDO: 'perdido' }
+const rotuloEtapa = (etapa: Etapa, t: (chave: string) => string): string => t(`pipe.etapa.${CHAVE_ETAPA[etapa]}`)
 const corEtapa: Record<Etapa, string> = { ENTROU: '#e8a87c', ATENDIDO: '#7cc4e8', NEGOCIANDO: '#c9a0ff', CONVERTIDO: '#7ce8a0', PERDIDO: '#888' }
 
 // Escala de cores da SITUAÇÃO (cor + ícone vêm do back; ícone só no front p/ acessibilidade).
@@ -35,11 +37,12 @@ const ordemSituacao: SituacaoChave[] = [
   'ESPERA_NO_PRAZO', 'ESPERA_APERTADO', 'ESPERA_ATRASADO',
   'ATENDIMENTO_NO_PRAZO', 'ATENDIMENTO_ATRASADO', 'REDISTRIBUIDO', 'CONVERTIDO', 'PERDIDO',
 ]
-const labelSituacao: Record<SituacaoChave, string> = {
-  ESPERA_NO_PRAZO: 'Em espera — no prazo', ESPERA_APERTADO: 'Em espera — apertado', ESPERA_ATRASADO: 'Em espera — atrasado',
-  ATENDIMENTO_NO_PRAZO: 'Em atendimento', ATENDIMENTO_ATRASADO: 'Em atendimento — atrasado',
-  REDISTRIBUIDO: 'Redistribuído', CONVERTIDO: 'Convertido', PERDIDO: 'Perdido',
+const CHAVE_SITUACAO: Record<SituacaoChave, string> = {
+  ESPERA_NO_PRAZO: 'esperaNoPrazo', ESPERA_APERTADO: 'esperaApertado', ESPERA_ATRASADO: 'esperaAtrasado',
+  ATENDIMENTO_NO_PRAZO: 'atendimentoNoPrazo', ATENDIMENTO_ATRASADO: 'atendimentoAtrasado',
+  REDISTRIBUIDO: 'redistribuido', CONVERTIDO: 'convertido', PERDIDO: 'perdido',
 }
+const labelSituacao = (chave: SituacaoChave, t: (chave: string) => string): string => t(`pipe.sit.${CHAVE_SITUACAO[chave]}`)
 const corSituacao: Record<SituacaoChave, string> = {
   ESPERA_NO_PRAZO: '#38BDF8', ESPERA_APERTADO: '#F59E0B', ESPERA_ATRASADO: '#EF4444',
   ATENDIMENTO_NO_PRAZO: '#22C55E', ATENDIMENTO_ATRASADO: '#F97316',
@@ -96,8 +99,9 @@ function ColunaDrop({ etapa, children }: { etapa: Etapa; children: ReactNode }) 
 
 // Card do cliente = item ARRASTÁVEL (alça ⠿). Mudança de etapa SÓ por arrastar (sem seletor).
 // Clicar no nome/telefone abre a conversa do cliente no Chat Zaieze.
-function CardLead({ c, redistribuir, podeRedistribuir, abrirChat }: {
+function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, t }: {
   c: Card; redistribuir: (c: Card) => void; podeRedistribuir: boolean; abrirChat: (clienteId: string) => void
+  t: (chave: string, vars?: Record<string, string | number>) => string
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: c.id, data: { card: c } })
   const ct = corTempoEspera(c)
@@ -107,10 +111,10 @@ function CardLead({ c, redistribuir, podeRedistribuir, abrirChat }: {
   return (
     <div ref={setNodeRef} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `4px solid ${ct ?? c.situacao.cor}`, background: ct ? `${ct}22` : undefined, opacity: isDragging ? 0.4 : 1, userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-        <button type="button" {...attributes} {...listeners} title="Arraste para mudar de etapa" aria-label="Arrastar card"
+        <button type="button" {...attributes} {...listeners} title={t('pipe.arrastarParaMudar')} aria-label={t('pipe.arrastarCard')}
           style={{ cursor: 'grab', touchAction: 'none', border: 'none', background: 'none', color: 'var(--ink-soft)', fontSize: 24, padding: '2px 4px', lineHeight: 1, alignSelf: 'stretch' }}>⠿</button>
         <button type="button" onClick={() => clienteId && abrirChat(clienteId)} disabled={!clienteId}
-          title={clienteId ? 'Abrir conversa no Chat Zaieze' : undefined}
+          title={clienteId ? t('pipe.abrirConversa') : undefined}
           style={{ flex: 1, minWidth: 0, textAlign: 'left', border: 'none', background: 'none', padding: 0, cursor: clienteId ? 'pointer' : 'default', color: 'inherit', display: 'block' }}>
           <div style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.25, color: clienteId ? 'var(--accent)' : undefined, overflowWrap: 'anywhere' }}>{nome}</div>
           <div style={{ fontSize: 12, color: 'var(--ink-soft)', lineHeight: 1.25, overflowWrap: 'anywhere' }}>{telefone}</div>
@@ -118,14 +122,14 @@ function CardLead({ c, redistribuir, podeRedistribuir, abrirChat }: {
       </div>
       <div style={{ marginTop: 6 }}><BadgeSituacao s={c.situacao} /></div>
       <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginTop: 4 }}>
-        👤 {c.vendedora.nome}{c.redistribuicoes > 0 && ` · ${c.redistribuicoes}× redistr.`}
+        👤 {c.vendedora.nome}{c.redistribuicoes > 0 && ` · ${t('pipe.redistribuicoesSufixo', { n: c.redistribuicoes })}`}
       </div>
       <div style={{ fontSize: 11, marginTop: 2, color: c.atrasado ? '#ff6b6b' : 'var(--ink-soft)' }}>
-        ⏱ {tempoNaEtapa(c.etapaDesde)} nesta etapa{c.atrasado && ' · atrasado'}
+        ⏱ {tempoNaEtapa(c.etapaDesde)} {t('pipe.nestaEtapa')}{c.atrasado && ` · ${t('pipe.atrasadoSufixo')}`}
       </div>
       {podeRedistribuir && ['ENTROU', 'ATENDIDO', 'NEGOCIANDO'].includes(c.status) && (
         <div style={{ marginTop: 8 }}>
-          <button className="btn secundario" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => redistribuir(c)} title="Redistribuir para outra vendedora">↪ Redistribuir</button>
+          <button className="btn secundario" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => redistribuir(c)} title={t('pipe.redistribuirTitle')}>↪ {t('pipe.redistribuirBtn')}</button>
         </div>
       )}
     </div>
@@ -139,6 +143,7 @@ export default function Pipeline() {
   const escopo = useLojaAtiva()
   const navigate = useNavigate()
   const abrirChat = useCallback((clienteId: string) => navigate(`/caixa?cliente=${clienteId}`), [navigate])
+  const { t } = useIdioma()
 
   const [pipe, setPipe] = useState<Pipeline | null>(null)
   const [meuLink, setMeuLink] = useState<LinkVend | null>(null)
@@ -168,7 +173,7 @@ export default function Pipeline() {
   }
   async function mover(card: Card, etapa: Etapa) {
     if (etapa === card.status) return
-    const motivoPerda = etapa === 'PERDIDO' ? (prompt('Motivo da perda (opcional):') ?? undefined) : undefined
+    const motivoPerda = etapa === 'PERDIDO' ? (prompt(t('pipe.motivoPerda')) ?? undefined) : undefined
     try { await api.patch(`/leads/${card.id}/etapa`, { etapa, motivoPerda }, { params: escopo.params }); carregar() }
     catch (err) { alert(mensagemDeErro(err)) }
   }
@@ -179,7 +184,7 @@ export default function Pipeline() {
   async function redistribuirAtrasados() {
     try {
       const { data } = await api.post('/leads/redistribuir-atrasados', {}, { params: escopo.params })
-      alert(`${data.redistribuidos} ciclo(s) redistribuído(s).`); carregar()
+      alert(t('pipe.cicloRedistribuido', { n: data.redistribuidos })); carregar()
     } catch (err) { alert(mensagemDeErro(err)) }
   }
 
@@ -201,19 +206,19 @@ export default function Pipeline() {
   return (
     <>
       <header>
-        <h1>Funil de atendimento &amp; vendas</h1>
+        <h1>{t('pipe.titulo')}</h1>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <SeletorLoja escopo={escopo} />
           {!ehVendedora && links.length > 0 && (
             <div className="campo" style={{ minWidth: 200, marginBottom: 0 }}>
-              <label>Vendedora</label>
+              <label>{t('pipe.vendedora')}</label>
               <select value={vendFiltro} onChange={(e) => setVendFiltro(e.target.value)}>
-                <option value="">Todas as vendedoras</option>
+                <option value="">{t('pipe.todasVendedoras')}</option>
                 {links.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
               </select>
             </div>
           )}
-          {podeRedistribuir && <button className="btn secundario" onClick={redistribuirAtrasados}>Redistribuir atrasados</button>}
+          {podeRedistribuir && <button className="btn secundario" onClick={redistribuirAtrasados}>{t('pipe.redistribuirAtrasados')}</button>}
         </div>
       </header>
 
@@ -222,29 +227,29 @@ export default function Pipeline() {
       {/* Links do catálogo */}
       {ehVendedora && meuLink && (
         <div className="cartao">
-          <h2 style={{ marginTop: 0 }}>Meu link do catálogo</h2>
+          <h2 style={{ marginTop: 0 }}>{t('pipe.meuLinkTitulo')}</h2>
           <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
-            Envie para as suas clientes — quem abrir cai no <strong>seu WhatsApp</strong> e entra na sua carteira.
-            {!meuLink.temWhatsapp && <strong style={{ color: '#e8a87c' }}> ⚠️ Conecte seu WhatsApp para receber os contatos.</strong>}
+            {t('pipe.meuLinkTexto')} <strong>{t('pipe.seuWhatsapp')}</strong> {t('pipe.eEntraCarteira')}
+            {!meuLink.temWhatsapp && <strong style={{ color: '#e8a87c' }}> {t('pipe.avisoSemWhatsapp')}</strong>}
           </p>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <code style={{ background: '#0003', padding: '8px 12px', borderRadius: 8 }}>{urlCatalogo(meuLink.redeSlug, meuLink.path)}</code>
-            <button className="btn" onClick={() => copiar(meuLink.redeSlug, meuLink.path, 'meu')}>{copiado === 'meu' ? '✓ copiado' : 'Copiar'}</button>
+            <button className="btn" onClick={() => copiar(meuLink.redeSlug, meuLink.path, 'meu')}>{copiado === 'meu' ? t('pipe.copiado') : t('pipe.copiar')}</button>
           </div>
         </div>
       )}
       {!ehVendedora && links.length > 0 && (
         <details className="cartao">
-          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Links das vendedoras ({links.length})</summary>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{t('pipe.linksVendedorasN', { n: links.length })}</summary>
           <table style={{ marginTop: 10 }}>
-            <thead><tr><th>Vendedora</th><th>Link</th><th>WhatsApp</th><th></th></tr></thead>
+            <thead><tr><th>{t('pipe.vendedora')}</th><th>Link</th><th>WhatsApp</th><th></th></tr></thead>
             <tbody>
               {links.map((v) => (
                 <tr key={v.id}>
                   <td>{v.nome}</td>
                   <td><code style={{ fontSize: 12 }}>{urlCatalogo(v.redeSlug, v.path)}</code></td>
-                  <td>{v.temWhatsapp ? <span className="selo ok">conectado</span> : <span className="selo baixo">sem WhatsApp</span>}</td>
-                  <td><a href="#" onClick={(e) => { e.preventDefault(); copiar(v.redeSlug, v.path, v.id) }}>{copiado === v.id ? '✓ copiado' : 'copiar'}</a></td>
+                  <td>{v.temWhatsapp ? <span className="selo ok">{t('pipe.conectado')}</span> : <span className="selo baixo">{t('pipe.semWhatsapp')}</span>}</td>
+                  <td><a href="#" onClick={(e) => { e.preventDefault(); copiar(v.redeSlug, v.path, v.id) }}>{copiado === v.id ? t('pipe.copiado') : t('pipe.copiarLink')}</a></td>
                 </tr>
               ))}
             </tbody>
@@ -255,11 +260,11 @@ export default function Pipeline() {
       {/* Métricas do funil */}
       {m && (
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '4px 0 12px' }}>
-          <Metr titulo="Abertos" valor={m.abertos} />
-          <Metr titulo="Atrasados (SLA)" valor={m.atrasados} alerta={m.atrasados > 0} />
-          <Metr titulo="Convertidos" valor={m.convertidos} />
-          <Metr titulo="Taxa de conversão" valor={`${m.taxaConversao}%`} />
-          <Metr titulo="Tempo médio 1ª resposta" valor={m.tempoMedioRespostaMin != null ? `${m.tempoMedioRespostaMin}min` : '—'} />
+          <Metr titulo={t('pipe.metr.abertos')} valor={m.abertos} />
+          <Metr titulo={t('pipe.metr.atrasados')} valor={m.atrasados} alerta={m.atrasados > 0} />
+          <Metr titulo={t('pipe.metr.convertidos')} valor={m.convertidos} />
+          <Metr titulo={t('pipe.metr.taxaConversao')} valor={`${m.taxaConversao}%`} />
+          <Metr titulo={t('pipe.metr.tempoMedio')} valor={m.tempoMedioRespostaMin != null ? `${m.tempoMedioRespostaMin}min` : '—'} />
         </div>
       )}
 
@@ -267,12 +272,12 @@ export default function Pipeline() {
       {m && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', margin: '0 0 12px' }}>
           {ordemSituacao.filter((ch) => (m.porSituacao[ch] ?? 0) > 0).map((ch) => (
-            <span key={ch} title={labelSituacao[ch]} style={{
+            <span key={ch} title={labelSituacao(ch, t)} style={{
               display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600,
               padding: '3px 9px', borderRadius: 999, color: corSituacao[ch],
               background: `${corSituacao[ch]}22`, border: `1px solid ${corSituacao[ch]}55`,
             }}>
-              <span aria-hidden>{iconeSituacao[ch]}</span>{labelSituacao[ch]}
+              <span aria-hidden>{iconeSituacao[ch]}</span>{labelSituacao(ch, t)}
               <strong style={{ marginLeft: 2 }}>{m.porSituacao[ch]}</strong>
             </span>
           ))}
@@ -281,7 +286,7 @@ export default function Pipeline() {
 
       {/* Kanban com arrastar-e-soltar (alça ⠿) — desktop e mobile. Mudança de etapa só por arrastar. */}
       <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '0 0 6px' }}>
-        Dica: arraste o card pela alça <strong>⠿</strong> para outra etapa (no celular, pressione e segure). Toque no nome para abrir a conversa no Chat.
+        {t('pipe.dicaParte1')} <strong>⠿</strong> {t('pipe.dicaParte2')}
       </div>
       <DndContext sensors={sensors} onDragStart={aoIniciarArrasto} onDragEnd={aoSoltar}>
         <div className="funil-kanban" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(180px, 1fr))', gap: 10, overflowX: 'auto' }}>
@@ -290,11 +295,11 @@ export default function Pipeline() {
             return (
               <ColunaDrop key={etapa} etapa={etapa}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px 8px', borderBottom: `2px solid ${corEtapa[etapa]}`, marginBottom: 8 }}>
-                  <strong style={{ color: corEtapa[etapa] }}>{rotuloEtapa[etapa]}</strong>
+                  <strong style={{ color: corEtapa[etapa] }}>{rotuloEtapa(etapa, t)}</strong>
                   <span style={{ color: 'var(--ink-soft)', fontSize: 12 }}>{cards.length}</span>
                 </div>
                 {cards.map((c) => (
-                  <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat} />
+                  <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat} t={t} />
                 ))}
                 {cards.length === 0 && <div style={{ color: 'var(--ink-soft)', fontSize: 12, padding: 6 }}>—</div>}
               </ColunaDrop>
@@ -305,7 +310,7 @@ export default function Pipeline() {
           {arrastando ? (
             <div className="cartao" style={{ padding: 10, borderLeft: `4px solid ${corTempoEspera(arrastando) ?? arrastando.situacao.cor}`, boxShadow: '0 8px 24px #0005' }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>{arrastando.cliente?.nome ?? arrastando.nome ?? '—'}</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-soft)' }}>Solte numa etapa</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-soft)' }}>{t('pipe.solteNumaEtapa')}</div>
             </div>
           ) : null}
         </DragOverlay>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, mensagemDeErro, formataReal } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
+import { useIdioma } from '../lib/i18n'
 
 type Canal = 'whatsapp' | 'instagram'
 
@@ -40,13 +41,13 @@ function hora(iso: string): string {
 }
 
 /** Recibo de entrega (WhatsApp): ✓ enviada, ✓✓ entregue/lida (lida = azul, tratado no estilo). */
-function recibo(status: string): string {
+function recibo(status: string, t: (chave: string) => string): string {
   switch (status) {
     case 'ENVIADA': return '✓'
     case 'ENTREGUE': return '✓✓'
     case 'LIDA': return '✓✓'
-    case 'FALHA': return 'falhou'
-    case 'SIMULADA': return 'simulada'
+    case 'FALHA': return t('caixa.falhou')
+    case 'SIMULADA': return t('caixa.simulada')
     default: return status.toLowerCase()
   }
 }
@@ -67,6 +68,7 @@ type Filtro = 'NOVIDADES' | 'NAO_LIDAS' | 'GRUPOS'
 export default function CaixaEntrada() {
   const escopo = useLojaAtiva()
   const navigate = useNavigate()
+  const { t } = useIdioma()
   const [searchParams] = useSearchParams()
   const abriuParam = useRef(false)
   const [stats, setStats] = useState<ChatStats | null>(null)
@@ -190,7 +192,7 @@ export default function CaixaEntrada() {
       setErro(''); setGravando(true); setSegGrav(0)
       timerGrav.current = window.setInterval(() => setSegGrav((s) => s + 1), 1000)
     } catch {
-      setErro('Não foi possível acessar o microfone. Verifique a permissão do navegador.')
+      setErro(t('caixa.microfoneNegado'))
     }
   }
 
@@ -202,7 +204,7 @@ export default function CaixaEntrada() {
     mr.onstop = async () => {
       mr.stream.getTracks().forEach((t) => t.stop())
       const blob = new Blob(chunks.current, { type: mr.mimeType || 'audio/webm' })
-      if (blob.size < 1200) { setErro('Áudio muito curto.'); return } // descarta gravações vazias
+      if (blob.size < 1200) { setErro(t('caixa.audioMuitoCurto')); return } // descarta gravações vazias
       setEnviando(true); setErro('')
       try {
         const fd = new FormData()
@@ -242,7 +244,7 @@ export default function CaixaEntrada() {
   }
 
   async function excluirGrupo(id: string) {
-    if (!confirm('Excluir este grupo? Os clientes não são apagados.')) return
+    if (!confirm(t('caixa.excluirGrupoConfirm'))) return
     await api.delete(`/whatsapp/grupos/${id}`, { params: escopo.params })
     setGrupoSel(null)
     carregarGrupos()
@@ -275,10 +277,10 @@ export default function CaixaEntrada() {
       )}
       {!temSel && (
         <div className="cz-stats">
-          <StatCard rotulo="Receita do mês" valor={stats ? formataReal(stats.receitaMes) : '—'} cor="#a855f7" />
-          <MetaCard pct={stats ? stats.pctMeta : null} cor="#c084fc" />
-          <StatCard rotulo="Novos leads" valor={stats ? String(stats.novosLeads) : '—'} cor="#22c55e" />
-          <StatCard rotulo="Taxa de conversão" valor={stats ? `${stats.taxaConversao}%` : '—'} cor="#ec4899" />
+          <StatCard rotulo={t('caixa.receitaMes')} valor={stats ? formataReal(stats.receitaMes) : '—'} cor="#a855f7" />
+          <MetaCard pct={stats ? stats.pctMeta : null} cor="#c084fc" rotulo={t('caixa.metaMes')} />
+          <StatCard rotulo={t('caixa.novosLeads')} valor={stats ? String(stats.novosLeads) : '—'} cor="#22c55e" />
+          <StatCard rotulo={t('caixa.taxaConversao')} valor={stats ? `${stats.taxaConversao}%` : '—'} cor="#ec4899" />
         </div>
       )}
 
@@ -287,31 +289,31 @@ export default function CaixaEntrada() {
         <aside className="cz-lista">
           <div className="cz-lista-top">
             <div className="cz-titulo">
-              {filtro === 'GRUPOS' ? <>Grupos <span className="cz-count">{grupos.length}</span></> : <>Conversas <span className="cz-count">{conversas.length}</span></>}
+              {filtro === 'GRUPOS' ? <>{t('caixa.grupos')} <span className="cz-count">{grupos.length}</span></> : <>{t('caixa.conversas')} <span className="cz-count">{conversas.length}</span></>}
             </div>
-            <input className="cz-busca" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={filtro === 'GRUPOS' ? 'Buscar grupos…' : 'Buscar conversas…'} />
+            <input className="cz-busca" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={filtro === 'GRUPOS' ? t('caixa.buscarGrupos') : t('caixa.buscarConversas')} />
             <div className="cz-tabs">
-              <button type="button" className={`cz-tab${filtro === 'NOVIDADES' ? ' ativo' : ''}`} onClick={() => { setFiltro('NOVIDADES'); setGrupoSel(null) }}>Novidades</button>
+              <button type="button" className={`cz-tab${filtro === 'NOVIDADES' ? ' ativo' : ''}`} onClick={() => { setFiltro('NOVIDADES'); setGrupoSel(null) }}>{t('caixa.novidades')}</button>
               <button type="button" className={`cz-tab${filtro === 'NAO_LIDAS' ? ' ativo' : ''}`} onClick={() => { setFiltro('NAO_LIDAS'); setGrupoSel(null) }}>
-                Não Lidas{totalNaoLidas > 0 && <span className="cz-tab-badge">{totalNaoLidas}</span>}
+                {t('caixa.naoLidas')}{totalNaoLidas > 0 && <span className="cz-tab-badge">{totalNaoLidas}</span>}
               </button>
-              <button type="button" className={`cz-tab${filtro === 'GRUPOS' ? ' ativo' : ''}`} onClick={() => { setFiltro('GRUPOS'); setSel(null) }}>Grupos</button>
+              <button type="button" className={`cz-tab${filtro === 'GRUPOS' ? ' ativo' : ''}`} onClick={() => { setFiltro('GRUPOS'); setSel(null) }}>{t('caixa.grupos')}</button>
             </div>
           </div>
 
           {filtro === 'GRUPOS' ? (
             <div className="cz-itens">
-              <button type="button" className="cz-criar-grupo" onClick={() => setModalGrupo(true)}>＋ Criar grupo</button>
+              <button type="button" className="cz-criar-grupo" onClick={() => setModalGrupo(true)}>{t('caixa.criarGrupo')}</button>
               {gruposFiltrados.map((g) => (
                 <button key={g.id} className={`cz-item${grupoSel?.id === g.id ? ' ativo' : ''}`} onClick={() => abrirGrupo(g.id)}>
                   <span className="cz-avatar grupo">{iniciais(g.nome)}</span>
                   <span className="cz-item-main">
                     <span className="cz-item-top"><strong>{g.nome}</strong><span className="cz-hora">{g.ultimaMensagem ? hora(g.ultimaEm) : ''}</span></span>
-                    <span className="cz-previa">{g.ultimaMensagem ?? `${g.membros} ${g.membros === 1 ? 'membro' : 'membros'}`}</span>
+                    <span className="cz-previa">{g.ultimaMensagem ?? `${g.membros} ${t(g.membros === 1 ? 'caixa.membro' : 'caixa.membros')}`}</span>
                   </span>
                 </button>
               ))}
-              {gruposFiltrados.length === 0 && <div className="cz-aviso">{grupos.length === 0 ? 'Nenhum grupo ainda. Crie o primeiro.' : 'Nada encontrado.'}</div>}
+              {gruposFiltrados.length === 0 && <div className="cz-aviso">{grupos.length === 0 ? t('caixa.nenhumGrupoAinda') : t('caixa.nadaEncontrado')}</div>}
             </div>
           ) : (
             <div className="cz-itens">
@@ -332,7 +334,7 @@ export default function CaixaEntrada() {
                   {c.naoLidas > 0 && <span className="cz-badge">{c.naoLidas}</span>}
                 </button>
               ))}
-              {lista.length === 0 && <div className="cz-aviso">{conversas.length === 0 ? 'Nenhuma conversa ainda.' : 'Nada encontrado.'}</div>}
+              {lista.length === 0 && <div className="cz-aviso">{conversas.length === 0 ? t('caixa.nenhumaConversaAinda') : t('caixa.nadaEncontrado')}</div>}
             </div>
           )}
         </aside>
@@ -342,13 +344,13 @@ export default function CaixaEntrada() {
           {grupoSel ? (
             <>
               <div className="cz-conv-top">
-                <button type="button" className="cz-voltar" onClick={() => setGrupoSel(null)} aria-label="Voltar">←</button>
+                <button type="button" className="cz-voltar" onClick={() => setGrupoSel(null)} aria-label={t('caixa.voltar')}>←</button>
                 <span className="cz-avatar sm grupo">{iniciais(grupoSel.nome)}</span>
                 <div className="cz-conv-nome">
                   <strong>{grupoSel.nome}</strong>
-                  <span>{grupoSel.membros.length} {grupoSel.membros.length === 1 ? 'membro' : 'membros'} · lista de transmissão</span>
+                  <span>{grupoSel.membros.length} {t(grupoSel.membros.length === 1 ? 'caixa.membro' : 'caixa.membros')} · {t('caixa.listaTransmissao')}</span>
                 </div>
-                <button className="cz-btn perigo" onClick={() => excluirGrupo(grupoSel.id)}>🗑 Excluir</button>
+                <button className="cz-btn perigo" onClick={() => excluirGrupo(grupoSel.id)}>🗑 {t('comum.excluir')}</button>
               </div>
 
               <div className="cz-bolhas cz-grupo-corpo">
@@ -356,44 +358,44 @@ export default function CaixaEntrada() {
                   {grupoSel.membros.map((m) => (
                     <span key={m.id} className="cz-chip">{m.nome}</span>
                   ))}
-                  {grupoSel.membros.length === 0 && <span className="cz-aviso">Grupo sem membros.</span>}
+                  {grupoSel.membros.length === 0 && <span className="cz-aviso">{t('caixa.grupoSemMembros')}</span>}
                 </div>
 
                 {resultadoGrupo && (
                   <div className="cz-resultado">
-                    Disparo: {resultadoGrupo.enviados} enviadas · {resultadoGrupo.simulados} simuladas · {resultadoGrupo.falhas} falhas
-                    {resultadoGrupo.semConsentimento > 0 && ` · ${resultadoGrupo.semConsentimento} sem consentimento`}
+                    {t('caixa.disparoResumo', { enviados: resultadoGrupo.enviados, simulados: resultadoGrupo.simulados, falhas: resultadoGrupo.falhas })}
+                    {resultadoGrupo.semConsentimento > 0 && ` · ${t('caixa.semConsentimentoSufixo', { n: resultadoGrupo.semConsentimento })}`}
                   </div>
                 )}
 
-                <div className="cz-dia">Disparos do grupo</div>
+                <div className="cz-dia">{t('caixa.disparosDoGrupo')}</div>
                 {grupoSel.disparos.map((d) => (
                   <div key={d.id} className="cz-bolha saida">
                     <div>{d.texto}</div>
                     <span className="cz-meta">{hora(d.createdAt)} · {d.status.toLowerCase()}</span>
                   </div>
                 ))}
-                {grupoSel.disparos.length === 0 && <div className="cz-aviso" style={{ margin: 'auto' }}>Nenhum disparo enviado ainda.</div>}
+                {grupoSel.disparos.length === 0 && <div className="cz-aviso" style={{ margin: 'auto' }}>{t('caixa.nenhumDisparoAinda')}</div>}
               </div>
 
               {erro && <div className="cz-alerta">{erro}</div>}
               <form className="cz-responder" onSubmit={dispararGrupo}>
-                <input value={textoGrupo} onChange={(e) => setTextoGrupo(e.target.value)} placeholder="Mensagem para todos os membros…" />
-                <button className="cz-enviar" disabled={enviando || !textoGrupo.trim()} aria-label="Disparar">{enviando ? '…' : '➤'}</button>
+                <input value={textoGrupo} onChange={(e) => setTextoGrupo(e.target.value)} placeholder={t('caixa.mensagemParaTodos')} />
+                <button className="cz-enviar" disabled={enviando || !textoGrupo.trim()} aria-label={t('caixa.disparar')}>{enviando ? '…' : '➤'}</button>
               </form>
             </>
           ) : !sel ? (
-            <div className="cz-vazio">{filtro === 'GRUPOS' ? 'Selecione um grupo ou crie um novo.' : 'Selecione uma conversa.'}</div>
+            <div className="cz-vazio">{filtro === 'GRUPOS' ? t('caixa.selecioneGrupoOuCrie') : t('caixa.selecioneConversa')}</div>
           ) : (
             <>
               <div className="cz-conv-top">
-                <button type="button" className="cz-voltar" onClick={() => setSel(null)} aria-label="Voltar">←</button>
+                <button type="button" className="cz-voltar" onClick={() => setSel(null)} aria-label={t('caixa.voltar')}>←</button>
                 <span className="cz-avatar sm">{iniciais(sel.cliente.nome)}</span>
                 <div className="cz-conv-nome">
                   <strong>{sel.cliente.nome}</strong>
                   <span>{sel.canal === 'instagram' ? '📷 Instagram' : sel.cliente.telefone}</span>
                 </div>
-                <button className="cz-btn cz-btn-venda" onClick={() => navigate(`/vendas?cliente=${sel.cliente.id}`)} title="Registrar venda">🛒<span className="cz-btn-txt"> Registrar venda</span></button>
+                <button className="cz-btn cz-btn-venda" onClick={() => navigate(`/vendas?cliente=${sel.cliente.id}`)} title={t('caixa.registrarVenda')}>🛒<span className="cz-btn-txt"> {t('caixa.registrarVenda')}</span></button>
               </div>
 
               <div className="cz-bolhas">
@@ -406,26 +408,26 @@ export default function CaixaEntrada() {
                         : <div>{m.texto}</div>}
                     <span className="cz-meta">
                       {hora(m.createdAt)}
-                      {m.direcao === 'ENVIADA' && <> · <span style={m.status === 'LIDA' ? { color: '#53bdeb' } : undefined}>{recibo(m.status)}</span></>}
+                      {m.direcao === 'ENVIADA' && <> · <span style={m.status === 'LIDA' ? { color: '#53bdeb' } : undefined}>{recibo(m.status, t)}</span></>}
                     </span>
                   </div>
                 ))}
-                {thread.length === 0 && <div style={{ color: 'var(--cz-mut)', margin: 'auto' }}>Sem mensagens.</div>}
+                {thread.length === 0 && <div style={{ color: 'var(--cz-mut)', margin: 'auto' }}>{t('caixa.semMensagens')}</div>}
               </div>
 
               {erro && <div className="cz-alerta">{erro}</div>}
               {gravando ? (
                 <div className="cz-gravando">
-                  <button type="button" className="cz-grav-lixo" onClick={cancelarGravacao} aria-label="Cancelar gravação">🗑</button>
-                  <span className="cz-grav-rec"><span className="cz-grav-dot" />Gravando… {mmss(segGrav)}</span>
-                  <button type="button" className="cz-enviar" onClick={enviarGravacao} disabled={enviando} aria-label="Enviar áudio">{enviando ? '…' : '➤'}</button>
+                  <button type="button" className="cz-grav-lixo" onClick={cancelarGravacao} aria-label={t('caixa.cancelarGravacao')}>🗑</button>
+                  <span className="cz-grav-rec"><span className="cz-grav-dot" />{t('caixa.gravando', { tempo: mmss(segGrav) })}</span>
+                  <button type="button" className="cz-enviar" onClick={enviarGravacao} disabled={enviando} aria-label={t('caixa.enviarAudio')}>{enviando ? '…' : '➤'}</button>
                 </div>
               ) : (
                 <form className="cz-responder" onSubmit={responder}>
-                  <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Digite sua mensagem…" />
+                  <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={t('caixa.digiteMensagem')} />
                   {texto.trim() || sel.canal === 'instagram'
-                    ? <button className="cz-enviar" disabled={enviando || !texto.trim()} aria-label="Enviar">{enviando ? '…' : '➤'}</button>
-                    : <button type="button" className="cz-mic" onClick={iniciarGravacao} disabled={enviando} aria-label="Gravar áudio">
+                    ? <button className="cz-enviar" disabled={enviando || !texto.trim()} aria-label={t('caixa.enviar')}>{enviando ? '…' : '➤'}</button>
+                    : <button type="button" className="cz-mic" onClick={iniciarGravacao} disabled={enviando} aria-label={t('caixa.gravarAudio')}>
                         <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>
                       </button>}
                 </form>
@@ -457,14 +459,14 @@ function StatCard({ rotulo, valor, cor }: { rotulo: string; valor: string; cor: 
 }
 
 /** Card "Meta do mês": anel de progresso com o % atingido no centro. */
-function MetaCard({ pct, cor }: { pct: number | null; cor: string }) {
+function MetaCard({ pct, cor, rotulo }: { pct: number | null; cor: string; rotulo: string }) {
   const v = Math.max(0, Math.min(pct ?? 0, 100))
   const r = 15
   const circ = 2 * Math.PI * r
   const off = circ * (1 - v / 100)
   return (
     <div className="cz-stat cz-stat-meta" style={{ borderTop: `3px solid ${cor}` }}>
-      <span className="cz-stat-rot">Meta Mês</span>
+      <span className="cz-stat-rot">{rotulo}</span>
       <div className="cz-meta-anel">
         <svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
           <circle cx="20" cy="20" r={r} fill="none" stroke="rgba(0,0,0,0.12)" strokeWidth="4" />
@@ -481,6 +483,7 @@ function MetaCard({ pct, cor }: { pct: number | null; cor: string }) {
 
 /** Modal de criação de grupo: nome + seleção de clientes da carteira. */
 function ModalCriarGrupo({ escopo, onFechar, onCriado }: { escopo: ReturnType<typeof useLojaAtiva>; onFechar: () => void; onCriado: () => void }) {
+  const { t } = useIdioma()
   const [nome, setNome] = useState('')
   const [clientes, setClientes] = useState<ClienteLite[]>([])
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -507,7 +510,7 @@ function ModalCriarGrupo({ escopo, onFechar, onCriado }: { escopo: ReturnType<ty
   }
 
   async function salvar() {
-    if (!nome.trim()) { setErro('Dê um nome ao grupo.'); return }
+    if (!nome.trim()) { setErro(t('caixa.deNomeAoGrupo')); return }
     setSalvando(true); setErro('')
     try {
       await api.post('/whatsapp/grupos', { nome, clienteIds: [...sel] }, { params: escopo.params })
@@ -523,26 +526,26 @@ function ModalCriarGrupo({ escopo, onFechar, onCriado }: { escopo: ReturnType<ty
     <div className="cz-modal-fundo" onClick={onFechar}>
       <div className="cz-modal" onClick={(e) => e.stopPropagation()}>
         <div className="cz-modal-top">
-          <strong>Novo grupo</strong>
-          <button className="cz-modal-x" onClick={onFechar} aria-label="Fechar">×</button>
+          <strong>{t('caixa.novoGrupo')}</strong>
+          <button className="cz-modal-x" onClick={onFechar} aria-label={t('comum.fechar')}>×</button>
         </div>
-        <input className="cz-busca" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome do grupo (ex.: Clientes VIP)" autoFocus />
-        <div className="cz-modal-sub">Membros <span className="cz-count">{sel.size}</span></div>
-        <input className="cz-busca" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente…" />
+        <input className="cz-busca" value={nome} onChange={(e) => setNome(e.target.value)} placeholder={t('caixa.nomeGrupoPlaceholder')} autoFocus />
+        <div className="cz-modal-sub">{t('caixa.membrosLabel')} <span className="cz-count">{sel.size}</span></div>
+        <input className="cz-busca" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={t('caixa.buscarCliente')} />
         <div className="cz-modal-clientes">
           {filtrados.map((c) => (
             <label key={c.id} className={`cz-cliente-op${sel.has(c.id) ? ' sel' : ''}`}>
               <input type="checkbox" checked={sel.has(c.id)} onChange={() => alternar(c.id)} />
               <span className="cz-avatar sm">{iniciais(c.nome)}</span>
-              <span className="cz-cliente-nome"><strong>{c.nome}</strong><span>{c.telefone ?? 'sem WhatsApp'}</span></span>
+              <span className="cz-cliente-nome"><strong>{c.nome}</strong><span>{c.telefone ?? t('caixa.semWhatsapp')}</span></span>
             </label>
           ))}
-          {filtrados.length === 0 && <div className="cz-aviso">Nenhum cliente encontrado.</div>}
+          {filtrados.length === 0 && <div className="cz-aviso">{t('caixa.nenhumClienteEncontrado')}</div>}
         </div>
         {erro && <div className="cz-alerta">{erro}</div>}
         <div className="cz-modal-acoes">
-          <button className="cz-btn fantasma" onClick={onFechar}>Cancelar</button>
-          <button className="cz-btn" disabled={salvando || !nome.trim()} onClick={salvar}>{salvando ? 'Criando…' : 'Criar grupo'}</button>
+          <button className="cz-btn fantasma" onClick={onFechar}>{t('comum.cancelar')}</button>
+          <button className="cz-btn" disabled={salvando || !nome.trim()} onClick={salvar}>{salvando ? t('caixa.criando') : t('caixa.criarGrupoBtn')}</button>
         </div>
       </div>
     </div>

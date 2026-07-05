@@ -485,7 +485,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .plano-card .preco { font-size: 34px; font-weight: 700; }
 .plano-card .preco span { font-size: 13px; font-weight: 400; color: var(--zz-mut); letter-spacing: 0.04em; }
 .plano-card .limite { color: var(--zz-mut); font-size: 12px; margin: 6px 0 18px; letter-spacing: 0.04em; text-transform: uppercase; }
-.cambio-aprox { color: var(--zz-mut); font-size: 12px; margin: -10px 0 14px; }
+.cambio-aprox { color: var(--zz-mut); font-size: 12px; line-height: 1.5; margin: 4px 0 14px; }
 .plano-card ul { list-style: none; padding: 0; margin: 0 0 24px; flex: 1; }
 .plano-card li { padding: 7px 0 7px 24px; position: relative; font-size: 14px; color: #d8d8d8; }
 .plano-card li::before { content: '—'; position: absolute; left: 0; color: #fff; }

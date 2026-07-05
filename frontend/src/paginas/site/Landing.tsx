@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api, formataReal, rotuloFeature, FEATURE_MIN, type Plano } from '../../api'
+import { api, formataReal, formataUsd, rotuloFeature, FEATURE_MIN, type Plano } from '../../api'
 import AgenteZaieze from './AgenteZaieze'
 import { useMetaTags } from '../../lib/useMetaTags'
 import { capturarRefAfiliado } from '../../lib/afiliado'
@@ -205,19 +205,23 @@ export default function Landing() {
             <div key={p.plano} className={`plano-card ${p.plano === 'PRO' ? 'destaque' : ''}`}>
               {p.plano === 'PRO' && <div className="tag">{t('planos.maisPopular')}</div>}
               <h3>{p.nome}</h3>
-              {periodicidade === 'ANUAL' ? (
-                <>
-                  <div className="preco">{formataReal(p.precoAnual)}<span>/{t('unidade.ano')}</span></div>
-                  <div style={{ fontSize: 12, color: 'var(--zz-mut)', marginTop: -6, marginBottom: 6 }}>
-                    {t('planos.equivaleMes')} {formataReal(p.precoAnual / 12)}/{t('unidade.mes')}
-                  </div>
-                </>
-              ) : (
-                <div className="preco">{formataReal(p.preco)}<span>/{t('unidade.mes')}</span></div>
-              )}
+              {(() => {
+                const emUsd = idioma !== 'pt' && cambio.usdPorBrl != null
+                const formata = (v: number) => emUsd ? formataUsd(v * cambio.usdPorBrl!) : formataReal(v)
+                return periodicidade === 'ANUAL' ? (
+                  <>
+                    <div className="preco">{formata(p.precoAnual)}<span>/{t('unidade.ano')}</span></div>
+                    <div style={{ fontSize: 12, color: 'var(--zz-mut)', marginTop: -6, marginBottom: 6 }}>
+                      {t('planos.equivaleMes')} {formata(p.precoAnual / 12)}/{t('unidade.mes')}
+                    </div>
+                  </>
+                ) : (
+                  <div className="preco">{formata(p.preco)}<span>/{t('unidade.mes')}</span></div>
+                )
+              })()}
               {idioma !== 'pt' && cambio.usdPorBrl != null && (
                 <div className="cambio-aprox">
-                  {t('cambio.aprox', { valor: Math.round((periodicidade === 'ANUAL' ? p.precoAnual : p.preco) * cambio.usdPorBrl) })}
+                  {t('cambio.aprox', { valor: formataReal(periodicidade === 'ANUAL' ? p.precoAnual : p.preco) })}
                 </div>
               )}
               <div className="limite">{p.limite}</div>

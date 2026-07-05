@@ -133,3 +133,7 @@ export function mensagemDeErro(e: unknown): string {
 export function formataReal(v: number | string): string {
   return `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
 }
+
+export function formataUsd(v: number | string): string {
+  return `US$ ${Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+}

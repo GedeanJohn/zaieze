@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, formataReal, mensagemDeErro, type Plano } from '../../api'
+import { api, formataReal, formataUsd, mensagemDeErro, type Plano } from '../../api'
 import { capturarRefAfiliado, refAfiliadoAtivo } from '../../lib/afiliado'
 import SeletorPeriodicidade, { type Periodicidade } from '../../componentes/SeletorPeriodicidade'
 import SeletorIdioma from '../../componentes/SeletorIdioma'
@@ -130,15 +130,21 @@ export default function Checkout() {
             <SeletorPeriodicidade valor={periodicidade} onChange={setPeriodicidade} percentualDesconto={descontoAnual} />
           </div>
           <div className="preco">
-            {promo?.valido && promo.tipo === 'PERCENTUAL'
-              ? <><s style={{ opacity: .55, fontSize: '0.6em' }}>{formataReal(preco)}</s> {formataReal(precoComDesc)}<span>/{periodicidade === 'ANUAL' ? t('unidade.ano') : t('unidade.mes')}</span></>
-              : <>{formataReal(preco)}<span>/{periodicidade === 'ANUAL' ? t('unidade.ano') : t('unidade.mes')}</span></>}
+            {(() => {
+              const emUsd = idioma !== 'pt' && cambio.usdPorBrl != null
+              const formata = (v: number) => emUsd ? formataUsd(v * cambio.usdPorBrl!) : formataReal(v)
+              return promo?.valido && promo.tipo === 'PERCENTUAL'
+                ? <><s style={{ opacity: .55, fontSize: '0.6em' }}>{formata(preco)}</s> {formata(precoComDesc)}<span>/{periodicidade === 'ANUAL' ? t('unidade.ano') : t('unidade.mes')}</span></>
+                : <>{formata(preco)}<span>/{periodicidade === 'ANUAL' ? t('unidade.ano') : t('unidade.mes')}</span></>
+            })()}
           </div>
           {idioma !== 'pt' && cambio.usdPorBrl != null && (
-            <div className="cambio-aprox">{t('cambio.aprox', { valor: Math.round(precoComDesc * cambio.usdPorBrl) })}</div>
+            <div className="cambio-aprox">{t('cambio.aprox', { valor: formataReal(precoComDesc) })}</div>
           )}
           {periodicidade === 'ANUAL' && (
-            <p style={{ fontSize: 13, color: '#666', marginTop: -8 }}>{t('planos.equivaleMes')} {formataReal(precoComDesc / 12)}/{t('unidade.mes')}</p>
+            <p style={{ fontSize: 13, color: '#666', marginTop: -8 }}>
+              {t('planos.equivaleMes')} {idioma !== 'pt' && cambio.usdPorBrl != null ? formataUsd((precoComDesc / 12) * cambio.usdPorBrl) : formataReal(precoComDesc / 12)}/{t('unidade.mes')}
+            </p>
           )}
           {promo?.valido && promo.tipo === 'DIAS_GRATIS' && (
             <p style={{ color: '#22c55e', fontWeight: 600 }}>🎁 {promo.dias} dias grátis — comece a pagar depois</p>

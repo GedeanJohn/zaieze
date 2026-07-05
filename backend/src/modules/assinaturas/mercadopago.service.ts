@@ -22,6 +22,7 @@ export async function criarPreapproval(opts: {
   redeSlug: string
   backUrl: string
   diasGratis?: number // free trial: 1ª cobrança só depois de N dias
+  periodicidade?: 'MENSAL' | 'ANUAL' // default MENSAL — ANUAL cobra 1x a cada 12 meses
 }): Promise<PreapprovalResult> {
   const resp = await fetch('https://api.mercadopago.com/preapproval', {
     method: 'POST',
@@ -38,7 +39,7 @@ export async function criarPreapproval(opts: {
       // do preapproval, sem depender de webhook configurado no painel da aplicação.
       notification_url: `${env.TENANT_SCHEME}://${env.DOMINIO_BASE}/api/assinaturas/webhook`,
       auto_recurring: {
-        frequency: 1,
+        frequency: opts.periodicidade === 'ANUAL' ? 12 : 1,
         frequency_type: 'months',
         transaction_amount: opts.valor,
         currency_id: 'BRL',

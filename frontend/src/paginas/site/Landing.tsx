@@ -4,11 +4,13 @@ import { api, formataReal, rotuloFeature, FEATURE_MIN, type Plano } from '../../
 import AgenteZaieze from './AgenteZaieze'
 import { useMetaTags } from '../../lib/useMetaTags'
 import { capturarRefAfiliado } from '../../lib/afiliado'
+import SeletorPeriodicidade, { type Periodicidade } from '../../componentes/SeletorPeriodicidade'
 
 interface PlanoCatalogo {
   plano: Plano
   nome: string
   preco: number
+  precoAnual: number
   limite: string
   resumo: string
 }
@@ -32,6 +34,8 @@ function featuresAte(plano: Plano): string[] {
 
 export default function Landing() {
   const [planos, setPlanos] = useState<PlanoCatalogo[]>([])
+  const [descontoAnual, setDescontoAnual] = useState(0)
+  const [periodicidade, setPeriodicidade] = useState<Periodicidade>('MENSAL')
   const [chatAberto, setChatAberto] = useState(false)
   const navigate = useNavigate()
 
@@ -42,7 +46,7 @@ export default function Landing() {
   })
 
   useEffect(() => {
-    api.get('/assinaturas/planos').then(({ data }) => setPlanos(data.planos)).catch(() => {})
+    api.get('/assinaturas/planos').then(({ data }) => { setPlanos(data.planos); setDescontoAnual(data.percentualDescontoAnual ?? 0) }).catch(() => {})
   }, [])
 
   useEffect(() => { capturarRefAfiliado() }, [])
@@ -81,17 +85,29 @@ export default function Landing() {
       <section className="planos-site" id="planos">
         <h2>Escolha seu plano</h2>
         <p className="sub">Pague por funcionalidade, não por tamanho. Cancele quando quiser.</p>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
+          <SeletorPeriodicidade valor={periodicidade} onChange={setPeriodicidade} percentualDesconto={descontoAnual} />
+        </div>
         <div className="planos-grid">
           {planos.map((p) => (
             <div key={p.plano} className={`plano-card ${p.plano === 'PRO' ? 'destaque' : ''}`}>
               {p.plano === 'PRO' && <div className="tag">Mais popular</div>}
               <h3>{p.nome}</h3>
-              <div className="preco">{formataReal(p.preco)}<span>/mês</span></div>
+              {periodicidade === 'ANUAL' ? (
+                <>
+                  <div className="preco">{formataReal(p.precoAnual)}<span>/ano</span></div>
+                  <div style={{ fontSize: 12, color: 'var(--zz-mut)', marginTop: -6, marginBottom: 6 }}>
+                    equivale a {formataReal(p.precoAnual / 12)}/mês
+                  </div>
+                </>
+              ) : (
+                <div className="preco">{formataReal(p.preco)}<span>/mês</span></div>
+              )}
               <div className="limite">{p.limite}</div>
               <ul>
                 {featuresAte(p.plano).map((f) => <li key={f}>{f}</li>)}
               </ul>
-              <button className="btn grande" onClick={() => navigate(`/checkout?plano=${p.plano}`)}>
+              <button className="btn grande" onClick={() => navigate(`/checkout?plano=${p.plano}&periodicidade=${periodicidade}`)}>
                 Assinar {p.nome}
               </button>
             </div>

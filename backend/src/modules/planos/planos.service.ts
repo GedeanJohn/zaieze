@@ -19,10 +19,31 @@ export async function precosDosPlanos(): Promise<Record<Plano, number>> {
   return map
 }
 
+/** Percentual de desconto do plano anual vigente (editável pelo SUPER_ADMIN). */
+export async function percentualDescontoAnual(): Promise<number> {
+  const c = await prisma.configAssinatura.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} })
+  return Number(c.percentualDescontoAnual)
+}
+
+/** Define o percentual de desconto do plano anual (admin). */
+export async function definirDescontoAnual(percentual: number): Promise<void> {
+  await prisma.configAssinatura.upsert({
+    where: { id: 1 },
+    create: { id: 1, percentualDescontoAnual: percentual },
+    update: { percentualDescontoAnual: percentual },
+  })
+}
+
+/** Valor cobrado 1x/ano a partir do preço mensal, aplicando o desconto anual. */
+export function valorAnual(precoMensal: number, percentualDesconto: number): number {
+  return arred2(precoMensal * 12 * (1 - percentualDesconto / 100))
+}
+
 /** Catálogo dos planos (metadados do código + preço do banco) — usado na landing e no upgrade. */
 export async function listarPlanos() {
   const precos = await precosDosPlanos()
-  return PLANOS_META.map((m) => ({ ...m, preco: precos[m.plano] }))
+  const desconto = await percentualDescontoAnual()
+  return PLANOS_META.map((m) => ({ ...m, preco: precos[m.plano], precoAnual: valorAnual(precos[m.plano], desconto) }))
 }
 
 /** Define manualmente os preços (admin). Só vale para novas assinaturas/trocas. */

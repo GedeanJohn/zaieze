@@ -14,6 +14,7 @@ const fmtData = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(
 export default function Admin() {
   const [planos, setPlanos] = useState<PlanoAdmin[]>([])
   const [precos, setPrecos] = useState<Record<string, string>>({})
+  const [descontoAnual, setDescontoAnual] = useState('10')
   const [redes, setRedes] = useState<RedeAdmin[]>([])
   const [promos, setPromos] = useState<Promo[]>([])
   const [ocupado, setOcupado] = useState(false)
@@ -26,6 +27,7 @@ export default function Admin() {
     }).catch((e) => avisar(mensagemDeErro(e), 'erro'))
     api.get('/admin/redes').then(({ data }) => setRedes(data.redes)).catch(() => {})
     api.get('/admin/promos').then(({ data }) => setPromos(data.promos)).catch(() => {})
+    api.get('/admin/config-assinatura').then(({ data }) => setDescontoAnual(String(data.percentualDescontoAnual))).catch(() => {})
   }
   useEffect(() => { carregar() }, [])
 
@@ -64,6 +66,14 @@ export default function Admin() {
     } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
   }
 
+  async function salvarDescontoAnual() {
+    setOcupado(true)
+    try {
+      await api.put('/admin/config-assinatura', { percentualDescontoAnual: Number(descontoAnual) })
+      avisar('Desconto do plano anual salvo.')
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
+  }
+
   return (
     <>
       <header><h1>🛠️ Painel do Admin</h1><span style={{ color: 'var(--ink-soft)', fontSize: 13 }}>Operação do SaaS</span></header>
@@ -86,6 +96,19 @@ export default function Admin() {
           ))}
         </div>
         <div style={{ marginTop: 8 }}><button className="btn" onClick={salvarPrecos} disabled={ocupado}>Salvar preços</button></div>
+
+        <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 8 }}>
+            Desconto do <strong>plano anual</strong> (cobrança 1x/ano, à vista) sobre 12x o preço mensal.
+          </div>
+          <div className="linha-campos" style={{ alignItems: 'end' }}>
+            <div className="campo" style={{ maxWidth: 140 }}>
+              <label>% de desconto</label>
+              <input type="number" min="0" max="90" step="0.01" value={descontoAnual} onChange={(e) => setDescontoAnual(e.target.value)} />
+            </div>
+            <div><button className="btn secundario" onClick={salvarDescontoAnual} disabled={ocupado}>Salvar %</button></div>
+          </div>
+        </div>
       </div>
 
       {/* ── Reajuste anual por IGP-M (contratos existentes, por aniversário) ── */}

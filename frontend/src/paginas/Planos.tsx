@@ -14,11 +14,13 @@ interface RespostaPlanos {
   planos: PlanoCatalogo[]
   features: Record<string, Plano>
   atual: Plano | null
+  percentualDescontoAnual: number
 }
 
 interface Assinatura {
   plano: Plano
   status: 'PENDENTE' | 'ATIVA' | 'CANCELADA'
+  periodicidade: 'MENSAL' | 'ANUAL'
   valor: string
   simulada: boolean
   cicloFimEm: string | null
@@ -37,6 +39,7 @@ const rotuloStatus: Record<string, string> = { PENDENTE: 'Pendente', ATIVA: 'Ati
 export default function Planos() {
   const [dados, setDados] = useState<RespostaPlanos | null>(null)
   const [assinatura, setAssinatura] = useState<Assinatura | null>(null)
+  const [mpConfiguradoNoServidor, setMpConfiguradoNoServidor] = useState(false)
   const [contratoAceito, setContratoAceito] = useState(true)
   const [erro, setErro] = useState('')
   const [msg, setMsg] = useState('')
@@ -45,7 +48,7 @@ export default function Planos() {
 
   function carregar() {
     api.get('/planos').then(({ data }) => setDados(data)).catch(() => setErro('Não foi possível carregar os planos.'))
-    api.get('/assinaturas/minha').then(({ data }) => setAssinatura(data.assinatura)).catch(() => setAssinatura(null))
+    api.get('/assinaturas/minha').then(({ data }) => { setAssinatura(data.assinatura); setMpConfiguradoNoServidor(Boolean(data.mpConfigurado)) }).catch(() => setAssinatura(null))
     api.get('/contrato/status').then(({ data }) => setContratoAceito(Boolean(data.aceito))).catch(() => {})
   }
   useEffect(() => { carregar() }, [])
@@ -62,6 +65,24 @@ export default function Planos() {
     try {
       await api.post('/assinaturas/trocar-plano', { plano })
       setMsg('Plano alterado. É necessário entrar novamente para aplicar as novas funcionalidades.')
+    } catch (e) {
+      setErro(mensagemDeErro(e))
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  async function trocarPeriodicidade(nova: 'MENSAL' | 'ANUAL') {
+    const aviso = nova === 'ANUAL'
+      ? 'Mudar para cobrança ANUAL (à vista, 1x/ano, com desconto)?'
+      : 'Mudar para cobrança MENSAL?'
+    if (!window.confirm(aviso + (mpConfiguradoNoServidor ? ' Você vai precisar reautorizar a cobrança no Mercado Pago.' : ''))) return
+    setErro(''); setMsg(''); setOcupado(true)
+    try {
+      const { data } = await api.post('/assinaturas/trocar-periodicidade', { periodicidade: nova })
+      if (data.initPoint) { window.location.href = data.initPoint; return }
+      setMsg('Periodicidade alterada.')
+      carregar()
     } catch (e) {
       setErro(mensagemDeErro(e))
     } finally {
@@ -146,7 +167,7 @@ export default function Planos() {
             <div>
               <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Sua assinatura</div>
               <div style={{ fontSize: 18 }}>
-                <strong>{assinatura.plano}</strong> · {formataReal(assinatura.valor)}/mês ·{' '}
+                <strong>{assinatura.plano}</strong> · {formataReal(assinatura.valor)}/{assinatura.periodicidade === 'ANUAL' ? 'ano' : 'mês'} ·{' '}
                 <span className={`selo ${assinatura.status === 'ATIVA' ? 'ok' : assinatura.status === 'CANCELADA' ? 'baixo' : 'ATACADO'}`}>
                   {rotuloStatus[assinatura.status]}
                 </span>
@@ -161,6 +182,15 @@ export default function Planos() {
                       ? `Cancelamento agendado — acesso até ${fmtData(assinatura.cicloFimEm)}, sem nova cobrança.`
                       : assinatura.cicloFimEm ? `Renova em ${fmtData(assinatura.cicloFimEm)}.` : ''}
               </div>
+              {assinatura.status === 'ATIVA' && !agendado && (
+                <div style={{ marginTop: 6 }}>
+                  <a href="#" onClick={(e) => { e.preventDefault(); trocarPeriodicidade(assinatura.periodicidade === 'ANUAL' ? 'MENSAL' : 'ANUAL') }}>
+                    {assinatura.periodicidade === 'ANUAL'
+                      ? 'Mudar para cobrança mensal'
+                      : `Mudar para cobrança anual (${dados.percentualDescontoAnual}% off)`}
+                  </a>
+                </div>
+              )}
             </div>
             {podeReassinar ? (
               contratoAceito

@@ -25,6 +25,11 @@ enum StatusAssinatura {
   CANCELADA // cancelada/inadimplente
 }
 
+enum Periodicidade {
+  MENSAL
+  ANUAL // cobrança 1x/ano, com desconto (ConfigAssinatura.percentualDescontoAnual)
+}
+
 enum Role {
   SUPER_ADMIN // operador do SaaS
   GESTOR // dono da marca/rede: cria lojas e denomina gerentes
@@ -248,6 +253,7 @@ model Assinatura {
   redeId                   String           @unique
   plano                    Plano
   status                   StatusAssinatura @default(PENDENTE)
+  periodicidade            Periodicidade    @default(MENSAL)
   valor                    Decimal          @db.Decimal(12, 2)
   mpPreapprovalId          String? // id da assinatura no Mercado Pago (preapproval); null em modo simulado
   simulada                 Boolean          @default(false)
@@ -277,6 +283,16 @@ model ConfigPlano {
   updatedAt DateTime @default(now()) @updatedAt
 
   @@map("config_planos")
+}
+
+/// Percentual de desconto do plano ANUAL (editável pelo SUPER_ADMIN). Uma linha só (id=1),
+/// mesmo padrão de ConfigAfiliados.
+model ConfigAssinatura {
+  id                      Int      @id @default(1)
+  percentualDescontoAnual Decimal  @default(10) @db.Decimal(5, 2)
+  updatedAt               DateTime @updatedAt
+
+  @@map("config_assinatura")
 }
 
 /// Histórico de reajustes de preço (ex.: IGP-M acumulado). Auditoria do admin.

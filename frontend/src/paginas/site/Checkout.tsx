@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, formataReal, mensagemDeErro, type Plano } from '../../api'
 import { capturarRefAfiliado, refAfiliadoAtivo } from '../../lib/afiliado'
+import SeletorPeriodicidade, { type Periodicidade } from '../../componentes/SeletorPeriodicidade'
 
 const NOME: Record<Plano, string> = { START: 'Start', PRO: 'Pro', ELITE: 'Elite' }
 
-interface PlanoInfo { plano: Plano; nome: string; preco: number }
+interface PlanoInfo { plano: Plano; nome: string; preco: number; precoAnual: number }
 interface PromoInfo { valido: boolean; beneficio?: string; tipo?: 'DIAS_GRATIS' | 'PERCENTUAL'; dias?: number | null; percentual?: string | null; plano?: Plano | null }
 interface Clausula { n: number; titulo: string; paragrafos: string[] }
 interface ContratoMontado { titulo: string; qualificacao: string[]; clausulas: Clausula[] }
@@ -15,10 +16,12 @@ export default function Checkout() {
   const navigate = useNavigate()
   // Plano é estado: um cupom com plano definido troca/trava o plano (link fica só ?cupom=).
   const [plano, setPlano] = useState<Plano>((params.get('plano') as Plano) || 'PRO')
+  const [periodicidade, setPeriodicidade] = useState<Periodicidade>((params.get('periodicidade') as Periodicidade) || 'MENSAL')
 
   const [form, setForm] = useState({ redeNome: '', slug: '', gestorNome: '', telefone: '', email: '', senha: '' })
   const [dominio, setDominio] = useState('zaieze.com')
   const [planos, setPlanos] = useState<PlanoInfo[]>([])
+  const [descontoAnual, setDescontoAnual] = useState(0)
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checando' | 'ok' | 'indisponivel'>('idle')
   // Pré-preenche o cupom pela URL (?cupom= ou ?codigo=) — permite compartilhar um link já com o cupom.
   const [codigoPromo, setCodigoPromo] = useState((params.get('cupom') || params.get('codigo') || '').toUpperCase())
@@ -30,16 +33,18 @@ export default function Checkout() {
   const [contratoAberto, setContratoAberto] = useState(false)
 
   useEffect(() => {
-    api.get('/assinaturas/planos').then(({ data }) => { setDominio(data.dominioBase); setPlanos(data.planos) }).catch(() => {})
+    api.get('/assinaturas/planos').then(({ data }) => {
+      setDominio(data.dominioBase); setPlanos(data.planos); setDescontoAnual(data.percentualDescontoAnual ?? 0)
+    }).catch(() => {})
     api.get('/contrato/termos').then(({ data }) => setContrato(data.contrato)).catch(() => {})
     capturarRefAfiliado()
   }, [])
 
   const info = planos.find((p) => p.plano === plano)
-  const preco = info?.preco ?? 0
+  const preco = periodicidade === 'ANUAL' ? (info?.precoAnual ?? 0) : (info?.preco ?? 0)
   const nome = info?.nome ?? NOME[plano]
 
-  // valor exibido considerando o código promocional
+  // valor exibido considerando o código promocional (aplicado sobre o preço mensal ou anual)
   const precoComDesc = useMemo(() => {
     if (promo?.valido && promo.tipo === 'PERCENTUAL' && promo.percentual) {
       return Math.round(preco * (1 - Number(promo.percentual) / 100) * 100) / 100
@@ -92,6 +97,7 @@ export default function Checkout() {
         plano, ...form, slug: form.slug.toLowerCase(),
         codigoPromo: codigoPromo.trim() || undefined,
         refAfiliado: refAfiliadoAtivo(),
+        periodicidade,
       })
       if (data.simulado) navigate(`/sucesso?slug=${data.slug}&plano=${plano}&simulado=1`)
       else if (data.initPoint) window.location.href = data.initPoint
@@ -108,15 +114,21 @@ export default function Checkout() {
       <div className="checkout-card">
         <div className="checkout-resumo">
           <h2>Plano {nome}</h2>
+          <div style={{ marginBottom: 12 }}>
+            <SeletorPeriodicidade valor={periodicidade} onChange={setPeriodicidade} percentualDesconto={descontoAnual} />
+          </div>
           <div className="preco">
             {promo?.valido && promo.tipo === 'PERCENTUAL'
-              ? <><s style={{ opacity: .55, fontSize: '0.6em' }}>{formataReal(preco)}</s> {formataReal(precoComDesc)}<span>/mês</span></>
-              : <>{formataReal(preco)}<span>/mês</span></>}
+              ? <><s style={{ opacity: .55, fontSize: '0.6em' }}>{formataReal(preco)}</s> {formataReal(precoComDesc)}<span>/{periodicidade === 'ANUAL' ? 'ano' : 'mês'}</span></>
+              : <>{formataReal(preco)}<span>/{periodicidade === 'ANUAL' ? 'ano' : 'mês'}</span></>}
           </div>
+          {periodicidade === 'ANUAL' && (
+            <p style={{ fontSize: 13, color: '#666', marginTop: -8 }}>equivale a {formataReal(precoComDesc / 12)}/mês</p>
+          )}
           {promo?.valido && promo.tipo === 'DIAS_GRATIS' && (
             <p style={{ color: '#22c55e', fontWeight: 600 }}>🎁 {promo.dias} dias grátis — comece a pagar depois</p>
           )}
-          <p>Lojas e vendedoras ilimitadas. Cobrança recorrente mensal via Mercado Pago. Cancele quando quiser.</p>
+          <p>Lojas e vendedoras ilimitadas. Cobrança recorrente {periodicidade === 'ANUAL' ? 'anual' : 'mensal'} via Mercado Pago. Cancele quando quiser.</p>
         </div>
 
         <form className="checkout-form" onSubmit={assinar}>

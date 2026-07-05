@@ -4,9 +4,9 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
 import { redeIdDe } from '../../plugins/auth'
-import { consultarPreapproval, criarPreapproval, mpConfigurado } from './mercadopago.service'
+import { consultarPreapproval, criarPreapproval, cancelarPreapproval, mpConfigurado } from './mercadopago.service'
 import { proximoCicloFim, reativarAssinatura, solicitarCancelamento } from './assinatura.service'
-import { listarPlanos, precoDoPlano } from '../planos/planos.service'
+import { listarPlanos, precoDoPlano, percentualDescontoAnual, valorAnual } from '../planos/planos.service'
 import { consumirCodigo, descricaoBeneficio, validarCodigo } from '../promo/promo.service'
 import { CONTRATO_VERSAO } from '../contrato/contrato.template'
 import { temAceiteVigente } from '../contrato/contrato.service'
@@ -27,6 +27,7 @@ const checkoutSchema = z.object({
   codigoPromo: z.string().optional(),
   // Programa de Afiliados: código do link de indicação (?ref=), capturado pela landing/checkout.
   refAfiliado: z.string().trim().optional(),
+  periodicidade: z.enum(['MENSAL', 'ANUAL']).default('MENSAL'),
 })
 
 // Subdomínios que não podem virar slug de tenant (colidem com o SaaS)
@@ -39,7 +40,9 @@ function urlTenant(slug: string): string {
 /** Billing SaaS — checkout público (landing) + webhook do Mercado Pago + provisionamento do tenant. */
 export async function assinaturasRoutes(app: FastifyInstance) {
   // Catálogo público de planos (consumido pela landing) — sem autenticação
-  app.get('/planos', async () => ({ planos: await listarPlanos(), dominioBase: env.DOMINIO_BASE }))
+  app.get('/planos', async () => ({
+    planos: await listarPlanos(), dominioBase: env.DOMINIO_BASE, percentualDescontoAnual: await percentualDescontoAnual(),
+  }))
 
   // Validação pública de código promocional (landing mostra o benefício antes do checkout)
   app.get('/codigo-promo', async (request) => {
@@ -82,6 +85,10 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     // Cupom pode FIXAR o plano da oferta (link só ?cupom=): quando definido, ele manda no plano.
     const plano = promo?.plano ?? body.plano
     let valor = await precoDoPlano(plano)
+    // Plano ANUAL: cobra 1x/ano o total com desconto, em vez do valor mensal.
+    if (body.periodicidade === 'ANUAL') {
+      valor = valorAnual(valor, await percentualDescontoAnual())
+    }
     if (promo?.tipo === 'PERCENTUAL' && promo.percentual) {
       valor = arred2(valor * (1 - Number(promo.percentual) / 100))
     }
@@ -105,7 +112,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
 
     // Início do 1º ciclo: com dias grátis, o acesso vai até now+dias (depois cobra).
     const inicioCiclo = () => {
-      if (!diasGratis) return proximoCicloFim()
+      if (!diasGratis) return proximoCicloFim(new Date(), body.periodicidade)
       const d = new Date(); d.setDate(d.getDate() + diasGratis); return d
     }
     // Data da 1ª cobrança quando há período grátis (free trial). Sem dias grátis, a
@@ -135,7 +142,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
       })
       await tx.assinatura.create({
         data: {
-          redeId: r.id, plano, valor, simulada: semCobranca,
+          redeId: r.id, plano, valor, simulada: semCobranca, periodicidade: body.periodicidade,
           status: semCobranca ? 'ATIVA' : 'PENDENTE',
           // sem cobrança (simulado ou 100% off) já entra com ciclo; no modo pago o ciclo começa no webhook
           cicloFimEm: cicloFimEmInicial,
@@ -172,6 +179,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
         redeSlug: slug,
         backUrl: `${urlTenant(slug)}/login`,
         diasGratis,
+        periodicidade: body.periodicidade,
       })
       await prisma.assinatura.update({ where: { redeId: rede.id }, data: { mpPreapprovalId: pre.id } })
       if (promo) await consumirCodigo(promo.id)
@@ -250,7 +258,9 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     if (!assinatura) return reply.code(404).send({ erro: 'Rede sem assinatura' })
     if (assinatura.plano === plano) return reply.code(422).send({ erro: 'A rede já está neste plano.' })
 
-    const valor = await precoDoPlano(plano)
+    let valor = await precoDoPlano(plano)
+    // Preserva a periodicidade vigente da assinatura (mensal/anual) ao trocar de plano.
+    if (assinatura.periodicidade === 'ANUAL') valor = valorAnual(valor, await percentualDescontoAnual())
     await prisma.$transaction([
       prisma.assinatura.update({
         where: { redeId },
@@ -258,12 +268,53 @@ export async function assinaturasRoutes(app: FastifyInstance) {
           plano, valor, status: 'ATIVA',
           // trocar de plano reengaja: cancela um cancelamento agendado e garante ciclo vigente
           cancelamentoSolicitadoEm: null, cancelamentoOrigem: null,
-          cicloFimEm: assinatura.cicloFimEm ?? proximoCicloFim(),
+          cicloFimEm: assinatura.cicloFimEm ?? proximoCicloFim(new Date(), assinatura.periodicidade),
         },
       }),
       prisma.rede.update({ where: { id: redeId }, data: { plano, ativo: true } }),
     ])
     return { ok: true, plano, observacao: assinatura.simulada ? 'Plano alterado (modo simulado).' : 'Plano alterado. A próxima cobrança no Mercado Pago refletirá o novo valor.' }
+  })
+
+  const trocarPeriodicidadeSchema = z.object({ periodicidade: z.enum(['MENSAL', 'ANUAL']) })
+
+  // Trocar entre cobrança mensal e anual. O Mercado Pago não permite mudar a frequência de um
+  // preapproval já criado — em modo real, cancela a recorrência atual e cria uma nova (mesmo
+  // padrão do /reassinar), e o gestor reautoriza no MP. Em modo simulado, aplica na hora.
+  app.post('/trocar-periodicidade', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
+    const redeId = redeIdDe(request)
+    const { periodicidade } = trocarPeriodicidadeSchema.parse(request.body)
+    const rede = await prisma.rede.findUnique({ where: { id: redeId }, include: { assinatura: true } })
+    if (!rede?.assinatura) return reply.code(404).send({ erro: 'Rede sem assinatura' })
+    const assinatura = rede.assinatura
+    if (assinatura.periodicidade === periodicidade) {
+      return reply.code(422).send({ erro: `A assinatura já está no modo ${periodicidade === 'ANUAL' ? 'anual' : 'mensal'}.` })
+    }
+
+    let valor = await precoDoPlano(assinatura.plano)
+    if (periodicidade === 'ANUAL') valor = valorAnual(valor, await percentualDescontoAnual())
+
+    if (assinatura.simulada || !mpConfigurado()) {
+      await prisma.assinatura.update({
+        where: { redeId },
+        data: { periodicidade, valor, cicloFimEm: proximoCicloFim(new Date(), periodicidade) },
+      })
+      return { simulado: true }
+    }
+
+    // Modo real: a frequência de um preapproval não é editável — cancela o atual e cria um novo.
+    if (assinatura.mpPreapprovalId) await cancelarPreapproval(assinatura.mpPreapprovalId).catch(() => { /* pendente/sem efeito */ })
+    const gestor = await prisma.usuario.findFirst({ where: { redeId, role: 'GESTOR' }, orderBy: { createdAt: 'asc' } })
+    const pre = await criarPreapproval({
+      plano: assinatura.plano,
+      valor,
+      email: gestor?.email ?? '',
+      redeSlug: rede.slug,
+      backUrl: `${urlTenant(rede.slug)}/login`,
+      periodicidade,
+    })
+    await prisma.assinatura.update({ where: { redeId }, data: { mpPreapprovalId: pre.id, periodicidade, valor } })
+    return { simulado: false, initPoint: pre.initPoint }
   })
 
   // Cancelar a assinatura — política de FIM DE CICLO: mantém o acesso até cicloFimEm.
@@ -297,7 +348,9 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     }
 
     const plano = rede.assinatura.plano
-    const valor = await precoDoPlano(plano)
+    const periodicidade = rede.assinatura.periodicidade
+    let valor = await precoDoPlano(plano)
+    if (periodicidade === 'ANUAL') valor = valorAnual(valor, await percentualDescontoAnual())
 
     // Modo simulado: reativa direto (equivale ao webhook de pagamento aprovado).
     if (!mpConfigurado()) {
@@ -314,6 +367,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
       email: gestor?.email ?? '',
       redeSlug: rede.slug,
       backUrl: `${urlTenant(rede.slug)}/login`,
+      periodicidade,
     })
     await prisma.assinatura.update({ where: { redeId }, data: { mpPreapprovalId: pre.id, plano, valor } })
     return { simulado: false, initPoint: pre.initPoint }

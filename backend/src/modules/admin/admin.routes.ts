@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
-import { aplicarReajuste, definirPrecos, listarPlanos, listarReajustes } from '../planos/planos.service'
+import { aplicarReajuste, definirPrecos, listarPlanos, listarReajustes, percentualDescontoAnual, definirDescontoAnual } from '../planos/planos.service'
 import { normalizarCodigo } from '../promo/promo.service'
 import { cancelarPreapproval, mpConfigurado } from '../assinaturas/mercadopago.service'
 import { excluirDoR2 } from '../midia/r2.service'
@@ -52,6 +52,14 @@ export async function adminRoutes(app: FastifyInstance) {
     const { precos } = precosSchema.parse(request.body)
     await definirPrecos(precos)
     return { ok: true, planos: await listarPlanos() }
+  })
+
+  // Desconto do plano ANUAL (a priori 10%) — vale para novas assinaturas/trocas de periodicidade.
+  app.get('/config-assinatura', async () => ({ percentualDescontoAnual: await percentualDescontoAnual() }))
+  app.put('/config-assinatura', async (request) => {
+    const { percentualDescontoAnual: pct } = z.object({ percentualDescontoAnual: z.coerce.number().min(0).max(90) }).parse(request.body)
+    await definirDescontoAnual(pct)
+    return { percentualDescontoAnual: pct }
   })
 
   // ── Reajuste por inflação (IGP-M acumulado) — só novas assinaturas/trocas ──

@@ -3,20 +3,26 @@ import { limparMidiaDaRede } from '../midia/limpeza.service'
 
 export type OrigemCancelamento = 'LOJISTA' | 'ADMIN' | 'MERCADO_PAGO' | 'DISTRATO_TERMOS'
 
-/** Fim do próximo ciclo mensal a partir de uma data (default: agora). */
-export function proximoCicloFim(base = new Date()): Date {
-  return new Date(base.getFullYear(), base.getMonth() + 1, base.getDate(), base.getHours(), base.getMinutes(), base.getSeconds())
+/** Fim do próximo ciclo a partir de uma data (default: agora) — 1 mês (MENSAL) ou 12 meses (ANUAL). */
+export function proximoCicloFim(base = new Date(), periodicidade: 'MENSAL' | 'ANUAL' = 'MENSAL'): Date {
+  const meses = periodicidade === 'ANUAL' ? 12 : 1
+  return new Date(base.getFullYear(), base.getMonth() + meses, base.getDate(), base.getHours(), base.getMinutes(), base.getSeconds())
 }
 
 /**
- * Ativa/renova o ciclo: assinatura ATIVA, rede no ar e acesso garantido por +1 mês.
- * Usado quando o pagamento é confirmado (webhook MP) ou no provisionamento simulado.
+ * Ativa/renova o ciclo: assinatura ATIVA, rede no ar e acesso garantido por +1 ciclo
+ * (1 mês ou 1 ano, conforme a periodicidade da assinatura). Usado quando o pagamento é
+ * confirmado (webhook MP) ou no provisionamento simulado.
  */
 export async function confirmarCiclo(redeId: string): Promise<void> {
+  const atual = await prisma.assinatura.findUnique({ where: { redeId }, select: { periodicidade: true } })
   await prisma.$transaction([
     prisma.assinatura.update({
       where: { redeId },
-      data: { status: 'ATIVA', cicloFimEm: proximoCicloFim(), cancelamentoSolicitadoEm: null, cancelamentoOrigem: null },
+      data: {
+        status: 'ATIVA', cicloFimEm: proximoCicloFim(new Date(), atual?.periodicidade),
+        cancelamentoSolicitadoEm: null, cancelamentoOrigem: null,
+      },
     }),
     prisma.rede.update({ where: { id: redeId }, data: { ativo: true } }),
   ])

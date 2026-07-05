@@ -28,6 +28,67 @@ function IconeWhatsApp({ size = 22 }: { size?: number }) {
   )
 }
 
+/** Ícones de linha simples (currentColor), mesma técnica do IconeWhatsApp. */
+function IconeVendas({ size = 26 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <path d="M6 8h12l-1 12H7L6 8Z" strokeLinejoin="round" />
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" strokeLinecap="round" />
+    </svg>
+  )
+}
+function IconeEstoque({ size = 26 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <path d="M12 3 3 7.5 12 12l9-4.5L12 3Z" strokeLinejoin="round" />
+      <path d="M3 7.5V16l9 5 9-5V7.5" strokeLinejoin="round" />
+      <path d="M12 12v9" />
+    </svg>
+  )
+}
+function IconeCrm({ size = 26 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 20a5.5 5.5 0 0 1 11 0" strokeLinecap="round" />
+      <circle cx="17" cy="8" r="2.4" />
+      <path d="M15.5 12.3A4.7 4.7 0 0 1 20.5 17" strokeLinecap="round" />
+    </svg>
+  )
+}
+function IconeCatalogo({ size = 26 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.2" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.2" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.2" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.2" />
+    </svg>
+  )
+}
+function IconeNuvem({ size = 26 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <path d="M6.5 18a4 4 0 0 1-.5-7.97A5 5 0 0 1 15.9 8.3 4.5 4.5 0 0 1 17.5 18H6.5Z" strokeLinejoin="round" />
+    </svg>
+  )
+}
+function IconeRaio({ size = 32 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  )
+}
+function IconeCarteira({ size = 32 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <circle cx="12" cy="8" r="3.4" />
+      <path d="M4.5 20a7.5 7.5 0 0 1 15 0" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function featuresAte(plano: Plano, t: (chave: string) => string): string[] {
   return Object.entries(FEATURE_MIN)
     .filter(([, min]) => ORDEM[min] <= ORDEM[plano])
@@ -80,12 +141,57 @@ export default function Landing() {
           <Link className="btn secundario grande" to="/entrar">{t('hero.jaSouCliente')}</Link>
         </div>
         <div className="hero-nota">{t('hero.nota')}</div>
+        <div className="selos-hero">
+          <span>⚡ {t('selos.implantacao')}</span>
+          <span>🎧 {t('selos.suporte')}</span>
+          <span>☁️ {t('selos.nuvem')}</span>
+          <span>🔒 {t('selos.seguranca')}</span>
+        </div>
+      </section>
+
+      <section className="recursos">
+        <h2>{t('recursos.titulo')}</h2>
+        <div className="recursos-grid">
+          <div className="recurso-card"><IconeVendas /><strong>{t('recursos.1.titulo')}</strong><p>{t('recursos.1.texto')}</p></div>
+          <div className="recurso-card"><IconeEstoque /><strong>{t('recursos.2.titulo')}</strong><p>{t('recursos.2.texto')}</p></div>
+          <div className="recurso-card"><IconeWhatsApp /><strong>{t('recursos.3.titulo')}</strong><p>{t('recursos.3.texto')}</p></div>
+          <div className="recurso-card"><IconeCrm /><strong>{t('recursos.4.titulo')}</strong><p>{t('recursos.4.texto')}</p></div>
+          <div className="recurso-card"><IconeCatalogo /><strong>{t('recursos.5.titulo')}</strong><p>{t('recursos.5.texto')}</p></div>
+          <div className="recurso-card"><IconeNuvem /><strong>{t('recursos.6.titulo')}</strong><p>{t('recursos.6.texto')}</p></div>
+        </div>
       </section>
 
       <section className="faixa" id="como">
         <div><strong>{t('faixa.1.titulo')}</strong><span>{t('faixa.1.texto')}</span></div>
         <div><strong>{t('faixa.2.titulo')}</strong><span>{t('faixa.2.texto')}</span></div>
         <div><strong>{t('faixa.3.titulo')}</strong><span>{t('faixa.3.texto')}</span></div>
+      </section>
+
+      <section className="confianca">
+        <div className="confianca-colagem">
+          <img className="foto-principal" src="https://unsplash.com/photos/5fdhWc1Vm1s/download?w=700" alt="" loading="lazy" />
+          <img src="https://unsplash.com/photos/IlHemAQpJ-U/download?w=500" alt="" loading="lazy" />
+          <img src="https://unsplash.com/photos/E8OLZnK3kVg/download?w=500" alt="" loading="lazy" />
+        </div>
+        <div className="confianca-texto">
+          <h2>{t('confianca.titulo')}<strong>{t('confianca.tituloDestaque')}</strong></h2>
+          <p>{t('confianca.texto')}</p>
+          <ul className="moda-lista">
+            <li>{t('moda.item1')}</li>
+            <li>{t('moda.item2')}</li>
+            <li>{t('moda.item3')}</li>
+            <li>{t('moda.item4')}</li>
+          </ul>
+        </div>
+      </section>
+
+      <section className="diferenciais-faixa">
+        <h2>{t('diferenciais.titulo')}</h2>
+        <div className="diferenciais-grid">
+          <div><IconeRaio /><p>{t('diferenciais.1')}</p></div>
+          <div><IconeCarteira /><p>{t('diferenciais.2')}</p></div>
+          <div><IconeNuvem size={32} /><p>{t('diferenciais.3')}</p></div>
+        </div>
       </section>
 
       <section className="planos-site" id="planos">
@@ -131,6 +237,11 @@ export default function Landing() {
             <IconeWhatsApp size={20} /> {t('planos.faleConosco')}
           </button>
         </div>
+      </section>
+
+      <section className="cta-final">
+        <h2>{t('ctaFinal.titulo')}</h2>
+        <a className="btn grande" href="#planos">{t('ctaFinal.botao')}</a>
       </section>
 
       {/* Botão flutuante — abre o atendimento da ZAIEZE (estilo da marca) */}

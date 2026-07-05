@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, mensagemDeErro } from '../api'
 import { useToast } from '../componentes/Toast'
+import { useIdioma } from '../lib/i18n'
 
 interface Clausula { n: number; titulo: string; paragrafos: string[] }
 interface ContratoMontado {
@@ -25,6 +26,7 @@ function fmt(iso: string | null): string {
 }
 
 export default function Contrato() {
+  const { t } = useIdioma()
   const [dados, setDados] = useState<RespostaContrato | null>(null)
   const [erro, setErro] = useState('')
   const avisar = useToast()
@@ -39,7 +41,7 @@ export default function Contrato() {
     setOcupado(true)
     try {
       await api.post('/contrato/aceitar', {})
-      avisar('Aceite registrado com sucesso.')
+      avisar(t('contrato.aceiteSucesso'))
       carregar()
     } catch (e) {
       avisar(mensagemDeErro(e), 'erro')
@@ -49,32 +51,30 @@ export default function Contrato() {
   }
 
   if (erro && !dados) return <div className="cartao alerta">{erro}</div>
-  if (!dados) return <div className="cartao">Carregando…</div>
+  if (!dados) return <div className="cartao">{t('contrato.carregando')}</div>
 
   const c = dados.contrato
 
   return (
     <>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-        <h1>📄 Contrato</h1>
+        <h1>{t('contrato.titulo')}</h1>
         <span className={`selo ${dados.aceito ? 'ok' : 'ATACADO'}`}>
-          {dados.aceito ? '✓ Aceito' : 'Pendente de aceite'}
+          {dados.aceito ? t('contrato.aceito') : t('contrato.pendente')}
         </span>
       </header>
 
       {!dados.aceito && dados.pendente && (
         <div className="cartao" style={{ borderLeft: '4px solid var(--danger)' }}>
-          <strong>Atualizamos nossos termos de prestação de serviços e conduta.</strong> Para manter o acesso, leia o
-          contrato abaixo e registre o aceite{dados.prazo && <> até <strong>{fmt(dados.prazo)}</strong></>}. Sem o aceite,
-          o contrato é distratado: a cobrança recorrente é interrompida e o acesso encerrado ao fim do período já pago.
+          <strong>{t('contrato.avisoTitulo')}</strong> {t('contrato.avisoTexto1')}{dados.prazo && <> {t('contrato.avisoTexto2')} <strong>{fmt(dados.prazo)}</strong></>}{t('contrato.avisoTexto3')}
         </div>
       )}
 
       <div className="cartao" style={{ maxHeight: '58vh', overflowY: 'auto', lineHeight: 1.65, fontSize: 14 }}>
         <h2 style={{ marginTop: 0 }}>{c.titulo}</h2>
         <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 12 }}>
-          Versão {c.versao}
-          {c.aceite && <> · aceito em {new Date(c.aceite.aceitoEm).toLocaleString('pt-BR')}{c.aceite.ip ? ` · IP ${c.aceite.ip}` : ''}</>}
+          {t('contrato.versaoLabel')} {c.versao}
+          {c.aceite && <> · {t('contrato.aceitoEmSufixo')} {new Date(c.aceite.aceitoEm).toLocaleString('pt-BR')}{c.aceite.ip ? ` · ${t('contrato.ipSufixo')} ${c.aceite.ip}` : ''}</>}
         </div>
 
         {c.qualificacao.map((p, i) => (
@@ -83,7 +83,7 @@ export default function Contrato() {
 
         {c.clausulas.map((cl) => (
           <div key={cl.n} style={{ marginTop: 14 }}>
-            <h3 style={{ margin: '0 0 4px', fontSize: 15 }}>CLÁUSULA {cl.n}ª — {cl.titulo}</h3>
+            <h3 style={{ margin: '0 0 4px', fontSize: 15 }}>{t('contrato.clausulaLabel')} {cl.n}ª — {cl.titulo}</h3>
             {cl.paragrafos.map((p, i) => (
               <p key={i} style={{ textAlign: 'justify', margin: '4px 0' }}>
                 <span style={{ color: 'var(--ink-soft)' }}>{cl.n}.{i + 1}.</span> {p}
@@ -96,7 +96,7 @@ export default function Contrato() {
       {!dados.aceito && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
           <button className="btn" onClick={aceitar} disabled={ocupado}>
-            {ocupado ? 'Registrando…' : 'Li e aceito o contrato'}
+            {ocupado ? t('contrato.registrando') : t('contrato.liEAceito')}
           </button>
         </div>
       )}

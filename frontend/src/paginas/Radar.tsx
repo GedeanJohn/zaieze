@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, formataReal, mensagemDeErro } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
+import { useIdioma } from '../lib/i18n'
 
 interface Oportunidade {
   produtoId: string
@@ -17,6 +18,7 @@ interface Oportunidade {
 
 export default function Radar() {
   const escopo = useLojaAtiva()
+  const { t } = useIdioma()
   const [ops, setOps] = useState<Oportunidade[]>([])
   const [disparo, setDisparo] = useState<{ op: Oportunidade; texto: string } | null>(null)
   const [erro, setErro] = useState('')
@@ -40,9 +42,9 @@ export default function Radar() {
         clienteIds: disparo.op.clienteIds,
         mensagemTemplate: disparo.texto,
       }, { params: escopo.params })
-      const partes = [`${data.enviados} enviada(s)`, data.simulados ? `${data.simulados} simulada(s)` : '', data.semConsentimento ? `${data.semConsentimento} sem LGPD` : '']
+      const partes = [t('camp.parteEnviadas', { n: data.enviados }), data.simulados ? t('camp.parteSimuladas', { n: data.simulados }) : '', data.semConsentimento ? t('camp.parteSemLgpdModelo', { n: data.semConsentimento }) : '']
       setDisparo(null)
-      avisar(`Campanha do Radar disparada para ${data.alcance} cliente(s): ${partes.filter(Boolean).join(' · ')}.`)
+      avisar(t('radar.campanhaDisparadaSucesso', { alcance: data.alcance, partes: partes.filter(Boolean).join(' · ') }))
     } catch (e) {
       setErro(mensagemDeErro(e))
     } finally {
@@ -53,12 +55,12 @@ export default function Radar() {
   return (
     <>
       <header>
-        <h1>★ Radar de Oportunidades</h1>
+        <h1>{t('radar.titulo')}</h1>
         <SeletorLoja escopo={escopo} />
       </header>
 
       <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-        Cruza <strong>estoque parado</strong> (sem venda há 60 dias) com o <strong>perfil dos clientes</strong> (quem já comprou aquela categoria) e sugere a campanha. Dispare em 1 clique — respeitando consentimento LGPD e roteando pela vendedora de cada cliente.
+        {t('radar.explicacao1')} <strong>{t('radar.estoqueParadoDestaque')}</strong> {t('radar.explicacao2')} <strong>{t('radar.perfilClientesDestaque')}</strong> {t('radar.explicacao3')}
       </div>
 
       {erro && !disparo && <div className="alerta">{erro}</div>}
@@ -72,19 +74,19 @@ export default function Radar() {
             </div>
             {op.categoria && <span className="selo ATACADO" style={{ alignSelf: 'flex-start' }}>{op.categoria}</span>}
             <div style={{ fontSize: 14, color: 'var(--ink-soft)' }}>
-              📦 {op.estoqueParado} parada(s) · {formataReal(op.valorParado)} imobilizado
+              📦 {t('radar.paradasSufixo', { n: op.estoqueParado })} · {formataReal(op.valorParado)} {t('radar.imobilizadoSufixo')}
             </div>
             <div style={{ fontSize: 15 }}>
-              🎯 <strong>{op.clientesAlvo}</strong> cliente(s) com perfil para esta peça
+              🎯 <strong>{op.clientesAlvo}</strong> {t('radar.clientesPerfilSufixo')}
             </div>
             <button className="btn" style={{ marginTop: 'auto' }} onClick={() => setDisparo({ op, texto: op.mensagemSugerida })}>
-              📲 Disparar campanha
+              {t('radar.dispararCampanha')}
             </button>
           </div>
         ))}
         {ops.length === 0 && (
           <div className="cartao" style={{ color: 'var(--ink-soft)' }}>
-            Nenhuma oportunidade no momento — não há estoque parado com clientes de perfil compatível. 👍
+            {t('radar.nenhumaOportunidade')}
           </div>
         )}
       </div>
@@ -92,18 +94,18 @@ export default function Radar() {
       {disparo && (
         <div className="modal-fundo" onClick={() => setDisparo(null)}>
           <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); confirmar() }} style={{ width: 'min(560px, 92vw)' }}>
-            <h2>Disparar: {disparo.op.produto}</h2>
+            <h2>{t('radar.dispararTitulo', { produto: disparo.op.produto })}</h2>
             <p style={{ color: 'var(--ink-soft)', fontSize: 13, marginTop: 0 }}>
-              {disparo.op.clientesAlvo} cliente(s) alvo · {disparo.op.categoria ?? 'sem categoria'}
+              {t('radar.clientesAlvoResumo', { n: disparo.op.clientesAlvo, categoria: disparo.op.categoria ?? t('radar.semCategoria') })}
             </p>
             {erro && <div className="alerta">{erro}</div>}
             <div className="campo">
-              <label>Mensagem (variáveis: {'{primeiroNome}'} {'{loja}'} {'{vendedora}'})</label>
+              <label>{t('radar.mensagemVariaveis')}</label>
               <textarea rows={4} value={disparo.texto} onChange={(e) => setDisparo({ ...disparo, texto: e.target.value })} />
             </div>
             <div className="acoes">
-              <button type="button" className="btn secundario" onClick={() => setDisparo(null)}>Cancelar</button>
-              <button className="btn" disabled={enviando}>{enviando ? 'Disparando…' : 'Confirmar disparo'}</button>
+              <button type="button" className="btn secundario" onClick={() => setDisparo(null)}>{t('comum.cancelar')}</button>
+              <button className="btn" disabled={enviando}>{enviando ? t('radar.disparando') : t('radar.confirmarDisparo')}</button>
             </div>
           </form>
         </div>

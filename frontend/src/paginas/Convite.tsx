@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { api, mensagemDeErro, rotuloPapel } from '../api'
+import { api, mensagemDeErro } from '../api'
+import { useIdioma } from '../lib/i18n'
 
 interface InfoConvite {
   valido: boolean
@@ -15,6 +16,7 @@ interface InfoConvite {
 export default function Convite() {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
+  const { t } = useIdioma()
   const [info, setInfo] = useState<InfoConvite | null>(null)
   const [senha, setSenha] = useState('')
   const [confirma, setConfirma] = useState('')
@@ -32,8 +34,8 @@ export default function Convite() {
   async function aceitar(e: React.FormEvent) {
     e.preventDefault()
     setErro('')
-    if (senha.length < 6) { setErro('A senha precisa ter pelo menos 6 caracteres.'); return }
-    if (senha !== confirma) { setErro('As senhas não conferem.'); return }
+    if (senha.length < 6) { setErro(t('convite.senhaMinima')); return }
+    if (senha !== confirma) { setErro(t('convite.senhasNaoConferem')); return }
     setSalvando(true)
     try {
       await api.post(`/convites/${token}/aceitar`, { senha })
@@ -46,14 +48,14 @@ export default function Convite() {
     }
   }
 
-  if (!info) return <div className="login-wrap"><div className="login-card">Carregando…</div></div>
+  if (!info) return <div className="login-wrap"><div className="login-card">{t('convite.carregando')}</div></div>
 
   if (pronto) {
     return (
       <div className="login-wrap">
         <div className="login-card" style={{ textAlign: 'center' }}>
-          <h1>Tudo certo! ✅</h1>
-          <p>Sua conta foi criada. Redirecionando para o login…</p>
+          <h1>{t('convite.tudoCerto')}</h1>
+          <p>{t('convite.contaCriada')}</p>
         </div>
       </div>
     )
@@ -63,12 +65,12 @@ export default function Convite() {
     return (
       <div className="login-wrap">
         <div className="login-card" style={{ textAlign: 'center' }}>
-          <h1>Convite indisponível</h1>
+          <h1>{t('convite.indisponivel')}</h1>
           <p>
-            {info.usado ? 'Este convite já foi utilizado.' : info.expirado ? 'Este convite expirou.' : 'Convite inválido.'}
-            {' '}Peça um novo link a quem te convidou.
+            {info.usado ? t('convite.jaUtilizado') : info.expirado ? t('convite.expirado') : t('convite.invalido')}
+            {' '}{t('convite.pecaNovoLink')}
           </p>
-          <button className="btn" style={{ width: '100%' }} onClick={() => navigate('/login')}>Ir para o login</button>
+          <button className="btn" style={{ width: '100%' }} onClick={() => navigate('/login')}>{t('convite.irParaLogin')}</button>
         </div>
       </div>
     )
@@ -77,31 +79,31 @@ export default function Convite() {
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={aceitar}>
-        <h1>Bem-vindo(a)!</h1>
+        <h1>{t('convite.bemVindo')}</h1>
         <p>
-          {info.redeNome ? <>Você foi convidado(a) para <strong>{info.redeNome}</strong></> : 'Você foi convidado(a)'}
-          {info.role ? <> como <strong>{rotuloPapel[info.role as keyof typeof rotuloPapel] ?? info.role}</strong></> : ''}.
-          {' '}Crie sua senha para acessar.
+          {info.redeNome ? <>{t('convite.convidadoPara')} <strong>{info.redeNome}</strong></> : t('convite.convidado')}
+          {info.role ? <> {t('convite.comoPapel')} <strong>{t(`papel.${info.role}`)}</strong></> : ''}.
+          {' '}{t('convite.crieSenhaTexto')}
         </p>
         {erro && <div className="alerta">{erro}</div>}
         <div className="campo">
-          <label>Nome</label>
+          <label>{t('convite.nomeLabel')}</label>
           <input value={info.nome ?? ''} disabled />
         </div>
         <div className="campo">
-          <label>E-mail (seu login)</label>
+          <label>{t('convite.emailLoginLabel')}</label>
           <input value={info.email ?? ''} disabled />
         </div>
         <div className="campo">
-          <label>Crie sua senha</label>
-          <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required autoFocus placeholder="mínimo 6 caracteres" />
+          <label>{t('convite.crieSenhaLabel')}</label>
+          <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required autoFocus placeholder={t('convite.senhaMinPlaceholder')} />
         </div>
         <div className="campo">
-          <label>Confirme a senha</label>
+          <label>{t('convite.confirmeSenhaLabel')}</label>
           <input type="password" value={confirma} onChange={(e) => setConfirma(e.target.value)} required />
         </div>
         <button className="btn" style={{ width: '100%' }} disabled={salvando}>
-          {salvando ? 'Criando…' : 'Criar acesso e entrar'}
+          {salvando ? t('convite.criando') : t('convite.criarAcesso')}
         </button>
       </form>
     </div>

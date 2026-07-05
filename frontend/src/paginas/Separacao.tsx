@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, formataReal, mensagemDeErro } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
+import { useIdioma } from '../lib/i18n'
 
 interface PedidoSep {
   id: string
@@ -18,16 +19,17 @@ interface PedidoSep {
 const dataBR = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
 /** Tempo decorrido desde a venda (cobrança do gerente: há quanto tempo está pendente). */
-function tempoDecorrido(iso: string): string {
+function tempoDecorrido(iso: string, t: (chave: string, vars?: Record<string, string | number>) => string): string {
   const ms = Date.now() - new Date(iso).getTime()
   const h = Math.floor(ms / 3_600_000)
-  if (h < 1) return `há ${Math.max(1, Math.floor(ms / 60_000))} min`
-  if (h < 48) return `há ${h}h`
-  return `há ${Math.floor(h / 24)} dias`
+  if (h < 1) return t('sep.haMin', { n: Math.max(1, Math.floor(ms / 60_000)) })
+  if (h < 48) return t('sep.haH', { n: h })
+  return t('sep.haDias', { n: Math.floor(h / 24) })
 }
 
 export default function Separacao() {
   const escopo = useLojaAtiva()
+  const { t } = useIdioma()
   const [pedidos, setPedidos] = useState<PedidoSep[]>([])
   const [verTodos, setVerTodos] = useState(false)
   const [erro, setErro] = useState('')
@@ -62,25 +64,25 @@ export default function Separacao() {
   return (
     <>
       <header>
-        <h1>Pedidos a separar</h1>
+        <h1>{t('sep.titulo')}</h1>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <SeletorLoja escopo={escopo} />
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
             <input type="checkbox" checked={verTodos} onChange={(e) => setVerTodos(e.target.checked)} />
-            Mostrar já separados
+            {t('sep.mostrarSeparados')}
           </label>
         </div>
       </header>
 
       <p style={{ color: 'var(--ink-soft)', marginTop: -4 }}>
-        Ao fechar uma venda, o pedido entra aqui como <strong>pendente</strong>. O gestor de estoque separa as peças e marca como
-        <strong> separado</strong>; o gerente acompanha e cobra os pendentes. Abra o comprovante para conferir os itens.
+        {t('sep.explicacao1')} <strong>{t('sep.pendenteDestaque')}</strong>{t('sep.explicacao2')}
+        <strong> {t('sep.separadoDestaque')}</strong>{t('sep.explicacao3')}
       </p>
 
       {erro && <div className="alerta">{erro}</div>}
 
       <div style={{ fontSize: 13, color: 'var(--ink-soft)', margin: '4px 0 10px' }}>
-        {pendentes > 0 ? <strong style={{ color: '#c2552b' }}>{pendentes} pendente(s)</strong> : 'Nenhum pedido pendente. 🎉'}
+        {pendentes > 0 ? <strong style={{ color: '#c2552b' }}>{t('sep.pendentesSufixo', { n: pendentes })}</strong> : t('sep.nenhumPendenteFesta')}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -88,28 +90,28 @@ export default function Separacao() {
           <div key={p.id} className="cartao" style={{ padding: 12, borderLeft: `4px solid ${p.separado ? '#7ce8a0' : '#e8a87c'}`, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
             <div style={{ flex: 1, minWidth: 200 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <strong>Pedido {p.id.slice(-6).toUpperCase()}</strong>
+                <strong>{t('sep.pedidoLabel')} {p.id.slice(-6).toUpperCase()}</strong>
                 <span className={`selo ${p.atacado ? 'baixo' : ''}`} style={{ fontSize: 11 }}>{p.atacado ? 'ATACADO' : 'VAREJO'}</span>
                 {p.separado
-                  ? <span className="selo ok" style={{ fontSize: 11 }}>separado</span>
-                  : <span className="selo" style={{ fontSize: 11, background: '#e8a87c33', color: '#a85a2b' }}>pendente · {tempoDecorrido(p.createdAt)}</span>}
+                  ? <span className="selo ok" style={{ fontSize: 11 }}>{t('sep.separadoStatus')}</span>
+                  : <span className="selo" style={{ fontSize: 11, background: '#e8a87c33', color: '#a85a2b' }}>{t('sep.pendenteHa')} {tempoDecorrido(p.createdAt, t)}</span>}
               </div>
               <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 4 }}>
-                {dataBR(p.createdAt)} · {p.cliente} · {p.pecas} peça(s) · {formataReal(p.total)}
+                {dataBR(p.createdAt)} · {p.cliente} · {t('sep.pecasSufixo', { n: p.pecas })} · {formataReal(p.total)}
               </div>
               <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>
-                👤 Vendedora: {p.vendedora}{p.separado && p.separadoEm ? ` · separado em ${dataBR(p.separadoEm)}` : ''}
+                {t('sep.vendedoraLabel')} {p.vendedora}{p.separado && p.separadoEm ? ` · ${t('sep.separadoEmSufixo')} ${dataBR(p.separadoEm)}` : ''}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button className="btn secundario" onClick={() => abrirComprovante(p.tokenPublico)}>🧾 Comprovante</button>
+              <button className="btn secundario" onClick={() => abrirComprovante(p.tokenPublico)}>{t('sep.comprovante')}</button>
               <button className={`btn ${p.separado ? 'secundario' : ''}`} disabled={salvando === p.id} onClick={() => alternar(p)}>
-                {salvando === p.id ? '…' : p.separado ? 'Reabrir' : '✓ Marcar separado'}
+                {salvando === p.id ? '…' : p.separado ? t('sep.reabrir') : t('sep.marcarSeparado')}
               </button>
             </div>
           </div>
         ))}
-        {pedidos.length === 0 && <div style={{ color: 'var(--ink-soft)', padding: 14 }}>{verTodos ? 'Nenhum pedido.' : 'Nenhum pedido pendente.'}</div>}
+        {pedidos.length === 0 && <div style={{ color: 'var(--ink-soft)', padding: 14 }}>{verTodos ? t('sep.nenhumPedido') : t('sep.nenhumPedidoPendente')}</div>}
       </div>
     </>
   )

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, formataReal, mensagemDeErro, rotuloFeature, type Plano } from '../api'
+import { useIdioma } from '../lib/i18n'
 
 interface PlanoCatalogo {
   plano: Plano
@@ -34,9 +35,9 @@ function fmtData(iso: string | null): string {
 }
 
 const ORDEM: Record<Plano, number> = { START: 0, PRO: 1, ELITE: 2 }
-const rotuloStatus: Record<string, string> = { PENDENTE: 'Pendente', ATIVA: 'Ativa', CANCELADA: 'Cancelada' }
 
 export default function Planos() {
+  const { t } = useIdioma()
   const [dados, setDados] = useState<RespostaPlanos | null>(null)
   const [assinatura, setAssinatura] = useState<Assinatura | null>(null)
   const [mpConfiguradoNoServidor, setMpConfiguradoNoServidor] = useState(false)
@@ -47,7 +48,7 @@ export default function Planos() {
   const navigate = useNavigate()
 
   function carregar() {
-    api.get('/planos').then(({ data }) => setDados(data)).catch(() => setErro('Não foi possível carregar os planos.'))
+    api.get('/planos').then(({ data }) => setDados(data)).catch(() => setErro(t('planosApp.erroCarregarPlanos')))
     api.get('/assinaturas/minha').then(({ data }) => { setAssinatura(data.assinatura); setMpConfiguradoNoServidor(Boolean(data.mpConfigurado)) }).catch(() => setAssinatura(null))
     api.get('/contrato/status').then(({ data }) => setContratoAceito(Boolean(data.aceito))).catch(() => {})
   }
@@ -60,11 +61,11 @@ export default function Planos() {
   }
 
   async function trocar(plano: Plano) {
-    if (!window.confirm(`Mudar a assinatura para o plano ${plano}?`)) return
+    if (!window.confirm(t('planosApp.confirmTrocarPlano', { plano }))) return
     setErro(''); setMsg(''); setOcupado(true)
     try {
       await api.post('/assinaturas/trocar-plano', { plano })
-      setMsg('Plano alterado. É necessário entrar novamente para aplicar as novas funcionalidades.')
+      setMsg(t('planosApp.planoAlteradoMsg'))
     } catch (e) {
       setErro(mensagemDeErro(e))
     } finally {
@@ -73,15 +74,13 @@ export default function Planos() {
   }
 
   async function trocarPeriodicidade(nova: 'MENSAL' | 'ANUAL') {
-    const aviso = nova === 'ANUAL'
-      ? 'Mudar para cobrança ANUAL (à vista, 1x/ano, com desconto)?'
-      : 'Mudar para cobrança MENSAL?'
-    if (!window.confirm(aviso + (mpConfiguradoNoServidor ? ' Você vai precisar reautorizar a cobrança no Mercado Pago.' : ''))) return
+    const aviso = nova === 'ANUAL' ? t('planosApp.confirmAnual') : t('planosApp.confirmMensal')
+    if (!window.confirm(aviso + (mpConfiguradoNoServidor ? t('planosApp.reautorizarMpAviso') : ''))) return
     setErro(''); setMsg(''); setOcupado(true)
     try {
       const { data } = await api.post('/assinaturas/trocar-periodicidade', { periodicidade: nova })
       if (data.initPoint) { window.location.href = data.initPoint; return }
-      setMsg('Periodicidade alterada.')
+      setMsg(t('planosApp.periodicidadeAlteradaMsg'))
       carregar()
     } catch (e) {
       setErro(mensagemDeErro(e))
@@ -91,11 +90,11 @@ export default function Planos() {
   }
 
   async function cancelar() {
-    if (!window.confirm('Cancelar a assinatura? O acesso continua até o fim do ciclo já pago e não há nova cobrança.')) return
+    if (!window.confirm(t('planosApp.confirmCancelar'))) return
     setErro(''); setMsg(''); setOcupado(true)
     try {
       const { data } = await api.post('/assinaturas/cancelar', {})
-      setMsg(`Cancelamento agendado. Acesso garantido até ${fmtData(data.acessoAte)} — depois disso a conta é encerrada.`)
+      setMsg(t('planosApp.cancelamentoAgendadoMsg', { data: fmtData(data.acessoAte) }))
       carregar()
     } catch (e) {
       setErro(mensagemDeErro(e))
@@ -108,7 +107,7 @@ export default function Planos() {
     setErro(''); setMsg(''); setOcupado(true)
     try {
       await api.post('/assinaturas/reativar', {})
-      setMsg('Assinatura reativada — a renovação volta a valer normalmente.')
+      setMsg(t('planosApp.assinaturaReativadaMsg'))
       carregar()
     } catch (e) {
       setErro(mensagemDeErro(e))
@@ -123,7 +122,7 @@ export default function Planos() {
     try {
       const { data } = await api.post('/assinaturas/reassinar', {})
       if (data.initPoint) { window.location.href = data.initPoint; return }
-      setMsg('Assinatura reativada (modo simulado). É necessário entrar novamente.')
+      setMsg(t('planosApp.assinaturaReativadaSimuladaMsg'))
       carregar()
     } catch (e) {
       setErro(mensagemDeErro(e))
@@ -133,19 +132,19 @@ export default function Planos() {
   }
 
   if (erro && !dados) return <div className="cartao alerta">{erro}</div>
-  if (!dados) return <div className="cartao">Carregando…</div>
+  if (!dados) return <div className="cartao">{t('planosApp.carregando')}</div>
 
   const featuresPorPlano = (plano: Plano) =>
     Object.entries(dados.features)
       .filter(([, min]) => min === plano)
-      .map(([f]) => rotuloFeature[f] ?? f)
+      .map(([f]) => t(`feature.${f}`) || rotuloFeature[f] || f)
 
   return (
     <>
       <header>
-        <h1>💳 Planos</h1>
+        <h1>{t('planosApp.titulo')}</h1>
         <div style={{ color: 'var(--ink-soft)', fontSize: 13 }}>
-          Lojas e vendedoras <strong>ilimitadas</strong> em todos os planos — você paga por funcionalidade, não por tamanho.
+          {t('planosApp.subtitulo1')} <strong>{t('planosApp.ilimitadasDestaque')}</strong> {t('planosApp.subtitulo2')}
         </div>
       </header>
 
@@ -153,7 +152,7 @@ export default function Planos() {
       {msg && (
         <div className="sucesso" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{msg}</span>
-          {msg.includes('entrar novamente') && <button className="btn" onClick={reentrar}>Entrar novamente</button>}
+          {(msg === t('planosApp.planoAlteradoMsg') || msg === t('planosApp.assinaturaReativadaSimuladaMsg')) && <button className="btn" onClick={reentrar}>{t('planosApp.entrarNovamente')}</button>}
         </div>
       )}
 
@@ -165,41 +164,41 @@ export default function Planos() {
         return (
           <div className="cartao" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Sua assinatura</div>
+              <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{t('planosApp.suaAssinatura')}</div>
               <div style={{ fontSize: 18 }}>
-                <strong>{assinatura.plano}</strong> · {formataReal(assinatura.valor)}/{assinatura.periodicidade === 'ANUAL' ? 'ano' : 'mês'} ·{' '}
+                <strong>{assinatura.plano}</strong> · {formataReal(assinatura.valor)}/{assinatura.periodicidade === 'ANUAL' ? t('unidade.ano') : t('unidade.mes')} ·{' '}
                 <span className={`selo ${assinatura.status === 'ATIVA' ? 'ok' : assinatura.status === 'CANCELADA' ? 'baixo' : 'ATACADO'}`}>
-                  {rotuloStatus[assinatura.status]}
+                  {t(`planosApp.status.${assinatura.status}`)}
                 </span>
-                {assinatura.simulada && <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>  (simulada)</span>}
+                {assinatura.simulada && <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>  {t('planosApp.simulada')}</span>}
               </div>
               <div style={{ fontSize: 13, color: agendado ? 'var(--danger)' : 'var(--ink-soft)', marginTop: 4 }}>
                 {assinatura.status === 'CANCELADA'
-                  ? 'Conta encerrada.'
+                  ? t('planosApp.contaEncerrada')
                   : distrato
-                    ? `Distrato dos termos — acesso até ${fmtData(assinatura.cicloFimEm)}. Reassine (novo contrato) para manter, sem refazer a loja.`
+                    ? t('planosApp.distratoTexto', { data: fmtData(assinatura.cicloFimEm) })
                     : agendado
-                      ? `Cancelamento agendado — acesso até ${fmtData(assinatura.cicloFimEm)}, sem nova cobrança.`
-                      : assinatura.cicloFimEm ? `Renova em ${fmtData(assinatura.cicloFimEm)}.` : ''}
+                      ? t('planosApp.cancelamentoAgendadoTexto', { data: fmtData(assinatura.cicloFimEm) })
+                      : assinatura.cicloFimEm ? t('planosApp.renovaEmTexto', { data: fmtData(assinatura.cicloFimEm) }) : ''}
               </div>
               {assinatura.status === 'ATIVA' && !agendado && (
                 <div style={{ marginTop: 6 }}>
                   <a href="#" onClick={(e) => { e.preventDefault(); trocarPeriodicidade(assinatura.periodicidade === 'ANUAL' ? 'MENSAL' : 'ANUAL') }}>
                     {assinatura.periodicidade === 'ANUAL'
-                      ? 'Mudar para cobrança mensal'
-                      : `Mudar para cobrança anual (${dados.percentualDescontoAnual}% off)`}
+                      ? t('planosApp.mudarMensal')
+                      : t('planosApp.mudarAnual', { pct: dados.percentualDescontoAnual })}
                   </a>
                 </div>
               )}
             </div>
             {podeReassinar ? (
               contratoAceito
-                ? <button className="btn" onClick={reassinar} disabled={ocupado}>Reassinar (novo contrato)</button>
-                : <button className="btn" onClick={() => navigate('/contrato')} disabled={ocupado}>Aceitar os novos termos</button>
+                ? <button className="btn" onClick={reassinar} disabled={ocupado}>{t('planosApp.reassinarBtn')}</button>
+                : <button className="btn" onClick={() => navigate('/contrato')} disabled={ocupado}>{t('planosApp.aceitarNovosTermos')}</button>
             ) : assinatura.status !== 'CANCELADA' && (
               agendado
-                ? <button className="btn" onClick={reativar} disabled={ocupado}>Reativar assinatura</button>
-                : <button className="btn secundario" onClick={cancelar} disabled={ocupado}>Cancelar assinatura</button>
+                ? <button className="btn" onClick={reativar} disabled={ocupado}>{t('planosApp.reativarBtn')}</button>
+                : <button className="btn secundario" onClick={cancelar} disabled={ocupado}>{t('planosApp.cancelarBtn')}</button>
             )}
           </div>
         )
@@ -218,16 +217,16 @@ export default function Planos() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                 <h2 style={{ margin: 0 }}>{p.nome}</h2>
-                {atual && <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700 }}>SEU PLANO</span>}
+                {atual && <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700 }}>{t('planosApp.seuPlano')}</span>}
               </div>
               <div style={{ fontSize: 26, fontWeight: 800, margin: '8px 0' }}>
-                {formataReal(p.preco)}<span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ink-soft)' }}>/mês</span>
+                {formataReal(p.preco)}<span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ink-soft)' }}>/{t('unidade.mes')}</span>
               </div>
               <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 12 }}>{p.limite}</div>
               <div style={{ fontSize: 13, marginBottom: 12 }}>{p.resumo}</div>
 
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', marginBottom: 6 }}>
-                {p.plano === 'START' ? 'Inclui' : 'Tudo do plano anterior, mais'}
+                {p.plano === 'START' ? t('planosApp.inclui') : t('planosApp.tudoDoAnterior')}
               </div>
               <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.7 }}>
                 {novidades.map((f) => <li key={f}>{f}</li>)}
@@ -239,7 +238,7 @@ export default function Planos() {
                 disabled={atual || ocupado}
                 onClick={() => trocar(p.plano)}
               >
-                {atual ? 'Plano atual' : inferior ? 'Mudar para este plano' : 'Fazer upgrade'}
+                {atual ? t('planosApp.planoAtual') : inferior ? t('planosApp.mudarParaEste') : t('planosApp.fazerUpgrade')}
               </button>
             </div>
           )
@@ -247,8 +246,7 @@ export default function Planos() {
       </div>
 
       <div className="cartao" style={{ marginTop: 16, fontSize: 12, color: 'var(--ink-soft)' }}>
-        A cobrança recorrente real entra com o Mercado Pago configurado (Fase 8). Em modo simulado, a troca de plano é
-        aplicada na hora; com o Mercado Pago ativo, o novo valor passa a valer na próxima cobrança.
+        {t('planosApp.rodapeTexto')}
       </div>
     </>
   )

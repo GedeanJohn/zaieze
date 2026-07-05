@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api, mensagemDeErro } from '../api'
 import PreviewLoja from '../componentes/PreviewLoja'
 import { useToast } from '../componentes/Toast'
+import { useIdioma } from '../lib/i18n'
 
 interface Marca {
   nome: string
@@ -64,6 +65,7 @@ async function extrairCoresDominantes(origem: File | string, max = 5): Promise<s
 }
 
 export default function Marca() {
+  const { t } = useIdioma()
   const [marca, setMarca] = useState<Marca | null>(null)
   const avisar = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -107,7 +109,7 @@ export default function Marca() {
         disparoVendedoraEditavel: marca.disparoVendedoraEditavel,
       })
       setMarca(data)
-      avisar('Identidade da marca salva.')
+      avisar(t('marca.identidadeSalva'))
     } catch (err) { avisar(mensagemDeErro(err), 'erro') }
   }
 
@@ -120,7 +122,7 @@ export default function Marca() {
     try {
       const { data } = await api.post('/marca/logo', fd, { params: marca.logoUrl ? { anterior: marca.logoUrl } : {} })
       setMarca(data)
-      avisar('Logo atualizada.')
+      avisar(t('marca.logoAtualizada'))
     } catch (err) { avisar(mensagemDeErro(err), 'erro') }
     finally { if (fileRef.current) fileRef.current.value = '' }
   }
@@ -134,7 +136,7 @@ export default function Marca() {
     try {
       const { data } = await api.post('/marca/banner', fd, { params: marca.bannerUrl ? { anterior: marca.bannerUrl } : {} })
       setMarca(data)
-      avisar('Banner atualizado.')
+      avisar(t('marca.bannerAtualizado'))
     } catch (err) { avisar(mensagemDeErro(err), 'erro') }
     finally { if (bannerRef.current) bannerRef.current.value = '' }
   }
@@ -144,25 +146,24 @@ export default function Marca() {
     try {
       const { data } = await api.delete('/marca/banner')
       setMarca(data)
-      avisar('Banner removido.')
+      avisar(t('marca.bannerRemovido'))
     } catch (err) { avisar(mensagemDeErro(err), 'erro') }
   }
 
-  if (!marca) return <p style={{ color: 'var(--ink-soft)' }}>Carregando…</p>
+  if (!marca) return <p style={{ color: 'var(--ink-soft)' }}>{t('marca.carregando')}</p>
 
   return (
     <>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-        <h1>Identidade da marca</h1>
-        <button type="button" className="btn secundario" onClick={() => setPreview(true)}>👁️ Visualizar loja</button>
+        <h1>{t('marca.titulo')}</h1>
+        <button type="button" className="btn secundario" onClick={() => setPreview(true)}>{t('marca.visualizarLoja')}</button>
       </header>
       <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-        A logo e as cores aparecem no <strong>catálogo público</strong> (Portal do Cliente) que as vendedoras compartilham.
-        O SLA define em quanto tempo a vendedora precisa responder um lead antes da redistribuição.
+        {t('marca.explicacao1')} <strong>{t('marca.catalogoPublicoDestaque')}</strong> {t('marca.explicacao2')}
       </div>
 
       <div className="cartao">
-        <h2 style={{ marginTop: 0 }}>Logo</h2>
+        <h2 style={{ marginTop: 0 }}>{t('marca.logoTitulo')}</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
           <div style={{
             width: 140, height: 140, borderRadius: 12, background: marca.corSecundaria,
@@ -170,20 +171,19 @@ export default function Marca() {
           }}>
             {marca.logoUrl
               ? <img src={marca.logoUrl} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-              : <span style={{ color: '#999', fontSize: 12 }}>sem logo</span>}
+              : <span style={{ color: '#999', fontSize: 12 }}>{t('marca.semLogo')}</span>}
           </div>
           <div>
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={enviarLogo} />
-            <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 6 }}>PNG, JPG, WEBP ou SVG · até 5&nbsp;MB.</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 6 }}>{t('marca.logoFormatos')}</div>
           </div>
         </div>
       </div>
 
       <div className="cartao">
-        <h2 style={{ marginTop: 0 }}>Banner do catálogo</h2>
+        <h2 style={{ marginTop: 0 }}>{t('marca.bannerTitulo')}</h2>
         <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
-          Faixa que aparece no topo do <strong>catálogo público</strong>, logo acima dos produtos. Use uma imagem
-          horizontal (ex.: 1200×400). Opcional — sem banner, o catálogo abre direto nos produtos.
+          {t('marca.bannerExplicacao1')} <strong>{t('marca.catalogoPublicoDestaque')}</strong>{t('marca.bannerExplicacao2')}
         </p>
         <div style={{
           width: '100%', maxWidth: 520, aspectRatio: '3 / 1', borderRadius: 12, background: '#00000010',
@@ -191,58 +191,57 @@ export default function Marca() {
         }}>
           {marca.bannerUrl
             ? <img src={marca.bannerUrl} alt="Banner" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <span style={{ color: '#999', fontSize: 12 }}>sem banner</span>}
+            : <span style={{ color: '#999', fontSize: 12 }}>{t('marca.semBanner')}</span>}
         </div>
         <div style={{ marginTop: 10, display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
           <input ref={bannerRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={enviarBanner} />
           {marca.bannerUrl && (
             <button type="button" onClick={removerBanner}
               style={{ background: 'none', border: '1px solid #00000033', color: 'var(--ink-soft)', padding: '7px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-              Remover banner
+              {t('marca.removerBanner')}
             </button>
           )}
         </div>
       </div>
 
       <form className="cartao" onSubmit={salvar}>
-        <h2 style={{ marginTop: 0 }}>Cores e atendimento</h2>
+        <h2 style={{ marginTop: 0 }}>{t('marca.coresAtendimentoTitulo')}</h2>
 
         <div className="campo">
-          <label>Nome da marca (exibido ao público)</label>
+          <label>{t('marca.nomeMarcaLabel')}</label>
           <input
             value={marca.nome}
             minLength={2}
             maxLength={80}
             required
             onChange={(e) => setMarca({ ...marca, nome: e.target.value })}
-            placeholder="Ex.: Zaieze Moda"
+            placeholder={t('marca.nomeMarcaPlaceholder')}
           />
           <small style={{ color: 'var(--ink-soft)' }}>
-            Aparece no catálogo público, na página da loja e nas mensagens automáticas.
+            {t('marca.nomeMarcaAviso')}
           </small>
         </div>
 
         <div className="campo">
-          <label>Descrição da loja (buscadores e IA)</label>
+          <label>{t('marca.descricaoLojaLabel')}</label>
           <textarea
             rows={3} maxLength={500}
             value={marca.descricaoPublica ?? ''}
             onChange={(e) => setMarca({ ...marca, descricaoPublica: e.target.value })}
-            placeholder="Ex.: Moda feminina autoral em Goiânia — vestidos, alfaiataria e peças exclusivas para o dia a dia e ocasiões especiais."
+            placeholder={t('marca.descricaoLojaPlaceholder')}
           />
           <small style={{ color: 'var(--ink-soft)' }}>
-            {(marca.descricaoPublica ?? '').length}/500 · usada como resumo da sua loja no Google e em respostas de IA
-            (ex.: ChatGPT) quando alguém pesquisa por ela.
+            {t('marca.descricaoLojaAviso', { n: (marca.descricaoPublica ?? '').length })}
           </small>
         </div>
 
         <div className="linha-campos">
           <div className="campo">
-            <label>Cor primária (CTA/botões)</label>
+            <label>{t('marca.corPrimariaLabel')}</label>
             <input type="color" value={marca.corPrimaria} onChange={(e) => setMarca({ ...marca, corPrimaria: e.target.value })} style={{ height: 42, padding: 4 }} />
           </div>
           <div className="campo">
-            <label>Cor de fundo</label>
+            <label>{t('marca.corFundoLabel')}</label>
             <input type="color" value={marca.corSecundaria} onChange={(e) => setMarca({ ...marca, corSecundaria: e.target.value })} style={{ height: 42, padding: 4 }} />
           </div>
         </div>
@@ -250,15 +249,15 @@ export default function Marca() {
         {sugestoes.length > 0 && (
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Sugestões extraídas da sua logo/banner — clique para aplicar em:</span>
+              <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{t('marca.sugestoesTexto')}</span>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button type="button" onClick={() => setAlvoCor('corPrimaria')}
                   style={{ fontSize: 11, padding: '3px 10px', borderRadius: 999, border: '1px solid #0000002a', cursor: 'pointer', background: alvoCor === 'corPrimaria' ? '#0a0a0b' : 'transparent', color: alvoCor === 'corPrimaria' ? '#fff' : '#0a0a0b' }}>
-                  Cor primária
+                  {t('marca.corPrimariaBtn')}
                 </button>
                 <button type="button" onClick={() => setAlvoCor('corSecundaria')}
                   style={{ fontSize: 11, padding: '3px 10px', borderRadius: 999, border: '1px solid #0000002a', cursor: 'pointer', background: alvoCor === 'corSecundaria' ? '#0a0a0b' : 'transparent', color: alvoCor === 'corSecundaria' ? '#fff' : '#0a0a0b' }}>
-                  Cor de fundo
+                  {t('marca.corFundoBtn')}
                 </button>
               </div>
             </div>
@@ -274,71 +273,69 @@ export default function Marca() {
           </div>
         )}
 
-        <h3 style={{ margin: '8px 0 4px' }}>SLA por etapa do funil (minutos)</h3>
+        <h3 style={{ margin: '8px 0 4px' }}>{t('marca.slaTitulo')}</h3>
         <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 0 }}>
-          Tempo máximo do ciclo em cada etapa antes de aparecer como <strong>atrasado</strong>.
-          O estouro de <strong>Entrou</strong> (1ª resposta) é o que dispara a redistribuição.
+          {t('marca.slaExplicacao1')} <strong>{t('marca.atrasadoDestaque')}</strong>{t('marca.slaExplicacao2')} <strong>{t('marca.entrouDestaque')}</strong> {t('marca.slaExplicacao3')}
         </p>
         <div className="linha-campos">
           <div className="campo">
-            <label>Entrou → resposta</label>
+            <label>{t('marca.entrouRespostaLabel')}</label>
             <input type="number" min={1} value={marca.slaEntrouMin} onChange={(e) => setMarca({ ...marca, slaEntrouMin: Number(e.target.value) })} />
           </div>
           <div className="campo">
-            <label>Atendido → avançar</label>
+            <label>{t('marca.atendidoAvancarLabel')}</label>
             <input type="number" min={1} value={marca.slaAtendidoMin} onChange={(e) => setMarca({ ...marca, slaAtendidoMin: Number(e.target.value) })} />
           </div>
           <div className="campo">
-            <label>Negociando → fechar</label>
+            <label>{t('marca.negociandoFecharLabel')}</label>
             <input type="number" min={1} value={marca.slaNegociandoMin} onChange={(e) => setMarca({ ...marca, slaNegociandoMin: Number(e.target.value) })} />
           </div>
         </div>
         <div className="campo">
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
             <input type="checkbox" checked={marca.slaAutoRedistribuir} onChange={(e) => setMarca({ ...marca, slaAutoRedistribuir: e.target.checked })} style={{ width: 'auto' }} />
-            Redistribuir automaticamente quando “Entrou” estourar o prazo
+            {t('marca.redistribuirAutoLabel')}
           </label>
         </div>
-        <h3 style={{ margin: '8px 0 4px' }}>Cores do card no funil (tempo de espera)</h3>
+        <h3 style={{ margin: '8px 0 4px' }}>{t('marca.coresCardTitulo')}</h3>
         <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 0 }}>
-          O card do cliente no funil muda de cor conforme o tempo vs. o SLA da etapa:
-          <span style={{ color: '#16a34a', fontWeight: 700 }}> 🟢 verde</span> (no prazo) →
-          <span style={{ color: '#d97706', fontWeight: 700 }}> 🟠 laranja</span> (apertado: faltando ≤ X% do prazo) →
-          <span style={{ color: '#dc2626', fontWeight: 700 }}> 🔴 vermelho</span> (atrasado: passou do SLA).
+          {t('marca.coresCardExplicacao1')}
+          <span style={{ color: '#16a34a', fontWeight: 700 }}> {t('marca.verde')}</span> {t('marca.noPrazo')}
+          <span style={{ color: '#d97706', fontWeight: 700 }}> {t('marca.laranja')}</span> {t('marca.apertado')}
+          <span style={{ color: '#dc2626', fontWeight: 700 }}> {t('marca.vermelho')}</span> {t('marca.atrasadoParen')}
         </p>
         <div className="linha-campos">
           <div className="campo" style={{ maxWidth: 280 }}>
-            <label>Laranja quando faltar ≤ (% do prazo)</label>
+            <label>{t('marca.laranjaQuandoLabel')}</label>
             <input type="number" min={1} max={90} value={marca.slaApertadoPct} onChange={(e) => setMarca({ ...marca, slaApertadoPct: Number(e.target.value) })} />
           </div>
         </div>
-        <h3 style={{ margin: '8px 0 4px' }}>Atacado × varejo</h3>
+        <h3 style={{ margin: '8px 0 4px' }}>{t('marca.atacadoVarejoTitulo')}</h3>
         <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 0 }}>
-          Pedido com este número de peças (ou mais) é tratado como <strong>atacado</strong> e usa o <strong>preço de atacado</strong> das peças. Abaixo disso, é varejo.
+          {t('marca.atacadoVarejoExplicacao1')} <strong>{t('marca.atacadoDestaque')}</strong> {t('marca.atacadoVarejoExplicacao2')} <strong>{t('marca.precoAtacadoDestaque')}</strong> {t('marca.atacadoVarejoExplicacao3')}
         </p>
         <div className="linha-campos">
           <div className="campo" style={{ maxWidth: 220 }}>
-            <label>Pedido mínimo de atacado (peças)</label>
+            <label>{t('marca.pedidoMinimoLabel')}</label>
             <input type="number" min={2} value={marca.pedidoMinimoAtacado} onChange={(e) => setMarca({ ...marca, pedidoMinimoAtacado: Number(e.target.value) })} />
           </div>
         </div>
-        <h3 style={{ margin: '8px 0 4px' }}>Texto padrão de disparo (WhatsApp)</h3>
+        <h3 style={{ margin: '8px 0 4px' }}>{t('marca.textoDisparoTitulo')}</h3>
         <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 0 }}>
-          Mensagem padrão que as vendedoras usam nas campanhas e ao enviar o link do catálogo.
-          Variáveis: {'{primeiroNome}'} {'{nome}'} {'{loja}'} {'{vendedora}'}.
+          {t('marca.textoDisparoExplicacao')} {'{primeiroNome}'} {'{nome}'} {'{loja}'} {'{vendedora}'}.
         </p>
         <div className="campo">
-          <textarea rows={3} value={marca.textoDisparoPadrao ?? ''} placeholder="Ex.: Oi {primeiroNome}! 😍 Chegaram novidades na {loja}. Dá uma olhada no catálogo:"
+          <textarea rows={3} value={marca.textoDisparoPadrao ?? ''} placeholder={t('marca.textoDisparoPlaceholder')}
             onChange={(e) => setMarca({ ...marca, textoDisparoPadrao: e.target.value })} />
         </div>
         <div className="campo">
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
             <input type="checkbox" checked={marca.disparoVendedoraEditavel} onChange={(e) => setMarca({ ...marca, disparoVendedoraEditavel: e.target.checked })} style={{ width: 'auto' }} />
-            Permitir que a vendedora edite/personalize o texto do disparo
+            {t('marca.permitirEdicaoLabel')}
           </label>
         </div>
         <div className="acoes">
-          <button className="btn">Salvar</button>
+          <button className="btn">{t('comum.salvar')}</button>
         </div>
       </form>
 

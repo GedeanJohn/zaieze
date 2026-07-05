@@ -6,6 +6,7 @@ import { limparMidiaExpirada, limparAudiosAntigos } from './modules/midia/limpez
 import { encerrarAssinaturasVencidas } from './modules/assinaturas/assinatura.service'
 import { aplicarReajustesIgpm } from './modules/assinaturas/igpm.service'
 import { aplicarDistratoTermos } from './modules/contrato/contrato.service'
+import { atualizarCotacaoUsd } from './modules/cambio/cambio.service'
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000
 
@@ -54,6 +55,14 @@ async function main() {
       .catch((err) => app.log.error({ err }, 'Falha no reajuste IGP-M por aniversário'))
     reajustarIgpm()
     setInterval(reajustarIgpm, UM_DIA_MS).unref()
+
+    // Cotação BRL→USD para exibição informativa no site (Mercado Pago segue 100% em BRL).
+    // Fonte: Frankfurter (gratuita, sem chave). Falha não derruba o boot — mantém o cache. Boot + 24h.
+    const atualizarCambio = () => atualizarCotacaoUsd()
+      .then(() => app.log.info('Cotação BRL→USD atualizada (Frankfurter)'))
+      .catch((err) => app.log.error({ err }, 'Falha ao atualizar cotação BRL→USD — mantendo último valor em cache'))
+    atualizarCambio()
+    setInterval(atualizarCambio, UM_DIA_MS).unref()
 
     // Segmentação automática: em produção roda via agendamento diário (cron).
     // No boot só roda se SEGMENTAR_BOOT=true — assim, em dev/demo, o recálculo

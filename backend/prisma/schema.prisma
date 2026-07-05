@@ -267,6 +267,11 @@ model Assinatura {
   cicloFimEm               DateTime? // acesso garantido até o fim do ciclo pago vigente
   cancelamentoSolicitadoEm DateTime? // quando o cancelamento foi pedido (null = renovando normalmente)
   cancelamentoOrigem       String? // LOJISTA | ADMIN | MERCADO_PAGO (auditoria)
+  // Cotação BRL→USD travada no momento da assinatura (cache do ConfigCambio no instante do
+  // checkout), só para histórico/auditoria informativa — NUNCA usada para cobrança (o Mercado
+  // Pago cobra 100% em BRL). Null = cotação indisponível no momento do cadastro.
+  cotacaoUsdNaAssinatura   Decimal?         @db.Decimal(10, 6)
+  cotacaoUsdDataFonte      DateTime?        @db.Date
   createdAt                DateTime         @default(now())
   updatedAt                DateTime         @updatedAt
 
@@ -293,6 +298,19 @@ model ConfigAssinatura {
   updatedAt               DateTime @updatedAt
 
   @@map("config_assinatura")
+}
+
+/// Cotação BRL→USD em cache (auto-fetch diário via Frankfurter, ver cambio.service.ts), só
+/// para exibição informativa no site (Mercado Pago cobra 100% em BRL). Uma linha só (id=1),
+/// mesmo padrão de ConfigAssinatura. Campos nullable: antes do 1º fetch bem-sucedido (ou se a
+/// API cair e nunca tiver funcionado), o site simplesmente não mostra o equivalente em dólar.
+model ConfigCambio {
+  id           Int       @id @default(1)
+  usdPorBrl    Decimal?  @db.Decimal(10, 6) // ex.: 0.192450 = 1 BRL vale esse tanto em USD
+  dataCotacao  DateTime? @db.Date // campo "date" devolvido pela Frankfurter (dia útil de referência)
+  atualizadoEm DateTime  @updatedAt
+
+  @@map("config_cambio")
 }
 
 /// Histórico de reajustes de preço (ex.: IGP-M acumulado). Auditoria do admin.

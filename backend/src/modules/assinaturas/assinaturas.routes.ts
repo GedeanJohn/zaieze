@@ -12,6 +12,7 @@ import { CONTRATO_VERSAO } from '../contrato/contrato.template'
 import { temAceiteVigente } from '../contrato/contrato.service'
 import { normalizarTelefone } from '../../lib/telefone'
 import { confirmarCicloEComissionar, gerarComissaoDoCiclo, normalizarCodigo as normalizarCodigoAfiliado } from '../afiliados/afiliado.service'
+import { obterCotacaoAtual } from '../cambio/cambio.service'
 
 const arred2 = (n: number) => Math.round(n * 100) / 100
 
@@ -44,6 +45,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
   // Catálogo público de planos (consumido pela landing) — sem autenticação
   app.get('/planos', async () => ({
     planos: await listarPlanos(), dominioBase: env.DOMINIO_BASE, percentualDescontoAnual: await percentualDescontoAnual(),
+    cambio: await obterCotacaoAtual(),
   }))
 
   // Validação pública de código promocional (landing mostra o benefício antes do checkout)
@@ -123,6 +125,9 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     // Calculado uma única vez (fora da transação) e reaproveitado como cicloEm da comissão do
     // afiliado abaixo — evita qualquer drift entre o valor gravado e o usado no cálculo.
     const cicloFimEmInicial = semCobranca ? inicioCiclo() : null
+    // Cotação BRL→USD em cache no instante do checkout — só histórico/auditoria informativa
+    // (a cobrança no Mercado Pago é 100% em BRL, sem nenhuma relação com este valor).
+    const cotacaoAtual = await obterCotacaoAtual()
 
     // Provisiona o tenant. Em modo simulado já nasce ATIVO; em modo real fica inativo
     // até o webhook de pagamento aprovado liberar o acesso.
@@ -149,6 +154,8 @@ export async function assinaturasRoutes(app: FastifyInstance) {
           // sem cobrança (simulado ou 100% off) já entra com ciclo; no modo pago o ciclo começa no webhook
           cicloFimEm: cicloFimEmInicial,
           primeiraCobrancaEm,
+          cotacaoUsdNaAssinatura: cotacaoAtual.usdPorBrl,
+          cotacaoUsdDataFonte: cotacaoAtual.dataCotacao,
         },
       })
       return r

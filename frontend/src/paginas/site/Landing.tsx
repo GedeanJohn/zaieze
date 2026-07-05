@@ -5,6 +5,8 @@ import AgenteZaieze from './AgenteZaieze'
 import { useMetaTags } from '../../lib/useMetaTags'
 import { capturarRefAfiliado } from '../../lib/afiliado'
 import SeletorPeriodicidade, { type Periodicidade } from '../../componentes/SeletorPeriodicidade'
+import SeletorIdioma from '../../componentes/SeletorIdioma'
+import { useIdioma } from '../../lib/i18n'
 
 interface PlanoCatalogo {
   plano: Plano
@@ -26,10 +28,10 @@ function IconeWhatsApp({ size = 22 }: { size?: number }) {
   )
 }
 
-function featuresAte(plano: Plano): string[] {
+function featuresAte(plano: Plano, t: (chave: string) => string): string[] {
   return Object.entries(FEATURE_MIN)
     .filter(([, min]) => ORDEM[min] <= ORDEM[plano])
-    .map(([f]) => rotuloFeature[f] ?? f)
+    .map(([f]) => t(`feature.${f}`) || rotuloFeature[f] || f)
 }
 
 export default function Landing() {
@@ -38,10 +40,11 @@ export default function Landing() {
   const [periodicidade, setPeriodicidade] = useState<Periodicidade>('MENSAL')
   const [chatAberto, setChatAberto] = useState(false)
   const navigate = useNavigate()
+  const { t } = useIdioma()
 
   useMetaTags({
-    titulo: 'ZAIEZE — Sistemas Inteligentes para a Moda',
-    descricao: 'Sistema de gestão, estoque e CRM para lojas de moda (varejo e atacado) com atendimento pelo WhatsApp organizado por vendedora e IA que recupera clientes e gira o estoque parado.',
+    titulo: t('meta.titulo'),
+    descricao: t('meta.descricao'),
     url: 'https://zaieze.com/',
   })
 
@@ -56,68 +59,66 @@ export default function Landing() {
       <header className="site-top">
         <img className="site-logo-img" src="/zaieze-branco.png" alt="ZAIEZE" />
         <nav>
-          <a href="#planos">Planos</a>
-          <a href="#como">Como funciona</a>
-          <Link className="btn secundario" to="/entrar">Entrar</Link>
+          <a href="#planos">{t('nav.planos')}</a>
+          <a href="#como">{t('nav.como')}</a>
+          <Link className="btn secundario" to="/entrar">{t('nav.entrar')}</Link>
+          <SeletorIdioma />
         </nav>
       </header>
 
       <section className="hero">
         <img className="hero-logo" src="/zaieze-branco.png" alt="ZAIEZE" />
-        <h1>Sistemas Inteligentes para a Moda</h1>
-        <p>
-          Organize a venda online da sua equipe pelo WhatsApp: carteira por vendedora, estoque em grade
-          e IA que recupera clientes e gira o que está parado. Seu painel no ar em minutos, no seu próprio endereço.
-        </p>
+        <h1>{t('hero.titulo')}</h1>
+        <p>{t('hero.texto')}</p>
         <div className="hero-acoes">
-          <a className="btn grande" href="#planos">Ver planos</a>
-          <Link className="btn secundario grande" to="/entrar">Já sou cliente</Link>
+          <a className="btn grande" href="#planos">{t('hero.verPlanos')}</a>
+          <Link className="btn secundario grande" to="/entrar">{t('hero.jaSouCliente')}</Link>
         </div>
-        <div className="hero-nota">Lojas e vendedoras ilimitadas em todos os planos · 7 dias para testar</div>
+        <div className="hero-nota">{t('hero.nota')}</div>
       </section>
 
       <section className="faixa" id="como">
-        <div><strong>1. Escolha o plano</strong><span>Start, Pro ou Elite — todos sem limite de lojas ou vendedoras.</span></div>
-        <div><strong>2. Crie seu endereço</strong><span>sualoja.zaieze.com fica pronto na hora do pagamento.</span></div>
-        <div><strong>3. Comece a vender</strong><span>Cadastre produtos, equipe e dispare no WhatsApp.</span></div>
+        <div><strong>{t('faixa.1.titulo')}</strong><span>{t('faixa.1.texto')}</span></div>
+        <div><strong>{t('faixa.2.titulo')}</strong><span>{t('faixa.2.texto')}</span></div>
+        <div><strong>{t('faixa.3.titulo')}</strong><span>{t('faixa.3.texto')}</span></div>
       </section>
 
       <section className="planos-site" id="planos">
-        <h2>Escolha seu plano</h2>
-        <p className="sub">Pague por funcionalidade, não por tamanho. Cancele quando quiser.</p>
+        <h2>{t('planos.titulo')}</h2>
+        <p className="sub">{t('planos.sub')}</p>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
           <SeletorPeriodicidade valor={periodicidade} onChange={setPeriodicidade} percentualDesconto={descontoAnual} />
         </div>
         <div className="planos-grid">
           {planos.map((p) => (
             <div key={p.plano} className={`plano-card ${p.plano === 'PRO' ? 'destaque' : ''}`}>
-              {p.plano === 'PRO' && <div className="tag">Mais popular</div>}
+              {p.plano === 'PRO' && <div className="tag">{t('planos.maisPopular')}</div>}
               <h3>{p.nome}</h3>
               {periodicidade === 'ANUAL' ? (
                 <>
-                  <div className="preco">{formataReal(p.precoAnual)}<span>/ano</span></div>
+                  <div className="preco">{formataReal(p.precoAnual)}<span>/{t('unidade.ano')}</span></div>
                   <div style={{ fontSize: 12, color: 'var(--zz-mut)', marginTop: -6, marginBottom: 6 }}>
-                    equivale a {formataReal(p.precoAnual / 12)}/mês
+                    {t('planos.equivaleMes')} {formataReal(p.precoAnual / 12)}/{t('unidade.mes')}
                   </div>
                 </>
               ) : (
-                <div className="preco">{formataReal(p.preco)}<span>/mês</span></div>
+                <div className="preco">{formataReal(p.preco)}<span>/{t('unidade.mes')}</span></div>
               )}
               <div className="limite">{p.limite}</div>
               <ul>
-                {featuresAte(p.plano).map((f) => <li key={f}>{f}</li>)}
+                {featuresAte(p.plano, t).map((f) => <li key={f}>{f}</li>)}
               </ul>
               <button className="btn grande" onClick={() => navigate(`/checkout?plano=${p.plano}&periodicidade=${periodicidade}`)}>
-                Assinar {p.nome}
+                {t('planos.assinar')} {p.nome}
               </button>
             </div>
           ))}
         </div>
 
         <div className="fale-conosco">
-          <span>Ficou com alguma dúvida sobre os planos?</span>
+          <span>{t('planos.duvida')}</span>
           <button className="btn grande zap-btn" onClick={() => setChatAberto(true)}>
-            <IconeWhatsApp size={20} /> Fale Conosco!
+            <IconeWhatsApp size={20} /> {t('planos.faleConosco')}
           </button>
         </div>
       </section>
@@ -130,8 +131,8 @@ export default function Landing() {
       {chatAberto && <AgenteZaieze onClose={() => setChatAberto(false)} />}
 
       <footer className="site-rodape">
-        <div>CNPJ: 43.391.734/0001-51 · ZAIEZE · Sistemas Inteligentes para a Moda © {new Date().getFullYear()}</div>
-        <div><Link to="/quem-somos">Quem Somos</Link> · <Link to="/lgpd">LGPD</Link> · <Link to="/privacidade">Política de Privacidade</Link> · Pagamento seguro via Mercado Pago</div>
+        <div>CNPJ: 43.391.734/0001-51 · ZAIEZE · {t('footer.tagline')} © {new Date().getFullYear()}</div>
+        <div><Link to="/quem-somos">{t('footer.quemSomos')}</Link> · <Link to="/lgpd">{t('footer.lgpd')}</Link> · <Link to="/privacidade">{t('footer.privacidade')}</Link> · {t('footer.pagamento')}</div>
       </footer>
     </div>
   )

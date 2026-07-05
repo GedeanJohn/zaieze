@@ -5,6 +5,7 @@ import './styles.css'
 import { usuarioLogado } from './api'
 import { HOST } from './host'
 import { ToastProvider } from './componentes/Toast'
+import { IdiomaProvider } from './lib/i18n'
 import Login from './paginas/Login'
 import Layout from './paginas/Layout'
 import Dashboard from './paginas/Dashboard'
@@ -110,8 +111,10 @@ function CrmApp() {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ToastProvider>
-      <BrowserRouter>{HOST.tipo === 'landing' ? <SiteApp /> : <CrmApp />}</BrowserRouter>
-    </ToastProvider>
+    <IdiomaProvider>
+      <ToastProvider>
+        <BrowserRouter>{HOST.tipo === 'landing' ? <SiteApp /> : <CrmApp />}</BrowserRouter>
+      </ToastProvider>
+    </IdiomaProvider>
   </React.StrictMode>,
 )

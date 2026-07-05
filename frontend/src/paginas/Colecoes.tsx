@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, mensagemDeErro, usuarioLogado } from '../api'
 import { useLojaAtiva } from '../componentes/SeletorLoja'
+import { useIdioma } from '../lib/i18n'
 
 interface Colecao {
   id: string
@@ -33,6 +34,7 @@ interface OutletForm {
 
 export default function Colecoes() {
   const escopo = useLojaAtiva()
+  const { t } = useIdioma()
   const usuario = usuarioLogado()!
   const podeOutlet = usuario.role === 'GESTOR' || usuario.role === 'GERENTE' || usuario.role === 'SUPER_ADMIN'
   const podeDistribuir = escopo.ehGestor || usuario.role === 'SUPER_ADMIN'
@@ -64,7 +66,7 @@ export default function Colecoes() {
   }
 
   async function liberar(c: Colecao) {
-    if (!confirm(`Liberar a coleção "${c.nome}"? Ela passa a aparecer para TODAS as vendedoras ao mesmo tempo.`)) return
+    if (!confirm(t('col.confirmLiberar', { nome: c.nome }))) return
     try { await api.post(`/colecoes/${c.id}/liberar`, {}, { params: escopo.params }); carregar() }
     catch (err) { alert(mensagemDeErro(err)) }
   }
@@ -76,13 +78,13 @@ export default function Colecoes() {
   }
 
   async function excluir(c: Colecao) {
-    if (!confirm(`Excluir a coleção "${c.nome}"? As peças dela NÃO são apagadas — apenas ficam sem coleção.`)) return
+    if (!confirm(t('col.confirmExcluir', { nome: c.nome }))) return
     try { await api.delete(`/colecoes/${c.id}`, { params: escopo.params }); carregar() }
     catch (err) { alert(mensagemDeErro(err)) }
   }
 
   async function recolher(c: Colecao) {
-    if (!confirm(`Recolher "${c.nome}"? Ela some do catálogo e do PDV das vendedoras.`)) return
+    if (!confirm(t('col.confirmRecolher', { nome: c.nome }))) return
     try { await api.post(`/colecoes/${c.id}/recolher`, {}, { params: escopo.params }); carregar() }
     catch (err) { alert(mensagemDeErro(err)) }
   }
@@ -137,7 +139,7 @@ export default function Colecoes() {
     }
     if (outlet.outlet && outlet.escopo === 'COLECAO') {
       const pct = parseInt(outlet.pctColecao, 10)
-      if (!pct || pct < 1 || pct > 90) { setErro('Informe um desconto de coleção entre 1% e 90%.'); return }
+      if (!pct || pct < 1 || pct > 90) { setErro(t('col.erroDescontoColecao')); return }
       corpo.descontoOutletPct = pct
     } else {
       corpo.descontoOutletPct = null
@@ -161,20 +163,20 @@ export default function Colecoes() {
   return (
     <>
       <header>
-        <h1>Coleções</h1>
-        <button className="btn" onClick={() => setForm({ nome: '' })}>+ Nova coleção</button>
+        <h1>{t('col.titulo')}</h1>
+        <button className="btn" onClick={() => setForm({ nome: '' })}>{t('col.novaColecao')}</button>
       </header>
 
       <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-        O gestor de estoque monta a coleção <strong>em preparação</strong> (cadastrando as peças) e só então <strong>libera</strong> —
-        aí ela aparece para todas as vendedoras simultaneamente, garantindo competição justa pelo estoque.
-        {podeOutlet && <> Coleções antigas podem virar <strong>Outlet</strong> (selo no catálogo), com desconto opcional na coleção inteira ou em peças específicas.</>}
+        {t('col.explicacao1')} <strong>{t('col.emPreparacaoDestaque')}</strong> {t('col.explicacao2')} <strong>{t('col.liberaDestaque')}</strong> —
+        {' '}{t('col.explicacao3')}
+        {podeOutlet && <> {t('col.outletExplicacao1')} <strong>{t('col.outletDestaque')}</strong> {t('col.outletExplicacao2')}</>}
       </div>
 
       <div className="cartao">
         <table>
           <thead>
-            <tr><th>Coleção</th><th>Status</th><th>Peças</th><th>Lojas</th><th>Liberada em</th><th></th></tr>
+            <tr><th>{t('col.colColecao')}</th><th>{t('col.colStatus')}</th><th>{t('col.colPecas')}</th><th>{t('col.colLojas')}</th><th>{t('col.colLiberadaEm')}</th><th></th></tr>
           </thead>
           <tbody>
             {lista.map((c) => (
@@ -183,55 +185,57 @@ export default function Colecoes() {
                   <strong>{c.nome}</strong>
                   {c.outlet && (
                     <span className="selo" style={{ marginLeft: 8, background: '#f59e0b22', color: '#f59e0b', border: '1px solid #f59e0b55' }}>
-                      🏷️ Outlet{c.descontoOutletPct ? ` −${c.descontoOutletPct}%` : ''}
+                      🏷️ {t('col.outletDestaque')}{c.descontoOutletPct ? ` −${c.descontoOutletPct}%` : ''}
                     </span>
                   )}
                   {c.descricao && <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{c.descricao}</div>}
                   {c.midiaExpiradaEm ? (
-                    <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>🗑️ mídia removida do catálogo ({new Date(c.midiaExpiradaEm).toLocaleDateString('pt-BR')})</div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>{t('col.midiaRemovida', { data: new Date(c.midiaExpiradaEm).toLocaleDateString('pt-BR') })}</div>
                   ) : c.diasParaExpirarMidia != null && c.diasParaExpirarMidia <= 30 && (
                     <div style={{ fontSize: 12, marginTop: 2, color: c.diasParaExpirarMidia <= 7 ? '#ef4444' : '#f59e0b', fontWeight: 600 }}>
-                      ⚠️ mídia expira em {c.diasParaExpirarMidia <= 0 ? 'breve' : `${c.diasParaExpirarMidia} dia(s)`}
-                      {c.midiaExpiraEm ? ` (${new Date(c.midiaExpiraEm).toLocaleDateString('pt-BR')})` : ''} — marque Outlet ou promova as vendas
+                      {t('col.midiaExpiraAviso', {
+                        tempo: c.diasParaExpirarMidia <= 0 ? t('col.midiaExpiraEmBreve') : t('col.midiaExpiraDias', { n: c.diasParaExpirarMidia }),
+                        dataSufixo: c.midiaExpiraEm ? ` (${new Date(c.midiaExpiraEm).toLocaleDateString('pt-BR')})` : '',
+                      })}
                     </div>
                   )}
                 </td>
                 <td>
                   <span className={`selo ${c.status === 'LIBERADA' ? 'ok' : 'baixo'}`}>
-                    {c.status === 'LIBERADA' ? 'Liberada' : 'Em preparação'}
+                    {c.status === 'LIBERADA' ? t('col.liberada') : t('col.emPreparacao')}
                   </span>
                 </td>
                 <td>{c.pecas}</td>
                 <td>
                   {c.lojaIds.length === 0
-                    ? <span style={{ color: 'var(--danger)', fontSize: 12 }}>nenhuma</span>
-                    : <span style={{ fontSize: 13 }}>{c.lojaIds.length} loja{c.lojaIds.length > 1 ? 's' : ''}</span>}
+                    ? <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t('col.nenhuma')}</span>
+                    : <span style={{ fontSize: 13 }}>{t('col.lojasCount', { n: c.lojaIds.length })}</span>}
                   {podeDistribuir && <>
                     {' '}
-                    <a href="#" style={{ fontSize: 12 }} onClick={(e) => { e.preventDefault(); setDistrib({ colecao: c, lojaIds: new Set(c.lojaIds) }) }}>distribuir</a>
+                    <a href="#" style={{ fontSize: 12 }} onClick={(e) => { e.preventDefault(); setDistrib({ colecao: c, lojaIds: new Set(c.lojaIds) }) }}>{t('col.distribuir')}</a>
                   </>}
                 </td>
                 <td>{c.liberadaEm ? new Date(c.liberadaEm).toLocaleDateString('pt-BR') : '—'}</td>
                 <td>
                   {c.status === 'EM_PREPARACAO'
-                    ? <a href="#" onClick={(e) => { e.preventDefault(); liberar(c) }}>🚀 liberar</a>
-                    : <a href="#" onClick={(e) => { e.preventDefault(); recolher(c) }}>recolher</a>}
+                    ? <a href="#" onClick={(e) => { e.preventDefault(); liberar(c) }}>{t('col.liberar')}</a>
+                    : <a href="#" onClick={(e) => { e.preventDefault(); recolher(c) }}>{t('col.recolher')}</a>}
                   {' · '}
-                  <a href="#" onClick={(e) => { e.preventDefault(); setForm({ id: c.id, nome: c.nome, descricao: c.descricao ?? '' }) }}>editar</a>
+                  <a href="#" onClick={(e) => { e.preventDefault(); setForm({ id: c.id, nome: c.nome, descricao: c.descricao ?? '' }) }}>{t('col.editar')}</a>
                   {' · '}
-                  <label title="Enviar/retirar do Outlet" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={c.outlet} onChange={() => alternarOutlet(c)} style={{ width: 'auto' }} /> Outlet
+                  <label title={t('col.outletTitle')} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={c.outlet} onChange={() => alternarOutlet(c)} style={{ width: 'auto' }} /> {t('col.outletCheckbox')}
                   </label>
                   {podeOutlet && c.outlet && <>
                     {' · '}
-                    <a href="#" onClick={(e) => { e.preventDefault(); abrirOutlet(c) }}>desconto</a>
+                    <a href="#" onClick={(e) => { e.preventDefault(); abrirOutlet(c) }}>{t('col.desconto')}</a>
                   </>}
                   {' · '}
-                  <a href="#" style={{ color: 'var(--danger)' }} onClick={(e) => { e.preventDefault(); excluir(c) }}>excluir</a>
+                  <a href="#" style={{ color: 'var(--danger)' }} onClick={(e) => { e.preventDefault(); excluir(c) }}>{t('col.excluir')}</a>
                 </td>
               </tr>
             ))}
-            {lista.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--ink-soft)' }}>Nenhuma coleção. Crie uma e cadastre as peças em Produtos.</td></tr>}
+            {lista.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--ink-soft)' }}>{t('col.nenhumaColecao')}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -239,19 +243,19 @@ export default function Colecoes() {
       {form && (
         <div className="modal-fundo" onClick={() => setForm(null)}>
           <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvar} style={{ width: 'min(520px, 92vw)' }}>
-            <h2>{form.id ? 'Editar coleção' : 'Nova coleção'}</h2>
+            <h2>{form.id ? t('col.editarColecaoTitulo') : t('col.novaColecaoTitulo')}</h2>
             {erro && <div className="alerta">{erro}</div>}
             <div className="campo">
-              <label>Nome*</label>
-              <input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required placeholder="Ex.: Verão 2026" />
+              <label>{t('col.nomeLabel')}</label>
+              <input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required placeholder={t('col.nomePlaceholder')} />
             </div>
             <div className="campo">
-              <label>Descrição</label>
-              <input value={form.descricao ?? ''} onChange={(e) => setForm({ ...form, descricao: e.target.value })} placeholder="Opcional" />
+              <label>{t('col.descricaoLabel')}</label>
+              <input value={form.descricao ?? ''} onChange={(e) => setForm({ ...form, descricao: e.target.value })} placeholder={t('col.descricaoPlaceholder')} />
             </div>
             <div className="acoes">
-              <button type="button" className="btn secundario" onClick={() => setForm(null)}>Cancelar</button>
-              <button className="btn">Salvar</button>
+              <button type="button" className="btn secundario" onClick={() => setForm(null)}>{t('comum.cancelar')}</button>
+              <button className="btn">{t('comum.salvar')}</button>
             </div>
           </form>
         </div>
@@ -260,40 +264,40 @@ export default function Colecoes() {
       {outlet && (
         <div className="modal-fundo" onClick={() => setOutlet(null)}>
           <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvarOutlet} style={{ width: 'min(640px, 94vw)' }}>
-            <h2>Outlet — {outlet.colecao.nome}</h2>
+            <h2>{t('col.outletModalTitulo', { nome: outlet.colecao.nome })}</h2>
             {erro && <div className="alerta">{erro}</div>}
 
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '6px 0' }}>
               <input type="checkbox" checked={outlet.outlet} onChange={(e) => setOutlet({ ...outlet, outlet: e.target.checked, escopo: e.target.checked ? outlet.escopo : 'NENHUM' })} />
-              <span>Marcar esta coleção como <strong>Outlet</strong> (selo no catálogo)</span>
+              <span>{t('col.marcarOutletTexto1')} <strong>{t('col.outletDestaque')}</strong> {t('col.marcarOutletTexto2')}</span>
             </label>
 
             {outlet.outlet && (
               <>
                 <div className="campo">
-                  <label>Desconto</label>
+                  <label>{t('col.descontoLabel')}</label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 14 }}>
                     <label style={{ display: 'flex', gap: 8 }}>
                       <input type="radio" name="esc" checked={outlet.escopo === 'NENHUM'} onChange={() => setOutlet({ ...outlet, escopo: 'NENHUM' })} />
-                      Sem desconto (só o selo de Outlet)
+                      {t('col.semDescontoOpt')}
                     </label>
                     <label style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <input type="radio" name="esc" checked={outlet.escopo === 'COLECAO'} onChange={() => setOutlet({ ...outlet, escopo: 'COLECAO' })} />
-                      Desconto na coleção inteira:
+                      {t('col.descontoColecaoOpt')}
                       <input type="number" min={1} max={90} value={outlet.pctColecao} disabled={outlet.escopo !== 'COLECAO'}
                         onChange={(e) => setOutlet({ ...outlet, pctColecao: e.target.value })}
                         style={{ width: 80 }} placeholder="%" /> %
                     </label>
                     <label style={{ display: 'flex', gap: 8 }}>
                       <input type="radio" name="esc" checked={outlet.escopo === 'PECAS'} onChange={() => setOutlet({ ...outlet, escopo: 'PECAS' })} />
-                      Desconto em peças específicas
+                      {t('col.descontoPecasOpt')}
                     </label>
                   </div>
                 </div>
 
                 {outlet.escopo === 'PECAS' && (
                   <div className="cartao" style={{ maxHeight: 280, overflowY: 'auto', padding: 8 }}>
-                    {outlet.pecas.length === 0 && <div style={{ color: 'var(--ink-soft)', fontSize: 13 }}>Coleção sem peças.</div>}
+                    {outlet.pecas.length === 0 && <div style={{ color: 'var(--ink-soft)', fontSize: 13 }}>{t('col.colecaoSemPecas')}</div>}
                     {outlet.pecas.map((p) => (
                       <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid #ffffff14' }}>
                         <div style={{ flex: 1, fontSize: 13 }}>
@@ -309,8 +313,8 @@ export default function Colecoes() {
             )}
 
             <div className="acoes">
-              <button type="button" className="btn secundario" onClick={() => setOutlet(null)}>Cancelar</button>
-              <button className="btn">Salvar</button>
+              <button type="button" className="btn secundario" onClick={() => setOutlet(null)}>{t('comum.cancelar')}</button>
+              <button className="btn">{t('comum.salvar')}</button>
             </div>
           </form>
         </div>
@@ -319,26 +323,26 @@ export default function Colecoes() {
       {distrib && (
         <div className="modal-fundo" onClick={() => setDistrib(null)}>
           <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvarDistribuicao} style={{ width: 'min(520px, 92vw)' }}>
-            <h2>Distribuir — {distrib.colecao.nome}</h2>
+            <h2>{t('col.distribuirModalTitulo', { nome: distrib.colecao.nome })}</h2>
             {erro && <div className="alerta">{erro}</div>}
             <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 10 }}>
-              Marque as lojas que podem <strong>vender</strong> esta coleção. O estoque é único (da fábrica) — isto é só permissão de venda.
+              {t('col.distribuirExplicacao1')} <strong>{t('col.venderDestaque')}</strong> {t('col.distribuirExplicacao2')}
             </div>
             {escopo.lojas.length === 0
-              ? <div style={{ color: 'var(--ink-soft)', fontSize: 13 }}>Nenhuma loja cadastrada na marca.</div>
+              ? <div style={{ color: 'var(--ink-soft)', fontSize: 13 }}>{t('col.nenhumaLojaCadastradaMarca')}</div>
               : (
                 <div className="cartao" style={{ maxHeight: 320, overflowY: 'auto', padding: 8 }}>
                   {escopo.lojas.map((l) => (
                     <label key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 2px', cursor: 'pointer' }}>
                       <input type="checkbox" checked={distrib.lojaIds.has(l.id)} onChange={() => alternarLojaDistrib(l.id)} style={{ width: 'auto' }} />
-                      <span>{l.nome}{l.ativo ? '' : ' (inativa)'}</span>
+                      <span>{l.nome}{l.ativo ? '' : ` ${t('equipe.inativaSufixo')}`}</span>
                     </label>
                   ))}
                 </div>
               )}
             <div className="acoes">
-              <button type="button" className="btn secundario" onClick={() => setDistrib(null)}>Cancelar</button>
-              <button className="btn">Salvar distribuição</button>
+              <button type="button" className="btn secundario" onClick={() => setDistrib(null)}>{t('comum.cancelar')}</button>
+              <button className="btn">{t('col.salvarDistribuicao')}</button>
             </div>
           </form>
         </div>

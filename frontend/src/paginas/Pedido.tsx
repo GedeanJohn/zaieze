@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import QRCode from 'qrcode'
-import { api, formataReal, rotuloForma, type FormaRecebimento } from '../api'
+import { api, formataReal, type FormaRecebimento } from '../api'
+import SeletorIdioma from '../componentes/SeletorIdioma'
+import { useIdioma } from '../lib/i18n'
 
 interface ItemPedido {
   quantidade: number
@@ -29,13 +31,15 @@ const dataBR = (iso: string) => new Date(iso).toLocaleString('pt-BR', { day: '2-
 
 export default function Pedido() {
   const { id, token } = useParams<{ id?: string; token?: string }>()
+  const { t } = useIdioma()
   const [p, setP] = useState<Pedido | null>(null)
   const [erro, setErro] = useState('')
   const [qr, setQr] = useState('')
 
   useEffect(() => {
     const url = token ? `/vendas/publico/${token}` : `/vendas/${id}`
-    api.get(url).then(({ data }) => setP(data)).catch(() => setErro('Pedido não encontrado.'))
+    api.get(url).then(({ data }) => setP(data)).catch(() => setErro(t('ped.naoEncontrado')))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, token])
 
   // Link público do comprovante (sem login) + link do PDF gerado no backend.
@@ -49,7 +53,7 @@ export default function Pedido() {
   }, [linkPublico])
 
   if (erro) return <div style={{ padding: 40, textAlign: 'center', color: '#777' }}>{erro}</div>
-  if (!p) return <div style={{ padding: 40, textAlign: 'center', color: '#777' }}>Carregando…</div>
+  if (!p) return <div style={{ padding: 40, textAlign: 'center', color: '#777' }}>{t('ped.carregando')}</div>
 
   const bruto = p.itens.reduce((s, i) => s + Number(i.precoUnitario) * i.quantidade, 0)
   const pecas = p.itens.reduce((s, i) => s + i.quantidade, 0)
@@ -60,12 +64,12 @@ export default function Pedido() {
     const linhas = p.itens.map((i) =>
       `• ${i.quantidade}x ${i.variacao.produto.nome} (${[i.variacao.cor, i.variacao.estampa, i.variacao.tamanho].filter(Boolean).join('/')}) — ${real(i.precoUnitario)}`)
     const txt = [
-      `*Pedido ${numero} — ${p.loja.rede.nome}*`,
+      `*${t('ped.pedidoLabel')} ${numero} — ${p.loja.rede.nome}*`,
       ...linhas, '',
-      Number(p.desconto) > 0 ? `Desconto: ${p.descontoPct}% (− ${real(p.desconto)})` : '',
-      `*Total: ${real(p.total)}*`,
-      `Pagamento: ${rotuloForma[p.formaRecebimento]}`,
-      '', linkPublico ? `Ver pedido: ${linkPublico}` : '',
+      Number(p.desconto) > 0 ? `${t('ped.waDescontoLabel')}: ${p.descontoPct}% (− ${real(p.desconto)})` : '',
+      `*${t('ped.waTotalLabel')}: ${real(p.total)}*`,
+      `${t('ped.waPagamentoLabel')}: ${t(`forma.${p.formaRecebimento}`)}`,
+      '', linkPublico ? `${t('ped.waVerPedido')}: ${linkPublico}` : '',
     ].filter(Boolean).join('\n')
     const tel = (p.cliente?.telefone ?? '').replace(/\D/g, '')
     const base = tel ? `https://wa.me/55${tel}` : 'https://wa.me/'
@@ -76,9 +80,10 @@ export default function Pedido() {
     <div className="ped-root">
       <PedidoEstilos />
       <div className="ped-acoes ped-noprint">
-        <button className="ped-btn cinza" onClick={() => window.print()}>🖨️ Imprimir</button>
-        <button className="ped-btn" onClick={() => linkPdf && window.open(linkPdf, '_blank')}>📄 Salvar PDF</button>
-        <button className="ped-btn alt" onClick={enviarWhatsapp}>💬 Enviar para o cliente</button>
+        <SeletorIdioma />
+        <button className="ped-btn cinza" onClick={() => window.print()}>{t('ped.imprimir')}</button>
+        <button className="ped-btn" onClick={() => linkPdf && window.open(linkPdf, '_blank')}>{t('ped.salvarPdf')}</button>
+        <button className="ped-btn alt" onClick={enviarWhatsapp}>{t('ped.enviarCliente')}</button>
       </div>
 
       <div className="ped-folha">
@@ -90,33 +95,33 @@ export default function Pedido() {
             <div className="ped-loja">{p.loja.nome}</div>
           </div>
           <div className="ped-num">
-            <div><strong>Pedido {numero}</strong></div>
+            <div><strong>{t('ped.pedidoLabel')} {numero}</strong></div>
             <div className="ped-data">{dataBR(p.createdAt)}</div>
-            <span className={`ped-tag ${p.atacado ? 'ata' : ''}`}>{p.atacado ? 'ATACADO' : 'VAREJO'}</span>
+            <span className={`ped-tag ${p.atacado ? 'ata' : ''}`}>{p.atacado ? t('ped.atacado') : t('ped.varejo')}</span>
           </div>
         </header>
 
         <section className="ped-partes">
           <div>
-            <div className="ped-rot">Cliente</div>
-            <div>{p.cliente?.nome ?? 'Consumidor avulso'}</div>
+            <div className="ped-rot">{t('ped.clienteLabel')}</div>
+            <div>{p.cliente?.nome ?? t('ped.consumidorAvulso')}</div>
             {p.cliente?.telefone && <div className="ped-sub">{p.cliente.telefone}</div>}
           </div>
           <div>
-            <div className="ped-rot">Vendedora</div>
+            <div className="ped-rot">{t('ped.vendedoraLabel')}</div>
             <div>{p.vendedora.nome}</div>
           </div>
         </section>
 
         <table className="ped-tab">
           <thead>
-            <tr><th></th><th>Produto</th><th>Variação</th><th className="r">Qtd</th><th className="r">Preço</th><th className="r">Subtotal</th></tr>
+            <tr><th></th><th>{t('ped.colProduto')}</th><th>{t('ped.colVariacao')}</th><th className="r">{t('ped.colQtd')}</th><th className="r">{t('ped.colPreco')}</th><th className="r">{t('ped.colSubtotal')}</th></tr>
           </thead>
           <tbody>
             {p.itens.map((i, idx) => (
               <tr key={idx}>
                 <td>{i.variacao.produto.fotos?.[0] ? <img className="ped-mini" src={i.variacao.produto.fotos[0]} alt="" /> : <div className="ped-mini vazio" />}</td>
-                <td>{i.variacao.produto.nome}{i.variacao.produto.referencia ? <div className="ped-sub">Ref. {i.variacao.produto.referencia}</div> : null}</td>
+                <td>{i.variacao.produto.nome}{i.variacao.produto.referencia ? <div className="ped-sub">{t('ped.refSufixo', { ref: i.variacao.produto.referencia })}</div> : null}</td>
                 <td>{[i.variacao.cor, i.variacao.estampa, i.variacao.tamanho].filter(Boolean).join(' / ')}</td>
                 <td className="r">{i.quantidade}</td>
                 <td className="r">{real(i.precoUnitario)}</td>
@@ -129,19 +134,19 @@ export default function Pedido() {
         <div className="ped-rodape">
           <div className="ped-qr">
             {qr && <img src={qr} alt="QR do pedido" />}
-            <span>Escaneie para ver o pedido</span>
+            <span>{t('ped.escaneiePara')}</span>
           </div>
           <div className="ped-totais">
-            <div><span>Peças</span><span>{pecas}</span></div>
-            <div><span>Subtotal</span><span>{real(bruto)}</span></div>
-            {Number(p.desconto) > 0 && <div className="d"><span>Desconto ({p.descontoPct}%)</span><span>− {real(p.desconto)}</span></div>}
-            <div className="t"><span>Total</span><span>{real(p.total)}</span></div>
-            <div className="pag"><span>Pagamento</span><span>{rotuloForma[p.formaRecebimento]}</span></div>
+            <div><span>{t('ped.pecasLabel')}</span><span>{pecas}</span></div>
+            <div><span>{t('ped.subtotalLabel')}</span><span>{real(bruto)}</span></div>
+            {Number(p.desconto) > 0 && <div className="d"><span>{t('ped.descontoLabel', { pct: p.descontoPct })}</span><span>− {real(p.desconto)}</span></div>}
+            <div className="t"><span>{t('ped.totalLabel')}</span><span>{real(p.total)}</span></div>
+            <div className="pag"><span>{t('ped.pagamentoLabel')}</span><span>{t(`forma.${p.formaRecebimento}`)}</span></div>
           </div>
         </div>
 
-        {p.observacao && <div className="ped-obs"><strong>Observações:</strong> {p.observacao}</div>}
-        <footer className="ped-pe">{p.loja.rede.nome} · powered by ZAIEZE</footer>
+        {p.observacao && <div className="ped-obs"><strong>{t('ped.observacoesLabel')}</strong> {p.observacao}</div>}
+        <footer className="ped-pe">{p.loja.rede.nome} · {t('ped.poweredBy')}</footer>
       </div>
     </div>
   )

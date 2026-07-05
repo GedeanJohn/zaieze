@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, mensagemDeErro } from '../api'
 import { HOST } from '../host'
-import { useIdioma } from '../lib/i18n'
+import { useIdioma, ehIdiomaValido } from '../lib/i18n'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -22,9 +22,7 @@ export default function Login() {
       localStorage.setItem('modacrm_token', data.token)
       localStorage.setItem('modacrm_usuario', JSON.stringify(data.usuario))
       // Aplica na hora o idioma salvo no perfil de quem acabou de logar.
-      if (data.usuario?.idioma === 'pt' || data.usuario?.idioma === 'en' || data.usuario?.idioma === 'es') {
-        setIdioma(data.usuario.idioma)
-      }
+      if (ehIdiomaValido(data.usuario?.idioma)) setIdioma(data.usuario.idioma)
       navigate('/')
     } catch (err) {
       setErro(mensagemDeErro(err))

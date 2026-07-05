@@ -96,7 +96,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
     const body = z.object({
       nome: z.string().min(2).optional(), email: z.string().email().optional(), senha: z.string().min(6).optional(),
       bioCatalogo: z.string().max(280).nullish(),
-      idioma: z.enum(['pt', 'en', 'es']).optional(),
+      idioma: z.enum(['pt', 'en', 'en-gb', 'es']).optional(),
     }).parse(request.body)
     if (body.email) {
       const email = body.email.toLowerCase()

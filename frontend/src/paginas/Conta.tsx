@@ -109,7 +109,8 @@ export default function Conta() {
         <div style={{ fontWeight: 600, marginBottom: 8 }}>Idioma</div>
         <select value={idioma} onChange={(e) => salvarIdioma(e.target.value as Idioma)} disabled={salvandoIdioma} style={{ maxWidth: 220 }}>
           <option value="pt">🇧🇷 Português</option>
-          <option value="en">🇺🇸 English</option>
+          <option value="en">🇺🇸 English (US)</option>
+          <option value="en-gb">🇬🇧 English (UK)</option>
           <option value="es">🇪🇸 Español</option>
         </select>
       </div>

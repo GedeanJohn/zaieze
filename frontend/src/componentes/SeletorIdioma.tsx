@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useIdioma, type Idioma } from '../lib/i18n'
 
-const BANDEIRA: Record<Idioma, string> = { pt: '🇧🇷', en: '🇺🇸', es: '🇪🇸' }
-const CODIGO: Record<Idioma, string> = { pt: 'PT', en: 'EN', es: 'ES' }
-const ORDEM: Idioma[] = ['pt', 'en', 'es']
+const BANDEIRA: Record<Idioma, string> = { pt: '🇧🇷', en: '🇺🇸', 'en-gb': '🇬🇧', es: '🇪🇸' }
+const CODIGO: Record<Idioma, string> = { pt: 'PT', en: 'EN', 'en-gb': 'EN-GB', es: 'ES' }
+const ORDEM: Idioma[] = ['pt', 'en', 'en-gb', 'es']
 
 /** Seletor de idioma (bandeira + dropdown) — estilo comum em sites institucionais (ex.: TOTVS). */
 export default function SeletorIdioma() {

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
 
-export type Idioma = 'pt' | 'en' | 'es'
+export type Idioma = 'pt' | 'en' | 'en-gb' | 'es'
 
 const CHAVE = 'zaieze_idioma'
 
@@ -245,6 +245,13 @@ const DICIONARIOS: Record<Idioma, Dicionario> = {
     'feature.ia_avancada': 'Advanced AI',
     'feature.portal_cliente': 'Customer Portal',
   },
+  // Inglês britânico — dicionário ENXUTO: só as chaves com grafia/palavra diferente do 'en'
+  // (americano). Tudo que não estiver aqui cai automaticamente pro 'en' (ver função t() abaixo).
+  'en-gb': {
+    'meta.descricao': 'Management, inventory and CRM system for fashion stores (retail and wholesale) with WhatsApp support organised by salesperson and AI that wins back customers and moves slow-moving stock.',
+    'hero.texto': 'Organise your team\'s online sales over WhatsApp: a portfolio per salesperson, grid-based inventory, and AI that wins back customers and moves slow stock. Your dashboard live in minutes, on your own address.',
+    'feature.produtos': 'Product catalogue',
+  },
   es: {
     'meta.titulo': 'ZAIEZE — Sistemas Inteligentes para la Moda',
     'meta.descricao': 'Sistema de gestión, stock y CRM para tiendas de moda (minorista y mayorista) con atención por WhatsApp organizada por vendedora e IA que recupera clientes y mueve el stock parado.',
@@ -368,8 +375,8 @@ const DICIONARIOS: Record<Idioma, Dicionario> = {
 interface CtxValor { idioma: Idioma; setIdioma: (i: Idioma) => void; t: (chave: string) => string }
 const IdiomaCtx = createContext<CtxValor | null>(null)
 
-function ehIdiomaValido(v: unknown): v is Idioma {
-  return v === 'pt' || v === 'en' || v === 'es'
+export function ehIdiomaValido(v: unknown): v is Idioma {
+  return v === 'pt' || v === 'en' || v === 'en-gb' || v === 'es'
 }
 
 /** Prioriza o idioma salvo no perfil do usuário logado (persistido no banco); sem sessão,
@@ -395,7 +402,11 @@ export function IdiomaProvider({ children }: { children: ReactNode }) {
   }
 
   function t(chave: string): string {
-    return DICIONARIOS[idioma][chave] ?? DICIONARIOS.pt[chave] ?? chave
+    const valor = DICIONARIOS[idioma][chave]
+    if (valor) return valor
+    // en-gb é um dicionário ENXUTO (só as diferenças do en-US) — cai pro 'en' antes do pt.
+    if (idioma === 'en-gb') return DICIONARIOS.en[chave] ?? DICIONARIOS.pt[chave] ?? chave
+    return DICIONARIOS.pt[chave] ?? chave
   }
 
   return <IdiomaCtx.Provider value={{ idioma, setIdioma, t }}>{children}</IdiomaCtx.Provider>

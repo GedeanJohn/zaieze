@@ -29,7 +29,7 @@ const checkoutSchema = z.object({
   refAfiliado: z.string().trim().optional(),
   periodicidade: z.enum(['MENSAL', 'ANUAL']).default('MENSAL'),
   // Idioma preferencial escolhido no cadastro (só afeta a UI do gestor; editável depois em "Minha conta").
-  idioma: z.enum(['pt', 'en', 'es']).default('pt'),
+  idioma: z.enum(['pt', 'en', 'en-gb', 'es']).default('pt'),
 })
 
 // Subdomínios que não podem virar slug de tenant (colidem com o SaaS)

@@ -1,112 +1,115 @@
+import { useIdioma } from '../lib/i18n'
+
 /**
  * Manual do Gestor — documentação in-app das funcionalidades do Portal do Cliente:
  * coleções, catálogo/link, funil de vendas, SLA por etapa e identidade da marca.
  * Marca d'água ZAIEZE no fundo das páginas (inclui impressão).
  */
 export default function Manual() {
+  const { t } = useIdioma()
   return (
     <div className="manual-root">
       <ManualEstilos />
       <header className="manual-cabecalho">
         <div>
-          <h1>Manual do Gestor</h1>
-          <p>Portal do Cliente · catálogo, funil de vendas e identidade da marca</p>
+          <h1>{t('manual.titulo')}</h1>
+          <p>{t('manual.subtitulo')}</p>
         </div>
-        <button className="btn" onClick={() => window.print()}>🖨️ Imprimir / PDF</button>
+        <button className="btn" onClick={() => window.print()}>{t('manual.imprimir')}</button>
       </header>
 
       <section className="manual-secao">
-        <h2>1. Coleções e liberação</h2>
-        <p>A coleção é a unidade onde as peças (modelo, estampa, tamanho) ficam agrupadas. Ela tem dois estados:</p>
+        <h2>{t('manual.s1.titulo')}</h2>
+        <p>{t('manual.s1.p1')}</p>
         <ul>
-          <li><strong>Em preparação</strong> — o gestor de estoque está cadastrando as peças. Ficam <strong>invisíveis</strong> para as vendedoras (não aparecem no PDV nem no catálogo).</li>
-          <li><strong>Liberada</strong> — o gestor de estoque clica em <em>liberar</em> e a coleção passa a aparecer para <strong>todas as vendedoras ao mesmo tempo</strong>.</li>
+          <li><strong>{t('manual.s1.li1a')}</strong> {t('manual.s1.li1b')} <strong>{t('manual.s1.li1c')}</strong> {t('manual.s1.li1d')}</li>
+          <li><strong>{t('manual.s1.li2a')}</strong> {t('manual.s1.li2b')} <em>{t('manual.s1.li2c')}</em> {t('manual.s1.li2d')} <strong>{t('manual.s1.li2e')}</strong>{t('manual.s1.li2f')}</li>
         </ul>
-        <p className="manual-nota">Por que simultâneo? As vendedoras disputam o mesmo estoque. Liberar para todas no mesmo instante garante competição justa — ninguém larga na frente.</p>
-        <p><strong>Onde:</strong> menu <em>Coleções</em>. O gestor de estoque cria, cadastra as peças em <em>Produtos</em> e depois libera.</p>
+        <p className="manual-nota">{t('manual.s1.nota')}</p>
+        <p><strong>{t('manual.s1.onde1')}</strong> {t('manual.s1.onde2')} <em>{t('manual.s1.onde3')}</em>{t('manual.s1.onde4')} <em>{t('manual.s1.onde5')}</em> {t('manual.s1.onde6')}</p>
       </section>
 
       <section className="manual-secao">
-        <h2>2. Catálogo e link da vendedora</h2>
-        <p>Cada vendedora tem um link próprio do catálogo, no formato:</p>
+        <h2>{t('manual.s2.titulo')}</h2>
+        <p>{t('manual.s2.p1')}</p>
         <p className="manual-url">suamarca.zaieze.com/nome-da-vendedora</p>
         <ul>
-          <li>A vendedora compartilha o link com a carteira de clientes dela.</li>
-          <li>Quem abre vê as coleções liberadas (estética de loja) e, ao tocar em <strong>“Falar com a vendedora”</strong>, é direcionado para o <strong>WhatsApp dela</strong>.</li>
-          <li>Esse contato vira o <strong>ponto de entrada no CRM</strong>: o cliente entra na carteira da vendedora e abre uma oportunidade no funil.</li>
+          <li>{t('manual.s2.li1')}</li>
+          <li>{t('manual.s2.li2a')} <strong>{t('manual.s2.li2b')}</strong>{t('manual.s2.li2c')} <strong>{t('manual.s2.li2d')}</strong>{t('manual.s2.li2e')}</li>
+          <li>{t('manual.s2.li3a')} <strong>{t('manual.s2.li3b')}</strong>{t('manual.s2.li3c')}</li>
         </ul>
-        <p><strong>Onde:</strong> menu <em>Funil de vendas</em> → “Links das vendedoras” (copiar e distribuir).</p>
+        <p><strong>{t('manual.s2.onde1')}</strong> {t('manual.s2.onde2')} <em>{t('manual.s2.onde3')}</em> {t('manual.s2.onde4')}</p>
       </section>
 
       <section className="manual-secao">
-        <h2>3. Funil de atendimento &amp; vendas</h2>
-        <p>Cada ciclo de contato é uma <strong>oportunidade</strong> independente. Um mesmo cliente pode ter várias ao longo do tempo (perdeu hoje, volta depois = nova oportunidade). As etapas:</p>
+        <h2>{t('manual.s3.titulo')}</h2>
+        <p>{t('manual.s3.p1a')} <strong>{t('manual.s3.p1b')}</strong> {t('manual.s3.p1c')}</p>
         <ol>
-          <li><strong>Entrou</strong> — chegou pelo catálogo; aguardando a 1ª resposta.</li>
-          <li><strong>Atendido</strong> — a vendedora respondeu (atender = responder).</li>
-          <li><strong>Negociando</strong> — atendimento ativo em andamento.</li>
-          <li><strong>Convertido</strong> — virou venda (automático ao registrar a venda do cliente) ou marcado à mão.</li>
-          <li><strong>Perdido</strong> — encerrado sem compra. O cliente pode reentrar e abrir um novo ciclo.</li>
+          <li><strong>{t('manual.s3.li1a')}</strong> {t('manual.s3.li1b')}</li>
+          <li><strong>{t('manual.s3.li2a')}</strong> {t('manual.s3.li2b')}</li>
+          <li><strong>{t('manual.s3.li3a')}</strong> {t('manual.s3.li3b')}</li>
+          <li><strong>{t('manual.s3.li4a')}</strong> {t('manual.s3.li4b')}</li>
+          <li><strong>{t('manual.s3.li5a')}</strong> {t('manual.s3.li5b')}</li>
         </ol>
-        <p className="manual-nota">Reentrada: se já existe um ciclo aberto, ele é reaproveitado; se todos estão fechados, abre-se um novo ciclo.</p>
-        <p><strong>Onde:</strong> menu <em>Funil de vendas</em> — quadro Kanban com métricas (abertos, atrasados, convertidos, taxa de conversão e tempo médio de 1ª resposta).</p>
+        <p className="manual-nota">{t('manual.s3.nota')}</p>
+        <p><strong>{t('manual.s3.onde1')}</strong> {t('manual.s3.onde2')} <em>{t('manual.s3.onde3')}</em> {t('manual.s3.onde4')}</p>
       </section>
 
       <section className="manual-secao">
-        <h2>4. SLA por etapa e redistribuição</h2>
-        <p>Você define o <strong>tempo máximo</strong> que uma oportunidade pode ficar em cada etapa. Estourou o prazo, o card aparece como <strong>atrasado</strong>.</p>
+        <h2>{t('manual.s4.titulo')}</h2>
+        <p>{t('manual.s4.p1a')} <strong>{t('manual.s4.p1b')}</strong> {t('manual.s4.p1c')} <strong>{t('manual.s4.p1d')}</strong>{t('manual.s4.p1e')}</p>
         <ul>
-          <li><strong>Entrou:</strong> prazo para a 1ª resposta. Ao estourar, o gestor pode redistribuir (ou o sistema redistribui sozinho, se a opção estiver ligada) para a vendedora mais ociosa.</li>
-          <li><strong>Atendido / Negociando:</strong> prazos para avançar; sinalizam oportunidades paradas.</li>
+          <li><strong>{t('manual.s4.li1a')}</strong> {t('manual.s4.li1b')}</li>
+          <li><strong>{t('manual.s4.li2a')}</strong> {t('manual.s4.li2b')}</li>
         </ul>
-        <p>Redistribuir move a oportunidade e a carteira do cliente para outra vendedora e reinicia o prazo. Use o botão <em>↪</em> no card ou <em>Redistribuir atrasados</em>.</p>
-        <p><strong>Onde:</strong> menu <em>Marca</em> (configura os prazos e a redistribuição automática).</p>
+        <p>{t('manual.s4.p2a')} <em>{t('manual.s4.p2b')}</em> {t('manual.s4.p2c')} <em>{t('manual.s4.p2d')}</em>{t('manual.s4.p2e')}</p>
+        <p><strong>{t('manual.s4.onde1')}</strong> {t('manual.s4.onde2')} <em>{t('manual.s4.onde3')}</em> {t('manual.s4.onde4')}</p>
       </section>
 
       <section className="manual-secao">
-        <h2>5. Identidade da marca</h2>
-        <p>A logo e as cores definidas aqui aparecem no catálogo público que as vendedoras compartilham.</p>
+        <h2>{t('manual.s5.titulo')}</h2>
+        <p>{t('manual.s5.p1')}</p>
         <ul>
-          <li><strong>Logo:</strong> envie um arquivo (PNG, JPG, WEBP ou SVG, até 5&nbsp;MB).</li>
-          <li><strong>Cores:</strong> cor primária (botões/CTA) e cor de fundo.</li>
+          <li><strong>{t('manual.s5.li1a')}</strong> {t('manual.s5.li1b')}</li>
+          <li><strong>{t('manual.s5.li2a')}</strong> {t('manual.s5.li2b')}</li>
         </ul>
-        <p><strong>Onde:</strong> menu <em>Marca</em>.</p>
+        <p><strong>{t('manual.s5.onde1')}</strong> {t('manual.s5.onde2')} <em>{t('manual.s5.onde3')}</em>{t('manual.s5.onde4')}</p>
       </section>
 
       <section className="manual-secao">
-        <h2>6. Campanhas da marca</h2>
-        <p>Centralize as campanhas: você <strong>monta uma vez</strong> e as vendedoras <strong>disparam</strong> para a carteira delas.</p>
+        <h2>{t('manual.s6.titulo')}</h2>
+        <p>{t('manual.s6.p1a')} <strong>{t('manual.s6.p1b')}</strong> {t('manual.s6.p1c')} <strong>{t('manual.s6.p1d')}</strong> {t('manual.s6.p1e')}</p>
         <ul>
-          <li>Crie a campanha com <strong>nome</strong>, <strong>segmento sugerido</strong>, <strong>mensagem</strong> e <strong>banner</strong> (opcional).</li>
-          <li><strong>Publique</strong> — ela fica disponível para as vendedoras. Pode <em>pausar</em>/<em>ativar</em> a qualquer momento.</li>
-          <li>Cada disparo de vendedora soma no <strong>resultado consolidado</strong> da campanha (alcance, enviadas).</li>
+          <li>{t('manual.s6.li1a')} <strong>{t('manual.s6.li1b')}</strong>{t('manual.s6.li1c')} <strong>{t('manual.s6.li1d')}</strong>{t('manual.s6.li1e')} <strong>{t('manual.s6.li1f')}</strong> {t('manual.s6.li1g')} <strong>{t('manual.s6.li1h')}</strong> {t('manual.s6.li1i')}</li>
+          <li><strong>{t('manual.s6.li2a')}</strong> {t('manual.s6.li2b')} <em>{t('manual.s6.li2c')}</em>{t('manual.s6.li2d')}<em>{t('manual.s6.li2e')}</em> {t('manual.s6.li2f')}</li>
+          <li>{t('manual.s6.li3a')} <strong>{t('manual.s6.li3b')}</strong> {t('manual.s6.li3c')}</li>
         </ul>
-        <p className="manual-nota">O banner aparece para a vendedora no catálogo; o envio do banner pelo WhatsApp entra com a API oficial. O texto padrão e a trava de edição ficam em <em>Marca</em>.</p>
-        <p><strong>Onde:</strong> menu <em>WhatsApp</em> → “Campanhas da marca”. O painel de resultados fica na mesma tela.</p>
+        <p className="manual-nota">{t('manual.s6.nota1')} <em>{t('manual.s6.nota2')}</em>{t('manual.s6.nota3')}</p>
+        <p><strong>{t('manual.s6.onde1')}</strong> {t('manual.s6.onde2')} <em>{t('manual.s6.onde3')}</em> {t('manual.s6.onde4')}</p>
       </section>
 
       <section className="manual-secao">
-        <h2>7. Pedidos a separar</h2>
-        <p>Toda venda fechada entra como <strong>pedido pendente</strong> de separação física.</p>
+        <h2>{t('manual.s7.titulo')}</h2>
+        <p>{t('manual.s7.p1a')} <strong>{t('manual.s7.p1b')}</strong> {t('manual.s7.p1c')}</p>
         <ul>
-          <li>O <strong>gestor de estoque</strong> separa as peças e marca como <strong>separado</strong>.</li>
-          <li>Você e o gerente <strong>acompanham e cobram</strong> os pendentes (mostra há quanto tempo estão na fila).</li>
-          <li>Cada pedido abre o <strong>comprovante</strong> (link público + PDF) para conferência.</li>
+          <li>{t('manual.s7.li1a')} <strong>{t('manual.s7.li1b')}</strong> {t('manual.s7.li1c')} <strong>{t('manual.s7.li1d')}</strong>{t('manual.s7.li1e')}</li>
+          <li>{t('manual.s7.li2a')} <strong>{t('manual.s7.li2b')}</strong> {t('manual.s7.li2c')}</li>
+          <li>{t('manual.s7.li3a')} <strong>{t('manual.s7.li3b')}</strong> {t('manual.s7.li3c')}</li>
         </ul>
-        <p><strong>Onde:</strong> menu <em>Pedidos a separar</em>.</p>
+        <p><strong>{t('manual.s7.onde1')}</strong> {t('manual.s7.onde2')} <em>{t('manual.s7.onde3')}</em>{t('manual.s7.onde4')}</p>
       </section>
 
       <section className="manual-secao">
-        <h2>8. Comprovante de pedido</h2>
-        <p>Ao registrar a venda, o pedido gera um comprovante que a vendedora envia ao cliente.</p>
+        <h2>{t('manual.s8.titulo')}</h2>
+        <p>{t('manual.s8.p1')}</p>
         <ul>
-          <li><strong>Link público</strong> (sem login) para o cliente abrir no celular.</li>
-          <li><strong>PDF</strong> gerado no sistema, para baixar ou imprimir.</li>
-          <li>Botão <strong>“Enviar para o cliente”</strong> abre o WhatsApp com o resumo e o link.</li>
+          <li><strong>{t('manual.s8.li1a')}</strong> {t('manual.s8.li1b')}</li>
+          <li><strong>{t('manual.s8.li2a')}</strong> {t('manual.s8.li2b')}</li>
+          <li>{t('manual.s8.li3a')} <strong>{t('manual.s8.li3b')}</strong> {t('manual.s8.li3c')}</li>
         </ul>
       </section>
 
-      <footer className="manual-rodape">ZAIEZE · Sistemas Inteligentes para a Moda</footer>
+      <footer className="manual-rodape">ZAIEZE · {t('footer.tagline')}</footer>
     </div>
   )
 }

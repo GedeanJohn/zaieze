@@ -365,7 +365,18 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .site-top nav a { color: #fff; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.85; }
 .site-top nav a:hover { opacity: 1; }
 
-.hero { text-align: center; padding: 90px 8vw 70px; max-width: 1000px; margin: 0 auto; }
+.hero {
+  text-align: center; padding: 90px 8vw 70px; max-width: 1000px; margin: 0 auto;
+  position: relative;
+}
+/* Fundo com profundidade (placeholder até entrar uma foto real da loja/vendedora) —
+   troque por background-image: url(...) quando houver o arquivo. */
+.hero::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background:
+    radial-gradient(ellipse at 70% 20%, rgba(194, 85, 43, 0.22), transparent 60%),
+    linear-gradient(165deg, #000 0%, #140b07 55%, #000 100%);
+}
 .hero-logo { width: min(460px, 80vw); margin: 0 auto 34px; display: block; }
 .hero h1 {
   font-family: var(--marca); /* lema da marca — única fonte NUSAR na página */
@@ -384,6 +395,34 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .faixa strong { display: block; margin-bottom: 8px; letter-spacing: 0.06em; text-transform: uppercase; font-size: 14px; }
 .faixa span { color: var(--zz-mut); font-size: 14px; }
 
+/* ── Seção "Confiança" — foto (placeholder) + texto em duas colunas ── */
+.confianca {
+  display: grid; grid-template-columns: 1fr 1.1fr; gap: 60px; align-items: center;
+  max-width: 1100px; margin: 90px auto; padding: 0 8vw;
+}
+.confianca-imagem {
+  aspect-ratio: 4 / 3; border-radius: 12px; border: 1px solid var(--zz-line);
+  background:
+    radial-gradient(circle at 30% 30%, rgba(194, 85, 43, 0.35), transparent 55%),
+    linear-gradient(140deg, var(--zz-surface), #000);
+}
+.confianca-texto h2 { font-size: 24px; line-height: 1.4; margin: 0 0 18px; text-transform: uppercase; letter-spacing: 0.03em; }
+.confianca-texto h2 strong { color: var(--accent); }
+.confianca-texto p { font-size: 15px; color: var(--zz-mut); line-height: 1.8; }
+@media (max-width: 760px) {
+  .confianca { grid-template-columns: 1fr; gap: 26px; margin: 60px auto; }
+}
+
+/* ── Faixa "Diferenciais" — largura cheia, cor da marca, 3 blocos ícone+texto ── */
+.diferenciais-faixa {
+  width: 100vw; margin-left: calc(-50vw + 50%); background: var(--accent); color: #fff;
+  padding: 60px 8vw; text-align: center;
+}
+.diferenciais-faixa h2 { font-size: 22px; margin: 0 0 44px; text-transform: uppercase; letter-spacing: 0.04em; }
+.diferenciais-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px; max-width: 1000px; margin: 0 auto; }
+.diferenciais-grid svg { margin: 0 auto 16px; display: block; }
+.diferenciais-grid p { font-size: 15px; line-height: 1.6; font-weight: 600; max-width: 260px; margin: 0 auto; }
+
 .planos-site { padding: 80px 8vw; max-width: 1180px; margin: 0 auto; text-align: center; }
 .planos-site h2 { font-size: 26px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.06em; }
 .planos-site .sub { color: var(--zz-mut); margin: 0 0 44px; letter-spacing: 0.02em; }
@@ -401,6 +440,7 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .plano-card .preco { font-size: 34px; font-weight: 700; }
 .plano-card .preco span { font-size: 13px; font-weight: 400; color: var(--zz-mut); letter-spacing: 0.04em; }
 .plano-card .limite { color: var(--zz-mut); font-size: 12px; margin: 6px 0 18px; letter-spacing: 0.04em; text-transform: uppercase; }
+.cambio-aprox { color: var(--zz-mut); font-size: 12px; margin: -10px 0 14px; }
 .plano-card ul { list-style: none; padding: 0; margin: 0 0 24px; flex: 1; }
 .plano-card li { padding: 7px 0 7px 24px; position: relative; font-size: 14px; color: #d8d8d8; }
 .plano-card li::before { content: '—'; position: absolute; left: 0; color: #fff; }

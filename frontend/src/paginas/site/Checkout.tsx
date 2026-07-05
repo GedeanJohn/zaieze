@@ -19,7 +19,8 @@ export default function Checkout() {
   // Plano é estado: um cupom com plano definido troca/trava o plano (link fica só ?cupom=).
   const [plano, setPlano] = useState<Plano>((params.get('plano') as Plano) || 'PRO')
   const [periodicidade, setPeriodicidade] = useState<Periodicidade>((params.get('periodicidade') as Periodicidade) || 'MENSAL')
-  const { idioma } = useIdioma()
+  const { idioma, t } = useIdioma()
+  const [cambio, setCambio] = useState<{ usdPorBrl: number | null }>({ usdPorBrl: null })
 
   const [form, setForm] = useState({ redeNome: '', slug: '', gestorNome: '', telefone: '', email: '', senha: '' })
   const [dominio, setDominio] = useState('zaieze.com')
@@ -38,6 +39,7 @@ export default function Checkout() {
   useEffect(() => {
     api.get('/assinaturas/planos').then(({ data }) => {
       setDominio(data.dominioBase); setPlanos(data.planos); setDescontoAnual(data.percentualDescontoAnual ?? 0)
+      setCambio(data.cambio ?? { usdPorBrl: null })
     }).catch(() => {})
     api.get('/contrato/termos').then(({ data }) => setContrato(data.contrato)).catch(() => {})
     capturarRefAfiliado()
@@ -126,11 +128,14 @@ export default function Checkout() {
           </div>
           <div className="preco">
             {promo?.valido && promo.tipo === 'PERCENTUAL'
-              ? <><s style={{ opacity: .55, fontSize: '0.6em' }}>{formataReal(preco)}</s> {formataReal(precoComDesc)}<span>/{periodicidade === 'ANUAL' ? 'ano' : 'mês'}</span></>
-              : <>{formataReal(preco)}<span>/{periodicidade === 'ANUAL' ? 'ano' : 'mês'}</span></>}
+              ? <><s style={{ opacity: .55, fontSize: '0.6em' }}>{formataReal(preco)}</s> {formataReal(precoComDesc)}<span>/{periodicidade === 'ANUAL' ? t('unidade.ano') : t('unidade.mes')}</span></>
+              : <>{formataReal(preco)}<span>/{periodicidade === 'ANUAL' ? t('unidade.ano') : t('unidade.mes')}</span></>}
           </div>
+          {idioma !== 'pt' && cambio.usdPorBrl != null && (
+            <div className="cambio-aprox">{t('cambio.aprox', { valor: Math.round(precoComDesc * cambio.usdPorBrl) })}</div>
+          )}
           {periodicidade === 'ANUAL' && (
-            <p style={{ fontSize: 13, color: '#666', marginTop: -8 }}>equivale a {formataReal(precoComDesc / 12)}/mês</p>
+            <p style={{ fontSize: 13, color: '#666', marginTop: -8 }}>{t('planos.equivaleMes')} {formataReal(precoComDesc / 12)}/{t('unidade.mes')}</p>
           )}
           {promo?.valido && promo.tipo === 'DIAS_GRATIS' && (
             <p style={{ color: '#22c55e', fontWeight: 600 }}>🎁 {promo.dias} dias grátis — comece a pagar depois</p>

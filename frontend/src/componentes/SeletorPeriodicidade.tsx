@@ -1,3 +1,5 @@
+import { useIdioma } from '../lib/i18n'
+
 export type Periodicidade = 'MENSAL' | 'ANUAL'
 
 interface Props {
@@ -8,6 +10,7 @@ interface Props {
 
 /** Seletor Mensal/Anual (pill) — usado na landing e no checkout. */
 export default function SeletorPeriodicidade({ valor, onChange, percentualDesconto }: Props) {
+  const { t } = useIdioma()
   const opcao = (id: Periodicidade, label: string) => (
     <button
       type="button"
@@ -30,8 +33,8 @@ export default function SeletorPeriodicidade({ valor, onChange, percentualDescon
         border: '1px solid var(--accent)', borderRadius: 999,
       }}
     >
-      {opcao('ANUAL', percentualDesconto ? `Anual (${percentualDesconto}% off)` : 'Anual')}
-      {opcao('MENSAL', 'Mensal')}
+      {opcao('ANUAL', percentualDesconto ? `${t('periodicidade.anual')} (${percentualDesconto}% ${t('periodicidade.off')})` : t('periodicidade.anual'))}
+      {opcao('MENSAL', t('periodicidade.mensal'))}
     </div>
   )
 }

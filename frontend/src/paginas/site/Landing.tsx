@@ -37,10 +37,11 @@ function featuresAte(plano: Plano, t: (chave: string) => string): string[] {
 export default function Landing() {
   const [planos, setPlanos] = useState<PlanoCatalogo[]>([])
   const [descontoAnual, setDescontoAnual] = useState(0)
+  const [cambio, setCambio] = useState<{ usdPorBrl: number | null }>({ usdPorBrl: null })
   const [periodicidade, setPeriodicidade] = useState<Periodicidade>('MENSAL')
   const [chatAberto, setChatAberto] = useState(false)
   const navigate = useNavigate()
-  const { t } = useIdioma()
+  const { t, idioma } = useIdioma()
 
   useMetaTags({
     titulo: t('meta.titulo'),
@@ -49,7 +50,11 @@ export default function Landing() {
   })
 
   useEffect(() => {
-    api.get('/assinaturas/planos').then(({ data }) => { setPlanos(data.planos); setDescontoAnual(data.percentualDescontoAnual ?? 0) }).catch(() => {})
+    api.get('/assinaturas/planos').then(({ data }) => {
+      setPlanos(data.planos)
+      setDescontoAnual(data.percentualDescontoAnual ?? 0)
+      setCambio(data.cambio ?? { usdPorBrl: null })
+    }).catch(() => {})
   }, [])
 
   useEffect(() => { capturarRefAfiliado() }, [])
@@ -103,6 +108,11 @@ export default function Landing() {
                 </>
               ) : (
                 <div className="preco">{formataReal(p.preco)}<span>/{t('unidade.mes')}</span></div>
+              )}
+              {idioma !== 'pt' && cambio.usdPorBrl != null && (
+                <div className="cambio-aprox">
+                  {t('cambio.aprox', { valor: Math.round((periodicidade === 'ANUAL' ? p.precoAnual : p.preco) * cambio.usdPorBrl) })}
+                </div>
               )}
               <div className="limite">{p.limite}</div>
               <ul>

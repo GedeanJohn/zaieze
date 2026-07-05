@@ -139,7 +139,7 @@ export default function Checkout() {
             })()}
           </div>
           {idioma !== 'pt' && cambio.usdPorBrl != null && (
-            <div className="cambio-aprox">{t('cambio.aprox', { valor: formataReal(precoComDesc) })}</div>
+            <div className="cambio-aprox">{t('cambio.aprox')}</div>
           )}
           {periodicidade === 'ANUAL' && (
             <p style={{ fontSize: 13, color: '#666', marginTop: -8 }}>

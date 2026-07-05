@@ -220,9 +220,7 @@ export default function Landing() {
                 )
               })()}
               {idioma !== 'pt' && cambio.usdPorBrl != null && (
-                <div className="cambio-aprox">
-                  {t('cambio.aprox', { valor: formataReal(periodicidade === 'ANUAL' ? p.precoAnual : p.preco) })}
-                </div>
+                <div className="cambio-aprox">{t('cambio.aprox')}</div>
               )}
               <div className="limite">{p.limite}</div>
               <ul>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, mensagemDeErro, usuarioLogado } from '../api'
 import { useLojaAtiva } from '../componentes/SeletorLoja'
+import { useIdioma } from '../lib/i18n'
 
 interface Variacao {
   id?: string
@@ -81,13 +82,13 @@ const ESTAMPAS_SUGERIDAS = [
   'Geométrico', 'Étnico', 'Mandala', 'Tie-dye', 'Abstrato', 'Estampado',
 ]
 
-const GENEROS: [string, string][] = [
-  ['FEMININO', 'Feminino'],
-  ['MASCULINO', 'Masculino'],
-  ['UNISSEX', 'Unissex'],
-  ['INFANTIL', 'Infantil'],
-]
-const rotuloGenero = Object.fromEntries(GENEROS) as Record<string, string>
+const CODIGOS_GENERO = ['FEMININO', 'MASCULINO', 'UNISSEX', 'INFANTIL'] as const
+function generos(t: (chave: string) => string): [string, string][] {
+  return CODIGOS_GENERO.map((c) => [c, t(`prod.genero.${c.toLowerCase()}`)])
+}
+function rotuloGenero(codigo: string, t: (chave: string) => string): string {
+  return t(`prod.genero.${codigo.toLowerCase()}`)
+}
 
 function norm(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
@@ -97,6 +98,7 @@ export default function Produtos() {
   const usuario = usuarioLogado()!
   const gerente = usuario.role !== 'VENDEDORA'
   const escopo = useLojaAtiva()
+  const { t } = useIdioma()
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [busca, setBusca] = useState('')
   const [form, setForm] = useState<FormProduto | null>(null)
@@ -113,10 +115,10 @@ export default function Produtos() {
   }, [busca, escopo.pronto, escopo.params])
 
   async function excluir(p: Produto) {
-    if (!confirm(`Excluir o produto "${p.nome}"? A mídia (fotos/vídeos) também será apagada. Esta ação não pode ser desfeita.`)) return
+    if (!confirm(t('prod.confirmExcluir', { nome: p.nome }))) return
     try {
       const { data } = await api.delete(`/produtos/${p.id}`, { params: escopo.params })
-      if (data?.desativado) alert('O produto tem vendas registradas, então foi desativado (some da lista) e a mídia foi apagada — o histórico de vendas é preservado.')
+      if (data?.desativado) alert(t('prod.desativadoAviso'))
       carregar()
     } catch (e) { alert(mensagemDeErro(e)) }
   }
@@ -280,25 +282,25 @@ export default function Produtos() {
   return (
     <>
       <header>
-        <h1>Produtos</h1>
-        {gerente && <button className="btn" onClick={abrirNovo} disabled={!escopo.pronto}>+ Novo produto</button>}
+        <h1>{t('prod.titulo')}</h1>
+        {gerente && <button className="btn" onClick={abrirNovo} disabled={!escopo.pronto}>{t('prod.novoProduto')}</button>}
       </header>
 
       <div className="cartao">
         <div className="campo">
-          <label>Buscar (nome ou referência)</label>
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Ex.: Vestido ou LUNA" />
+          <label>{t('prod.buscarLabel')}</label>
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={t('prod.buscarPlaceholder')} />
         </div>
         <table>
           <thead>
-            <tr><th>Ref.</th><th>Modelo</th><th>Gênero</th><th>Tipo</th><th>Preço varejo</th><th>Grade</th><th>Estoque</th><th></th></tr>
+            <tr><th>{t('prod.colRef')}</th><th>{t('prod.colModelo')}</th><th>{t('prod.colGenero')}</th><th>{t('prod.colTipo')}</th><th>{t('prod.colPrecoVarejo')}</th><th>{t('prod.colGrade')}</th><th>{t('prod.colEstoque')}</th><th></th></tr>
           </thead>
           <tbody>
             {produtos.map((p) => (
               <tr key={p.id}>
                 <td style={{ fontFamily: 'Consolas, monospace', fontSize: 12 }}>{p.referencia ?? '—'}</td>
                 <td>{p.nome}</td>
-                <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{rotuloGenero[p.genero] ?? p.genero}</td>
+                <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{rotuloGenero(p.genero, t)}</td>
                 <td>{p.categoria?.nome ?? '—'}</td>
                 <td>R$ {Number(p.precoVarejo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                 <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
@@ -310,14 +312,14 @@ export default function Produtos() {
                   </span>
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>{gerente && <>
-                  <a href="#" onClick={(e) => { e.preventDefault(); abrirEdicao(p) }}>editar</a>
+                  <a href="#" onClick={(e) => { e.preventDefault(); abrirEdicao(p) }}>{t('prod.editarLink')}</a>
                   {' · '}
-                  <a href="#" style={{ color: 'var(--danger)' }} onClick={(e) => { e.preventDefault(); excluir(p) }}>excluir</a>
+                  <a href="#" style={{ color: 'var(--danger)' }} onClick={(e) => { e.preventDefault(); excluir(p) }}>{t('prod.excluirLink')}</a>
                 </>}</td>
               </tr>
             ))}
             {produtos.length === 0 && (
-              <tr><td colSpan={8} style={{ color: 'var(--ink-soft)' }}>Nenhum produto encontrado.</td></tr>
+              <tr><td colSpan={8} style={{ color: 'var(--ink-soft)' }}>{t('prod.nenhumProdutoEncontrado')}</td></tr>
             )}
           </tbody>
         </table>
@@ -326,56 +328,56 @@ export default function Produtos() {
       {form && (
         <div className="modal-fundo" onClick={() => setForm(null)}>
           <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvar}>
-            <h2>{form.id ? 'Editar produto' : 'Novo produto'}</h2>
+            <h2>{form.id ? t('prod.editarProduto') : t('prod.novoProdutoTitulo')}</h2>
             {erro && <div className="alerta">{erro}</div>}
 
             {/* Coleção: a peça/modelo é vinculada a uma das coleções já criadas (em Coleções). */}
             <div className="campo">
-              <label>Coleção</label>
+              <label>{t('prod.colecaoLabel')}</label>
               <select value={form.colecao ?? ''} onChange={(e) => setForm({ ...form, colecao: e.target.value })}>
-                <option value="">{colecoes.length ? '— Selecione a coleção —' : 'Nenhuma coleção criada (crie em Coleções)'}</option>
+                <option value="">{colecoes.length ? t('prod.selecioneColecao') : t('prod.nenhumaColecaoCriada')}</option>
                 {colecoes.map((c) => <option key={c.id} value={c.nome}>{c.nome}</option>)}
               </select>
-              <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>Escolha a coleção de que este modelo faz parte.</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>{t('prod.escolhaColecaoTexto')}</div>
             </div>
 
             {/* Essenciais */}
             <div className="linha-campos">
               <div className="campo">
                 <label>
-                  Referência do modelo{' '}
-                  <button type="button" className="btn-link" onClick={sugerirReferencia}>sugerir</button>
+                  {t('prod.referenciaLabel')}{' '}
+                  <button type="button" className="btn-link" onClick={sugerirReferencia}>{t('prod.sugerir')}</button>
                 </label>
                 <input
                   value={form.referencia ?? ''}
                   onChange={(e) => setForm({ ...form, referencia: e.target.value })}
-                  placeholder="Ex.: VP26-VESTLONG-JULIA (vazio = gerado)"
+                  placeholder={t('prod.referenciaPlaceholder')}
                 />
               </div>
               <div className="campo">
-                <label>Nome do modelo*</label>
-                <input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="Ex.: Júlia" required />
+                <label>{t('prod.nomeModeloLabel')}</label>
+                <input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder={t('prod.nomeModeloPlaceholder')} required />
               </div>
             </div>
             <div className="linha-campos">
               <div className="campo">
-                <label>Gênero*</label>
+                <label>{t('prod.generoLabel')}</label>
                 <select value={form.genero} onChange={(e) => setForm({ ...form, genero: e.target.value })}>
-                  {GENEROS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  {generos(t).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </div>
               <div className="campo">
-                <label>Tipo de peça (categoria)</label>
-                <input value={form.categoria ?? ''} onChange={(e) => setForm({ ...form, categoria: e.target.value })} placeholder="Ex.: Vestido Longo" />
+                <label>{t('prod.tipoLabel')}</label>
+                <input value={form.categoria ?? ''} onChange={(e) => setForm({ ...form, categoria: e.target.value })} placeholder={t('prod.tipoPlaceholder')} />
               </div>
               <div className="campo">
-                <label>Preço varejo (R$)*</label>
+                <label>{t('prod.precoVarejoLabel')}</label>
                 <input type="number" step="0.01" min="0.01" value={form.precoVarejo} onChange={(e) => setForm({ ...form, precoVarejo: e.target.value })} required />
               </div>
             </div>
 
             {/* Fotos */}
-            <h3 style={{ marginBottom: 8 }}>Fotos da peça</h3>
+            <h3 style={{ marginBottom: 8 }}>{t('prod.fotosTitulo')}</h3>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
               {form.fotos.map((url, i) => {
                 const cores = [...new Set(form.variacoes.map((v) => v.cor.trim()).filter(Boolean))]
@@ -384,7 +386,7 @@ export default function Produtos() {
                     <div style={{ position: 'relative', width: 72, height: 96 }}>
                       <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6, border: '1px solid #00000022' }} />
                       <button
-                        type="button" className="remover" title="Remover foto"
+                        type="button" className="remover" title={t('prod.removerFoto')}
                         style={{ position: 'absolute', top: -8, right: -8 }}
                         onClick={() => setForm({ ...form, fotos: form.fotos.filter((_, idx) => idx !== i), fotosCores: form.fotosCores.filter((_, idx) => idx !== i) })}
                       >×</button>
@@ -393,71 +395,71 @@ export default function Produtos() {
                       value={form.fotosCores[i] ?? ''}
                       onChange={(e) => setForm({ ...form, fotosCores: form.fotos.map((_, idx) => idx === i ? e.target.value : (form.fotosCores[idx] ?? '')) })}
                       style={{ width: 72, fontSize: 11, marginTop: 4, padding: '2px 4px' }}
-                      title="Cor desta foto (troca a galeria no catálogo)"
+                      title={t('prod.corFotoTitle')}
                     >
-                      <option value="">Todas</option>
+                      <option value="">{t('prod.todas')}</option>
                       {cores.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                 )
               })}
-              {form.fotos.length === 0 && <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Nenhuma foto ainda.</span>}
+              {form.fotos.length === 0 && <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{t('prod.nenhumaFotoAinda')}</span>}
             </div>
             <label className="btn secundario" style={{ cursor: 'pointer', display: 'inline-block' }}>
-              {enviandoFoto ? 'Enviando…' : '+ Adicionar fotos'}
+              {enviandoFoto ? t('prod.enviando') : t('prod.adicionarFotos')}
               <input type="file" accept="image/*" multiple onChange={enviarFotos} disabled={enviandoFoto} style={{ display: 'none' }} />
             </label>
-            <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '4px 0 14px' }}>As fotos são otimizadas e hospedadas no CDN automaticamente. Marque a <strong>cor</strong> de cada foto para a galeria trocar quando o cliente escolher a cor (deixe “Todas” se serve para qualquer cor).</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '4px 0 14px' }}>{t('prod.fotosExplicacao1')} <strong>{t('prod.corDestaque')}</strong> {t('prod.fotosExplicacao2')}</div>
 
             {/* Vídeos */}
-            <h3 style={{ marginBottom: 8 }}>Vídeos da peça</h3>
+            <h3 style={{ marginBottom: 8 }}>{t('prod.videosTitulo')}</h3>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
               {form.videos.map((url, i) => (
                 <div key={i} style={{ position: 'relative', width: 120 }}>
                   <video src={url} style={{ width: '100%', borderRadius: 6, border: '1px solid #00000022' }} controls preload="metadata" />
                   <button
-                    type="button" className="remover" title="Remover vídeo"
+                    type="button" className="remover" title={t('prod.removerVideo')}
                     style={{ position: 'absolute', top: -8, right: -8 }}
                     onClick={() => setForm({ ...form, videos: form.videos.filter((_, idx) => idx !== i) })}
                   >×</button>
                 </div>
               ))}
-              {form.videos.length === 0 && <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Nenhum vídeo ainda.</span>}
+              {form.videos.length === 0 && <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{t('prod.nenhumVideoAinda')}</span>}
             </div>
             <label className="btn secundario" style={{ cursor: 'pointer', display: 'inline-block' }}>
-              {enviandoVideo ? 'Enviando e convertendo…' : '+ Adicionar vídeo'}
+              {enviandoVideo ? t('prod.enviandoConvertendo') : t('prod.adicionarVideo')}
               <input type="file" accept="video/*" multiple onChange={enviarVideos} disabled={enviandoVideo} style={{ display: 'none' }} />
             </label>
-            <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '4px 0 14px' }}>O vídeo é convertido para MP4 e hospedado no CDN. Pode levar alguns segundos. Máx 60&nbsp;MB.</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '4px 0 14px' }}>{t('prod.videoExplicacao')}</div>
 
             {/* Grade */}
-            <h3 style={{ marginBottom: 8 }}>Grade (cor × estampa × tamanho)</h3>
+            <h3 style={{ marginBottom: 8 }}>{t('prod.gradeTitulo')}</h3>
             <div className="grade-variacoes gv-head" style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
-              <span>Cor</span><span>Estampa</span><span>Tamanho</span><span>Cód. barras (EAN)</span><span>Estoque</span><span title="Reserva exclusiva p/ varejo (peças únicas)">Varejo</span><span>Mínimo</span><span></span>
+              <span>{t('prod.corLabel')}</span><span>{t('prod.estampaLabel')}</span><span>{t('prod.tamanhoLabel')}</span><span>{t('prod.codBarrasLabel')}</span><span>{t('prod.colEstoque')}</span><span title={t('prod.reservaVarejoTitle')}>{t('prod.varejoLabel')}</span><span>{t('prod.minimoLabel')}</span><span></span>
             </div>
             <datalist id="estampas-sugeridas">
-              {ESTAMPAS_SUGERIDAS.map((t) => <option key={t} value={t} />)}
+              {ESTAMPAS_SUGERIDAS.map((es) => <option key={es} value={es} />)}
             </datalist>
             {form.variacoes.map((v, i) => (
               <div className="grade-variacoes" key={i}>
                 <div className="gv-cell">
-                  <span>Cor</span>
-                  <input value={v.cor} onChange={(e) => mudarVariacao(i, 'cor', e.target.value)} placeholder="Preto" required />
+                  <span>{t('prod.corLabel')}</span>
+                  <input value={v.cor} onChange={(e) => mudarVariacao(i, 'cor', e.target.value)} placeholder={t('prod.corPlaceholder')} required />
                 </div>
                 <div className="gv-cell">
-                  <span>Estampa</span>
-                  <input value={v.estampa ?? ''} onChange={(e) => mudarVariacao(i, 'estampa', e.target.value)} placeholder="opcional (ex.: Paisley)" list="estampas-sugeridas" />
+                  <span>{t('prod.estampaLabel')}</span>
+                  <input value={v.estampa ?? ''} onChange={(e) => mudarVariacao(i, 'estampa', e.target.value)} placeholder={t('prod.estampaPlaceholder')} list="estampas-sugeridas" />
                 </div>
                 <div className="gv-cell">
-                  <span>Tamanho</span>
+                  <span>{t('prod.tamanhoLabel')}</span>
                   {v.livre || (v.tamanho !== '' && !TAMANHOS_SUGERIDOS.includes(v.tamanho)) ? (
                     <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                       <input
                         value={v.tamanho} onChange={(e) => mudarVariacao(i, 'tamanho', e.target.value)}
-                        placeholder="Tamanho" required autoFocus style={{ flex: 1, minWidth: 0 }}
+                        placeholder={t('prod.tamanhoPlaceholder')} required autoFocus style={{ flex: 1, minWidth: 0 }}
                       />
                       <button
-                        type="button" title="Escolher da lista" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--ink-soft)' }}
+                        type="button" title={t('prod.escolherDaLista')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--ink-soft)' }}
                         onClick={() => setForm({ ...form, variacoes: form.variacoes.map((x, idx) => idx === i ? { ...x, tamanho: '', livre: false } : x) })}
                       >↩</button>
                     </div>
@@ -470,97 +472,97 @@ export default function Produtos() {
                         else mudarVariacao(i, 'tamanho', val)
                       }}
                     >
-                      <option value="" disabled>Tamanho</option>
-                      {TAMANHOS_SUGERIDOS.map((t) => <option key={t} value={t}>{t}</option>)}
-                      <option value="__outro__">Outro…</option>
+                      <option value="" disabled>{t('prod.tamanhoLabel')}</option>
+                      {TAMANHOS_SUGERIDOS.map((tm) => <option key={tm} value={tm}>{tm}</option>)}
+                      <option value="__outro__">{t('prod.outro')}</option>
                     </select>
                   )}
                 </div>
                 <div className="gv-cell">
-                  <span>Cód. barras (EAN)</span>
-                  <input value={v.codigoBarras ?? ''} onChange={(e) => mudarVariacao(i, 'codigoBarras', e.target.value)} placeholder="opcional" />
+                  <span>{t('prod.codBarrasLabel')}</span>
+                  <input value={v.codigoBarras ?? ''} onChange={(e) => mudarVariacao(i, 'codigoBarras', e.target.value)} placeholder={t('prod.codBarrasPlaceholder')} />
                 </div>
                 <div className="gv-cell">
-                  <span>Estoque</span>
+                  <span>{t('prod.colEstoque')}</span>
                   <input type="number" min="0" value={v.estoque} onChange={(e) => mudarVariacao(i, 'estoque', e.target.value)} />
                 </div>
                 <div className="gv-cell">
-                  <span title="Reserva exclusiva p/ varejo (peças únicas)">Varejo</span>
-                  <input type="number" min="0" max={v.estoque} value={v.estoqueVarejo ?? 0} onChange={(e) => mudarVariacao(i, 'estoqueVarejo', e.target.value)} title="Reserva exclusiva p/ varejo (≤ estoque)" />
+                  <span title={t('prod.reservaVarejoTitle')}>{t('prod.varejoLabel')}</span>
+                  <input type="number" min="0" max={v.estoque} value={v.estoqueVarejo ?? 0} onChange={(e) => mudarVariacao(i, 'estoqueVarejo', e.target.value)} title={t('prod.reservaVarejoTitle2')} />
                 </div>
                 <div className="gv-cell">
-                  <span>Mínimo</span>
+                  <span>{t('prod.minimoLabel')}</span>
                   <input type="number" min="0" value={v.estoqueMinimo} onChange={(e) => mudarVariacao(i, 'estoqueMinimo', e.target.value)} />
                 </div>
                 <button
-                  type="button" className="remover" title="Remover"
+                  type="button" className="remover" title={t('prod.remover')}
                   onClick={() => setForm({ ...form, variacoes: form.variacoes.filter((_, idx) => idx !== i) })}
                   disabled={form.variacoes.length === 1}
                 >×</button>
               </div>
             ))}
             <button type="button" className="btn secundario" onClick={() => setForm({ ...form, variacoes: [...form.variacoes, { ...VARIACAO_VAZIA }] })}>
-              + Adicionar variação
+              {t('prod.adicionarVariacao')}
             </button>
 
             {/* Opcionais */}
             <details className="mais-detalhes">
-              <summary>Mais detalhes (opcional)</summary>
+              <summary>{t('prod.maisDetalhes')}</summary>
               <div className="linha-campos">
                 <div className="campo">
-                  <label>Marca</label>
+                  <label>{t('prod.marcaLabel')}</label>
                   <input value={form.marca ?? ''} onChange={(e) => setForm({ ...form, marca: e.target.value })} />
                 </div>
               </div>
               <div className="linha-campos">
                 <div className="campo">
-                  <label>Composição / tecido</label>
-                  <input value={form.composicao ?? ''} onChange={(e) => setForm({ ...form, composicao: e.target.value })} placeholder="Ex.: 95% viscose, 5% elastano" />
+                  <label>{t('prod.composicaoLabel')}</label>
+                  <input value={form.composicao ?? ''} onChange={(e) => setForm({ ...form, composicao: e.target.value })} placeholder={t('prod.composicaoPlaceholder')} />
                 </div>
                 <div className="campo">
-                  <label>Modelagem / caimento</label>
-                  <input value={form.modelagem ?? ''} onChange={(e) => setForm({ ...form, modelagem: e.target.value })} placeholder="Ex.: evasê, slim" />
+                  <label>{t('prod.modelagemLabel')}</label>
+                  <input value={form.modelagem ?? ''} onChange={(e) => setForm({ ...form, modelagem: e.target.value })} placeholder={t('prod.modelagemPlaceholder')} />
                 </div>
               </div>
               <div className="linha-campos">
                 <div className="campo">
-                  <label>Preço atacado (R$)</label>
+                  <label>{t('prod.precoAtacadoLabel')}</label>
                   <input type="number" step="0.01" min="0" value={form.precoAtacado ?? ''} onChange={(e) => setForm({ ...form, precoAtacado: e.target.value })} />
                 </div>
                 <div className="campo">
-                  <label>Custo (R$)</label>
+                  <label>{t('prod.custoLabel')}</label>
                   <input type="number" step="0.01" min="0" value={form.custo ?? ''} onChange={(e) => setForm({ ...form, custo: e.target.value })} />
                 </div>
               </div>
               <div className="linha-campos">
                 <div className="campo">
-                  <label>Fornecedor / confecção</label>
+                  <label>{t('prod.fornecedorLabel')}</label>
                   <input value={form.fornecedor ?? ''} onChange={(e) => setForm({ ...form, fornecedor: e.target.value })} />
                 </div>
                 <div className="campo">
-                  <label>NCM (fiscal)</label>
+                  <label>{t('prod.ncmLabel')}</label>
                   <input value={form.ncm ?? ''} onChange={(e) => setForm({ ...form, ncm: e.target.value })} />
                 </div>
               </div>
               <div className="linha-campos">
                 <div className="campo">
-                  <label>Peso (g)</label>
+                  <label>{t('prod.pesoLabel')}</label>
                   <input type="number" min="0" value={form.pesoGramas ?? ''} onChange={(e) => setForm({ ...form, pesoGramas: e.target.value })} />
                 </div>
                 <div className="campo">
-                  <label>Faixa etária (infantil)</label>
-                  <input value={form.faixaEtaria ?? ''} onChange={(e) => setForm({ ...form, faixaEtaria: e.target.value })} placeholder="Ex.: 4-6 anos" />
+                  <label>{t('prod.faixaEtariaLabel')}</label>
+                  <input value={form.faixaEtaria ?? ''} onChange={(e) => setForm({ ...form, faixaEtaria: e.target.value })} placeholder={t('prod.faixaEtariaPlaceholder')} />
                 </div>
               </div>
               <div className="campo">
-                <label>Descrição</label>
+                <label>{t('prod.descricaoLabel')}</label>
                 <textarea rows={2} value={form.descricao ?? ''} onChange={(e) => setForm({ ...form, descricao: e.target.value })} />
               </div>
             </details>
 
             <div className="acoes">
-              <button type="button" className="btn secundario" onClick={() => setForm(null)}>Cancelar</button>
-              <button className="btn">Salvar</button>
+              <button type="button" className="btn secundario" onClick={() => setForm(null)}>{t('comum.cancelar')}</button>
+              <button className="btn">{t('comum.salvar')}</button>
             </div>
           </form>
         </div>

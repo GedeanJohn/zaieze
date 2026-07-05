@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, formataReal, mensagemDeErro, usuarioLogado } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
+import { useIdioma } from '../lib/i18n'
 
 interface LinhaRank {
   posicao: number; id: string; nome: string; equipe: string | null
@@ -16,6 +17,7 @@ export default function Ranking() {
   const usuario = usuarioLogado()!
   const gerente = usuario.role !== 'VENDEDORA'
   const escopo = useLojaAtiva()
+  const { t } = useIdioma()
 
   const [rank, setRank] = useState<LinhaRank[]>([])
   const [comissoes, setComissoes] = useState<Record<string, Comissao>>({})
@@ -69,7 +71,7 @@ export default function Ranking() {
   return (
     <>
       <header>
-        <h1>🏆 Ranking & Comissão</h1>
+        <h1>{t('rank.titulo')}</h1>
         <SeletorLoja escopo={escopo} />
       </header>
 
@@ -82,11 +84,11 @@ export default function Ranking() {
               <div style={{ fontFamily: 'Georgia, serif', fontSize: 18 }}>{v.nome}</div>
               <div style={{ fontSize: 22, fontWeight: 700, marginTop: 4 }}>{formataReal(v.total)}</div>
               <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-                {v.vendas} venda(s){v.pctMeta != null ? ` · ${v.pctMeta}% da meta` : ''}
+                {t('rank.vendasCount', { n: v.vendas })}{v.pctMeta != null ? ` · ${t('rank.pctMetaSufixo', { pct: v.pctMeta })}` : ''}
               </div>
               {comissoes[v.id] && (
                 <div style={{ marginTop: 6, fontSize: 14, color: 'var(--accent)' }}>
-                  comissão {formataReal(comissoes[v.id].comissao)}{comissoes[v.id].atingiuMeta ? ' 🎯' : ''}
+                  {t('rank.comissaoLabel')} {formataReal(comissoes[v.id].comissao)}{comissoes[v.id].atingiuMeta ? ' 🎯' : ''}
                 </div>
               )}
             </div>
@@ -96,16 +98,16 @@ export default function Ranking() {
 
       {/* Tabela completa */}
       <div className="cartao">
-        <h2 className="painel-titulo">Classificação do mês</h2>
+        <h2 className="painel-titulo">{t('rank.classificacaoMes')}</h2>
         <table>
           <thead>
-            <tr><th>#</th><th>Vendedora</th><th>Vendas</th><th>Faturamento</th><th>Meta</th><th>Comissão</th></tr>
+            <tr><th>#</th><th>{t('rank.colVendedora')}</th><th>{t('rank.colVendas')}</th><th>{t('rank.colFaturamento')}</th><th>{t('rank.colMeta')}</th><th>{t('rank.colComissao')}</th></tr>
           </thead>
           <tbody>
             {rank.map((v) => (
               <tr key={v.id} style={{ background: v.id === usuario.id ? 'var(--accent-soft)' : undefined }}>
                 <td>{v.posicao <= 3 ? MEDALHAS[v.posicao - 1] : v.posicao}</td>
-                <td>{v.nome}<div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{v.equipe ?? 'Sem equipe'}</div></td>
+                <td>{v.nome}<div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{v.equipe ?? t('rank.semEquipe')}</div></td>
                 <td>{v.vendas}</td>
                 <td>{formataReal(v.total)}</td>
                 <td style={{ minWidth: 120 }}>
@@ -116,7 +118,7 @@ export default function Ranking() {
                 <td>{comissoes[v.id] ? <strong style={{ color: 'var(--accent)' }}>{formataReal(comissoes[v.id].comissao)}</strong> : '—'}</td>
               </tr>
             ))}
-            {rank.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--ink-soft)' }}>Sem vendedoras.</td></tr>}
+            {rank.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--ink-soft)' }}>{t('rank.semVendedoras')}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -125,12 +127,12 @@ export default function Ranking() {
       {gerente && (
         <div className="cartao">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 className="painel-titulo" style={{ margin: 0 }}>Regras de comissão</h2>
-            <button className="btn secundario" onClick={() => setForm({ escopo: 'CATEGORIA', refId: '', percentual: '', percentualMeta: '' })}>+ Nova regra</button>
+            <h2 className="painel-titulo" style={{ margin: 0 }}>{t('rank.regrasComissao')}</h2>
+            <button className="btn secundario" onClick={() => setForm({ escopo: 'CATEGORIA', refId: '', percentual: '', percentualMeta: '' })}>{t('rank.novaRegra')}</button>
           </div>
           {erro && <div className="alerta" style={{ marginTop: 12 }}>{erro}</div>}
           <table style={{ marginTop: 12 }}>
-            <thead><tr><th>Escopo</th><th>Alvo</th><th>% base</th><th>% na meta</th></tr></thead>
+            <thead><tr><th>{t('rank.colEscopo')}</th><th>{t('rank.colAlvo')}</th><th>{t('rank.colPctBase')}</th><th>{t('rank.colPctMeta')}</th></tr></thead>
             <tbody>
               {regras.map((r) => (
                 <tr key={r.id}>
@@ -140,11 +142,11 @@ export default function Ranking() {
                   <td>{r.percentualMeta != null ? `${Number(r.percentualMeta)}%` : '—'}</td>
                 </tr>
               ))}
-              {regras.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--ink-soft)' }}>Nenhuma regra — usa a comissão padrão da vendedora.</td></tr>}
+              {regras.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--ink-soft)' }}>{t('rank.nenhumaRegra')}</td></tr>}
             </tbody>
           </table>
           <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 8 }}>
-            A regra mais específica vence: produto › categoria › marca › padrão. O “% na meta” entra quando a vendedora bate a meta do mês.
+            {t('rank.explicacaoRegra')}
           </p>
         </div>
       )}
@@ -152,22 +154,22 @@ export default function Ranking() {
       {form && (
         <div className="modal-fundo" onClick={() => setForm(null)}>
           <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvarRegra} style={{ width: 'min(520px, 92vw)' }}>
-            <h2>Nova regra de comissão</h2>
+            <h2>{t('rank.novaRegraTitulo')}</h2>
             {erro && <div className="alerta">{erro}</div>}
             <div className="linha-campos">
               <div className="campo">
-                <label>Escopo</label>
+                <label>{t('rank.escopoLabel')}</label>
                 <select value={form.escopo} onChange={(e) => setForm({ ...form, escopo: e.target.value, refId: '' })}>
-                  <option value="CATEGORIA">Categoria</option>
-                  <option value="MARCA">Marca</option>
-                  <option value="PADRAO">Padrão da loja</option>
+                  <option value="CATEGORIA">{t('rank.categoria')}</option>
+                  <option value="MARCA">{t('rank.marca')}</option>
+                  <option value="PADRAO">{t('rank.padraoLoja')}</option>
                 </select>
               </div>
               {form.escopo !== 'PADRAO' && (
                 <div className="campo">
-                  <label>Alvo</label>
+                  <label>{t('rank.alvoLabel')}</label>
                   <select value={form.refId} onChange={(e) => setForm({ ...form, refId: e.target.value })} required>
-                    <option value="">— Selecione —</option>
+                    <option value="">{t('comum.selecione')}</option>
                     {(form.escopo === 'CATEGORIA' ? categorias : marcas).map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
                   </select>
                 </div>
@@ -175,17 +177,17 @@ export default function Ranking() {
             </div>
             <div className="linha-campos">
               <div className="campo">
-                <label>% base*</label>
+                <label>{t('rank.pctBase')}</label>
                 <input type="number" step="0.5" min="0" max="100" value={form.percentual} onChange={(e) => setForm({ ...form, percentual: e.target.value })} required />
               </div>
               <div className="campo">
-                <label>% ao bater a meta</label>
+                <label>{t('rank.pctAoBaterMeta')}</label>
                 <input type="number" step="0.5" min="0" max="100" value={form.percentualMeta} onChange={(e) => setForm({ ...form, percentualMeta: e.target.value })} />
               </div>
             </div>
             <div className="acoes">
-              <button type="button" className="btn secundario" onClick={() => setForm(null)}>Cancelar</button>
-              <button className="btn">Salvar</button>
+              <button type="button" className="btn secundario" onClick={() => setForm(null)}>{t('comum.cancelar')}</button>
+              <button className="btn">{t('comum.salvar')}</button>
             </div>
           </form>
         </div>

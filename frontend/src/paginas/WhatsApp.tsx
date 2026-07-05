@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, mensagemDeErro } from '../api'
 import { useToast } from '../componentes/Toast'
+import { useIdioma } from '../lib/i18n'
 
 interface Config {
   waPhoneNumberId: string | null
@@ -16,6 +17,7 @@ interface Config {
 }
 
 export default function WhatsApp() {
+  const { t } = useIdioma()
   const [cfg, setCfg] = useState<Config | null>(null)
   const avisar = useToast()
   const [salvando, setSalvando] = useState(false)
@@ -57,7 +59,7 @@ export default function WhatsApp() {
       // recarrega para refletir conectado/temToken
       const { data: c } = await api.get('/whatsapp/config')
       aplicar(c)
-      avisar(data.conectado ? `Conectado ✅ ${data.numero ? `· ${data.numero}` : ''}` : `Salvo. Conexão não confirmada: ${data.erro ?? 'verifique número/token.'}`)
+      avisar(data.conectado ? t('wa.conectadoSucesso', { numero: data.numero ? `· ${data.numero}` : '' }) : t('wa.salvoNaoConfirmado', { erro: data.erro ?? t('wa.verifiqueNumeroToken') }))
     } catch (err) { avisar(mensagemDeErro(err), 'erro') }
     finally { setSalvando(false) }
   }
@@ -67,102 +69,101 @@ export default function WhatsApp() {
     setTestando(true)
     try {
       const { data } = await api.post('/whatsapp/testar', { telefone: telTeste.trim() })
-      avisar(`Teste ${data.status === 'ENVIADA' ? 'enviado ✅' : data.status}.`)
+      avisar(data.status === 'ENVIADA' ? t('wa.testeEnviado') : t('wa.testeStatus', { status: data.status }))
     } catch (err) { avisar(mensagemDeErro(err), 'erro') }
     finally { setTestando(false) }
   }
 
-  function copiar(txt: string) { navigator.clipboard?.writeText(txt).then(() => avisar('Copiado.')).catch(() => {}) }
+  function copiar(txt: string) { navigator.clipboard?.writeText(txt).then(() => avisar(t('wa.copiado'))).catch(() => {}) }
 
-  if (!cfg) return <p style={{ color: 'var(--ink-soft)' }}>Carregando…</p>
+  if (!cfg) return <p style={{ color: 'var(--ink-soft)' }}>{t('wa.carregando')}</p>
 
   return (
     <>
-      <header><h1>WhatsApp oficial</h1></header>
+      <header><h1>{t('wa.titulo')}</h1></header>
       <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-        Conecte o <strong>número oficial da sua marca</strong> (WhatsApp Cloud API da Meta). Todas as vendedoras atendem por
-        este número; a identidade da vendedora vai no conteúdo. As mensagens recebidas continuam roteadas pela carteira.
+        {t('wa.explicacao1')} <strong>{t('wa.numeroOficialDestaque')}</strong> {t('wa.explicacao2')}
       </div>
 
       <div className="cartao">
         <h2 style={{ marginTop: 0 }}>
-          Status: {cfg.conectado
-            ? <span style={{ color: 'var(--ok)' }}>✅ Conectado{cfg.waNumeroExibicao ? ` · ${cfg.waNumeroExibicao}` : ''}</span>
-            : <span style={{ color: 'var(--ink-soft)' }}>⚪ Não conectado</span>}
+          {t('wa.statusLabel')} {cfg.conectado
+            ? <span style={{ color: 'var(--ok)' }}>{t('wa.conectado')}{cfg.waNumeroExibicao ? ` · ${cfg.waNumeroExibicao}` : ''}</span>
+            : <span style={{ color: 'var(--ink-soft)' }}>{t('wa.naoConectado')}</span>}
         </h2>
         {!cfg.servidorPodeCifrar && (
-          <div className="alerta">O servidor está sem <code>WA_TOKEN_SECRET</code> — defina-o no ambiente para guardar o token com segurança.</div>
+          <div className="alerta">{t('wa.avisoSemSecret1')} <code>WA_TOKEN_SECRET</code> {t('wa.avisoSemSecret2')}</div>
         )}
       </div>
 
       <form className="cartao" onSubmit={salvar}>
-        <h2 style={{ marginTop: 0 }}>Credenciais (Meta Business Manager)</h2>
+        <h2 style={{ marginTop: 0 }}>{t('wa.credenciaisTitulo')}</h2>
         <div className="linha-campos">
           <div className="campo">
-            <label>Phone Number ID</label>
-            <input value={phoneId} onChange={(e) => setPhoneId(e.target.value)} placeholder="ex.: 1029384756..." required />
+            <label>{t('wa.phoneNumberIdLabel')}</label>
+            <input value={phoneId} onChange={(e) => setPhoneId(e.target.value)} placeholder={t('wa.phoneNumberIdPlaceholder')} required />
           </div>
           <div className="campo">
-            <label>WhatsApp Business Account ID (WABA)</label>
-            <input value={wabaId} onChange={(e) => setWabaId(e.target.value)} placeholder="opcional" />
+            <label>{t('wa.wabaIdLabel')}</label>
+            <input value={wabaId} onChange={(e) => setWabaId(e.target.value)} placeholder={t('wa.opcional')} />
           </div>
         </div>
         <div className="linha-campos">
           <div className="campo">
-            <label>Número de exibição</label>
-            <input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="+55 62 9xxxx-xxxx (auto se conectar)" />
+            <label>{t('wa.numeroExibicaoLabel')}</label>
+            <input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder={t('wa.numeroExibicaoPlaceholder')} />
           </div>
           <div className="campo">
-            <label>Verify token (webhook)</label>
-            <input value={verifyToken} onChange={(e) => setVerifyToken(e.target.value)} placeholder="crie um texto secreto (mín. 6)" required minLength={6} />
+            <label>{t('wa.verifyTokenLabel')}</label>
+            <input value={verifyToken} onChange={(e) => setVerifyToken(e.target.value)} placeholder={t('wa.verifyTokenPlaceholder')} required minLength={6} />
           </div>
         </div>
         <div className="linha-campos">
           <div className="campo">
-            <label>Token permanente {cfg.temToken && <small style={{ color: 'var(--ok)' }}>· salvo ✓</small>}</label>
-            <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={cfg.temToken ? 'deixe em branco para manter' : 'cole o token do System User'} autoComplete="off" />
+            <label>{t('wa.tokenPermanenteLabel')} {cfg.temToken && <small style={{ color: 'var(--ok)' }}>{t('wa.salvoCheck')}</small>}</label>
+            <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={cfg.temToken ? t('wa.tokenPlaceholderSalvo') : t('wa.tokenPlaceholderNovo')} autoComplete="off" />
           </div>
           <div className="campo">
-            <label>App Secret {cfg.temAppSecret && <small style={{ color: 'var(--ok)' }}>· salvo ✓</small>}</label>
-            <input type="password" value={appSecret} onChange={(e) => setAppSecret(e.target.value)} placeholder="opcional (valida assinatura do webhook)" autoComplete="off" />
+            <label>{t('wa.appSecretLabel')} {cfg.temAppSecret && <small style={{ color: 'var(--ok)' }}>{t('wa.salvoCheck')}</small>}</label>
+            <input type="password" value={appSecret} onChange={(e) => setAppSecret(e.target.value)} placeholder={t('wa.appSecretPlaceholder')} autoComplete="off" />
           </div>
         </div>
         <div className="acoes">
-          <button className="btn" disabled={salvando}>{salvando ? 'Salvando e testando…' : 'Salvar e testar conexão'}</button>
+          <button className="btn" disabled={salvando}>{salvando ? t('wa.salvandoTestando') : t('wa.salvarETestar')}</button>
         </div>
       </form>
 
       <div className="cartao">
-        <h2 style={{ marginTop: 0 }}>Webhook (configure na Meta)</h2>
+        <h2 style={{ marginTop: 0 }}>{t('wa.webhookTitulo')}</h2>
         <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 0 }}>
-          No painel da Meta (WhatsApp → Configuration → Webhook), use a URL de callback e o verify token abaixo, e assine os campos <strong>messages</strong>.
+          {t('wa.webhookExplicacao1')} <strong>{t('wa.messagesDestaque')}</strong>{t('wa.webhookExplicacao2')}
         </p>
         <div className="campo">
-          <label>Callback URL</label>
+          <label>{t('wa.callbackUrlLabel')}</label>
           <div style={{ display: 'flex', gap: 8 }}>
             <input readOnly value={cfg.webhookUrl} style={{ flex: 1 }} />
-            <button type="button" className="btn secundario" onClick={() => copiar(cfg.webhookUrl)}>Copiar</button>
+            <button type="button" className="btn secundario" onClick={() => copiar(cfg.webhookUrl)}>{t('wa.copiar')}</button>
           </div>
         </div>
         <div className="campo">
-          <label>Verify token</label>
+          <label>{t('wa.verifyTokenLabel2')}</label>
           <div style={{ display: 'flex', gap: 8 }}>
             <input readOnly value={verifyToken} style={{ flex: 1 }} />
-            <button type="button" className="btn secundario" onClick={() => copiar(verifyToken)}>Copiar</button>
+            <button type="button" className="btn secundario" onClick={() => copiar(verifyToken)}>{t('wa.copiar')}</button>
           </div>
         </div>
       </div>
 
       <div className="cartao">
-        <h2 style={{ marginTop: 0 }}>Enviar mensagem de teste</h2>
+        <h2 style={{ marginTop: 0 }}>{t('wa.enviarTesteTitulo')}</h2>
         <div className="linha-campos" style={{ alignItems: 'end' }}>
           <div className="campo">
-            <label>Número (com DDI/DDD)</label>
+            <label>{t('wa.numeroDdiLabel')}</label>
             <input value={telTeste} onChange={(e) => setTelTeste(e.target.value)} placeholder="5562999990000" />
           </div>
-          <div><button type="button" className="btn" onClick={testar} disabled={testando || !cfg.conectado}>{testando ? 'Enviando…' : 'Enviar teste'}</button></div>
+          <div><button type="button" className="btn" onClick={testar} disabled={testando || !cfg.conectado}>{testando ? t('wa.enviando') : t('wa.enviarTesteBtn')}</button></div>
         </div>
-        {!cfg.conectado && <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 6 }}>Conecte o número antes de testar.</p>}
+        {!cfg.conectado && <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 6 }}>{t('wa.conecteAntesDeTestar')}</p>}
       </div>
 
       <TemplatesSection conectado={cfg.conectado} />
@@ -176,6 +177,7 @@ interface Template { id: string; nome: string; metaNome: string; categoria: stri
 const seloStatus: Record<string, string> = { APROVADO: 'ok', PENDENTE: 'ATACADO', REJEITADO: 'baixo', PAUSADO: 'baixo', RASCUNHO: 'ATACADO' }
 
 function TemplatesSection({ conectado }: { conectado: boolean }) {
+  const { t } = useIdioma()
   const [lista, setLista] = useState<Template[]>([])
   const [nome, setNome] = useState('')
   const [categoria, setCategoria] = useState('MARKETING')
@@ -195,67 +197,67 @@ function TemplatesSection({ conectado }: { conectado: boolean }) {
     try {
       await api.post('/whatsapp/templates', { nome, categoria, corpo })
       setNome(''); setCorpo(''); carregar()
-      avisar(conectado ? 'Template enviado à Meta para aprovação.' : 'Template criado (aprovado no modo simulado).')
+      avisar(conectado ? t('wa.templateEnviadoMeta') : t('wa.templateCriadoSimulado'))
     } catch (e2) { avisar(mensagemDeErro(e2), 'erro') } finally { setOcupado(false) }
   }
   async function sincronizar() {
-    try { const { data } = await api.post('/whatsapp/templates/sync'); avisar(`Sincronizados: ${data.sincronizados}.`); carregar() }
+    try { const { data } = await api.post('/whatsapp/templates/sync'); avisar(t('wa.sincronizadosMsg', { n: data.sincronizados })); carregar() }
     catch (e) { avisar(mensagemDeErro(e), 'erro') }
   }
-  async function remover(t: Template) {
-    if (!window.confirm(`Excluir o template "${t.nome}"?`)) return
-    await api.delete(`/whatsapp/templates/${t.id}`).catch(() => {}); carregar()
+  async function remover(tpl: Template) {
+    if (!window.confirm(t('wa.confirmExcluirTemplate', { nome: tpl.nome }))) return
+    await api.delete(`/whatsapp/templates/${tpl.id}`).catch(() => {}); carregar()
   }
 
   return (
     <div className="cartao">
-      <h2 style={{ marginTop: 0 }}>📝 Templates de mensagem</h2>
+      <h2 style={{ marginTop: 0 }}>{t('wa.templatesTitulo')}</h2>
       <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
-        Campanhas e réguas vão para clientes <strong>fora da janela de 24h</strong> → a Meta só entrega via <strong>template aprovado</strong>.
-        Escreva o corpo com os placeholders abaixo; convertemos e submetemos à Meta automaticamente.
-        {!conectado && <> <em>Sem a WABA conectada, o template entra como aprovado (modo simulado) para você testar.</em></>}
+        {t('wa.templatesExplicacao1')} <strong>{t('wa.foraJanelaDestaque')}</strong> {t('wa.templatesExplicacao2')} <strong>{t('wa.templateAprovadoDestaque')}</strong>
+        {' '}{t('wa.templatesExplicacao3')}
+        {!conectado && <> <em>{t('wa.semWabaAviso')}</em></>}
       </div>
 
       <form onSubmit={criar}>
         <div className="linha-campos">
-          <div className="campo"><label>Nome do template</label><input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Novidades da semana" required minLength={2} /></div>
-          <div className="campo"><label>Categoria</label>
+          <div className="campo"><label>{t('wa.nomeTemplateLabel')}</label><input value={nome} onChange={(e) => setNome(e.target.value)} placeholder={t('wa.nomeTemplatePlaceholder')} required minLength={2} /></div>
+          <div className="campo"><label>{t('wa.categoriaLabel')}</label>
             <select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-              <option value="MARKETING">Marketing</option>
-              <option value="UTILITY">Utilidade</option>
+              <option value="MARKETING">{t('wa.marketing')}</option>
+              <option value="UTILITY">{t('wa.utilidade')}</option>
             </select>
           </div>
         </div>
         <div className="campo">
-          <label>Corpo da mensagem</label>
-          <textarea rows={3} value={corpo} onChange={(e) => setCorpo(e.target.value)} placeholder="Oi {primeiroNome}! 😍 Novidades na {loja}. Veja: {link}" required minLength={5} />
+          <label>{t('wa.corpoMensagemLabel')}</label>
+          <textarea rows={3} value={corpo} onChange={(e) => setCorpo(e.target.value)} placeholder={t('wa.corpoMensagemPlaceholder')} required minLength={5} />
         </div>
         <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 8 }}>
-          Placeholders: {PLACEHOLDERS.map((p) => <code key={p} style={{ marginRight: 6 }}>{p}</code>)}
+          {t('wa.placeholdersLabel')} {PLACEHOLDERS.map((p) => <code key={p} style={{ marginRight: 6 }}>{p}</code>)}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" className="btn secundario" onClick={sugerir}>✨ Sugerir com IA</button>
-          <button className="btn" disabled={ocupado}>{ocupado ? 'Enviando…' : 'Criar template'}</button>
+          <button type="button" className="btn secundario" onClick={sugerir}>{t('wa.sugerirComIa')}</button>
+          <button className="btn" disabled={ocupado}>{ocupado ? t('wa.enviando') : t('wa.criarTemplate')}</button>
         </div>
       </form>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
-        <h3 style={{ margin: 0 }}>Templates ({lista.length})</h3>
-        <button type="button" className="btn secundario" onClick={sincronizar} disabled={!conectado} title={conectado ? '' : 'Conecte a WABA'}>Sincronizar status</button>
+        <h3 style={{ margin: 0 }}>{t('wa.templatesCount', { n: lista.length })}</h3>
+        <button type="button" className="btn secundario" onClick={sincronizar} disabled={!conectado} title={conectado ? '' : t('wa.conecteWaba')}>{t('wa.sincronizarStatus')}</button>
       </div>
       <table style={{ marginTop: 8 }}>
-        <thead><tr><th>Nome</th><th>Categoria</th><th>Status</th><th>Corpo</th><th></th></tr></thead>
+        <thead><tr><th>{t('wa.colNome')}</th><th>{t('wa.colCategoria')}</th><th>{t('wa.colStatus')}</th><th>{t('wa.colCorpo')}</th><th></th></tr></thead>
         <tbody>
-          {lista.map((t) => (
-            <tr key={t.id}>
-              <td>{t.nome}<div style={{ fontSize: 11, color: 'var(--ink-soft)' }}>{t.metaNome}</div></td>
-              <td>{t.categoria === 'MARKETING' ? 'Marketing' : 'Utilidade'}</td>
-              <td><span className={`selo ${seloStatus[t.status] ?? 'ATACADO'}`}>{t.status}</span>{t.motivoRejeicao ? <div style={{ fontSize: 11, color: 'var(--erro, #c62828)' }}>{t.motivoRejeicao}</div> : null}</td>
-              <td style={{ fontSize: 12, color: 'var(--ink-soft)', maxWidth: 320 }}>{t.corpo}</td>
-              <td><a href="#" onClick={(e) => { e.preventDefault(); remover(t) }}>excluir</a></td>
+          {lista.map((tpl) => (
+            <tr key={tpl.id}>
+              <td>{tpl.nome}<div style={{ fontSize: 11, color: 'var(--ink-soft)' }}>{tpl.metaNome}</div></td>
+              <td>{tpl.categoria === 'MARKETING' ? t('wa.marketing') : t('wa.utilidade')}</td>
+              <td><span className={`selo ${seloStatus[tpl.status] ?? 'ATACADO'}`}>{tpl.status}</span>{tpl.motivoRejeicao ? <div style={{ fontSize: 11, color: 'var(--erro, #c62828)' }}>{tpl.motivoRejeicao}</div> : null}</td>
+              <td style={{ fontSize: 12, color: 'var(--ink-soft)', maxWidth: 320 }}>{tpl.corpo}</td>
+              <td><a href="#" onClick={(e) => { e.preventDefault(); remover(tpl) }}>{t('wa.excluir')}</a></td>
             </tr>
           ))}
-          {lista.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--ink-soft)' }}>Nenhum template ainda.</td></tr>}
+          {lista.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--ink-soft)' }}>{t('wa.nenhumTemplate')}</td></tr>}
         </tbody>
       </table>
     </div>

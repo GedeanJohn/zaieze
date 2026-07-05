@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, formataReal, mensagemDeErro, usuarioLogado } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
+import { useIdioma } from '../lib/i18n'
 
 interface Cliente {
   id: string
@@ -58,6 +59,7 @@ function dataCurta(iso: string): string {
 
 export default function Clientes() {
   const usuario = usuarioLogado()!
+  const { t } = useIdioma()
   const gerente = usuario.role !== 'VENDEDORA'
   const escopo = useLojaAtiva()
 
@@ -116,8 +118,8 @@ export default function Clientes() {
       const { data } = await api.post('/clientes/segmentar', {}, { params: escopo.params })
       const d = data.distribuicao as Distribuicao
       avisar(
-        `Segmentação recalculada — ${data.atualizados} cliente(s) reclassificado(s). ` +
-          `VIP ${d.VIP} · Frequente ${d.FREQUENTE} · Inativo ${d.INATIVO} · Atacado ${d.ATACADO} · Novo ${d.NOVO}.`,
+        `${t('cli.segmentacaoRecalculada')} ${data.atualizados} ${t('cli.clientesReclassificados')} ` +
+          `${t('segmento.VIP')} ${d.VIP} · ${t('segmento.FREQUENTE')} ${d.FREQUENTE} · ${t('segmento.INATIVO')} ${d.INATIVO} · ${t('segmento.ATACADO')} ${d.ATACADO} · ${t('segmento.NOVO')} ${d.NOVO}.`,
       )
       await carregar()
     } catch (err) {
@@ -186,16 +188,16 @@ export default function Clientes() {
   async function enviarCatalogo() {
     const ids = [...selecao]
     if (ids.length === 0) return
-    if (!confirm(`Enviar o link do catálogo para ${ids.length} cliente(s) selecionado(s)?`)) return
+    if (!confirm(`${t('cli.enviarCatalogoConfirm')} ${ids.length} ${t('cli.clientesSelecionadosPergunta')}`)) return
     setEnviando(true)
     try {
       const { data } = await api.post('/clientes/enviar-catalogo', { clienteIds: ids }, { params: escopo.params })
-      const partes = [`${data.enviados} enviado(s)`]
-      if (data.simulados) partes.push(`${data.simulados} simulado(s) (WhatsApp não conectado)`)
-      if (data.falhas) partes.push(`${data.falhas} falha(s)`)
-      if (data.semConsentimento) partes.push(`${data.semConsentimento} sem consentimento LGPD`)
-      if (data.semVendedora) partes.push(`${data.semVendedora} sem vendedora/instância`)
-      avisar(`Disparo concluído: ${partes.join(' · ')}.`)
+      const partes = [`${data.enviados} ${t('cli.enviados')}`]
+      if (data.simulados) partes.push(`${data.simulados} ${t('cli.simuladosWa')}`)
+      if (data.falhas) partes.push(`${data.falhas} ${t('cli.falhas')}`)
+      if (data.semConsentimento) partes.push(`${data.semConsentimento} ${t('cli.semConsentimentoQtd')}`)
+      if (data.semVendedora) partes.push(`${data.semVendedora} ${t('cli.semVendedoraInstancia')}`)
+      avisar(`${t('cli.disparoConcluido')} ${partes.join(' · ')}.`)
       setSelecao(new Set())
     } catch (err) { avisar(mensagemDeErro(err), 'erro') }
     finally { setEnviando(false) }
@@ -206,34 +208,34 @@ export default function Clientes() {
   return (
     <>
       <header>
-        <h1>{gerente ? 'Clientes da loja' : 'Minha carteira'}</h1>
+        <h1>{gerente ? t('cli.clientesDaLoja') : t('cli.minhaCarteira')}</h1>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
           <SeletorLoja escopo={escopo} />
           {gerente && (
             <button className="btn secundario" onClick={recalcular} disabled={segmentando || !escopo.pronto}>
-              {segmentando ? 'Recalculando…' : '🔄 Recalcular segmentação'}
+              {segmentando ? t('cli.recalculando') : t('cli.recalcularSegmentacao')}
             </button>
           )}
-          <button className="btn" onClick={() => setEditando({ consentimentoLgpd: false })}>+ Novo cliente</button>
+          <button className="btn" onClick={() => setEditando({ consentimentoLgpd: false })}>{t('cli.novoCliente')}</button>
         </div>
       </header>
 
 
       {/* Distribuição da carteira por segmento (clicável = filtro) */}
       <div className="cartao" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <strong style={{ fontSize: 14 }}>Carteira:</strong>
+        <strong style={{ fontSize: 14 }}>{t('cli.carteira')}</strong>
         {SEGMENTOS.map((s) => (
           <button
             key={s}
             onClick={() => setSegmento(segmento === s ? '' : s)}
-            title={segmento === s ? 'Remover filtro' : `Filtrar por ${s}`}
+            title={segmento === s ? t('cli.removerFiltro') : `${t('cli.filtrarPor')} ${t(`segmento.${s}`)}`}
             style={{
               border: segmento === s ? '2px solid var(--accent)' : '1px solid var(--border)',
               background: 'transparent', borderRadius: 999, padding: '4px 4px 4px 10px', cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 8, width: 'auto',
             }}
           >
-            <span className={`selo ${s}`}>{s}</span>
+            <span className={`selo ${s}`}>{t(`segmento.${s}`)}</span>
             <strong>{distribuicao[s] ?? 0}</strong>
           </button>
         ))}
@@ -242,40 +244,40 @@ export default function Clientes() {
       <div className="cartao">
         <div className="linha-campos">
           <div className="campo">
-            <label>Buscar (nome ou telefone)</label>
+            <label>{t('cli.buscarNomeTelefone')}</label>
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Ex.: Ana" />
           </div>
           <div className="campo">
-            <label>Classificação</label>
+            <label>{t('cli.classificacao')}</label>
             <select value={segmento} onChange={(e) => setSegmento(e.target.value)}>
-              {FILTRO_SEGMENTOS.map((s) => <option key={s} value={s}>{s || 'Todos'}</option>)}
+              {FILTRO_SEGMENTOS.map((s) => <option key={s} value={s}>{s ? t(`segmento.${s}`) : t('cli.todos')}</option>)}
             </select>
           </div>
           <div className="campo">
-            <label>DDD</label>
+            <label>{t('cli.ddd')}</label>
             <select value={ddd} onChange={(e) => setDdd(e.target.value)}>
-              <option value="">Todos</option>
+              <option value="">{t('cli.todos')}</option>
               {locais.ddds.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
           <div className="campo">
-            <label>Cidade</label>
+            <label>{t('cli.cidade')}</label>
             <select value={cidade} onChange={(e) => setCidade(e.target.value)}>
-              <option value="">Todas</option>
+              <option value="">{t('cli.todas')}</option>
               {locais.cidades.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div className="campo">
-            <label>UF</label>
+            <label>{t('cli.uf')}</label>
             <select value={uf} onChange={(e) => { setUf(e.target.value); if (e.target.value) setRegiao('') }}>
-              <option value="">Todas</option>
+              <option value="">{t('cli.todas')}</option>
               {locais.ufs.map((u) => <option key={u} value={u}>{u}</option>)}
             </select>
           </div>
           <div className="campo">
-            <label>Região</label>
+            <label>{t('cli.regiao')}</label>
             <select value={regiao} onChange={(e) => setRegiao(e.target.value)} disabled={!!uf}>
-              <option value="">Todas</option>
+              <option value="">{t('cli.todas')}</option>
               {locais.regioes.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
@@ -284,13 +286,13 @@ export default function Clientes() {
         {/* Toolbar de seleção + envio do link do catálogo (R1) */}
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
           <button className="btn secundario" type="button" onClick={alternarTodos} disabled={clientes.length === 0}>
-            {selecao.size === clientes.length && clientes.length > 0 ? 'Limpar seleção' : 'Selecionar todos'}
+            {selecao.size === clientes.length && clientes.length > 0 ? t('cli.limparSelecao') : t('cli.selecionarTodos')}
           </button>
-          <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{selecao.size} selecionado(s)</span>
+          <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{selecao.size} {t('cli.selecionados')}</span>
           <button className="btn" type="button" onClick={enviarCatalogo} disabled={selecao.size === 0 || enviando}>
-            {enviando ? 'Enviando…' : `📲 Enviar link do catálogo${selecao.size ? ` (${selecao.size})` : ''}`}
+            {enviando ? t('cli.enviando') : `${t('cli.enviarLinkCatalogo')}${selecao.size ? ` (${selecao.size})` : ''}`}
           </button>
-          <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Só vai para quem tem consentimento LGPD.</span>
+          <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{t('cli.soVaiParaConsentimento')}</span>
         </div>
         <table>
           <thead>
@@ -298,9 +300,9 @@ export default function Clientes() {
               <th style={{ width: 28 }}>
                 <input type="checkbox" checked={selecao.size === clientes.length && clientes.length > 0} onChange={alternarTodos} />
               </th>
-              <th>Nome</th><th>WhatsApp</th><th>Local</th><th>Classificação</th><th>Total gasto</th><th>Última compra</th>
-              {gerente && <th>Vendedora</th>}
-              <th>LGPD</th><th></th>
+              <th>{t('cli.nome')}</th><th>{t('cli.whatsapp')}</th><th>{t('cli.local')}</th><th>{t('cli.classificacao')}</th><th>{t('cli.totalGasto')}</th><th>{t('cli.ultimaCompra')}</th>
+              {gerente && <th>{t('cli.vendedora')}</th>}
+              <th>{t('cli.lgpd')}</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -312,19 +314,19 @@ export default function Clientes() {
                   <td><a href="#" onClick={(e) => { e.preventDefault(); abrirDetalhe(c.id) }}>{c.nome}</a></td>
                   <td>{c.telefone || (c.instagram ? `📷 ${c.instagram}` : '—')}</td>
                   <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{c.cidade ? `${c.cidade}${c.uf ? `/${c.uf}` : ''}` : '—'}</td>
-                  <td><span className={`selo ${c.segmento}`}>{c.segmento}</span></td>
+                  <td><span className={`selo ${c.segmento}`}>{t(`segmento.${c.segmento}`)}</span></td>
                   <td>{formataReal(c.totalGasto)}</td>
                   <td style={{ fontSize: 13, color: dias != null && dias > 90 ? 'var(--danger)' : 'var(--ink-soft)' }}>
-                    {dias == null ? '—' : dias === 0 ? 'hoje' : `há ${dias} dias`}
+                    {dias == null ? '—' : dias === 0 ? t('cli.hoje') : t('cli.haDiasAtras', { n: dias })}
                   </td>
                   {gerente && <td>{c.vendedora?.nome ?? '—'}</td>}
                   <td>{c.consentimentoLgpd ? '✅' : '—'}</td>
-                  <td><a href="#" onClick={(e) => { e.preventDefault(); setEditando(c) }}>editar</a></td>
+                  <td><a href="#" onClick={(e) => { e.preventDefault(); setEditando(c) }}>{t('cli.editarLink')}</a></td>
                 </tr>
               )
             })}
             {clientes.length === 0 && (
-              <tr><td colSpan={gerente ? 10 : 9} style={{ color: 'var(--ink-soft)' }}>Nenhum cliente encontrado.</td></tr>
+              <tr><td colSpan={gerente ? 10 : 9} style={{ color: 'var(--ink-soft)' }}>{t('cli.nenhumClienteEncontrado')}</td></tr>
             )}
           </tbody>
         </table>
@@ -337,51 +339,51 @@ export default function Clientes() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
               <div>
                 <h2 style={{ marginBottom: 4 }}>{detalhe.nome}</h2>
-                <span className={`selo ${detalhe.segmento}`}>{detalhe.segmento}</span>
+                <span className={`selo ${detalhe.segmento}`}>{t(`segmento.${detalhe.segmento}`)}</span>
               </div>
-              <button className="btn secundario" onClick={() => setDetalhe(null)}>Fechar</button>
+              <button className="btn secundario" onClick={() => setDetalhe(null)}>{t('cli.fechar')}</button>
             </div>
 
             <div className="grade-cards" style={{ marginTop: 16 }}>
-              <div className="cartao kpi"><div className="rotulo">Total gasto</div><div className="valor">{formataReal(detalhe.totalGasto)}</div></div>
-              <div className="cartao kpi"><div className="rotulo">Compras</div><div className="valor">{detalhe.vendas.filter((v) => v.status === 'CONCLUIDA').length}</div></div>
+              <div className="cartao kpi"><div className="rotulo">{t('cli.totalGasto')}</div><div className="valor">{formataReal(detalhe.totalGasto)}</div></div>
+              <div className="cartao kpi"><div className="rotulo">{t('cli.compras')}</div><div className="valor">{detalhe.vendas.filter((v) => v.status === 'CONCLUIDA').length}</div></div>
               <div className="cartao kpi">
-                <div className="rotulo">Última compra</div>
+                <div className="rotulo">{t('cli.ultimaCompra')}</div>
                 <div className="valor" style={{ fontSize: 18 }}>
-                  {detalheDias == null ? '—' : detalheDias === 0 ? 'hoje' : `há ${detalheDias}d`}
+                  {detalheDias == null ? '—' : detalheDias === 0 ? t('cli.hoje') : t('cli.haDAtras', { n: detalheDias })}
                 </div>
               </div>
             </div>
 
             <div style={{ fontSize: 13, color: 'var(--ink-soft)', margin: '8px 0 16px' }}>
               {detalhe.telefone ? `📱 ${detalhe.telefone}` : ''}{detalhe.instagram ? `${detalhe.telefone ? ' · ' : ''}📷 ${detalhe.instagram}` : ''}
-              {detalhe.vendedora ? ` · carteira de ${detalhe.vendedora.nome}` : ''}
-              {detalhe.consentimentoLgpd ? ' · ✅ aceita campanhas' : ' · ⚠ sem consentimento LGPD'}
+              {detalhe.vendedora ? ` · ${t('cli.carteiraDe', { nome: detalhe.vendedora.nome })}` : ''}
+              {detalhe.consentimentoLgpd ? ` · ✅ ${t('cli.aceitaCampanhas')}` : ` · ⚠ ${t('cli.semConsentimentoLgpd')}`}
             </div>
 
             {detalhe.segmento === 'INATIVO' && (
               <div className="alerta" style={{ background: '#fff3e0', color: 'var(--warn)' }}>
-                💡 Oportunidade de recuperação: cliente sem comprar há {detalheDias} dias. Acione na régua de inativos (Fase 4 — WhatsApp).
+                {t('cli.oportunidadeRecuperacao', { n: detalheDias ?? 0 })}
               </div>
             )}
 
-            <h3 className="painel-titulo">Histórico de compras</h3>
+            <h3 className="painel-titulo">{t('cli.historicoCompras')}</h3>
             <table>
-              <thead><tr><th>Data</th><th>Itens</th><th>Total</th><th>Status</th></tr></thead>
+              <thead><tr><th>{t('cli.data')}</th><th>{t('cli.itens')}</th><th>{t('cli.total')}</th><th>{t('cli.status')}</th></tr></thead>
               <tbody>
                 {detalhe.vendas.map((venda) => (
                   <tr key={venda.id} style={{ opacity: venda.status === 'CANCELADA' ? 0.5 : 1 }}>
                     <td>{dataCurta(venda.createdAt)}</td>
                     <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
                       {venda.itens.map((i) => `${i.quantidade}× ${i.variacao.produto.nome} ${i.variacao.cor}/${i.variacao.tamanho}`).join(' · ')}
-                      {venda.atacado ? '  🏷️atacado' : ''}
+                      {venda.atacado ? `  🏷️${t('vendas.atacadoTag')}` : ''}
                     </td>
                     <td>{formataReal(venda.total)}</td>
-                    <td><span className={`selo ${venda.status === 'CONCLUIDA' ? 'ok' : 'baixo'}`}>{venda.status === 'CONCLUIDA' ? 'OK' : 'Cancelada'}</span></td>
+                    <td><span className={`selo ${venda.status === 'CONCLUIDA' ? 'ok' : 'baixo'}`}>{venda.status === 'CONCLUIDA' ? t('cli.ok') : t('cli.cancelada')}</span></td>
                   </tr>
                 ))}
                 {detalhe.vendas.length === 0 && (
-                  <tr><td colSpan={4} style={{ color: 'var(--ink-soft)' }}>Sem compras registradas — cliente novo na carteira.</td></tr>
+                  <tr><td colSpan={4} style={{ color: 'var(--ink-soft)' }}>{t('cli.semComprasRegistradas')}</td></tr>
                 )}
               </tbody>
             </table>
@@ -393,53 +395,53 @@ export default function Clientes() {
       {editando && (
         <div className="modal-fundo" onClick={() => setEditando(null)}>
           <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvar}>
-            <h2>{editando.id ? 'Editar cliente' : 'Novo cliente'}</h2>
+            <h2>{editando.id ? t('cli.editarCliente') : t('cli.novoClienteTitulo')}</h2>
             {erro && <div className="alerta">{erro}</div>}
             <div className="linha-campos">
               <div className="campo">
-                <label>Nome*</label>
+                <label>{t('cli.nomeObrig')}</label>
                 <input value={editando.nome ?? ''} onChange={(e) => setEditando({ ...editando, nome: e.target.value })} required />
               </div>
               <div className="campo">
-                <label>WhatsApp (com DDI)</label>
+                <label>{t('cli.whatsappComDdi')}</label>
                 <input value={editando.telefone ?? ''} onChange={(e) => setEditando({ ...editando, telefone: e.target.value })} placeholder="5562999998888" />
               </div>
             </div>
             <div className="linha-campos">
               <div className="campo">
-                <label>E-mail</label>
+                <label>{t('cli.email')}</label>
                 <input type="email" value={editando.email ?? ''} onChange={(e) => setEditando({ ...editando, email: e.target.value })} />
               </div>
               <div className="campo">
-                <label>Instagram</label>
+                <label>{t('cli.instagram')}</label>
                 <input value={editando.instagram ?? ''} onChange={(e) => setEditando({ ...editando, instagram: e.target.value })} placeholder="@cliente" />
               </div>
             </div>
             <div className="linha-campos">
               <div className="campo">
-                <label>CEP {cepBuscando && <span style={{ color: 'var(--ink-soft)' }}>· buscando…</span>}</label>
+                <label>{t('cli.cep')} {cepBuscando && <span style={{ color: 'var(--ink-soft)' }}>· {t('cli.buscandoCep')}</span>}</label>
                 <input value={editando.cep ?? ''} inputMode="numeric"
                   onChange={(e) => setEditando({ ...editando, cep: e.target.value })}
                   onBlur={(e) => buscarCep(e.target.value)} placeholder="74000-000" />
               </div>
               <div className="campo">
-                <label>Cidade</label>
-                <input value={editando.cidade ?? ''} onChange={(e) => setEditando({ ...editando, cidade: e.target.value })} placeholder="Preenche pelo CEP" />
+                <label>{t('cli.cidade')}</label>
+                <input value={editando.cidade ?? ''} onChange={(e) => setEditando({ ...editando, cidade: e.target.value })} placeholder={t('cli.preenchePeloCep')} />
               </div>
               <div className="campo" style={{ maxWidth: 90 }}>
-                <label>UF</label>
+                <label>{t('cli.uf')}</label>
                 <input value={editando.uf ?? ''} maxLength={2}
                   onChange={(e) => setEditando({ ...editando, uf: e.target.value.toUpperCase() })} placeholder="GO" />
               </div>
             </div>
             {gerente && (
               <div className="campo">
-                <label>Vendedora (carteira)</label>
+                <label>{t('cli.vendedoraCarteira')}</label>
                 <select
                   value={(editando as { vendedoraId?: string }).vendedoraId ?? editando.vendedora?.id ?? ''}
                   onChange={(e) => setEditando({ ...editando, vendedoraId: e.target.value } as never)}
                 >
-                  <option value="">— Sem carteira —</option>
+                  <option value="">{t('cli.semCarteira')}</option>
                   {vendedoras.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
                 </select>
               </div>
@@ -450,11 +452,11 @@ export default function Clientes() {
                 checked={editando.consentimentoLgpd ?? false}
                 onChange={(e) => setEditando({ ...editando, consentimentoLgpd: e.target.checked })}
               />
-              <label htmlFor="lgpd" style={{ margin: 0 }}>Cliente consentiu receber campanhas (LGPD)</label>
+              <label htmlFor="lgpd" style={{ margin: 0 }}>{t('cli.clienteConsentiu')}</label>
             </div>
             <div className="acoes">
-              <button type="button" className="btn secundario" onClick={() => setEditando(null)}>Cancelar</button>
-              <button className="btn">Salvar</button>
+              <button type="button" className="btn secundario" onClick={() => setEditando(null)}>{t('comum.cancelar')}</button>
+              <button className="btn">{t('comum.salvar')}</button>
             </div>
           </form>
         </div>

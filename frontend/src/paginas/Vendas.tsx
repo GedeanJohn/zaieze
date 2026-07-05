@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, formataReal, mensagemDeErro, usuarioLogado, FORMAS_RECEBIMENTO, rotuloForma, CANAIS_VENDA, rotuloCanal, type FormaRecebimento, type CanalVenda } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
+import { useIdioma } from '../lib/i18n'
 
 interface ItemVendaView {
   id: string
@@ -53,6 +54,7 @@ function formataData(iso: string): string {
 
 export default function Vendas() {
   const usuario = usuarioLogado()!
+  const { t } = useIdioma()
   const gerente = usuario.role !== 'VENDEDORA'
   // Quem efetivamente registra venda: vendedora e gerente de loja. Gestor (rede) e admin supervisionam.
   const podeVender = usuario.role === 'VENDEDORA' || usuario.role === 'GERENTE'
@@ -169,9 +171,9 @@ export default function Vendas() {
     e.preventDefault()
     if (!form) return
     setErro('')
-    if (gerente && !form.vendedoraId) return setErro('Selecione a vendedora da venda.')
+    if (gerente && !form.vendedoraId) return setErro(t('vendas.erroSelecioneVendedora'))
     if (form.itens.some((l) => !l.variacaoId || Number(l.quantidade) < 1)) {
-      return setErro('Cada item precisa de uma variação e quantidade ≥ 1.')
+      return setErro(t('vendas.erroItemInvalido'))
     }
     void enviar()
   }
@@ -199,9 +201,9 @@ export default function Vendas() {
     } catch (err) {
       const code = (err as { response?: { data?: { erro?: string } } }).response?.data?.erro
       if (code === 'SENHA_NECESSARIA') {
-        setAutoriz({ tipo: 'senha', senha: '', gEmail: '', gSenha: '', erro: cred ? 'Senha incorreta. Tente de novo.' : undefined })
+        setAutoriz({ tipo: 'senha', senha: '', gEmail: '', gSenha: '', erro: cred ? t('vendas.erroSenhaIncorreta') : undefined })
       } else if (code === 'GERENTE_NECESSARIO') {
-        setAutoriz((a) => ({ tipo: 'gerente', senha: '', gEmail: a?.gEmail ?? '', gSenha: '', erro: cred ? 'E-mail/senha do gerente inválidos.' : undefined }))
+        setAutoriz((a) => ({ tipo: 'gerente', senha: '', gEmail: a?.gEmail ?? '', gSenha: '', erro: cred ? t('vendas.erroGerenteInvalido') : undefined }))
       } else {
         setErro(mensagemDeErro(err))
       }
@@ -209,7 +211,7 @@ export default function Vendas() {
   }
 
   async function cancelar(v: Venda) {
-    if (!window.confirm(`Cancelar a venda de ${formataReal(v.total)}? O estoque será devolvido.`)) return
+    if (!window.confirm(`${t('vendas.confirmarCancelar')} ${formataReal(v.total)}${t('vendas.estoqueSeraDevolvido')}`)) return
     try {
       await api.post(`/vendas/${v.id}/cancelar`, {}, { params: escopo.params })
       carregar()
@@ -221,36 +223,36 @@ export default function Vendas() {
   return (
     <>
       <header>
-        <h1>Vendas</h1>
+        <h1>{t('vendas.titulo')}</h1>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
           <SeletorLoja escopo={escopo} />
-          {podeVender && <button className="btn" onClick={() => abrirNova()} disabled={!escopo.pronto}>+ Nova venda</button>}
+          {podeVender && <button className="btn" onClick={() => abrirNova()} disabled={!escopo.pronto}>{t('vendas.novaVenda')}</button>}
         </div>
       </header>
 
       <div className="cartao">
         <div className="linha-campos">
           <div className="campo">
-            <label>De</label>
+            <label>{t('vendas.de')}</label>
             <input type="date" value={de} onChange={(e) => setDe(e.target.value)} />
           </div>
           <div className="campo">
-            <label>Até</label>
+            <label>{t('vendas.ate')}</label>
             <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} />
           </div>
           <div className="campo">
-            <label>Canal</label>
+            <label>{t('vendas.canal')}</label>
             <select value={canalFiltro} onChange={(e) => setCanalFiltro(e.target.value)}>
-              <option value="">Todos os canais</option>
-              {CANAIS_VENDA.map((c) => <option key={c} value={c}>{rotuloCanal[c]}</option>)}
+              <option value="">{t('vendas.todosCanais')}</option>
+              {CANAIS_VENDA.map((c) => <option key={c} value={c}>{t(`canal.${c}`) || rotuloCanal[c]}</option>)}
             </select>
           </div>
         </div>
         <table>
           <thead>
             <tr>
-              <th>Data</th><th>Cliente</th><th>Vendedora</th><th>Canal</th><th>Itens</th>
-              <th>Total</th><th>Recebimento</th><th>Status</th><th></th>
+              <th>{t('vendas.data')}</th><th>{t('vendas.cliente')}</th><th>{t('vendas.vendedora')}</th><th>{t('vendas.canal')}</th><th>{t('vendas.itens')}</th>
+              <th>{t('vendas.total')}</th><th>{t('vendas.recebimento')}</th><th>{t('vendas.status')}</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -260,29 +262,29 @@ export default function Vendas() {
                 <td>{v.cliente?.nome ?? '—'}</td>
                 <td>{v.vendedora.nome}</td>
                 <td>
-                  <span style={{ fontSize: 13 }}>{v.canal === 'ONLINE' ? '📲 Online' : '🏬 Balcão'}</span>
+                  <span style={{ fontSize: 13 }}>{v.canal === 'ONLINE' ? `📲 ${t('canal.ONLINE')}` : `🏬 ${t('canal.BALCAO')}`}</span>
                 </td>
                 <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
                   {v.itens.map((i) => `${i.quantidade}× ${i.variacao.produto.nome} ${i.variacao.cor}/${i.variacao.tamanho}`).join(' · ')}
-                  {v.atacado ? '  🏷️atacado' : ''}
+                  {v.atacado ? `  🏷️${t('vendas.atacadoTag')}` : ''}
                 </td>
                 <td>{formataReal(v.total)}</td>
-                <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{rotuloForma[v.formaRecebimento] ?? v.formaRecebimento}</td>
+                <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{t(`forma.${v.formaRecebimento}`) || rotuloForma[v.formaRecebimento] || v.formaRecebimento}</td>
                 <td>
                   <span className={`selo ${v.status === 'CONCLUIDA' ? 'ok' : 'baixo'}`}>
-                    {v.status === 'CONCLUIDA' ? 'Concluída' : 'Cancelada'}
+                    {v.status === 'CONCLUIDA' ? t('vendas.concluida') : t('vendas.cancelada')}
                   </span>
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  <a href={`/pedido/${v.id}`} target="_blank" rel="noreferrer">🧾 pedido</a>
+                  <a href={`/pedido/${v.id}`} target="_blank" rel="noreferrer">🧾 {t('vendas.pedido')}</a>
                   {gerente && v.status === 'CONCLUIDA' && (
-                    <>{' · '}<a href="#" style={{ color: 'var(--danger)' }} onClick={(e) => { e.preventDefault(); cancelar(v) }}>cancelar</a></>
+                    <>{' · '}<a href="#" style={{ color: 'var(--danger)' }} onClick={(e) => { e.preventDefault(); cancelar(v) }}>{t('vendas.cancelarLink')}</a></>
                   )}
                 </td>
               </tr>
             ))}
             {vendas.length === 0 && (
-              <tr><td colSpan={9} style={{ color: 'var(--ink-soft)' }}>Nenhuma venda no período.</td></tr>
+              <tr><td colSpan={9} style={{ color: 'var(--ink-soft)' }}>{t('vendas.nenhumaVenda')}</td></tr>
             )}
           </tbody>
         </table>
@@ -291,46 +293,46 @@ export default function Vendas() {
       {form && (
         <div className="modal-fundo" onClick={() => setForm(null)}>
           <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvar}>
-            <h2>Nova venda</h2>
+            <h2>{t('vendas.novaVendaTitulo')}</h2>
             {erro && <div className="alerta">{erro}</div>}
 
             <div className="linha-campos">
               <div className="campo">
-                <label>Canal da venda*</label>
+                <label>{t('vendas.canalDaVenda')}</label>
                 <select value={form.canal} onChange={(e) => setForm({ ...form, canal: e.target.value as CanalVenda })}>
-                  {CANAIS_VENDA.map((c) => <option key={c} value={c}>{rotuloCanal[c]}</option>)}
+                  {CANAIS_VENDA.map((c) => <option key={c} value={c}>{t(`canal.${c}`) || rotuloCanal[c]}</option>)}
                 </select>
               </div>
               <div className="campo">
-                <label>Cliente</label>
+                <label>{t('vendas.cliente')}</label>
                 <select value={form.clienteId} onChange={(e) => setForm({ ...form, clienteId: e.target.value })}>
-                  <option value="">— Sem cliente (avulsa) —</option>
+                  <option value="">{t('vendas.semClienteAvulsa')}</option>
                   {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                 </select>
               </div>
               {gerente && (
                 <div className="campo">
-                  <label>Vendedora*</label>
+                  <label>{t('vendas.vendedoraObrig')}</label>
                   <select value={form.vendedoraId} onChange={(e) => setForm({ ...form, vendedoraId: e.target.value })} required>
-                    <option value="">— Selecione —</option>
+                    <option value="">{t('comum.selecione')}</option>
                     {vendedoras.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
                   </select>
                 </div>
               )}
             </div>
 
-            <h3 style={{ marginBottom: 8 }}>Itens</h3>
+            <h3 style={{ marginBottom: 8 }}>{t('vendas.itensTitulo')}</h3>
             <div className="grade-itens" style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
-              <span>Produto</span><span>Variação</span><span>Qtd</span><span>Preço un.</span><span></span>
+              <span>{t('vendas.produto')}</span><span>{t('vendas.variacao')}</span><span>{t('vendas.qtd')}</span><span>{t('vendas.precoUn')}</span><span></span>
             </div>
             {form.itens.map((l, i) => (
               <div className="grade-itens" key={i}>
                 <select value={l.produtoId} onChange={(e) => mudarLinha(i, { produtoId: e.target.value })} required>
-                  <option value="">— Produto —</option>
+                  <option value="">{t('vendas.produtoPlaceholder')}</option>
                   {produtos.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
                 </select>
                 <select value={l.variacaoId} onChange={(e) => mudarLinha(i, { variacaoId: e.target.value })} disabled={!l.produtoId} required>
-                  <option value="">— Cor/Tam —</option>
+                  <option value="">{t('vendas.corTamPlaceholder')}</option>
                   {variacoesDe(l.produtoId).map((v) => (
                     <option key={v.id} value={v.id} disabled={v.estoque <= 0}>
                       {v.cor}/{v.tamanho} ({v.estoque})
@@ -340,33 +342,33 @@ export default function Vendas() {
                 <input type="number" min="1" value={l.quantidade} onChange={(e) => mudarLinha(i, { quantidade: Number(e.target.value) })} />
                 <input type="number" step="0.01" min="0" value={l.precoUnitario} onChange={(e) => mudarLinha(i, { precoUnitario: e.target.value })} placeholder="auto" />
                 <button
-                  type="button" className="remover" title="Remover"
+                  type="button" className="remover" title={t('comum.excluir')}
                   onClick={() => setForm({ ...form, itens: form.itens.filter((_, idx) => idx !== i) })}
                   disabled={form.itens.length === 1}
                 >×</button>
               </div>
             ))}
             <button type="button" className="btn secundario" onClick={() => setForm({ ...form, itens: [...form.itens, { ...LINHA_VAZIA }] })}>
-              + Adicionar item
+              {t('vendas.adicionarItem')}
             </button>
 
             <div className="linha-campos" style={{ marginTop: 16 }}>
               <div className="campo">
-                <label>Forma de recebimento*</label>
+                <label>{t('vendas.formaRecebimentoObrig')}</label>
                 <select value={form.formaRecebimento} onChange={(e) => setForm({ ...form, formaRecebimento: e.target.value as FormaRecebimento })}>
-                  {FORMAS_RECEBIMENTO.map((f) => <option key={f} value={f}>{rotuloForma[f]}</option>)}
+                  {FORMAS_RECEBIMENTO.map((f) => <option key={f} value={f}>{t(`forma.${f}`) || rotuloForma[f]}</option>)}
                 </select>
               </div>
               <div className="campo" style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'end' }}>
                 <input type="checkbox" style={{ width: 'auto' }} id="atacado" checked={form.atacado} onChange={(e) => mudarAtacado(e.target.checked)} />
-                <label htmlFor="atacado" style={{ margin: 0 }}>Preço de atacado</label>
+                <label htmlFor="atacado" style={{ margin: 0 }}>{t('vendas.precoAtacado')}</label>
               </div>
             </div>
 
             {/* Régua + slider de desconto */}
             <div className="desc-box">
               <div className="desc-cab">
-                <label style={{ margin: 0 }}>Desconto</label>
+                <label style={{ margin: 0 }}>{t('vendas.desconto')}</label>
                 <div className="desc-regua">
                   {config.regua.map((f, i) => (
                     <span key={i} className={`desc-faixa ${f.pct === sugeridoPct ? 'sug' : ''}`}>
@@ -381,31 +383,31 @@ export default function Vendas() {
                 <span className={`desc-pct ${zonaDesconto}`}>{pct}%</span>
                 {sugeridoPct > 0 && pct !== sugeridoPct && (
                   <button type="button" className="desc-sug-btn" onClick={() => setForm({ ...form, descontoPct: String(sugeridoPct) })}>
-                    usar sugerido ({sugeridoPct}%)
+                    {t('vendas.usarSugerido')} ({sugeridoPct}%)
                   </button>
                 )}
               </div>
               <div className={`desc-aviso ${zonaDesconto}`}>
-                {zonaDesconto === 'ok' && `Liberado (até ${config.autoMaxPct}%).`}
-                {zonaDesconto === 'senha' && `Acima de ${config.autoMaxPct}% — vai pedir sua senha ao registrar.`}
-                {zonaDesconto === 'gerente' && `Acima de ${config.senhaMaxPct}% — precisa de autorização do gerente.`}
+                {zonaDesconto === 'ok' && `${t('vendas.liberadoAte')} ${config.autoMaxPct}%).`}
+                {zonaDesconto === 'senha' && `${t('vendas.acimaDe')} ${config.autoMaxPct}% ${t('vendas.acimaVaiPedirSenha')}`}
+                {zonaDesconto === 'gerente' && `${t('vendas.acimaDe')} ${config.senhaMaxPct}% ${t('vendas.acimaPrecisaGerente')}`}
               </div>
             </div>
 
             <div className="campo">
-              <label>Observação</label>
+              <label>{t('vendas.observacao')}</label>
               <input value={form.observacao} onChange={(e) => setForm({ ...form, observacao: e.target.value })} />
             </div>
 
             <div className="desc-totais">
-              <div><span>Subtotal</span><span>{formataReal(bruto)}</span></div>
-              {pct > 0 && <div className="desc"><span>Desconto ({pct}%)</span><span>− {formataReal(descontoValor)}</span></div>}
-              <div className="tot"><span>Total</span><span>{formataReal(totalPrevisto)}</span></div>
+              <div><span>{t('vendas.subtotal')}</span><span>{formataReal(bruto)}</span></div>
+              {pct > 0 && <div className="desc"><span>{t('vendas.desconto')} ({pct}%)</span><span>− {formataReal(descontoValor)}</span></div>}
+              <div className="tot"><span>{t('vendas.total')}</span><span>{formataReal(totalPrevisto)}</span></div>
             </div>
 
             <div className="acoes">
-              <button type="button" className="btn secundario" onClick={() => setForm(null)}>Cancelar</button>
-              <button className="btn">Registrar venda</button>
+              <button type="button" className="btn secundario" onClick={() => setForm(null)}>{t('comum.cancelar')}</button>
+              <button className="btn">{t('vendas.registrarVenda')}</button>
             </div>
           </form>
         </div>
@@ -418,33 +420,33 @@ export default function Vendas() {
             className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}
             onSubmit={(e) => { e.preventDefault(); void enviar({ senha: autoriz.senha, gerenteEmail: autoriz.gEmail, gerenteSenha: autoriz.gSenha }) }}
           >
-            <h2>{autoriz.tipo === 'senha' ? 'Confirmar desconto' : 'Autorização do gerente'}</h2>
+            <h2>{autoriz.tipo === 'senha' ? t('vendas.confirmarDesconto') : t('vendas.autorizacaoGerente')}</h2>
             <p style={{ color: 'var(--ink-soft)', fontSize: 14, marginTop: -4 }}>
               {autoriz.tipo === 'senha'
-                ? `Desconto de ${pct}% (${formataReal(descontoValor)}). Confirme sua senha para aplicar.`
-                : `Desconto de ${pct}% acima do limite. Um gerente precisa autorizar.`}
+                ? `${t('vendas.descontoDe')} ${pct}% (${formataReal(descontoValor)}). ${t('vendas.confirmeSenhaParaAplicar')}`
+                : `${t('vendas.descontoDe')} ${pct}% ${t('vendas.acimaLimiteGerentePrecisa')}`}
             </p>
             {autoriz.erro && <div className="alerta">{autoriz.erro}</div>}
             {autoriz.tipo === 'senha' ? (
               <div className="campo">
-                <label>Sua senha</label>
+                <label>{t('vendas.suaSenha')}</label>
                 <input type="password" autoFocus value={autoriz.senha} onChange={(e) => setAutoriz({ ...autoriz, senha: e.target.value })} required />
               </div>
             ) : (
               <>
                 <div className="campo">
-                  <label>E-mail do gerente</label>
+                  <label>{t('vendas.emailGerente')}</label>
                   <input type="email" autoFocus value={autoriz.gEmail} onChange={(e) => setAutoriz({ ...autoriz, gEmail: e.target.value })} required />
                 </div>
                 <div className="campo">
-                  <label>Senha do gerente</label>
+                  <label>{t('vendas.senhaGerente')}</label>
                   <input type="password" value={autoriz.gSenha} onChange={(e) => setAutoriz({ ...autoriz, gSenha: e.target.value })} required />
                 </div>
               </>
             )}
             <div className="acoes">
-              <button type="button" className="btn secundario" onClick={() => setAutoriz(null)}>Cancelar</button>
-              <button className="btn">Autorizar e registrar</button>
+              <button type="button" className="btn secundario" onClick={() => setAutoriz(null)}>{t('comum.cancelar')}</button>
+              <button className="btn">{t('vendas.autorizarERegistrar')}</button>
             </div>
           </form>
         </div>

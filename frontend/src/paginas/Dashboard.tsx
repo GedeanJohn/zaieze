@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, formataReal, rotuloForma, usuarioLogado } from '../api'
 import DashboardEstoque from './DashboardEstoque'
+import { useIdioma } from '../lib/i18n'
 
 // ─── Tipos das três visões devolvidas por /api/dashboard ───
 interface FormaResumo { forma: string; total: number; qtd: number }
@@ -72,14 +73,15 @@ function Kpi({ rotulo, valor }: { rotulo: string; valor: string }) {
 
 // Card "Funil agora": ciclos abertos por cor de tempo de espera (verde/laranja/vermelho).
 function FunilCard({ f }: { f: FunilCores }) {
+  const { t } = useIdioma()
   const itens = [
-    { rotulo: 'No prazo', valor: f.noPrazo, cor: '#16a34a', icone: '🟢' },
-    { rotulo: 'Apertado', valor: f.apertado, cor: '#d97706', icone: '🟠' },
-    { rotulo: 'Atrasado', valor: f.atrasado, cor: '#dc2626', icone: '🔴' },
+    { rotulo: t('dash.noPrazo'), valor: f.noPrazo, cor: '#16a34a', icone: '🟢' },
+    { rotulo: t('dash.apertado'), valor: f.apertado, cor: '#d97706', icone: '🟠' },
+    { rotulo: t('dash.atrasado'), valor: f.atrasado, cor: '#dc2626', icone: '🔴' },
   ]
   return (
     <div className="cartao">
-      <h2 className="painel-titulo">Funil agora — tempo de espera ({f.total} aberto{f.total === 1 ? '' : 's'})</h2>
+      <h2 className="painel-titulo">{t('dash.funilAgora')} ({f.total} {f.total === 1 ? t('dash.aberto') : t('dash.abertos')})</h2>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         {itens.map((i) => (
           <div key={i.rotulo} style={{ flex: 1, minWidth: 110, border: `1px solid ${i.cor}55`, background: `${i.cor}14`, borderRadius: 10, padding: '10px 12px' }}>
@@ -107,6 +109,7 @@ export default function Dashboard() {
 }
 
 function DashboardGeral() {
+  const { t } = useIdioma()
   const [dados, setDados] = useState<Dados | null>(null)
   const [erro, setErro] = useState('')
   // Drill-down do gestor: '' = rede consolidada; id = loja específica
@@ -132,7 +135,7 @@ function DashboardGeral() {
   // Seletor de loja (apenas gestor): consolidado ↔ loja
   const seletor = lojas.length > 0 && (
     <select value={lojaSel} onChange={(e) => setLojaSel(e.target.value)} style={{ width: 'auto' }}>
-      <option value="">Rede (consolidado)</option>
+      <option value="">{t('dash.redeConsolidado')}</option>
       {lojas.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
     </select>
   )
@@ -141,35 +144,35 @@ function DashboardGeral() {
   if (dados.papel === 'VENDEDORA') {
     return (
       <>
-        <header><h1>Meu desempenho</h1><span style={{ color: 'var(--ink-soft)', fontSize: 14 }}>{dados.equipe ?? 'Sem equipe'}</span></header>
+        <header><h1>{t('dash.vendedora.titulo')}</h1><span style={{ color: 'var(--ink-soft)', fontSize: 14 }}>{dados.equipe ?? t('dash.semEquipe')}</span></header>
         <div className="grade-cards">
-          <Kpi rotulo="Vendi hoje" valor={formataReal(dados.hoje.total)} />
-          <Kpi rotulo="Vendas hoje" valor={String(dados.hoje.vendas)} />
-          <Kpi rotulo="Vendi no mês" valor={formataReal(dados.mes.total)} />
-          <Kpi rotulo={`Venda online (${dados.online.pct}%)`} valor={formataReal(dados.online.total)} />
-          <Kpi rotulo="Ticket médio" valor={formataReal(dados.mes.ticketMedio)} />
-          <Kpi rotulo="Clientes na carteira" valor={String(dados.clientesCarteira)} />
+          <Kpi rotulo={t('dash.vendiHoje')} valor={formataReal(dados.hoje.total)} />
+          <Kpi rotulo={t('dash.vendasHoje')} valor={String(dados.hoje.vendas)} />
+          <Kpi rotulo={t('dash.vendiMes')} valor={formataReal(dados.mes.total)} />
+          <Kpi rotulo={`${t('dash.vendaOnline')} (${dados.online.pct}%)`} valor={formataReal(dados.online.total)} />
+          <Kpi rotulo={t('dash.ticketMedio')} valor={formataReal(dados.mes.ticketMedio)} />
+          <Kpi rotulo={t('dash.clientesCarteira')} valor={String(dados.clientesCarteira)} />
         </div>
         {dados.funilCores && <div style={{ marginTop: 16 }}><FunilCard f={dados.funilCores} /></div>}
         {dados.meta != null && (
           <div className="cartao" style={{ marginTop: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-              <span>Meta do mês: {formataReal(dados.meta)}</span>
+              <span>{t('dash.metaDoMes')}: {formataReal(dados.meta)}</span>
               <strong>{dados.pctMeta ?? 0}%</strong>
             </div>
             <BarraMeta pct={dados.pctMeta ?? 0} />
           </div>
         )}
         <div className="cartao" style={{ marginTop: 16 }}>
-          <h2 className="painel-titulo">Minhas vendas por forma de recebimento</h2>
+          <h2 className="painel-titulo">{t('dash.minhasVendasPorForma')}</h2>
           <table>
-            <thead><tr><th>Forma</th><th>Vendas</th><th>Total</th></tr></thead>
+            <thead><tr><th>{t('dash.forma')}</th><th>{t('dash.vendas')}</th><th>{t('dash.total')}</th></tr></thead>
             <tbody>
               {dados.porForma.map((f) => (
-                <tr key={f.forma}><td>{rotuloForma[f.forma] ?? f.forma}</td><td>{f.qtd}</td><td>{formataReal(f.total)}</td></tr>
+                <tr key={f.forma}><td>{t(`forma.${f.forma}`) || rotuloForma[f.forma] || f.forma}</td><td>{f.qtd}</td><td>{formataReal(f.total)}</td></tr>
               ))}
               {dados.porForma.length === 0 && (
-                <tr><td colSpan={3} style={{ color: 'var(--ink-soft)' }}>Sem vendas no mês.</td></tr>
+                <tr><td colSpan={3} style={{ color: 'var(--ink-soft)' }}>{t('dash.semVendasMes')}</td></tr>
               )}
             </tbody>
           </table>
@@ -184,34 +187,34 @@ function DashboardGeral() {
       <>
         <header>
           <h1>{dados.rede.nome}</h1>
-          <span style={{ color: 'var(--ink-soft)', fontSize: 14 }}>Rede · plano {dados.rede.plano}</span>
+          <span style={{ color: 'var(--ink-soft)', fontSize: 14 }}>{t('dash.redePlano')} {dados.rede.plano}</span>
         </header>
         {seletor && <div style={{ marginBottom: 16 }}>{seletor}</div>}
         <div className="grade-cards">
-          <Kpi rotulo="Faturamento hoje" valor={formataReal(dados.consolidado.faturamentoHoje)} />
-          <Kpi rotulo="Faturamento no mês" valor={formataReal(dados.consolidado.faturamentoMes)} />
+          <Kpi rotulo={t('dash.faturamentoHoje')} valor={formataReal(dados.consolidado.faturamentoHoje)} />
+          <Kpi rotulo={t('dash.faturamentoMes')} valor={formataReal(dados.consolidado.faturamentoMes)} />
           <Kpi
-            rotulo={`Venda online (${dados.consolidado.faturamentoMes > 0 ? Math.round((dados.consolidado.faturamentoOnlineMes / dados.consolidado.faturamentoMes) * 100) : 0}%)`}
+            rotulo={`${t('dash.vendaOnline')} (${dados.consolidado.faturamentoMes > 0 ? Math.round((dados.consolidado.faturamentoOnlineMes / dados.consolidado.faturamentoMes) * 100) : 0}%)`}
             valor={formataReal(dados.consolidado.faturamentoOnlineMes)}
           />
-          <Kpi rotulo="Vendas no mês" valor={String(dados.consolidado.vendasMes)} />
-          <Kpi rotulo="Clientes" valor={String(dados.consolidado.clientes)} />
+          <Kpi rotulo={t('dash.vendasMes')} valor={String(dados.consolidado.vendasMes)} />
+          <Kpi rotulo={t('dash.clientes')} valor={String(dados.consolidado.clientes)} />
         </div>
         {dados.funilCores && <div style={{ marginTop: 16 }}><FunilCard f={dados.funilCores} /></div>}
         <div className="cartao" style={{ marginTop: 16 }}>
-          <h2 className="painel-titulo">Lojas</h2>
+          <h2 className="painel-titulo">{t('dash.lojas')}</h2>
           <table>
-            <thead><tr><th>Loja</th><th>Hoje</th><th>Mês</th><th>Venda online</th><th>Vendas mês</th><th>Ticket médio</th><th>Clientes</th></tr></thead>
+            <thead><tr><th>{t('dash.loja')}</th><th>{t('dash.hoje')}</th><th>{t('dash.mesCol')}</th><th>{t('dash.vendaOnline')}</th><th>{t('dash.vendasMes')}</th><th>{t('dash.ticketMedio')}</th><th>{t('dash.clientes')}</th></tr></thead>
             <tbody>
               {dados.porLoja.map((l) => (
                 <tr key={l.id} style={{ opacity: l.ativo ? 1 : 0.5 }}>
-                  <td>{l.nome}{l.ativo ? '' : ' (inativa)'}</td>
+                  <td>{l.nome}{l.ativo ? '' : ` ${t('dash.inativa')}`}</td>
                   <td>{formataReal(l.faturamentoHoje)}</td>
                   <td>{formataReal(l.faturamentoMes)}</td>
                   <td>{formataReal(l.faturamentoOnlineMes)} <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>({l.pctOnlineMes}%)</span></td>
                   <td>{l.vendasMes}</td>
                   <td>{formataReal(l.ticketMedioMes)}</td>
-                  <td>{l.clientes}{l.clientesInativos > 0 ? ` (${l.clientesInativos} inativos)` : ''}</td>
+                  <td>{l.clientes}{l.clientesInativos > 0 ? ` (${l.clientesInativos} ${t('dash.inativosParen')})` : ''}</td>
                 </tr>
               ))}
             </tbody>
@@ -229,27 +232,27 @@ function DashboardGeral() {
         {seletor}
       </header>
       <div className="grade-cards">
-        <Kpi rotulo="Faturamento hoje" valor={formataReal(dados.faturamentoHoje)} />
-        <Kpi rotulo="Vendas hoje" valor={String(dados.vendasHoje)} />
-        <Kpi rotulo="Faturamento no mês" valor={formataReal(dados.faturamentoMes)} />
-        <Kpi rotulo={`Venda online (${dados.pctOnlineMes}%)`} valor={formataReal(dados.faturamentoOnlineMes)} />
-        <Kpi rotulo="Ticket médio" valor={formataReal(dados.ticketMedioMes)} />
-        <Kpi rotulo="Clientes" valor={String(dados.clientes)} />
-        <Kpi rotulo="Inativos (90+ dias)" valor={String(dados.clientesInativos)} />
-        {dados.conversao && <Kpi rotulo={`Conversão (${dados.conversao.convertidos}/${dados.conversao.total})`} valor={`${dados.conversao.pct}%`} />}
+        <Kpi rotulo={t('dash.faturamentoHoje')} valor={formataReal(dados.faturamentoHoje)} />
+        <Kpi rotulo={t('dash.vendasHoje')} valor={String(dados.vendasHoje)} />
+        <Kpi rotulo={t('dash.faturamentoMes')} valor={formataReal(dados.faturamentoMes)} />
+        <Kpi rotulo={`${t('dash.vendaOnline')} (${dados.pctOnlineMes}%)`} valor={formataReal(dados.faturamentoOnlineMes)} />
+        <Kpi rotulo={t('dash.ticketMedio')} valor={formataReal(dados.ticketMedioMes)} />
+        <Kpi rotulo={t('dash.clientes')} valor={String(dados.clientes)} />
+        <Kpi rotulo={t('dash.inativosDias')} valor={String(dados.clientesInativos)} />
+        {dados.conversao && <Kpi rotulo={`${t('dash.conversao')} (${dados.conversao.convertidos}/${dados.conversao.total})`} valor={`${dados.conversao.pct}%`} />}
       </div>
 
       {dados.funilCores && <div style={{ marginTop: 16 }}><FunilCard f={dados.funilCores} /></div>}
 
       <div className="grade-paineis" style={{ marginTop: 16 }}>
         <div className="cartao">
-          <h2 className="painel-titulo">Vendedoras no mês</h2>
+          <h2 className="painel-titulo">{t('dash.vendedorasNoMes')}</h2>
           <table>
-            <thead><tr><th>Vendedora</th><th>Vendas</th><th>Total</th><th>Online</th><th>Meta</th></tr></thead>
+            <thead><tr><th>{t('dash.vendedora')}</th><th>{t('dash.vendas')}</th><th>{t('dash.total')}</th><th>{t('dash.online')}</th><th>{t('dash.meta')}</th></tr></thead>
             <tbody>
               {dados.porVendedora.map((v) => (
                 <tr key={v.id} style={{ opacity: v.ativo ? 1 : 0.5 }}>
-                  <td>{v.nome}<div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{v.equipe ?? 'Sem equipe'}</div></td>
+                  <td>{v.nome}<div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{v.equipe ?? t('dash.semEquipe')}</div></td>
                   <td>{v.vendasMes}</td>
                   <td>{formataReal(v.totalMes)}</td>
                   <td>{formataReal(v.onlineMes)} <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>({v.pctOnline}%)</span></td>
@@ -261,20 +264,20 @@ function DashboardGeral() {
                 </tr>
               ))}
               {dados.porVendedora.length === 0 && (
-                <tr><td colSpan={5} style={{ color: 'var(--ink-soft)' }}>Sem vendedoras.</td></tr>
+                <tr><td colSpan={5} style={{ color: 'var(--ink-soft)' }}>{t('dash.semVendedoras')}</td></tr>
               )}
             </tbody>
           </table>
         </div>
 
         <div className="cartao">
-          <h2 className="painel-titulo">Vendas por forma de recebimento</h2>
+          <h2 className="painel-titulo">{t('dash.vendasPorForma')}</h2>
           <table>
-            <thead><tr><th>Forma</th><th>Vendas</th><th>Total</th><th>Quem mais vendeu</th></tr></thead>
+            <thead><tr><th>{t('dash.forma')}</th><th>{t('dash.vendas')}</th><th>{t('dash.total')}</th><th>{t('dash.quemMaisVendeu')}</th></tr></thead>
             <tbody>
               {dados.porFormaRecebimento.map((f) => (
                 <tr key={f.forma}>
-                  <td>{rotuloForma[f.forma] ?? f.forma}</td>
+                  <td>{t(`forma.${f.forma}`) || rotuloForma[f.forma] || f.forma}</td>
                   <td>{f.qtd}</td>
                   <td>{formataReal(f.total)}</td>
                   <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
@@ -283,71 +286,71 @@ function DashboardGeral() {
                 </tr>
               ))}
               {dados.porFormaRecebimento.length === 0 && (
-                <tr><td colSpan={4} style={{ color: 'var(--ink-soft)' }}>Sem vendas no mês.</td></tr>
+                <tr><td colSpan={4} style={{ color: 'var(--ink-soft)' }}>{t('dash.semVendasMes')}</td></tr>
               )}
             </tbody>
           </table>
         </div>
 
         <div className="cartao">
-          <h2 className="painel-titulo">Produtos mais vendidos</h2>
+          <h2 className="painel-titulo">{t('dash.produtosMaisVendidos')}</h2>
           <table>
-            <thead><tr><th>Produto</th><th>Qtd</th><th>Total</th></tr></thead>
+            <thead><tr><th>{t('dash.produto')}</th><th>{t('dash.qtd')}</th><th>{t('dash.total')}</th></tr></thead>
             <tbody>
               {dados.topProdutos.map((p) => (
                 <tr key={p.nome}><td>{p.nome}</td><td>{p.qtd}</td><td>{formataReal(p.total)}</td></tr>
               ))}
               {dados.topProdutos.length === 0 && (
-                <tr><td colSpan={3} style={{ color: 'var(--ink-soft)' }}>Sem vendas no mês.</td></tr>
+                <tr><td colSpan={3} style={{ color: 'var(--ink-soft)' }}>{t('dash.semVendasMes')}</td></tr>
               )}
             </tbody>
           </table>
         </div>
 
         <div className="cartao">
-          <h2 className="painel-titulo">Melhores clientes</h2>
+          <h2 className="painel-titulo">{t('dash.melhoresClientes')}</h2>
           <table>
-            <thead><tr><th>Cliente</th><th>Classificação</th><th>Total gasto</th></tr></thead>
+            <thead><tr><th>{t('dash.cliente')}</th><th>{t('dash.classificacao')}</th><th>{t('dash.totalGasto')}</th></tr></thead>
             <tbody>
               {dados.topClientes.map((c) => (
                 <tr key={c.id}><td>{c.nome}</td><td><span className={`selo ${c.segmento}`}>{c.segmento}</span></td><td>{formataReal(c.totalGasto)}</td></tr>
               ))}
               {dados.topClientes.length === 0 && (
-                <tr><td colSpan={3} style={{ color: 'var(--ink-soft)' }}>Sem clientes com compras.</td></tr>
+                <tr><td colSpan={3} style={{ color: 'var(--ink-soft)' }}>{t('dash.semClientesCompras')}</td></tr>
               )}
             </tbody>
           </table>
         </div>
 
         <div className="cartao">
-          <h2 className="painel-titulo">Produtos parados (sem venda no mês)</h2>
+          <h2 className="painel-titulo">{t('dash.produtosParados')}</h2>
           <table>
-            <thead><tr><th>Produto</th><th>Em estoque</th></tr></thead>
+            <thead><tr><th>{t('dash.produto')}</th><th>{t('dash.emEstoque')}</th></tr></thead>
             <tbody>
               {dados.produtosParados.map((p) => (
-                <tr key={p.nome}><td>{p.nome}</td><td><span className="selo baixo">{p.estoque} un</span></td></tr>
+                <tr key={p.nome}><td>{p.nome}</td><td><span className="selo baixo">{p.estoque} {t('dash.un')}</span></td></tr>
               ))}
               {dados.produtosParados.length === 0 && (
-                <tr><td colSpan={2} style={{ color: 'var(--ok)' }}>Tudo girando. 👍</td></tr>
+                <tr><td colSpan={2} style={{ color: 'var(--ok)' }}>{t('dash.tudoGirando')}</td></tr>
               )}
             </tbody>
           </table>
         </div>
 
         <div className="cartao">
-          <h2 className="painel-titulo">Estoque crítico</h2>
+          <h2 className="painel-titulo">{t('dash.estoqueCritico')}</h2>
           <table>
-            <thead><tr><th>Produto</th><th>Grade</th><th>Estoque</th></tr></thead>
+            <thead><tr><th>{t('dash.produto')}</th><th>{t('dash.grade')}</th><th>{t('dash.estoque')}</th></tr></thead>
             <tbody>
               {dados.estoqueCritico.map((e) => (
                 <tr key={e.sku}>
                   <td>{e.produto}</td>
                   <td style={{ color: 'var(--ink-soft)' }}>{e.cor}/{e.tamanho}</td>
-                  <td><span className="selo baixo">{e.estoque} un (mín {e.estoqueMinimo})</span></td>
+                  <td><span className="selo baixo">{e.estoque} {t('dash.un')} ({t('dash.min')} {e.estoqueMinimo})</span></td>
                 </tr>
               ))}
               {dados.estoqueCritico.length === 0 && (
-                <tr><td colSpan={3} style={{ color: 'var(--ok)' }}>Tudo acima do mínimo. 👍</td></tr>
+                <tr><td colSpan={3} style={{ color: 'var(--ok)' }}>{t('dash.tudoAcimaMinimo')}</td></tr>
               )}
             </tbody>
           </table>

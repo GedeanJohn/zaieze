@@ -141,6 +141,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
         data: {
           redeId: r.id,
           versao: CONTRATO_VERSAO,
+          idioma: body.idioma,
           assinanteNome: body.gestorNome,
           assinanteEmail: email,
           ip: request.ip,

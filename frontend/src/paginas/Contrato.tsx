@@ -26,21 +26,21 @@ function fmt(iso: string | null): string {
 }
 
 export default function Contrato() {
-  const { t } = useIdioma()
+  const { t, idioma } = useIdioma()
   const [dados, setDados] = useState<RespostaContrato | null>(null)
   const [erro, setErro] = useState('')
   const avisar = useToast()
   const [ocupado, setOcupado] = useState(false)
 
   function carregar() {
-    api.get('/contrato/meu').then(({ data }) => setDados(data)).catch((e) => setErro(mensagemDeErro(e)))
+    api.get('/contrato/meu', { params: { idioma } }).then(({ data }) => setDados(data)).catch((e) => setErro(mensagemDeErro(e)))
   }
-  useEffect(() => { carregar() }, [])
+  useEffect(() => { carregar() }, [idioma])
 
   async function aceitar() {
     setOcupado(true)
     try {
-      await api.post('/contrato/aceitar', {})
+      await api.post('/contrato/aceitar', { idioma })
       avisar(t('contrato.aceiteSucesso'))
       carregar()
     } catch (e) {

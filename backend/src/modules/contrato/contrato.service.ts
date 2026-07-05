@@ -51,7 +51,7 @@ export async function statusReaceite(redeId: string): Promise<StatusReaceite> {
 }
 
 /** Monta o contrato personalizado da rede (contratante + plano + último aceite). */
-export async function montarContratoDaRede(redeId: string): Promise<ContratoMontado> {
+export async function montarContratoDaRede(redeId: string, idioma?: string): Promise<ContratoMontado> {
   const [rede, gestor, assinatura, aceite] = await Promise.all([
     prisma.rede.findUnique({ where: { id: redeId } }),
     prisma.usuario.findFirst({ where: { redeId, role: 'GESTOR' }, orderBy: { createdAt: 'asc' } }),
@@ -70,19 +70,21 @@ export async function montarContratoDaRede(redeId: string): Promise<ContratoMont
       : undefined,
     plano: assinatura ? { nome: assinatura.plano, valor: Number(assinatura.valor) } : undefined,
     aceite: aceite ? { aceitoEm: aceite.aceitoEm, ip: aceite.ip, versao: aceite.versao } : undefined,
+    idioma,
   })
 }
 
 /** Registra o aceite eletrônico da versão vigente (idempotente por versão). */
 export async function registrarAceite(
   redeId: string,
-  dados: { nome: string; email: string; ip?: string | null; userAgent?: string | null },
+  dados: { nome: string; email: string; ip?: string | null; userAgent?: string | null; idioma?: string },
 ): Promise<{ jaAceito: boolean }> {
   if (await temAceiteVigente(redeId)) return { jaAceito: true }
   await prisma.aceiteContrato.create({
     data: {
       redeId,
       versao: CONTRATO_VERSAO,
+      idioma: dados.idioma ?? 'pt',
       assinanteNome: dados.nome,
       assinanteEmail: dados.email,
       ip: dados.ip ?? null,

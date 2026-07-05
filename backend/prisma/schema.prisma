@@ -233,6 +233,7 @@ model AceiteContrato {
   id             String   @id @default(cuid())
   redeId         String
   versao         String // versão do contrato aceita
+  idioma         String   @default("pt") // idioma exibido no momento do aceite (auditoria) — não afeta a lógica de reaceite/distrato, que segue só por versao
   assinanteNome  String   @map("assinante_nome")
   assinanteEmail String   @map("assinante_email")
   ip             String?

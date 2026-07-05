@@ -41,9 +41,12 @@ export default function Checkout() {
       setDominio(data.dominioBase); setPlanos(data.planos); setDescontoAnual(data.percentualDescontoAnual ?? 0)
       setCambio(data.cambio ?? { usdPorBrl: null })
     }).catch(() => {})
-    api.get('/contrato/termos').then(({ data }) => setContrato(data.contrato)).catch(() => {})
     capturarRefAfiliado()
   }, [])
+
+  useEffect(() => {
+    api.get('/contrato/termos', { params: { idioma } }).then(({ data }) => setContrato(data.contrato)).catch(() => {})
+  }, [idioma])
 
   const info = planos.find((p) => p.plano === plano)
   const preco = periodicidade === 'ANUAL' ? (info?.precoAnual ?? 0) : (info?.preco ?? 0)

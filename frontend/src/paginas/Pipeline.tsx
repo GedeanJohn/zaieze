@@ -237,27 +237,6 @@ export default function Pipeline() {
               </select>
             </div>
           )}
-          <div className="campo" style={{ minWidth: 140, marginBottom: 0 }}>
-            <label>{t('pipe.filtroNome')}</label>
-            <input value={nomeFiltro} onChange={(e) => setNomeFiltro(e.target.value)} />
-          </div>
-          <div className="campo" style={{ minWidth: 140, marginBottom: 0 }}>
-            <label>{t('pipe.filtroTelefone')}</label>
-            <input value={telefoneFiltro} onChange={(e) => setTelefoneFiltro(e.target.value)} />
-          </div>
-          <div className="campo" style={{ minWidth: 140, marginBottom: 0 }}>
-            <label>{t('pipe.filtroCidade')}</label>
-            <input value={cidadeFiltro} onChange={(e) => setCidadeFiltro(e.target.value)} />
-          </div>
-          <div className="campo" style={{ minWidth: 90, marginBottom: 0 }}>
-            <label>{t('pipe.filtroEstado')}</label>
-            <input value={ufFiltro} maxLength={2} onChange={(e) => setUfFiltro(e.target.value.toUpperCase())} />
-          </div>
-          {filtroAtivo && (
-            <button className="btn secundario" onClick={() => { setNomeFiltro(''); setTelefoneFiltro(''); setCidadeFiltro(''); setUfFiltro('') }}>
-              {t('pipe.limparFiltros')}
-            </button>
-          )}
           {podeRedistribuir && <button className="btn secundario" onClick={redistribuirAtrasados}>{t('pipe.redistribuirAtrasados')}</button>}
         </div>
       </header>
@@ -307,6 +286,31 @@ export default function Pipeline() {
           <Metr titulo={t('pipe.metr.tempoMedio')} valor={m.tempoMedioRespostaMin != null ? `${m.tempoMedioRespostaMin}min` : '—'} />
         </div>
       )}
+
+      {/* Filtros de busca do funil */}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', margin: '0 0 12px' }}>
+        <div className="campo" style={{ minWidth: 140, marginBottom: 0 }}>
+          <label>{t('pipe.filtroNome')}</label>
+          <input value={nomeFiltro} onChange={(e) => setNomeFiltro(e.target.value)} />
+        </div>
+        <div className="campo" style={{ minWidth: 140, marginBottom: 0 }}>
+          <label>{t('pipe.filtroTelefone')}</label>
+          <input value={telefoneFiltro} onChange={(e) => setTelefoneFiltro(e.target.value)} />
+        </div>
+        <div className="campo" style={{ minWidth: 140, marginBottom: 0 }}>
+          <label>{t('pipe.filtroCidade')}</label>
+          <input value={cidadeFiltro} onChange={(e) => setCidadeFiltro(e.target.value)} />
+        </div>
+        <div className="campo" style={{ minWidth: 90, marginBottom: 0 }}>
+          <label>{t('pipe.filtroEstado')}</label>
+          <input value={ufFiltro} maxLength={2} onChange={(e) => setUfFiltro(e.target.value.toUpperCase())} />
+        </div>
+        {filtroAtivo && (
+          <button className="btn secundario" onClick={() => { setNomeFiltro(''); setTelefoneFiltro(''); setCidadeFiltro(''); setUfFiltro('') }}>
+            {t('pipe.limparFiltros')}
+          </button>
+        )}
+      </div>
 
       {/* Legenda + contadores por situação (mapa de gargalos — vendedora e gestor) */}
       {m && (

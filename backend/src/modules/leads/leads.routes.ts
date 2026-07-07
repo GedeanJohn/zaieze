@@ -18,7 +18,7 @@ const ETAPAS: StatusLead[] = ['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'CONVERTIDO', 
 
 const incluiLead = {
   vendedora: { select: { id: true, nome: true } },
-  cliente: { select: { id: true, nome: true, telefone: true } },
+  cliente: { select: { id: true, nome: true, telefone: true, cidade: true, uf: true } },
 }
 
 function decorar<T extends { status: StatusLead; prazoEm: Date; etapaDesde: Date; redistribuidoEm: Date | null }>(l: T, agora: number, apertadoPct?: number) {

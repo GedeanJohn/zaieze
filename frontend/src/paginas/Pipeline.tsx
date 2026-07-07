@@ -21,7 +21,7 @@ interface Card {
   situacao: Situacao
   redistribuicoes: number; etapaDesde: string; createdAt: string
   vendedora: { id: string; nome: string }
-  cliente?: { id: string; nome: string; telefone: string } | null
+  cliente?: { id: string; nome: string; telefone: string; cidade?: string | null; uf?: string | null } | null
 }
 interface Metricas { total: number; abertos: number; atrasados: number; convertidos: number; perdidos: number; taxaConversao: number; tempoMedioRespostaMin: number | null; porSituacao: Partial<Record<SituacaoChave, number>> }
 interface Pipeline { colunas: Record<Etapa, Card[]>; metricas: Metricas }
@@ -149,8 +149,25 @@ export default function Pipeline() {
   const [meuLink, setMeuLink] = useState<LinkVend | null>(null)
   const [links, setLinks] = useState<LinkVend[]>([])
   const [vendFiltro, setVendFiltro] = useState('')
+  const [nomeFiltro, setNomeFiltro] = useState('')
+  const [telefoneFiltro, setTelefoneFiltro] = useState('')
+  const [cidadeFiltro, setCidadeFiltro] = useState('')
+  const [ufFiltro, setUfFiltro] = useState('')
   const [erro, setErro] = useState('')
   const [copiado, setCopiado] = useState('')
+
+  const filtroAtivo = !!(nomeFiltro || telefoneFiltro || cidadeFiltro || ufFiltro)
+  function normalizar(v: string): string { return v.trim().toLowerCase() }
+  function cardBate(c: Card): boolean {
+    if (nomeFiltro && !normalizar(c.cliente?.nome ?? c.nome ?? '').includes(normalizar(nomeFiltro))) return false
+    if (telefoneFiltro && !(c.cliente?.telefone ?? c.telefone ?? '').replace(/\D/g, '').includes(telefoneFiltro.replace(/\D/g, ''))) return false
+    if (cidadeFiltro && !normalizar(c.cliente?.cidade ?? '').includes(normalizar(cidadeFiltro))) return false
+    if (ufFiltro && normalizar(c.cliente?.uf ?? '') !== normalizar(ufFiltro)) return false
+    return true
+  }
+  const pipeFiltrado: Pipeline | null = pipe && filtroAtivo
+    ? { ...pipe, colunas: Object.fromEntries(ETAPAS.map((etapa) => [etapa, pipe.colunas[etapa].filter(cardBate)])) as Record<Etapa, Card[]> }
+    : pipe
 
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
@@ -164,8 +181,10 @@ export default function Pipeline() {
   }, [escopo.pronto, escopo.params, ehVendedora, vendFiltro])
 
   useEffect(() => { carregar() }, [carregar])
-  // Ao trocar de loja, zera o filtro de vendedora (ela pode não existir na outra loja).
-  useEffect(() => { setVendFiltro('') }, [escopo.lojaId])
+  // Ao trocar de loja, zera o filtro de vendedora (ela pode não existir na outra loja) e os filtros de texto.
+  useEffect(() => {
+    setVendFiltro(''); setNomeFiltro(''); setTelefoneFiltro(''); setCidadeFiltro(''); setUfFiltro('')
+  }, [escopo.lojaId])
 
   async function copiar(redeSlug: string, path: string, chave: string) {
     try { await navigator.clipboard.writeText(urlCatalogo(redeSlug, path)) } catch { /* ignore */ }
@@ -217,6 +236,27 @@ export default function Pipeline() {
                 {links.map((v) => <option key={v.id} value={v.id}>{v.nome}</option>)}
               </select>
             </div>
+          )}
+          <div className="campo" style={{ minWidth: 140, marginBottom: 0 }}>
+            <label>{t('pipe.filtroNome')}</label>
+            <input value={nomeFiltro} onChange={(e) => setNomeFiltro(e.target.value)} />
+          </div>
+          <div className="campo" style={{ minWidth: 140, marginBottom: 0 }}>
+            <label>{t('pipe.filtroTelefone')}</label>
+            <input value={telefoneFiltro} onChange={(e) => setTelefoneFiltro(e.target.value)} />
+          </div>
+          <div className="campo" style={{ minWidth: 140, marginBottom: 0 }}>
+            <label>{t('pipe.filtroCidade')}</label>
+            <input value={cidadeFiltro} onChange={(e) => setCidadeFiltro(e.target.value)} />
+          </div>
+          <div className="campo" style={{ minWidth: 90, marginBottom: 0 }}>
+            <label>{t('pipe.filtroEstado')}</label>
+            <input value={ufFiltro} maxLength={2} onChange={(e) => setUfFiltro(e.target.value.toUpperCase())} />
+          </div>
+          {filtroAtivo && (
+            <button className="btn secundario" onClick={() => { setNomeFiltro(''); setTelefoneFiltro(''); setCidadeFiltro(''); setUfFiltro('') }}>
+              {t('pipe.limparFiltros')}
+            </button>
           )}
           {podeRedistribuir && <button className="btn secundario" onClick={redistribuirAtrasados}>{t('pipe.redistribuirAtrasados')}</button>}
         </div>
@@ -291,7 +331,7 @@ export default function Pipeline() {
       <DndContext sensors={sensors} onDragStart={aoIniciarArrasto} onDragEnd={aoSoltar}>
         <div className="funil-kanban" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(180px, 1fr))', gap: 10, overflowX: 'auto' }}>
           {ETAPAS.map((etapa) => {
-            const cards = pipe?.colunas[etapa] ?? []
+            const cards = pipeFiltrado?.colunas[etapa] ?? []
             return (
               <ColunaDrop key={etapa} etapa={etapa}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px 8px', borderBottom: `2px solid ${corEtapa[etapa]}`, marginBottom: 8 }}>

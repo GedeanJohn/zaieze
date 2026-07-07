@@ -41,7 +41,7 @@ async function templateAprovado(redeId: string, templateId: string | null | unde
 
 /** Vendedora só age sobre a própria carteira; gerente/gestor sobre toda a loja. */
 function filtroCarteira(request: FastifyRequest, lojaId: string): Prisma.ClienteWhereInput {
-  const where: Prisma.ClienteWhereInput = { lojaId, ativo: true }
+  const where: Prisma.ClienteWhereInput = { lojaId, ativo: true, consumidorOutro: false }
   if (request.user.role === 'VENDEDORA') where.vendedoraId = request.user.sub
   return where
 }

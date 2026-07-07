@@ -76,6 +76,14 @@ export default function Vendas() {
   const [codigoLido, setCodigoLido] = useState('')
   const [buscandoCodigo, setBuscandoCodigo] = useState(false)
 
+  // Venda presencial (balcão): cliente coringa "Consumidor Outro" pré-selecionado; a
+  // vendedora troca para um cliente cadastrado (ou cadastra um novo ali mesmo) se não for ele.
+  const [presencial, setPresencial] = useState(false)
+  const [consumidorOutro, setConsumidorOutro] = useState<Pessoa | null>(null)
+  const [trocarCliente, setTrocarCliente] = useState(false)
+  const [novoCliente, setNovoCliente] = useState<{ nome: string; telefone: string } | null>(null)
+  const [salvandoCliente, setSalvandoCliente] = useState(false)
+
   useEffect(() => {
     if (!escopo.pronto) return
     api.get('/vendas/config-desconto', { params: escopo.params }).then(({ data }) => setConfig(data)).catch(() => {})
@@ -95,6 +103,9 @@ export default function Vendas() {
 
   const abrirNova = useCallback(async (prefClienteId = '') => {
     setErro('')
+    setPresencial(false)
+    setTrocarCliente(false)
+    setNovoCliente(null)
     const [prod, cli] = await Promise.all([
       api.get('/produtos', { params: { ...escopo.params, ativo: 'true' } }),
       api.get('/clientes', { params: escopo.params }),
@@ -108,6 +119,52 @@ export default function Vendas() {
     // venda vinda da caixa de entrada já nasce Online, com o cliente preenchido
     setForm({ clienteId: prefClienteId, vendedoraId: '', canal: 'ONLINE', atacado: false, formaRecebimento: 'DINHEIRO', descontoPct: '', observacao: '', itens: [{ ...LINHA_VAZIA }] })
   }, [escopo.params, gerente])
+
+  // Venda presencial (balcão): abre o PDV já como Balcão, com o cliente coringa "Consumidor
+  // Outro" pré-selecionado — a vendedora só troca de cliente se não for uma venda avulsa.
+  const abrirPresencial = useCallback(async () => {
+    setErro('')
+    setTrocarCliente(false)
+    setNovoCliente(null)
+    const [prod, cli, consOutro] = await Promise.all([
+      api.get('/produtos', { params: { ...escopo.params, ativo: 'true' } }),
+      api.get('/clientes', { params: escopo.params }),
+      api.get('/clientes/consumidor-outro', { params: escopo.params }),
+    ])
+    setProdutos(prod.data)
+    setClientes(cli.data)
+    if (gerente) {
+      const { data } = await api.get('/usuarios', { params: escopo.params })
+      setVendedoras(data.filter((u: Pessoa) => u.role === 'VENDEDORA'))
+    }
+    setConsumidorOutro(consOutro.data)
+    setPresencial(true)
+    setForm({ clienteId: consOutro.data.id, vendedoraId: '', canal: 'BALCAO', atacado: false, formaRecebimento: 'DINHEIRO', descontoPct: '', observacao: '', itens: [{ ...LINHA_VAZIA }] })
+  }, [escopo.params, gerente])
+
+  function fecharForm() {
+    setForm(null)
+    setPresencial(false)
+    setTrocarCliente(false)
+    setNovoCliente(null)
+    setErro('')
+  }
+
+  async function salvarNovoClienteRapido() {
+    if (!novoCliente?.nome.trim() || !form) return
+    setSalvandoCliente(true)
+    setErro('')
+    try {
+      const { data } = await api.post('/clientes', { nome: novoCliente.nome.trim(), telefone: novoCliente.telefone.trim() || undefined }, { params: escopo.params })
+      setClientes((cs) => [...cs, { id: data.id, nome: data.nome }])
+      setForm((f) => f && { ...f, clienteId: data.id })
+      setNovoCliente(null)
+    } catch (err) {
+      setErro(mensagemDeErro(err))
+    } finally {
+      setSalvandoCliente(false)
+    }
+  }
 
   // Atalho da caixa de entrada: /vendas?cliente=<id> abre o PDV pré-preenchido (venda online)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -229,7 +286,7 @@ export default function Vendas() {
     }
     try {
       await api.post('/vendas', corpo, { params: escopo.params })
-      setForm(null); setAutoriz(null); carregar()
+      fecharForm(); setAutoriz(null); carregar()
     } catch (err) {
       const code = (err as { response?: { data?: { erro?: string } } }).response?.data?.erro
       if (code === 'SENHA_NECESSARIA') {
@@ -258,6 +315,7 @@ export default function Vendas() {
         <h1>{t('vendas.titulo')}</h1>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
           <SeletorLoja escopo={escopo} />
+          {podeVender && <button className="btn secundario" onClick={() => abrirPresencial()} disabled={!escopo.pronto}>{t('vendas.vendaPresencial')}</button>}
           {podeVender && <button className="btn" onClick={() => abrirNova()} disabled={!escopo.pronto}>{t('vendas.novaVenda')}</button>}
         </div>
       </header>
@@ -323,24 +381,21 @@ export default function Vendas() {
       </div>
 
       {form && (
-        <div className="modal-fundo" onClick={() => setForm(null)}>
+        <div className="modal-fundo" onClick={fecharForm}>
           <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvar}>
-            <h2>{t('vendas.novaVendaTitulo')}</h2>
+            <h2>{presencial ? t('vendas.vendaPresencialTitulo') : t('vendas.novaVendaTitulo')}</h2>
             {erro && <div className="alerta">{erro}</div>}
 
             <div className="linha-campos">
               <div className="campo">
                 <label>{t('vendas.canalDaVenda')}</label>
-                <select value={form.canal} onChange={(e) => setForm({ ...form, canal: e.target.value as CanalVenda })}>
-                  {CANAIS_VENDA.map((c) => <option key={c} value={c}>{t(`canal.${c}`) || rotuloCanal[c]}</option>)}
-                </select>
-              </div>
-              <div className="campo">
-                <label>{t('vendas.cliente')}</label>
-                <select value={form.clienteId} onChange={(e) => setForm({ ...form, clienteId: e.target.value })}>
-                  <option value="">{t('vendas.semClienteAvulsa')}</option>
-                  {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                </select>
+                {presencial ? (
+                  <input value={`🏬 ${t('canal.BALCAO')}`} disabled />
+                ) : (
+                  <select value={form.canal} onChange={(e) => setForm({ ...form, canal: e.target.value as CanalVenda })}>
+                    {CANAIS_VENDA.map((c) => <option key={c} value={c}>{t(`canal.${c}`) || rotuloCanal[c]}</option>)}
+                  </select>
+                )}
               </div>
               {gerente && (
                 <div className="campo">
@@ -352,6 +407,60 @@ export default function Vendas() {
                 </div>
               )}
             </div>
+
+            {presencial ? (
+              <div className="campo">
+                <label>{t('vendas.cliente')}</label>
+                {!trocarCliente ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <strong>{consumidorOutro?.nome}</strong>
+                    <a href="#" onClick={(e) => { e.preventDefault(); setTrocarCliente(true) }}>{t('vendas.trocarClienteLink')}</a>
+                  </div>
+                ) : (
+                  <>
+                    <select value={form.clienteId} onChange={(e) => setForm({ ...form, clienteId: e.target.value })}>
+                      {consumidorOutro && <option value={consumidorOutro.id}>{consumidorOutro.nome}</option>}
+                      {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                    </select>
+                    {!novoCliente ? (
+                      <a href="#" onClick={(e) => { e.preventDefault(); setNovoCliente({ nome: '', telefone: '' }) }}>{t('vendas.novoClienteRapido')}</a>
+                    ) : (
+                      <div className="linha-campos" style={{ marginTop: 8 }}>
+                        <div className="campo">
+                          <label>{t('cli.nomeObrig')}</label>
+                          <input value={novoCliente.nome} onChange={(e) => setNovoCliente({ ...novoCliente, nome: e.target.value })} />
+                        </div>
+                        <div className="campo">
+                          <label>{t('cli.whatsappComDdi')}</label>
+                          <input value={novoCliente.telefone} onChange={(e) => setNovoCliente({ ...novoCliente, telefone: e.target.value })} placeholder="5562999998888" />
+                        </div>
+                        <button type="button" className="btn secundario" onClick={salvarNovoClienteRapido} disabled={!novoCliente.nome.trim() || salvandoCliente}>
+                          {salvandoCliente ? '…' : t('comum.salvar')}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="campo">
+                <label>{t('vendas.cliente')}</label>
+                <select value={form.clienteId} onChange={(e) => setForm({ ...form, clienteId: e.target.value })}>
+                  <option value="">{t('vendas.semClienteAvulsa')}</option>
+                  {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+              </div>
+            )}
+
+            {presencial && (
+              <div className="campo">
+                <label>{t('vendas.tipoDeVenda')}</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" className={`btn ${form.atacado ? 'secundario' : ''}`} onClick={() => mudarAtacado(false)}>{t('vendas.varejoOpc')}</button>
+                  <button type="button" className={`btn ${form.atacado ? '' : 'secundario'}`} onClick={() => mudarAtacado(true)}>{t('vendas.atacadoOpc')}</button>
+                </div>
+              </div>
+            )}
 
             <h3 style={{ marginBottom: 8 }}>{t('vendas.itensTitulo')}</h3>
             <div className="campo">
@@ -402,10 +511,12 @@ export default function Vendas() {
                   {FORMAS_RECEBIMENTO.map((f) => <option key={f} value={f}>{t(`forma.${f}`) || rotuloForma[f]}</option>)}
                 </select>
               </div>
-              <div className="campo" style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'end' }}>
-                <input type="checkbox" style={{ width: 'auto' }} id="atacado" checked={form.atacado} onChange={(e) => mudarAtacado(e.target.checked)} />
-                <label htmlFor="atacado" style={{ margin: 0 }}>{t('vendas.precoAtacado')}</label>
-              </div>
+              {!presencial && (
+                <div className="campo" style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'end' }}>
+                  <input type="checkbox" style={{ width: 'auto' }} id="atacado" checked={form.atacado} onChange={(e) => mudarAtacado(e.target.checked)} />
+                  <label htmlFor="atacado" style={{ margin: 0 }}>{t('vendas.precoAtacado')}</label>
+                </div>
+              )}
             </div>
 
             {/* Régua + slider de desconto */}
@@ -449,7 +560,7 @@ export default function Vendas() {
             </div>
 
             <div className="acoes">
-              <button type="button" className="btn secundario" onClick={() => setForm(null)}>{t('comum.cancelar')}</button>
+              <button type="button" className="btn secundario" onClick={fecharForm}>{t('comum.cancelar')}</button>
               <button className="btn">{t('vendas.registrarVenda')}</button>
             </div>
           </form>

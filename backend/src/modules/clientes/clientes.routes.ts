@@ -49,11 +49,26 @@ const atualizarClienteSchema = criarClienteSchema.partial().extend({
  * - DONO_LOJA / SUPER_ADMIN enxergam todos os clientes da loja.
  */
 function filtroCarteira(request: FastifyRequest, lojaId: string): Prisma.ClienteWhereInput {
-  const where: Prisma.ClienteWhereInput = { lojaId }
+  // "Consumidor Outro" (cliente coringa de venda presencial) fica fora das listagens normais
+  // de carteira/segmentação/campanha — só é acessado via GET /clientes/consumidor-outro.
+  const where: Prisma.ClienteWhereInput = { lojaId, consumidorOutro: false }
   if (request.user.role === 'VENDEDORA') {
     where.vendedoraId = request.user.sub
   }
   return where
+}
+
+/**
+ * Cliente coringa "Consumidor Outro": 1 por loja, criado sob demanda (idempotente) para a
+ * vendedora lançar vendas presenciais (varejo/atacado) sem precisar cadastrar o cliente real.
+ * Sem carteira (vendedoraId null) — visível a qualquer vendedora da loja.
+ */
+export async function obterOuCriarConsumidorOutro(lojaId: string) {
+  const existente = await prisma.cliente.findFirst({ where: { lojaId, consumidorOutro: true } })
+  if (existente) return existente
+  return prisma.cliente.create({
+    data: { lojaId, nome: 'Consumidor Outro', consumidorOutro: true },
+  })
 }
 
 export async function clientesRoutes(app: FastifyInstance) {
@@ -164,6 +179,13 @@ export async function clientesRoutes(app: FastifyInstance) {
     for (const g of grupos) distribuicao[g.segmento] += g._count._all
     const total = Object.values(distribuicao).reduce((s, n) => s + n, 0)
     return { total, distribuicao }
+  })
+
+  // Cliente coringa "Consumidor Outro" da loja (venda presencial sem cadastro) — cria se ainda não existir.
+  app.get('/consumidor-outro', { preHandler: [app.authenticate] }, async (request) => {
+    const lojaId = await lojaIdDe(request)
+    const cliente = await obterOuCriarConsumidorOutro(lojaId)
+    return { id: cliente.id, nome: cliente.nome }
   })
 
   // Recalcula a segmentação automática da loja (módulo 3) — gerente/gestor

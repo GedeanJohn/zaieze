@@ -12,7 +12,7 @@ export async function atacadoRoutes(app: FastifyInstance) {
 
   app.get('/', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request) => {
     const lojaId = await lojaIdDe(request)
-    const where: Prisma.ClienteWhereInput = { lojaId, ativo: true, segmento: 'ATACADO' }
+    const where: Prisma.ClienteWhereInput = { lojaId, ativo: true, segmento: 'ATACADO', consumidorOutro: false }
     if (request.user.role === 'VENDEDORA') where.vendedoraId = request.user.sub
 
     const [clientes, agg] = await Promise.all([

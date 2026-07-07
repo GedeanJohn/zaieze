@@ -36,8 +36,8 @@ async function kpisDaLoja(lojaId: string) {
       _sum: { total: true },
       _count: true,
     }),
-    prisma.cliente.count({ where: { lojaId, ativo: true } }),
-    prisma.cliente.count({ where: { lojaId, ativo: true, segmento: 'INATIVO' } }),
+    prisma.cliente.count({ where: { lojaId, ativo: true, consumidorOutro: false } }),
+    prisma.cliente.count({ where: { lojaId, ativo: true, segmento: 'INATIVO', consumidorOutro: false } }),
   ])
 
   const faturamentoMes = num(mes._sum.total)
@@ -82,7 +82,7 @@ async function dashboardDaLoja(lojaId: string) {
       take: 20,
     }),
     prisma.cliente.findMany({
-      where: { lojaId, ativo: true, totalGasto: { gt: 0 } },
+      where: { lojaId, ativo: true, totalGasto: { gt: 0 }, consumidorOutro: false },
       orderBy: { totalGasto: 'desc' },
       take: 5,
       select: { id: true, nome: true, totalGasto: true, segmento: true },

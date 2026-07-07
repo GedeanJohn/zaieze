@@ -58,7 +58,7 @@ export async function segmentarLoja(lojaId: string): Promise<{ atualizados: numb
   const agora = new Date()
 
   const clientes = await prisma.cliente.findMany({
-    where: { lojaId, ativo: true },
+    where: { lojaId, ativo: true, consumidorOutro: false },
     select: {
       id: true,
       segmento: true,

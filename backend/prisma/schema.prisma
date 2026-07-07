@@ -542,6 +542,10 @@ model Cliente {
   cidade            String?
   uf                String? // sigla do estado (ex.: GO); região é derivada da UF
   segmento          SegmentoCliente @default(NOVO)
+  // "Consumidor Outro": cliente coringa, 1 por loja, criado sob demanda (getOrCreate) para
+  // vendas presenciais de balcão sem cadastro completo. Excluído das listagens normais de
+  // carteira/segmentação (ver filtroCarteira em clientes.routes.ts).
+  consumidorOutro   Boolean         @default(false)
   // agregados mantidos pelo módulo de vendas e job de segmentação (fase 3)
   totalGasto        Decimal         @default(0) @db.Decimal(12, 2)
   ultimaCompraEm    DateTime?
@@ -570,6 +574,7 @@ model Cliente {
   @@unique([lojaId, igScopedId])
   @@index([lojaId, vendedoraId])
   @@index([lojaId, segmento])
+  @@index([lojaId, consumidorOutro])
   @@map("clientes")
 }
 

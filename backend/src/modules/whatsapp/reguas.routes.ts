@@ -46,7 +46,7 @@ export async function reguasRoutes(app: FastifyInstance) {
     if (reguas.length === 0) return { reguas: [] }
 
     const clientes = await prisma.cliente.findMany({
-      where: { lojaId, ativo: true, ultimaCompraEm: { not: null } },
+      where: { lojaId, ativo: true, ultimaCompraEm: { not: null }, consumidorOutro: false },
       select: selCliente,
     })
     const desde = new Date(Date.now() - DEBOUNCE_DIAS * 86_400_000)

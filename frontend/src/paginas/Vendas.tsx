@@ -73,6 +73,8 @@ export default function Vendas() {
   const [vendedoras, setVendedoras] = useState<Pessoa[]>([])
   const [config, setConfig] = useState<ConfigDesconto>({ regua: [], autoMaxPct: 10, senhaMaxPct: 15 })
   const [autoriz, setAutoriz] = useState<AutorizDesc | null>(null)
+  const [codigoLido, setCodigoLido] = useState('')
+  const [buscandoCodigo, setBuscandoCodigo] = useState(false)
 
   useEffect(() => {
     if (!escopo.pronto) return
@@ -165,6 +167,36 @@ export default function Vendas() {
 
   function variacoesDe(produtoId: string): VariacaoP[] {
     return produtos.find((p) => p.id === produtoId)?.variacoes ?? []
+  }
+
+  // Leitura de código de barras (venda presencial): leitor USB/Bluetooth digita o código + Enter,
+  // como um teclado. Se a variação já está no carrinho, só soma 1; senão cria/preenche uma linha.
+  async function lerCodigo(codigo: string) {
+    const c = codigo.trim()
+    if (!c || !form) return
+    setBuscandoCodigo(true)
+    setErro('')
+    try {
+      const { data } = await api.get('/produtos/variacao-por-codigo', { params: { ...escopo.params, codigo: c } })
+      setForm((f) => {
+        if (!f) return f
+        const existente = f.itens.findIndex((l) => l.variacaoId === data.variacaoId)
+        if (existente >= 0) {
+          const itens = f.itens.map((l, idx) => (idx === existente ? { ...l, quantidade: Number(l.quantidade) + 1 } : l))
+          return { ...f, itens }
+        }
+        const preco = f.atacado && data.precoAtacado ? data.precoAtacado : data.precoVarejo
+        const novaLinha: LinhaItem = { produtoId: data.produtoId, variacaoId: data.variacaoId, quantidade: 1, precoUnitario: preco }
+        const vazioIdx = f.itens.findIndex((l) => !l.produtoId)
+        const itens = vazioIdx >= 0 ? f.itens.map((l, idx) => (idx === vazioIdx ? novaLinha : l)) : [...f.itens, novaLinha]
+        return { ...f, itens }
+      })
+    } catch (err) {
+      setErro(mensagemDeErro(err))
+    } finally {
+      setBuscandoCodigo(false)
+      setCodigoLido('')
+    }
   }
 
   function salvar(e: React.FormEvent) {
@@ -322,6 +354,17 @@ export default function Vendas() {
             </div>
 
             <h3 style={{ marginBottom: 8 }}>{t('vendas.itensTitulo')}</h3>
+            <div className="campo">
+              <label>{t('vendas.leitorCodigoLabel')}</label>
+              <input
+                value={codigoLido}
+                onChange={(e) => setCodigoLido(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void lerCodigo(codigoLido) } }}
+                placeholder={t('vendas.leitorCodigoPlaceholder')}
+                disabled={buscandoCodigo}
+                autoFocus
+              />
+            </div>
             <div className="grade-itens" style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
               <span>{t('vendas.produto')}</span><span>{t('vendas.variacao')}</span><span>{t('vendas.qtd')}</span><span>{t('vendas.precoUn')}</span><span></span>
             </div>

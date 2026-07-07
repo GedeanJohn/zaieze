@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, mensagemDeErro, usuarioLogado } from '../api'
 import { useLojaAtiva } from '../componentes/SeletorLoja'
+import EtiquetasModal, { type ProdutoEtq } from '../componentes/EtiquetasModal'
 import { useIdioma } from '../lib/i18n'
 
 interface Variacao {
@@ -106,6 +107,20 @@ export default function Produtos() {
   const [enviandoFoto, setEnviandoFoto] = useState(false)
   const [enviandoVideo, setEnviandoVideo] = useState(false)
   const [colecoes, setColecoes] = useState<{ id: string; nome: string }[]>([])
+  const [etiquetas, setEtiquetas] = useState<ProdutoEtq | null>(null)
+
+  function abrirEtiquetas(p: Produto) {
+    setEtiquetas({
+      id: p.id,
+      nome: p.nome,
+      referencia: p.referencia,
+      precoVarejo: p.precoVarejo,
+      precoAtacado: p.precoAtacado,
+      variacoes: p.variacoes.map((v) => ({
+        id: v.id!, cor: v.cor, estampa: v.estampa, tamanho: v.tamanho, codigoBarras: v.codigoBarras ?? null, estoque: v.estoque,
+      })),
+    })
+  }
 
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
@@ -313,6 +328,8 @@ export default function Produtos() {
                 </td>
                 <td style={{ whiteSpace: 'nowrap' }}>{gerente && <>
                   <a href="#" onClick={(e) => { e.preventDefault(); abrirEdicao(p) }}>{t('prod.editarLink')}</a>
+                  {' · '}
+                  <a href="#" onClick={(e) => { e.preventDefault(); abrirEtiquetas(p) }}>{t('prod.etiquetasLink')}</a>
                   {' · '}
                   <a href="#" style={{ color: 'var(--danger)' }} onClick={(e) => { e.preventDefault(); excluir(p) }}>{t('prod.excluirLink')}</a>
                 </>}</td>
@@ -566,6 +583,15 @@ export default function Produtos() {
             </div>
           </form>
         </div>
+      )}
+
+      {etiquetas && (
+        <EtiquetasModal
+          produto={etiquetas}
+          params={escopo.params}
+          onClose={() => setEtiquetas(null)}
+          onAtualizado={carregar}
+        />
       )}
     </>
   )

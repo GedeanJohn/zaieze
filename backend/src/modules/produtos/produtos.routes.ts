@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import { randomInt } from 'node:crypto'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe, redeIdDeQualquer } from '../../plugins/auth'
 import { excluirDoR2 } from '../midia/r2.service'
@@ -80,6 +81,19 @@ async function skuLivre(base: string): Promise<string> {
     sku = `${base}-${n}`
   }
   return sku
+}
+
+/**
+ * Gera um código de barras numérico (8 dígitos, formato Code128 — qualquer leitor USB/Bluetooth
+ * genérico lê), único, para etiquetar a variação quando o gestor de estoque não informar um manualmente.
+ */
+async function gerarCodigoBarrasLivre(): Promise<string> {
+  for (let tentativa = 0; tentativa < 10; tentativa++) {
+    const codigo = String(randomInt(10_000_000, 100_000_000))
+    const existe = await prisma.variacaoProduto.findUnique({ where: { codigoBarras: codigo }, select: { id: true } })
+    if (!existe) return codigo
+  }
+  throw new Error('Não foi possível gerar um código de barras único')
 }
 
 /** Garante referência única na rede (estoque central). */
@@ -174,6 +188,46 @@ export async function produtosRoutes(app: FastifyInstance) {
     return produto
   })
 
+  // Leitura de código de barras no PDV (venda presencial): resolve código/SKU → variação pronta
+  // para virar linha do carrinho, respeitando o mesmo escopo de loja/liberação da listagem.
+  app.get('/variacao-por-codigo', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const redeId = await redeIdDeQualquer(request)
+    const { codigo } = request.query as { codigo?: string }
+    if (!codigo?.trim()) return reply.code(400).send({ erro: 'Informe o código' })
+    const c = codigo.trim()
+
+    const and: import('@prisma/client').Prisma.ProdutoWhereInput[] = []
+    const role = request.user.role
+    if (role === 'GERENTE' || role === 'VENDEDORA') {
+      const lojaId = await lojaIdDe(request)
+      and.push({ colecao: { lojas: { some: { lojaId } } } })
+      if (role === 'VENDEDORA') {
+        and.push({ colecao: { status: 'LIBERADA', OR: [{ validadeAte: null }, { validadeAte: { gte: new Date() } }] } })
+      }
+    }
+
+    const variacao = await prisma.variacaoProduto.findFirst({
+      where: {
+        OR: [{ codigoBarras: c }, { sku: c }],
+        produto: { redeId, ativo: true, ...(and.length ? { AND: and } : {}) },
+      },
+      include: { produto: { select: { id: true, nome: true, referencia: true, precoVarejo: true, precoAtacado: true } } },
+    })
+    if (!variacao) return reply.code(404).send({ erro: 'Código não encontrado' })
+    return {
+      produtoId: variacao.produtoId,
+      produtoNome: variacao.produto.nome,
+      referencia: variacao.produto.referencia,
+      variacaoId: variacao.id,
+      cor: variacao.cor,
+      estampa: variacao.estampa,
+      tamanho: variacao.tamanho,
+      estoque: variacao.estoque,
+      precoVarejo: variacao.produto.precoVarejo,
+      precoAtacado: variacao.produto.precoAtacado,
+    }
+  })
+
   app.post('/', { preHandler: [app.authorize(...MUTACAO)] }, async (request, reply) => {
     const redeId = await redeIdDeQualquer(request)
     const body = criarProdutoSchema.parse(request.body)
@@ -184,6 +238,8 @@ export async function produtosRoutes(app: FastifyInstance) {
     const variacoesData = []
     for (const v of body.variacoes) {
       const sku = await skuLivre(skuBase(referencia, v.cor, v.estampa, v.tamanho))
+      // Toda variação sai do cadastro já com código de barras pronto para etiqueta (gera se não veio manual).
+      const codigoBarras = v.codigoBarras?.trim() || (await gerarCodigoBarrasLivre())
       variacoesData.push({
         cor: v.cor,
         estampa: v.estampa,
@@ -192,7 +248,7 @@ export async function produtosRoutes(app: FastifyInstance) {
         estoqueMinimo: v.estoqueMinimo,
         estoqueVarejo: Math.min(v.estoqueVarejo, v.estoque), // reserva nunca passa do total
         sku,
-        codigoBarras: v.codigoBarras?.trim() || null,
+        codigoBarras,
         movimentos: v.estoque > 0 ? { create: { tipo: 'ENTRADA' as const, quantidade: v.estoque, motivo: 'Estoque inicial' } } : undefined,
       })
     }
@@ -265,12 +321,13 @@ export async function produtosRoutes(app: FastifyInstance) {
                   estoque: v.estoque,
                   estoqueMinimo: v.estoqueMinimo,
                   estoqueVarejo: Math.min(v.estoqueVarejo, v.estoque),
-                  codigoBarras: v.codigoBarras?.trim() || atual.codigoBarras,
+                  codigoBarras: v.codigoBarras?.trim() || atual.codigoBarras || (await gerarCodigoBarrasLivre()),
                   movimentos: delta !== 0 ? { create: { tipo: 'AJUSTE', quantidade: delta, motivo: 'Ajuste manual de grade' } } : undefined,
                 },
               })
             } else {
               const sku = await skuLivre(skuBase(referencia, v.cor, v.estampa, v.tamanho))
+              const codigoBarras = v.codigoBarras?.trim() || (await gerarCodigoBarrasLivre())
               await tx.variacaoProduto.create({
                 data: {
                   produtoId: id,
@@ -281,7 +338,7 @@ export async function produtosRoutes(app: FastifyInstance) {
                   estoqueMinimo: v.estoqueMinimo,
                   estoqueVarejo: Math.min(v.estoqueVarejo, v.estoque),
                   sku,
-                  codigoBarras: v.codigoBarras?.trim() || null,
+                  codigoBarras,
                   movimentos: v.estoque > 0 ? { create: { tipo: 'ENTRADA', quantidade: v.estoque, motivo: 'Nova variação' } } : undefined,
                 },
               })
@@ -300,6 +357,18 @@ export async function produtosRoutes(app: FastifyInstance) {
       }
       throw e
     }
+  })
+
+  // Gera código de barras para uma variação que ainda não tem (peças cadastradas antes desta
+  // feature). Idempotente: se já tiver, só devolve o que já existe.
+  app.post('/variacoes/:id/gerar-codigo-barras', { preHandler: [app.authorize(...MUTACAO)] }, async (request, reply) => {
+    const redeId = await redeIdDeQualquer(request)
+    const { id } = request.params as { id: string }
+    const variacao = await prisma.variacaoProduto.findFirst({ where: { id, produto: { redeId } } })
+    if (!variacao) return reply.code(404).send({ erro: 'Variação não encontrada' })
+    if (variacao.codigoBarras) return variacao
+    const codigoBarras = await gerarCodigoBarrasLivre()
+    return prisma.variacaoProduto.update({ where: { id }, data: { codigoBarras } })
   })
 
   // Exclui o produto. Apaga a mídia do R2 (fotos+vídeos) sempre. Se NÃO houver vendas,

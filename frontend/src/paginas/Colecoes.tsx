@@ -9,6 +9,8 @@ interface Colecao {
   descricao?: string | null
   status: 'EM_PREPARACAO' | 'LIBERADA'
   liberadaEm?: string | null
+  validadeAte?: string | null
+  vigenciaExpirada: boolean
   outlet: boolean
   outletDesde?: string | null
   descontoOutletPct?: number | null
@@ -19,7 +21,14 @@ interface Colecao {
   midiaExpiradaEm?: string | null
 }
 
-interface FormC { id?: string; nome: string; descricao?: string }
+interface FormC { id?: string; nome: string; descricao?: string; validadeAte?: string }
+
+// Data pura (sem hora, ex.: "2026-01-01T00:00:00.000Z" vindo de <input type="date">) — formata pelos
+// componentes UTC da própria string, sem passar pelo fuso local (evita cair um dia por causa do fuso).
+function fmtDataPura(iso: string): string {
+  const [ano, mes, dia] = iso.slice(0, 10).split('-')
+  return `${dia}/${mes}/${ano}`
+}
 
 // Peça da coleção, para configurar desconto por peça no Outlet.
 interface PecaOutlet { id: string; nome: string; referencia?: string | null; precoVarejo: number; descontoOutletPct: number | null }
@@ -57,7 +66,7 @@ export default function Colecoes() {
     if (!form) return
     setErro('')
     try {
-      const corpo = { nome: form.nome, descricao: form.descricao || undefined }
+      const corpo = { nome: form.nome, descricao: form.descricao || undefined, validadeAte: form.validadeAte || null }
       if (form.id) await api.patch(`/colecoes/${form.id}`, corpo, { params: escopo.params })
       else await api.post('/colecoes', corpo, { params: escopo.params })
       setForm(null)
@@ -189,6 +198,13 @@ export default function Colecoes() {
                     </span>
                   )}
                   {c.descricao && <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{c.descricao}</div>}
+                  {c.validadeAte && (
+                    <div style={{ fontSize: 12, marginTop: 2, color: c.vigenciaExpirada ? '#ef4444' : 'var(--ink-soft)', fontWeight: c.vigenciaExpirada ? 600 : 400 }}>
+                      {c.vigenciaExpirada
+                        ? t('col.vigenciaExpirada', { data: fmtDataPura(c.validadeAte) })
+                        : t('col.vigenciaAte', { data: fmtDataPura(c.validadeAte) })}
+                    </div>
+                  )}
                   {c.midiaExpiradaEm ? (
                     <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>{t('col.midiaRemovida', { data: new Date(c.midiaExpiradaEm).toLocaleDateString('pt-BR') })}</div>
                   ) : c.diasParaExpirarMidia != null && c.diasParaExpirarMidia <= 30 && (
@@ -221,7 +237,7 @@ export default function Colecoes() {
                     ? <a href="#" onClick={(e) => { e.preventDefault(); liberar(c) }}>{t('col.liberar')}</a>
                     : <a href="#" onClick={(e) => { e.preventDefault(); recolher(c) }}>{t('col.recolher')}</a>}
                   {' · '}
-                  <a href="#" onClick={(e) => { e.preventDefault(); setForm({ id: c.id, nome: c.nome, descricao: c.descricao ?? '' }) }}>{t('col.editar')}</a>
+                  <a href="#" onClick={(e) => { e.preventDefault(); setForm({ id: c.id, nome: c.nome, descricao: c.descricao ?? '', validadeAte: c.validadeAte ? c.validadeAte.slice(0, 10) : '' }) }}>{t('col.editar')}</a>
                   {' · '}
                   <label title={t('col.outletTitle')} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
                     <input type="checkbox" checked={c.outlet} onChange={() => alternarOutlet(c)} style={{ width: 'auto' }} /> {t('col.outletCheckbox')}
@@ -252,6 +268,11 @@ export default function Colecoes() {
             <div className="campo">
               <label>{t('col.descricaoLabel')}</label>
               <input value={form.descricao ?? ''} onChange={(e) => setForm({ ...form, descricao: e.target.value })} placeholder={t('col.descricaoPlaceholder')} />
+            </div>
+            <div className="campo">
+              <label>{t('col.validadeLabel')}</label>
+              <input type="date" value={form.validadeAte ?? ''} onChange={(e) => setForm({ ...form, validadeAte: e.target.value })} />
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>{t('col.validadeAjuda')}</div>
             </div>
             <div className="acoes">
               <button type="button" className="btn secundario" onClick={() => setForm(null)}>{t('comum.cancelar')}</button>

@@ -643,6 +643,7 @@ model Colecao {
   descricao         String?
   status            StatusColecao @default(EM_PREPARACAO)
   liberadaEm        DateTime? // quando foi liberada para as vendedoras
+  validadeAte       DateTime? // data limite de vigência: após essa data a coleção some do catálogo/PDV (null = sem prazo)
   // Outlet: marcado MANUALMENTE pelo gestor (ortogonal ao status — coleção Outlet continua LIBERADA/vendável).
   outlet            Boolean       @default(false)
   outletDesde       DateTime?

@@ -155,7 +155,9 @@ export async function produtosRoutes(app: FastifyInstance) {
       // Peça só aparece para a loja se a coleção dela estiver distribuída à loja.
       and.push({ colecao: { lojas: { some: { lojaId } } } })
       // Vendedora não vê coleção em preparação.
-      if (role === 'VENDEDORA') and.push({ colecao: { status: 'LIBERADA' } })
+      if (role === 'VENDEDORA') {
+        and.push({ colecao: { status: 'LIBERADA', OR: [{ validadeAte: null }, { validadeAte: { gte: new Date() } }] } })
+      }
     }
     return prisma.produto.findMany({
       where: { redeId, ...(and.length ? { AND: and } : {}) },

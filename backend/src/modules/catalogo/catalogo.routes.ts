@@ -129,7 +129,11 @@ export async function catalogoRoutes(app: FastifyInstance) {
 
     // Estoque central: a vendedora vende as coleções LIBERADAS distribuídas à sua loja.
     const colecoes = await prisma.colecao.findMany({
-      where: { lojas: { some: { lojaId: vend.lojaId! } }, status: 'LIBERADA' },
+      where: {
+        lojas: { some: { lojaId: vend.lojaId! } },
+        status: 'LIBERADA',
+        OR: [{ validadeAte: null }, { validadeAte: { gte: new Date() } }],
+      },
       orderBy: { liberadaEm: 'desc' },
       include: {
         produtos: {

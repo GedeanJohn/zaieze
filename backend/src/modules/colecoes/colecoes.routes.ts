@@ -16,6 +16,7 @@ const criarSchema = z.object({
   nome: z.string().min(2),
   descricao: z.string().optional(),
   lojaIds: z.array(z.string()).optional(), // distribuição inicial (opcional)
+  validadeAte: z.coerce.date().nullish(), // data limite de vigência (null = sem prazo)
 })
 
 const distribuicaoSchema = z.object({
@@ -66,6 +67,8 @@ export async function colecoesRoutes(app: FastifyInstance) {
         descricao: c.descricao,
         status: c.status,
         liberadaEm: c.liberadaEm,
+        validadeAte: c.validadeAte,
+        vigenciaExpirada: !!c.validadeAte && c.validadeAte.getTime() < agora,
         outlet: c.outlet,
         outletDesde: c.outletDesde,
         descontoOutletPct: c.descontoOutletPct,
@@ -91,6 +94,7 @@ export async function colecoesRoutes(app: FastifyInstance) {
           redeId,
           nome: body.nome.trim(),
           descricao: body.descricao,
+          validadeAte: body.validadeAte,
           lojas: lojaIds.length ? { create: lojaIds.map((lojaId) => ({ lojaId })) } : undefined,
         },
       })
@@ -107,7 +111,10 @@ export async function colecoesRoutes(app: FastifyInstance) {
     const body = criarSchema.partial().parse(request.body)
     const existente = await prisma.colecao.findFirst({ where: { id, redeId } })
     if (!existente) return reply.code(404).send({ erro: 'Coleção não encontrada' })
-    return prisma.colecao.update({ where: { id }, data: { nome: body.nome?.trim(), descricao: body.descricao } })
+    return prisma.colecao.update({
+      where: { id },
+      data: { nome: body.nome?.trim(), descricao: body.descricao, ...(body.validadeAte !== undefined ? { validadeAte: body.validadeAte } : {}) },
+    })
   })
 
   // Define a distribuição da coleção (toggles): o conjunto COMPLETO de lojas que podem vendê-la.

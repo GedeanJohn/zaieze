@@ -16,6 +16,10 @@ interface Inteligencia {
   campeoes: { produto: string; referencia: string | null; qtd: number }[]
   ruptura: { produto: string; referencia: string | null; cor: string; tamanho: string; estoque: number; vendidos30: number; diasEstimados: number }[]
 }
+interface DemandaReserva {
+  variacaoId: string; produto: string; referencia: string | null; cor: string; tamanho: string
+  estoqueAtual: number; quantidadePendente: number; quantidadeDisponivel: number; pedidos: number; maisAntigoEm: string
+}
 
 interface VariacaoP { id: string; cor: string; tamanho: string; estoque: number; estoqueVarejo: number; sku: string }
 interface ProdutoP { id: string; nome: string; referencia?: string | null; variacoes: VariacaoP[] }
@@ -61,6 +65,7 @@ export default function Estoque() {
   const [movimentos, setMovimentos] = useState<Movimento[]>([])
   const [dash, setDash] = useState<DashEstoque | null>(null)
   const [intel, setIntel] = useState<Inteligencia | null>(null)
+  const [demanda, setDemanda] = useState<DemandaReserva[]>([])
   const [tipo, setTipo] = useState('')
   const [produtos, setProdutos] = useState<ProdutoP[]>([])
   const [entrada, setEntrada] = useState<FormEntrada | null>(null)
@@ -84,7 +89,13 @@ export default function Estoque() {
     setIntel(i)
   }, [escopo.pronto, escopo.params])
 
-  useEffect(() => { carregar(); carregarDash() }, [carregar, carregarDash])
+  const carregarDemanda = useCallback(async () => {
+    if (!escopo.pronto) return
+    const { data } = await api.get('/reservas/demanda', { params: escopo.params })
+    setDemanda(data)
+  }, [escopo.pronto, escopo.params])
+
+  useEffect(() => { carregar(); carregarDash(); carregarDemanda() }, [carregar, carregarDash, carregarDemanda])
 
   async function carregarProdutos() {
     const { data } = await api.get('/produtos', { params: { ...escopo.params, ativo: 'true' } })
@@ -156,7 +167,7 @@ export default function Estoque() {
       const { data } = await api.post('/estoque/entrada', corpo, { params: escopo.params })
       setEntrada(null)
       avisar(t('estq.entradaSucesso', { pecas: data.totalPecas, itens: data.itens }))
-      carregar(); carregarDash()
+      carregar(); carregarDash(); carregarDemanda()
     } catch (err) {
       setErro(mensagemDeErro(err))
     }
@@ -243,6 +254,35 @@ export default function Estoque() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Demanda de pedidos de reserva (peças esgotadas com cliente esperando) — para programar produção */}
+      {demanda.length > 0 && (
+        <div className="cartao" style={{ marginTop: 16 }}>
+          <h2 className="painel-titulo">{t('estq.demandaReservaTitulo')}</h2>
+          <p style={{ color: 'var(--ink-soft)', fontSize: 13, marginTop: -4 }}>{t('estq.demandaReservaExplicacao')}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>{t('estq.colProduto')}</th><th>{t('estq.colGrade')}</th><th>{t('estq.colEstoque')}</th>
+                <th>{t('estq.colDemandaPendente')}</th><th>{t('estq.colDemandaDisponivel')}</th><th>{t('estq.colPedidos')}</th><th>{t('estq.colMaisAntigo')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {demanda.map((d) => (
+                <tr key={d.variacaoId}>
+                  <td>{d.produto}<div style={{ fontSize: 12, color: 'var(--ink-soft)', fontFamily: 'Consolas, monospace' }}>{d.referencia ?? ''}</div></td>
+                  <td style={{ color: 'var(--ink-soft)' }}>{d.cor}/{d.tamanho}</td>
+                  <td>{d.estoqueAtual}</td>
+                  <td><span className="selo ATACADO">{d.quantidadePendente}</span></td>
+                  <td>{d.quantidadeDisponivel > 0 ? <span className="selo ok">{d.quantidadeDisponivel}</span> : '—'}</td>
+                  <td>{d.pedidos}</td>
+                  <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{dataHora(d.maisAntigoEm)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {intel && (intel.campeoes.length > 0 || intel.ruptura.length > 0) && (

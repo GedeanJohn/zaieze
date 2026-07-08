@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { redeIdDeQualquer } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
+import { flagPedidosDisponiveis } from '../reservas/reservas.service'
 
 const itemEntradaSchema = z.object({
   variacaoId: z.string(),
@@ -104,6 +105,8 @@ export async function estoqueRoutes(app: FastifyInstance) {
       for (const item of body.itens) {
         await tx.variacaoProduto.update({ where: { id: item.variacaoId }, data: { estoque: { increment: item.quantidade } } })
         await tx.movimentoEstoque.create({ data: { variacaoId: item.variacaoId, tipo: 'ENTRADA', quantidade: item.quantidade, motivo } })
+        // Reposição pode cobrir pedidos de reserva pendentes dessa variação (FIFO).
+        await flagPedidosDisponiveis(tx, item.variacaoId)
       }
     })
 

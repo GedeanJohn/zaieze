@@ -26,11 +26,25 @@ interface Venda {
   itens: ItemVendaView[]
 }
 
-interface VariacaoP { id: string; cor: string; tamanho: string; estoque: number }
+interface VariacaoP { id: string; cor: string; tamanho: string; estoque: number; estoqueVarejo: number }
 interface ProdutoP { id: string; nome: string; precoVarejo: string; precoAtacado?: string | null; variacoes: VariacaoP[] }
 interface Pessoa { id: string; nome: string; role?: string }
 
 interface LinhaItem { produtoId: string; variacaoId: string; quantidade: number; precoUnitario: string }
+
+type StatusReserva = 'PENDENTE' | 'DISPONIVEL' | 'CONVERTIDO' | 'CANCELADO'
+interface PedidoReserva {
+  id: string
+  status: StatusReserva
+  quantidade: number
+  precoUnitario: string
+  atacado: boolean
+  observacao?: string | null
+  createdAt: string
+  cliente?: { id: string; nome: string } | null
+  vendedora: { id: string; nome: string }
+  variacao: { cor: string; tamanho: string; produto: { nome: string } }
+}
 
 interface FormVenda {
   clienteId: string
@@ -61,6 +75,7 @@ export default function Vendas() {
   const escopo = useLojaAtiva()
 
   const [vendas, setVendas] = useState<Venda[]>([])
+  const [reservas, setReservas] = useState<PedidoReserva[]>([])
   const [de, setDe] = useState('')
   const [ate, setAte] = useState('')
   const [canalFiltro, setCanalFiltro] = useState('')
@@ -100,6 +115,14 @@ export default function Vendas() {
   }, [de, ate, canalFiltro, escopo.pronto, escopo.params])
 
   useEffect(() => { carregar() }, [carregar])
+
+  const carregarReservas = useCallback(async () => {
+    if (!escopo.pronto) return
+    const { data } = await api.get('/reservas', { params: escopo.params })
+    setReservas(data)
+  }, [escopo.pronto, escopo.params])
+
+  useEffect(() => { carregarReservas() }, [carregarReservas])
 
   const abrirNova = useCallback(async (prefClienteId = '') => {
     setErro('')
@@ -226,6 +249,20 @@ export default function Vendas() {
     return produtos.find((p) => p.id === produtoId)?.variacoes ?? []
   }
 
+  // Quanto está disponível para VENDA IMEDIATA nesse canal (o resto vira "sob encomenda").
+  function disponivelPara(v: VariacaoP, atacado: boolean): number {
+    return atacado ? v.estoque - v.estoqueVarejo : v.estoqueVarejo
+  }
+
+  // Uma linha vira "sob encomenda" (pedido de reserva) quando o estoque do canal escolhido
+  // não cobre a quantidade pedida — a peça esgotou (ou o balde do canal não tem o suficiente).
+  function linhaSobEncomenda(l: LinhaItem): boolean {
+    if (!form || !l.variacaoId) return false
+    const v = variacoesDe(l.produtoId).find((x) => x.id === l.variacaoId)
+    if (!v) return false
+    return disponivelPara(v, form.atacado) < Number(l.quantidade || 1)
+  }
+
   // Leitura de código de barras (venda presencial): leitor USB/Bluetooth digita o código + Enter,
   // como um teclado. Se a variação já está no carrinho, só soma 1; senão cria/preenche uma linha.
   async function lerCodigo(codigo: string) {
@@ -264,7 +301,52 @@ export default function Vendas() {
     if (form.itens.some((l) => !l.variacaoId || Number(l.quantidade) < 1)) {
       return setErro(t('vendas.erroItemInvalido'))
     }
+    const flags = form.itens.map(linhaSobEncomenda)
+    const algumaReserva = flags.some(Boolean)
+    const todasReserva = flags.every(Boolean)
+    if (algumaReserva && !todasReserva) return setErro(t('vendas.erroReservaMista'))
+    if (todasReserva) return void enviarReserva()
     void enviar()
+  }
+
+  async function enviarReserva() {
+    if (!form) return
+    const corpo = {
+      clienteId: form.clienteId || undefined,
+      vendedoraId: gerente ? form.vendedoraId : undefined,
+      atacado: form.atacado,
+      observacao: form.observacao || undefined,
+      itens: form.itens.map((l) => ({
+        variacaoId: l.variacaoId,
+        quantidade: Number(l.quantidade),
+        precoUnitario: l.precoUnitario ? Number(l.precoUnitario) : undefined,
+      })),
+    }
+    try {
+      await api.post('/reservas', corpo, { params: escopo.params })
+      fecharForm(); carregarReservas()
+    } catch (err) {
+      setErro(mensagemDeErro(err))
+    }
+  }
+
+  async function confirmarReserva(p: PedidoReserva) {
+    try {
+      await api.post(`/reservas/${p.id}/confirmar`, {}, { params: escopo.params })
+      carregarReservas(); carregar()
+    } catch (err) {
+      alert(mensagemDeErro(err))
+    }
+  }
+
+  async function cancelarReserva(p: PedidoReserva) {
+    if (!window.confirm(t('vendas.confirmarCancelarReserva'))) return
+    try {
+      await api.post(`/reservas/${p.id}/cancelar`, {}, { params: escopo.params })
+      carregarReservas()
+    } catch (err) {
+      alert(mensagemDeErro(err))
+    }
   }
 
   async function enviar(cred?: { senha?: string; gerenteEmail?: string; gerenteSenha?: string }) {
@@ -380,11 +462,59 @@ export default function Vendas() {
         </table>
       </div>
 
-      {form && (
+      {/* Pedidos de reserva: peças esgotadas com demanda — a fábrica repõe, alguém confirma e vira venda. */}
+      <div className="cartao">
+        <h3 className="painel-titulo">{t('vendas.pedidosReservaTitulo')}</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>{t('vendas.data')}</th><th>{t('vendas.cliente')}</th><th>{t('vendas.itens')}</th><th>{t('vendas.qtd')}</th>
+              {gerente && <th>{t('vendas.vendedora')}</th>}
+              <th>{t('vendas.status')}</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {reservas.map((r) => (
+              <tr key={r.id} style={{ opacity: r.status === 'CANCELADO' ? 0.5 : 1 }}>
+                <td>{formataData(r.createdAt)}</td>
+                <td>{r.cliente?.nome ?? '—'}</td>
+                <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+                  {r.variacao.produto.nome} {r.variacao.cor}/{r.variacao.tamanho}
+                  {r.atacado ? `  🏷️${t('vendas.atacadoTag')}` : ''}
+                </td>
+                <td>{r.quantidade}</td>
+                {gerente && <td>{r.vendedora.nome}</td>}
+                <td>
+                  <span className={`selo ${r.status === 'CANCELADO' ? 'baixo' : r.status === 'PENDENTE' ? 'ATACADO' : 'ok'}`}>
+                    {t(`reserva.status.${r.status}`)}
+                  </span>
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  {r.status === 'DISPONIVEL' && (
+                    <a href="#" onClick={(e) => { e.preventDefault(); confirmarReserva(r) }}>{t('vendas.confirmarReservaLink')}</a>
+                  )}
+                  {(r.status === 'PENDENTE' || r.status === 'DISPONIVEL') && (
+                    <>{r.status === 'DISPONIVEL' ? ' · ' : ''}<a href="#" style={{ color: 'var(--danger)' }} onClick={(e) => { e.preventDefault(); cancelarReserva(r) }}>{t('vendas.cancelarLink')}</a></>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {reservas.length === 0 && (
+              <tr><td colSpan={gerente ? 7 : 6} style={{ color: 'var(--ink-soft)' }}>{t('vendas.nenhumaReserva')}</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {form && (() => {
+        const itensComVariacao = form.itens.filter((l) => l.variacaoId)
+        const modoReserva = itensComVariacao.length > 0 && itensComVariacao.every(linhaSobEncomenda)
+        return (
         <div className="modal-fundo" onClick={fecharForm}>
           <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvar}>
-            <h2>{presencial ? t('vendas.vendaPresencialTitulo') : t('vendas.novaVendaTitulo')}</h2>
+            <h2>{modoReserva ? t('vendas.pedidoReservaTitulo') : presencial ? t('vendas.vendaPresencialTitulo') : t('vendas.novaVendaTitulo')}</h2>
             {erro && <div className="alerta">{erro}</div>}
+            {modoReserva && <div className="alerta" style={{ background: '#fff3e0', color: 'var(--warn)' }}>{t('vendas.avisoModoReserva')}</div>}
 
             <div className="linha-campos">
               <div className="campo">
@@ -485,11 +615,14 @@ export default function Vendas() {
                 </select>
                 <select value={l.variacaoId} onChange={(e) => mudarLinha(i, { variacaoId: e.target.value })} disabled={!l.produtoId} required>
                   <option value="">{t('vendas.corTamPlaceholder')}</option>
-                  {variacoesDe(l.produtoId).map((v) => (
-                    <option key={v.id} value={v.id} disabled={v.estoque <= 0}>
-                      {v.cor}/{v.tamanho} ({v.estoque})
-                    </option>
-                  ))}
+                  {variacoesDe(l.produtoId).map((v) => {
+                    const disp = disponivelPara(v, form.atacado)
+                    return (
+                      <option key={v.id} value={v.id}>
+                        {v.cor}/{v.tamanho} {disp > 0 ? `(${disp})` : `— ${t('vendas.subEncomendaOpc')}`}
+                      </option>
+                    )
+                  })}
                 </select>
                 <input type="number" min="1" value={l.quantidade} onChange={(e) => mudarLinha(i, { quantidade: Number(e.target.value) })} />
                 <input type="number" step="0.01" min="0" value={l.precoUnitario} onChange={(e) => mudarLinha(i, { precoUnitario: e.target.value })} placeholder="auto" />
@@ -504,49 +637,53 @@ export default function Vendas() {
               {t('vendas.adicionarItem')}
             </button>
 
-            <div className="linha-campos" style={{ marginTop: 16 }}>
-              <div className="campo">
-                <label>{t('vendas.formaRecebimentoObrig')}</label>
-                <select value={form.formaRecebimento} onChange={(e) => setForm({ ...form, formaRecebimento: e.target.value as FormaRecebimento })}>
-                  {FORMAS_RECEBIMENTO.map((f) => <option key={f} value={f}>{t(`forma.${f}`) || rotuloForma[f]}</option>)}
-                </select>
-              </div>
-              {!presencial && (
-                <div className="campo" style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'end' }}>
-                  <input type="checkbox" style={{ width: 'auto' }} id="atacado" checked={form.atacado} onChange={(e) => mudarAtacado(e.target.checked)} />
-                  <label htmlFor="atacado" style={{ margin: 0 }}>{t('vendas.precoAtacado')}</label>
+            {!modoReserva && (
+              <div className="linha-campos" style={{ marginTop: 16 }}>
+                <div className="campo">
+                  <label>{t('vendas.formaRecebimentoObrig')}</label>
+                  <select value={form.formaRecebimento} onChange={(e) => setForm({ ...form, formaRecebimento: e.target.value as FormaRecebimento })}>
+                    {FORMAS_RECEBIMENTO.map((f) => <option key={f} value={f}>{t(`forma.${f}`) || rotuloForma[f]}</option>)}
+                  </select>
                 </div>
-              )}
-            </div>
-
-            {/* Régua + slider de desconto */}
-            <div className="desc-box">
-              <div className="desc-cab">
-                <label style={{ margin: 0 }}>{t('vendas.desconto')}</label>
-                <div className="desc-regua">
-                  {config.regua.map((f, i) => (
-                    <span key={i} className={`desc-faixa ${f.pct === sugeridoPct ? 'sug' : ''}`}>
-                      {f.ate == null ? '+' : `≤${(f.ate / 1000).toLocaleString('pt-BR')}k`} · {f.pct}%
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div className="desc-slider">
-                <input type="range" min={0} max={30} step={1} value={pct}
-                  onChange={(e) => setForm({ ...form, descontoPct: e.target.value })} />
-                <span className={`desc-pct ${zonaDesconto}`}>{pct}%</span>
-                {sugeridoPct > 0 && pct !== sugeridoPct && (
-                  <button type="button" className="desc-sug-btn" onClick={() => setForm({ ...form, descontoPct: String(sugeridoPct) })}>
-                    {t('vendas.usarSugerido')} ({sugeridoPct}%)
-                  </button>
+                {!presencial && (
+                  <div className="campo" style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'end' }}>
+                    <input type="checkbox" style={{ width: 'auto' }} id="atacado" checked={form.atacado} onChange={(e) => mudarAtacado(e.target.checked)} />
+                    <label htmlFor="atacado" style={{ margin: 0 }}>{t('vendas.precoAtacado')}</label>
+                  </div>
                 )}
               </div>
-              <div className={`desc-aviso ${zonaDesconto}`}>
-                {zonaDesconto === 'ok' && `${t('vendas.liberadoAte')} ${config.autoMaxPct}%).`}
-                {zonaDesconto === 'senha' && `${t('vendas.acimaDe')} ${config.autoMaxPct}% ${t('vendas.acimaVaiPedirSenha')}`}
-                {zonaDesconto === 'gerente' && `${t('vendas.acimaDe')} ${config.senhaMaxPct}% ${t('vendas.acimaPrecisaGerente')}`}
+            )}
+
+            {/* Régua + slider de desconto — não se aplica a pedido de reserva (preço travado) */}
+            {!modoReserva && (
+              <div className="desc-box">
+                <div className="desc-cab">
+                  <label style={{ margin: 0 }}>{t('vendas.desconto')}</label>
+                  <div className="desc-regua">
+                    {config.regua.map((f, i) => (
+                      <span key={i} className={`desc-faixa ${f.pct === sugeridoPct ? 'sug' : ''}`}>
+                        {f.ate == null ? '+' : `≤${(f.ate / 1000).toLocaleString('pt-BR')}k`} · {f.pct}%
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="desc-slider">
+                  <input type="range" min={0} max={30} step={1} value={pct}
+                    onChange={(e) => setForm({ ...form, descontoPct: e.target.value })} />
+                  <span className={`desc-pct ${zonaDesconto}`}>{pct}%</span>
+                  {sugeridoPct > 0 && pct !== sugeridoPct && (
+                    <button type="button" className="desc-sug-btn" onClick={() => setForm({ ...form, descontoPct: String(sugeridoPct) })}>
+                      {t('vendas.usarSugerido')} ({sugeridoPct}%)
+                    </button>
+                  )}
+                </div>
+                <div className={`desc-aviso ${zonaDesconto}`}>
+                  {zonaDesconto === 'ok' && `${t('vendas.liberadoAte')} ${config.autoMaxPct}%).`}
+                  {zonaDesconto === 'senha' && `${t('vendas.acimaDe')} ${config.autoMaxPct}% ${t('vendas.acimaVaiPedirSenha')}`}
+                  {zonaDesconto === 'gerente' && `${t('vendas.acimaDe')} ${config.senhaMaxPct}% ${t('vendas.acimaPrecisaGerente')}`}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="campo">
               <label>{t('vendas.observacao')}</label>
@@ -555,17 +692,18 @@ export default function Vendas() {
 
             <div className="desc-totais">
               <div><span>{t('vendas.subtotal')}</span><span>{formataReal(bruto)}</span></div>
-              {pct > 0 && <div className="desc"><span>{t('vendas.desconto')} ({pct}%)</span><span>− {formataReal(descontoValor)}</span></div>}
-              <div className="tot"><span>{t('vendas.total')}</span><span>{formataReal(totalPrevisto)}</span></div>
+              {!modoReserva && pct > 0 && <div className="desc"><span>{t('vendas.desconto')} ({pct}%)</span><span>− {formataReal(descontoValor)}</span></div>}
+              <div className="tot"><span>{t('vendas.total')}</span><span>{formataReal(modoReserva ? bruto : totalPrevisto)}</span></div>
             </div>
 
             <div className="acoes">
               <button type="button" className="btn secundario" onClick={fecharForm}>{t('comum.cancelar')}</button>
-              <button className="btn">{t('vendas.registrarVenda')}</button>
+              <button className="btn">{modoReserva ? t('vendas.registrarPedidoReserva') : t('vendas.registrarVenda')}</button>
             </div>
           </form>
         </div>
-      )}
+        )
+      })()}
 
       {/* Autorização do desconto */}
       {autoriz && (

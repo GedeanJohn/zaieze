@@ -58,6 +58,15 @@ enum StatusVenda {
   CANCELADA
 }
 
+// Pedido de reserva: a peça esgotou (ou o estoque disponível no canal é insuficiente) mas o
+// cliente quer aquela variação mesmo assim — vira demanda programada para a fábrica produzir.
+enum StatusPedidoReserva {
+  PENDENTE // aguardando reposição de estoque
+  DISPONIVEL // a entrada de produção já cobre a quantidade; aguardando confirmação (vira Venda)
+  CONVERTIDO // confirmado — virou Venda (ver vendaId)
+  CANCELADO
+}
+
 // Canal da venda — o foco do produto é a "venda online" (atendimento da vendedora pelo WhatsApp)
 enum CanalVenda {
   BALCAO // venda presencial na loja física
@@ -404,6 +413,7 @@ model Loja {
   equipes              Equipe[]
   clientes             Cliente[]
   vendas               Venda[]
+  pedidosReserva       PedidoReserva[]
   // Distribuição: coleções (da rede) que esta loja pode vender. Estoque é central (não por loja).
   colecoesDistribuidas ColecaoLoja[]
   campanhas            Campanha[]
@@ -467,6 +477,7 @@ model Usuario {
   equipe            Equipe?            @relation(fields: [equipeId], references: [id], onDelete: SetNull)
   carteira          Cliente[]          @relation("CarteiraVendedora")
   vendas            Venda[]
+  pedidosReserva    PedidoReserva[]
   mensagens         MensagemWhatsapp[] @relation("MensagensVendedora")
   mensagensInstagram MensagemInstagram[] @relation("MensagensInstagramVendedora")
   campanhas         Campanha[]
@@ -565,6 +576,7 @@ model Cliente {
   loja              Loja                 @relation(fields: [lojaId], references: [id], onDelete: Cascade)
   vendedora         Usuario?             @relation("CarteiraVendedora", fields: [vendedoraId], references: [id], onDelete: SetNull)
   vendas            Venda[]
+  pedidosReserva    PedidoReserva[]
   mensagens         MensagemWhatsapp[]
   mensagensInstagram MensagemInstagram[]
   leads             Lead[]
@@ -745,6 +757,7 @@ model VariacaoProduto {
   produto    Produto            @relation(fields: [produtoId], references: [id], onDelete: Cascade)
   itensVenda ItemVenda[]
   movimentos MovimentoEstoque[]
+  pedidosReserva PedidoReserva[]
 
   @@unique([produtoId, cor, estampa, tamanho])
   @@map("variacoes_produto")
@@ -780,10 +793,44 @@ model Venda {
   vendedora        Usuario     @relation(fields: [vendedoraId], references: [id])
   itens            ItemVenda[]
   leadsConvertidos Lead[]
+  pedidoReserva    PedidoReserva?
 
   @@index([lojaId, createdAt])
   @@index([lojaId, vendedoraId])
   @@map("vendas")
+}
+
+// Pedido de reserva (peça esgotada com demanda): a vendedora registra a intenção de compra de
+// uma variação sem estoque suficiente; some da "fila normal" de venda e vira um sinal de demanda
+// programada para o gestor de estoque planejar a produção. Quando a fábrica repõe o suficiente
+// (POST /estoque/entrada), o(s) pedido(s) mais antigo(s) daquela variação viram DISPONIVEL; a
+// confirmação (POST /reservas/:id/confirmar) cria a Venda de fato e abate o estoque.
+model PedidoReserva {
+  id            String              @id @default(cuid())
+  lojaId        String
+  clienteId     String?
+  vendedoraId   String
+  variacaoId    String
+  quantidade    Int
+  precoUnitario Decimal             @db.Decimal(12, 2)
+  atacado       Boolean             @default(false)
+  status        StatusPedidoReserva @default(PENDENTE)
+  observacao    String?
+  vendaId       String?             @unique // preenchido na confirmação (CONVERTIDO)
+  disponivelEm  DateTime? // quando a reposição passou a cobrir a quantidade pedida
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  loja      Loja            @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  cliente   Cliente?        @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  vendedora Usuario         @relation(fields: [vendedoraId], references: [id])
+  variacao  VariacaoProduto @relation(fields: [variacaoId], references: [id], onDelete: Cascade)
+  venda     Venda?          @relation(fields: [vendaId], references: [id], onDelete: SetNull)
+
+  @@index([lojaId, status])
+  @@index([variacaoId, status])
+  @@index([vendedoraId, status])
+  @@map("pedidos_reserva")
 }
 
 // Histórico de auditoria de descontos aplicados no PDV (quem, quando, %, valor, quem autorizou).

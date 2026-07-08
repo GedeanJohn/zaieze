@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
-  Megaphone, Package, Tag, Layers, Boxes, UsersRound,
+  Megaphone, Package, Tag, Layers, Boxes, UsersRound, Eye,
   Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Wrench, Smartphone, Camera,
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
@@ -51,6 +51,8 @@ export default function Layout() {
   const ehAdmin = role === 'SUPER_ADMIN'
   // Pedidos a separar: gestor de estoque (separa) + gerente/gestor/admin (acompanham e cobram)
   const podeSeparacao = role === 'ESTOQUISTA' || role === 'GERENTE' || role === 'GESTOR' || role === 'SUPER_ADMIN'
+  // Supervisão do atendimento (espelho somente leitura das conversas das vendedoras): gerente/gestor/admin.
+  const podeSupervisionar = role === 'GERENTE' || role === 'GESTOR' || role === 'SUPER_ADMIN'
   const cls = ({ isActive }: { isActive: boolean }) => (isActive ? 'ativo' : '')
 
   function sair() {
@@ -85,6 +87,7 @@ export default function Layout() {
         {podeVendasClientes && <NavLink to="/vendas" className={cls}><ShoppingBag {...ICON} /><span>{t('layout.vendas')}</span></NavLink>}
         {podeVendasClientes && <NavLink to="/clientes" className={cls}><Users {...ICON} /><span>{t('layout.clientes')}</span></NavLink>}
         {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/caixa" className={cls}><Inbox {...ICON} /><span>{t('layout.chatZaieze')}</span></NavLink>}
+        {podeSupervisionar && temFeature('whatsapp') && <NavLink to="/supervisao" className={cls}><Eye {...ICON} /><span>{t('layout.supervisao')}</span></NavLink>}
         {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/campanhas" className={cls}><MessageCircle {...ICON} /><span>{t('layout.campanhas')}</span></NavLink>}
         {podeVendasClientes && temFeature('funil') && <NavLink to="/funil" className={cls}><Filter {...ICON} /><span>{t('layout.funil')}</span></NavLink>}
         {podeVendasClientes && temFeature('radar') && <NavLink to="/radar" className={cls}><Radar {...ICON} /><span>{t('layout.radar')}</span></NavLink>}

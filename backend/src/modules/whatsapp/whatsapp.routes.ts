@@ -279,10 +279,13 @@ export async function whatsappRoutes(app: FastifyInstance) {
   // ─────────── Caixa de entrada / conversas ───────────
 
   // Conversas (clientes com mensagens), com a última mensagem de cada um.
+  // ?vendedoraId= — usado pela supervisão (gerente/gestor) para espelhar só a carteira de uma vendedora.
   app.get('/conversas', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
+    const { vendedoraId } = request.query as { vendedoraId?: string }
     const where: Prisma.MensagemWhatsappWhereInput = { lojaId, clienteId: { not: null } }
     if (request.user.role === 'VENDEDORA') where.vendedoraId = request.user.sub
+    else if (vendedoraId) where.vendedoraId = vendedoraId
 
     const msgs = await prisma.mensagemWhatsapp.findMany({
       where,
@@ -317,8 +320,10 @@ export async function whatsappRoutes(app: FastifyInstance) {
   app.get('/conversas/:clienteId', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     const { clienteId } = request.params as { clienteId: string }
+    const { vendedoraId } = request.query as { vendedoraId?: string }
     const where: Prisma.MensagemWhatsappWhereInput = { clienteId, lojaId }
     if (request.user.role === 'VENDEDORA') where.vendedoraId = request.user.sub
+    else if (vendedoraId) where.vendedoraId = vendedoraId
     return prisma.mensagemWhatsapp.findMany({ where, orderBy: { createdAt: 'asc' }, take: 200 })
   })
 

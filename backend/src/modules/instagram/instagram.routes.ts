@@ -156,10 +156,13 @@ export async function instagramRoutes(app: FastifyInstance) {
 
   // ─────────── Caixa de entrada / conversas ───────────
 
+  // ?vendedoraId= — usado pela supervisão (gerente/gestor) para espelhar só a carteira de uma vendedora.
   app.get('/conversas', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
+    const { vendedoraId } = request.query as { vendedoraId?: string }
     const where: Prisma.MensagemInstagramWhereInput = { lojaId, clienteId: { not: null } }
     if (request.user.role === 'VENDEDORA') where.vendedoraId = request.user.sub
+    else if (vendedoraId) where.vendedoraId = vendedoraId
 
     const msgs = await prisma.mensagemInstagram.findMany({
       where,
@@ -193,8 +196,10 @@ export async function instagramRoutes(app: FastifyInstance) {
   app.get('/conversas/:clienteId', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     const { clienteId } = request.params as { clienteId: string }
+    const { vendedoraId } = request.query as { vendedoraId?: string }
     const where: Prisma.MensagemInstagramWhereInput = { clienteId, lojaId }
     if (request.user.role === 'VENDEDORA') where.vendedoraId = request.user.sub
+    else if (vendedoraId) where.vendedoraId = vendedoraId
     return prisma.mensagemInstagram.findMany({ where, orderBy: { createdAt: 'asc' }, take: 200 })
   })
 

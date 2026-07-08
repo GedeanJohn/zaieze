@@ -50,25 +50,11 @@ function iniciais(nome: string): string {
   return ((p[0]?.[0] ?? '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase() || '?'
 }
 
-/** Janela de páginas estilo Google: 1 2 3 … 8 9 (sempre com bordas e vizinhas da atual). */
-function paginasVisiveis(total: number, atual: number): (number | '…')[] {
-  if (total <= 9) return Array.from({ length: total }, (_, i) => i + 1)
-  const marcadas = new Set<number>([1, 2, total - 1, total, atual - 1, atual, atual + 1])
-  const ordenadas = [...marcadas].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b)
-  const saida: (number | '…')[] = []
-  let anterior = 0
-  for (const p of ordenadas) {
-    if (anterior && p - anterior > 1) saida.push('…')
-    saida.push(p)
-    anterior = p
-  }
-  return saida
-}
-
 /**
  * Supervisão do atendimento: gerente/gestor acompanham (somente leitura) o WhatsApp/Instagram
- * de cada vendedora, uma por vez, navegando por paginação — página N = a N-ésima vendedora,
- * com o nome dela como título. Atualiza sozinho por polling (sem WebSocket na base atual).
+ * de cada vendedora, uma por vez, navegando por abas (uma aba = uma vendedora, estilo abas de
+ * navegador) — o nome dela vira o título da aba ativa E o título da página (aba do navegador).
+ * Atualiza sozinho por polling (sem WebSocket na base atual).
  */
 export default function Supervisao() {
   const escopo = useLojaAtiva()
@@ -141,7 +127,6 @@ export default function Supervisao() {
 
   const q = busca.trim().toLowerCase()
   const lista = q ? conversas.filter((c) => c.cliente.nome.toLowerCase().includes(q) || (c.cliente.telefone ?? '').includes(q)) : conversas
-  const paginas = paginasVisiveis(vendedoras.length, pagina)
 
   return (
     <>
@@ -151,7 +136,22 @@ export default function Supervisao() {
       </header>
       <p style={{ color: 'var(--ink-soft)', fontSize: 14, marginTop: -8 }}>{t('superv.subtitulo')}</p>
 
-      <div className="cartao">
+      {/* Abas — uma por vendedora, estilo abas de navegador. */}
+      {vendedoras.length > 0 && (
+        <div className="superv-abas" role="tablist" aria-label={t('superv.titulo')}>
+          {vendedoras.map((v, i) => (
+            <button
+              key={v.id} type="button" role="tab" aria-selected={i === pagina - 1}
+              className={`superv-aba${i === pagina - 1 ? ' ativa' : ''}`}
+              onClick={() => setPagina(i + 1)}
+            >
+              {v.nome}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="cartao superv-painel">
         {vendedoraAtual ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
             <h2 className="painel-titulo" style={{ margin: 0 }}>{vendedoraAtual.nome}</h2>
@@ -220,17 +220,6 @@ export default function Supervisao() {
               )}
             </section>
           </div>
-        )}
-
-        {/* Paginação estilo Google: cada número é UMA vendedora. */}
-        {vendedoras.length > 1 && (
-          <nav className="superv-paginacao" aria-label={t('superv.titulo')}>
-            <button type="button" className="superv-pg" disabled={pagina <= 1} onClick={() => setPagina((p) => p - 1)}>{t('superv.anterior')}</button>
-            {paginas.map((p, i) => p === '…'
-              ? <span key={`e${i}`} className="superv-pg-reticencias">…</span>
-              : <button key={p} type="button" className={`superv-pg${p === pagina ? ' ativo' : ''}`} onClick={() => setPagina(p)}>{p}</button>)}
-            <button type="button" className="superv-pg" disabled={pagina >= vendedoras.length} onClick={() => setPagina((p) => p + 1)}>{t('superv.proxima')}</button>
-          </nav>
         )}
       </div>
     </>

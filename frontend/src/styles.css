@@ -722,13 +722,16 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 .cz-alerta { margin: 0 12px; background: #4a1d1d; color: #ffb4b4; border-radius: 10px; padding: 8px 12px; font-size: 13px; }
 .cz-aviso { color: var(--cz-mut); padding: 14px; font-size: 13px; }
 
-/* Paginação da Supervisão (1 página = 1 vendedora), estilo resultados do Google. */
-.superv-paginacao { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; margin-top: 18px; }
-.superv-pg { background: transparent; border: 1px solid var(--border); color: var(--ink-soft); border-radius: 8px; min-width: 34px; height: 34px; padding: 0 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
-.superv-pg:hover:not(:disabled) { background: var(--accent-suave, #ffffff10); }
-.superv-pg:disabled { opacity: .4; cursor: default; }
-.superv-pg.ativo { background: var(--accent); border-color: var(--accent); color: #fff; }
-.superv-pg-reticencias { color: var(--ink-soft); padding: 0 4px; font-size: 13px; }
+/* Abas da Supervisão (1 aba = 1 vendedora), estilo abas de navegador — a ativa "gruda" no painel abaixo. */
+.superv-abas { display: flex; gap: 4px; overflow-x: auto; padding: 0 4px; margin-top: 4px; }
+.superv-aba {
+  background: var(--bg); border: 1px solid var(--border); border-bottom: none;
+  color: var(--ink-soft); border-radius: 10px 10px 0 0; padding: 9px 16px; font-size: 13px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; flex: 0 0 auto; position: relative; top: 1px;
+}
+.superv-aba:hover:not(.ativa) { color: var(--ink); }
+.superv-aba.ativa { background: var(--surface); color: var(--accent); border-color: var(--accent); }
+.superv-painel { border-top-left-radius: 0; }
 
 /* Avatar do grupo (tom diferente das pessoas) + selo/online */
 .cz-avatar.grupo { background: linear-gradient(135deg, #14b8a6, #0ea5e9); }

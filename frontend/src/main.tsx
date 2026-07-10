@@ -31,12 +31,15 @@ import Contrato from './paginas/Contrato'
 import Admin from './paginas/Admin'
 import WhatsAppOficial from './paginas/WhatsApp'
 import InstagramOficial from './paginas/Instagram'
+import MercadoLivre from './paginas/MercadoLivre'
 import PainelAfiliado from './paginas/afiliado/PainelAfiliado'
 import Conta from './paginas/Conta'
 import Convite from './paginas/Convite'
 import Pedido from './paginas/Pedido'
 import Orcamentos from './paginas/Orcamentos'
 import OrcamentoPublico from './paginas/OrcamentoPublico'
+import Provador from './paginas/Provador'
+import LookProvador from './paginas/LookProvador'
 import Landing from './paginas/site/Landing'
 import Checkout from './paginas/site/Checkout'
 import Sucesso from './paginas/site/Sucesso'
@@ -82,6 +85,8 @@ function CrmApp() {
       <Route path="/pedido/publico/:token" element={<Pedido />} />
       {/* Orçamento público (sem login): o cliente aprova ou pede alterações por este link */}
       <Route path="/orcamento/publico/:token" element={<OrcamentoPublico />} />
+      {/* Provador virtual (sem login): a vendedora manda esse link, o cliente consente e envia a selfie */}
+      <Route path="/look/:token" element={<LookProvador />} />
       <Route path="/" element={<Protegida><Raiz /></Protegida>}>
         <Route index element={<Dashboard />} />
         <Route path="vendas" element={<Vendas />} />
@@ -96,6 +101,7 @@ function CrmApp() {
         <Route path="ranking" element={<Ranking />} />
         <Route path="mural" element={<Mural />} />
         <Route path="atacado" element={<Atacado />} />
+        <Route path="provador" element={<Provador />} />
         <Route path="produtos" element={<Produtos />} />
         <Route path="colecoes" element={<Colecoes />} />
         <Route path="equipe" element={<Equipe />} />
@@ -107,6 +113,7 @@ function CrmApp() {
         <Route path="admin" element={<Admin />} />
         <Route path="whatsapp-config" element={<WhatsAppOficial />} />
         <Route path="instagram-config" element={<InstagramOficial />} />
+        <Route path="mercadolivre-config" element={<MercadoLivre />} />
         <Route path="conta" element={<Conta />} />
       </Route>
       {/* Catálogo público da vendedora: <marca>.zaieze.com/<vendedora> (sem login) */}

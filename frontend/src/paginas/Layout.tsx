@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
   Megaphone, Package, Tag, Layers, Boxes, UsersRound, Eye, Receipt,
-  Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Wrench, Smartphone, Camera,
+  Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Wrench, Smartphone, Camera, Store, Shirt,
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
 import { useIdioma } from '../lib/i18n'
@@ -95,6 +95,7 @@ export default function Layout() {
         {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/ranking" className={cls}><Trophy {...ICON} /><span>{t('layout.ranking')}</span></NavLink>}
         {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/mural" className={cls}><Megaphone {...ICON} /><span>{t('layout.mural')}</span></NavLink>}
         {podeVendasClientes && temFeature('atacado') && <NavLink to="/atacado" className={cls}><Package {...ICON} /><span>{t('layout.atacado')}</span></NavLink>}
+        {podeVendasClientes && <NavLink to="/provador" className={cls}><Shirt {...ICON} /><span>{t('layout.provador')}</span></NavLink>}
         {podeEstoque && <NavLink to="/colecoes" className={cls}><Layers {...ICON} /><span>{t('layout.colecoes')}</span></NavLink>}
         <NavLink to="/produtos" className={cls}><Tag {...ICON} /><span>{t('layout.produtos')}</span></NavLink>
         {podeEstoque && <NavLink to="/estoque" className={cls}><Boxes {...ICON} /><span>{t('layout.estoque')}</span></NavLink>}
@@ -102,6 +103,7 @@ export default function Layout() {
         {podeEquipe && <NavLink to="/equipe" className={cls}><UsersRound {...ICON} /><span>{t('layout.equipe')}</span></NavLink>}
         {ehDonoRede && temFeature('whatsapp') && <NavLink to="/whatsapp-config" className={cls}><Smartphone {...ICON} /><span>{t('layout.whatsappOficial')}</span></NavLink>}
         {ehDonoRede && temFeature('whatsapp') && <NavLink to="/instagram-config" className={cls}><Camera {...ICON} /><span>{t('layout.instagramOficial')}</span></NavLink>}
+        {ehDonoRede && temFeature('marketplace') && <NavLink to="/mercadolivre-config" className={cls}><Store {...ICON} /><span>{t('layout.mercadoLivre')}</span></NavLink>}
         {ehDonoRede && temFeature('portal_cliente') && <NavLink to="/marca" className={cls}><Palette {...ICON} /><span>{t('layout.minhaLoja')}</span></NavLink>}
         {ehDonoRede && <NavLink to="/manual" className={cls}><BookOpen {...ICON} /><span>{t('layout.manual')}</span></NavLink>}
         {ehDonoRede && <NavLink to="/planos" className={cls}><CreditCard {...ICON} /><span>{t('layout.planos')}</span></NavLink>}

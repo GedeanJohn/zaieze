@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
-  Megaphone, Package, Tag, Layers, Boxes, UsersRound, Eye,
+  Megaphone, Package, Tag, Layers, Boxes, UsersRound, Eye, Receipt,
   Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Wrench, Smartphone, Camera,
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
@@ -85,6 +85,7 @@ export default function Layout() {
         <nav className="sidebar-nav">
         <NavLink to="/" end className={cls}><LayoutDashboard {...ICON} /><span>{t('layout.dashboard')}</span></NavLink>
         {podeVendasClientes && <NavLink to="/vendas" className={cls}><ShoppingBag {...ICON} /><span>{t('layout.vendas')}</span></NavLink>}
+        {podeVendasClientes && <NavLink to="/orcamentos" className={cls}><Receipt {...ICON} /><span>{t('layout.orcamentos')}</span></NavLink>}
         {podeVendasClientes && <NavLink to="/clientes" className={cls}><Users {...ICON} /><span>{t('layout.clientes')}</span></NavLink>}
         {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/caixa" className={cls}><Inbox {...ICON} /><span>{t('layout.chatZaieze')}</span></NavLink>}
         {podeSupervisionar && temFeature('whatsapp') && <NavLink to="/supervisao" className={cls}><Eye {...ICON} /><span>{t('layout.supervisao')}</span></NavLink>}

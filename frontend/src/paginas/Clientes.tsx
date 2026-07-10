@@ -36,10 +36,19 @@ interface VendaHist {
   createdAt: string
   itens: ItemHist[]
 }
+interface OrcamentoHist {
+  id: string
+  status: 'RASCUNHO' | 'AGUARDANDO_APROVACAO_DESCONTO' | 'ENVIADO' | 'ALTERACAO_SOLICITADA' | 'CONVERTIDO' | 'CANCELADO'
+  total: string
+  atacado: boolean
+  createdAt: string
+  itens: ItemHist[]
+}
 interface ClienteDetalhe extends Cliente {
   cpf?: string | null
   observacoes?: string | null
   vendas: VendaHist[]
+  orcamentos: OrcamentoHist[]
 }
 
 interface Vendedora { id: string; nome: string; role: string }
@@ -384,6 +393,27 @@ export default function Clientes() {
                 ))}
                 {detalhe.vendas.length === 0 && (
                   <tr><td colSpan={4} style={{ color: 'var(--ink-soft)' }}>{t('cli.semComprasRegistradas')}</td></tr>
+                )}
+              </tbody>
+            </table>
+
+            <h3 className="painel-titulo" style={{ marginTop: 18 }}>{t('cli.orcamentosTitulo')}</h3>
+            <table>
+              <thead><tr><th>{t('cli.data')}</th><th>{t('cli.itens')}</th><th>{t('cli.total')}</th><th>{t('vendas.status')}</th></tr></thead>
+              <tbody>
+                {detalhe.orcamentos.map((o) => (
+                  <tr key={o.id} style={{ opacity: o.status === 'CANCELADO' ? 0.5 : 1 }}>
+                    <td>{dataCurta(o.createdAt)}</td>
+                    <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+                      {o.itens.map((i) => `${i.quantidade}× ${i.variacao.produto.nome} ${i.variacao.cor}/${i.variacao.tamanho}`).join(' · ')}
+                      {o.atacado ? `  🏷️${t('vendas.atacadoTag')}` : ''}
+                    </td>
+                    <td>{formataReal(o.total)}</td>
+                    <td><span className={`selo ${o.status === 'CONVERTIDO' ? 'ok' : o.status === 'CANCELADO' || o.status === 'ALTERACAO_SOLICITADA' ? 'baixo' : 'NOVO'}`}>{t(`orc.status.${o.status}`)}</span></td>
+                  </tr>
+                ))}
+                {detalhe.orcamentos.length === 0 && (
+                  <tr><td colSpan={4} style={{ color: 'var(--ink-soft)' }}>{t('cli.semOrcamentos')}</td></tr>
                 )}
               </tbody>
             </table>

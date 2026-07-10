@@ -35,6 +35,8 @@ import PainelAfiliado from './paginas/afiliado/PainelAfiliado'
 import Conta from './paginas/Conta'
 import Convite from './paginas/Convite'
 import Pedido from './paginas/Pedido'
+import Orcamentos from './paginas/Orcamentos'
+import OrcamentoPublico from './paginas/OrcamentoPublico'
 import Landing from './paginas/site/Landing'
 import Checkout from './paginas/site/Checkout'
 import Sucesso from './paginas/site/Sucesso'
@@ -78,9 +80,12 @@ function CrmApp() {
       <Route path="/pedido/:id" element={<Protegida><Pedido /></Protegida>} />
       {/* Comprovante público do pedido (sem login): link enviado ao cliente */}
       <Route path="/pedido/publico/:token" element={<Pedido />} />
+      {/* Orçamento público (sem login): o cliente aprova ou pede alterações por este link */}
+      <Route path="/orcamento/publico/:token" element={<OrcamentoPublico />} />
       <Route path="/" element={<Protegida><Raiz /></Protegida>}>
         <Route index element={<Dashboard />} />
         <Route path="vendas" element={<Vendas />} />
+        <Route path="orcamentos" element={<Orcamentos />} />
         <Route path="estoque" element={<Estoque />} />
         <Route path="separacao" element={<Separacao />} />
         <Route path="clientes" element={<Clientes />} />

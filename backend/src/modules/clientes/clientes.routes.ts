@@ -207,6 +207,11 @@ export async function clientesRoutes(app: FastifyInstance) {
           take: 20,
           include: { itens: { include: { variacao: { include: { produto: { select: { nome: true } } } } } } },
         },
+        orcamentos: {
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          include: { itens: { include: { variacao: { include: { produto: { select: { nome: true } } } } } } },
+        },
       },
     })
     if (!cliente) return reply.code(404).send({ erro: 'Cliente não encontrado ou fora da sua carteira' })

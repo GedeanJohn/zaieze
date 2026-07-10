@@ -25,6 +25,18 @@ enum StatusAssinatura {
   CANCELADA // cancelada/inadimplente
 }
 
+// Add-ons: recursos vendidos À PARTE de qualquer plano (START/PRO/ELITE) — a rede assina
+// independente do plano em que está. Cada tipo tem sua própria recorrência no Mercado Pago.
+enum TipoAddon {
+  PROVADOR // Provador Virtual (FASHN AI — try-on de foto e vídeo)
+}
+
+enum StatusAddon {
+  PENDENTE // checkout iniciado, aguardando aprovação do pagamento
+  ATIVA
+  CANCELADA
+}
+
 enum Periodicidade {
   MENSAL
   ANUAL // cobrança 1x/ano, com desconto (ConfigAssinatura.percentualDescontoAnual)
@@ -161,6 +173,20 @@ enum OrigemLead {
   CATALOGO // entrou pelo link do catálogo da vendedora
 }
 
+// Provador virtual (módulo 13 — Elite). Ciclo de vida de um "look": a vendedora gera o
+// link, o cliente envia a selfie (consentimento LGPD), e a FASHN gera a foto (try-on) e,
+// opcionalmente, o vídeo (image-to-video). Processado por uma fila no banco (worker poller).
+enum StatusProvador {
+  AGUARDANDO_FOTO // link criado; aguardando o cliente enviar a selfie
+  PENDENTE // selfie recebida + consentida; na fila para o try-on
+  PROCESSANDO_FOTO // chamando a FASHN (try-on)
+  FOTO_PRONTA // foto gerada; segue para o vídeo quando solicitado
+  PROCESSANDO_VIDEO // chamando a FASHN (image-to-video)
+  CONCLUIDO // foto (e vídeo) prontos
+  FALHOU // erro na geração (ver campo `erro`)
+  EXPIRADO // link venceu sem o cliente enviar a foto
+}
+
 // ─────────────────────────── Rede (marca) — tenant raiz ───────────────────────────
 
 model Rede {
@@ -235,6 +261,7 @@ model Rede {
   lojas      Loja[]
   usuarios   Usuario[] // gestores da rede
   assinatura Assinatura?
+  addons     AssinaturaAddon[]
   // Estoque central da fábrica/marca: coleções, produtos e taxonomias vivem no nível da REDE
   // (não por loja). As lojas apenas recebem permissão de venda via ColecaoLoja (distribuição).
   colecoes   Colecao[]
@@ -244,6 +271,7 @@ model Rede {
   campanhasModelo CampanhaModelo[]
   aceitesContrato AceiteContrato[]
   afiliadoOrigem Afiliado? @relation(fields: [afiliadoId], references: [id], onDelete: SetNull)
+  looksProvador   LookProvador[]
 
   @@map("redes")
 }
@@ -303,6 +331,28 @@ model Assinatura {
   @@map("assinaturas")
 }
 
+/// Assinatura de um add-on (hoje só Provador Virtual) — recorrência PRÓPRIA no Mercado Pago,
+/// independente do plano/Assinatura principal. Uma rede pode ter várias (uma por tipo).
+model AssinaturaAddon {
+  id                       String      @id @default(cuid())
+  redeId                   String
+  tipo                     TipoAddon
+  status                   StatusAddon @default(PENDENTE)
+  valor                    Decimal     @db.Decimal(12, 2)
+  mpPreapprovalId          String? // id da assinatura no Mercado Pago (preapproval); null em modo simulado
+  simulada                 Boolean     @default(false)
+  cicloFimEm               DateTime? // acesso garantido até o fim do ciclo pago vigente
+  cancelamentoSolicitadoEm DateTime?
+  cancelamentoOrigem       String? // LOJISTA | ADMIN | MERCADO_PAGO (auditoria)
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
+
+  rede Rede @relation(fields: [redeId], references: [id], onDelete: Cascade)
+
+  @@unique([redeId, tipo])
+  @@map("assinaturas_addon")
+}
+
 /// Preço de cada plano (editável pelo SUPER_ADMIN no Painel do Admin, sem deploy).
 /// A classificação de funcionalidades por plano continua no código (FEATURE_MIN_PLANO).
 model ConfigPlano {
@@ -311,6 +361,15 @@ model ConfigPlano {
   updatedAt DateTime @default(now()) @updatedAt
 
   @@map("config_planos")
+}
+
+/// Preço vigente de cada add-on (editável pelo SUPER_ADMIN) — mesmo padrão de ConfigPlano.
+model ConfigAddon {
+  tipo      TipoAddon @id
+  preco     Decimal   @db.Decimal(12, 2)
+  updatedAt DateTime  @default(now()) @updatedAt
+
+  @@map("config_addons")
 }
 
 /// Percentual de desconto do plano ANUAL (editável pelo SUPER_ADMIN). Uma linha só (id=1),
@@ -436,6 +495,7 @@ model Loja {
   postsMural           PostMural[]
   leads                Lead[]
   gruposTransmissao    GrupoTransmissao[]
+  looksProvador        LookProvador[]
 
   @@index([redeId])
   @@map("lojas")
@@ -501,6 +561,7 @@ model Usuario {
   postsMural        PostMural[]
   leads             Lead[]             @relation("LeadsVendedora")
   gruposTransmissao GrupoTransmissao[] @relation("GruposVendedora")
+  looksProvador     LookProvador[]     @relation("LooksProvadorCriados")
   solicitacoesSenha SolicitacaoSenha[]
   afiliado          Afiliado?
 
@@ -558,11 +619,6 @@ model Cliente {
   email             String?
   cpf               String?
   instagram         String?
-  // Instagram oficial (Meta) — id da pessoa escopado à conta da marca (não é o @handle).
-  // Chave de roteamento de conversas do Instagram, equivalente ao telefone no WhatsApp.
-  igScopedId        String?
-  // Última mensagem RECEBIDA do cliente pelo Instagram — base da janela de 24h da Graph API.
-  igUltimaEntradaEm DateTime?
   // Endereço (para filtros de segmentação geográfica em campanhas/seleção — R1).
   // Preenchidos via CEP (ViaCEP) no cadastro; DDD é derivado do telefone.
   cep               String?
@@ -579,6 +635,11 @@ model Cliente {
   // Última mensagem RECEBIDA do cliente — base da janela de 24h da Cloud API
   // (texto/mídia livre só até 24h depois; fora disso, só template aprovado).
   waUltimaEntradaEm DateTime?
+  // Instagram oficial (Meta) — id da pessoa escopado à conta da marca (não é o @handle).
+  // Chave de roteamento de conversas do Instagram, equivalente ao telefone no WhatsApp.
+  igScopedId        String?
+  // Última mensagem RECEBIDA do cliente pelo Instagram — base da janela de 24h da Graph API.
+  igUltimaEntradaEm DateTime?
   // LGPD: consentimento para campanhas (WhatsApp/Custom Audiences — módulos 4, 10, 16)
   consentimentoLgpd Boolean         @default(false)
   observacoes       String?
@@ -589,15 +650,15 @@ model Cliente {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
-  loja              Loja                 @relation(fields: [lojaId], references: [id], onDelete: Cascade)
-  vendedora         Usuario?             @relation("CarteiraVendedora", fields: [vendedoraId], references: [id], onDelete: SetNull)
-  vendas            Venda[]
-  pedidosReserva    PedidoReserva[]
-  orcamentos        Orcamento[]
-  mensagens         MensagemWhatsapp[]
+  loja         Loja               @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  vendedora    Usuario?           @relation("CarteiraVendedora", fields: [vendedoraId], references: [id], onDelete: SetNull)
+  vendas       Venda[]
+  pedidosReserva PedidoReserva[]
+  orcamentos   Orcamento[]
+  mensagens    MensagemWhatsapp[]
   mensagensInstagram MensagemInstagram[]
-  leads             Lead[]
-  gruposMembro      GrupoMembro[]
+  leads        Lead[]
+  gruposMembro GrupoMembro[]
 
   @@unique([lojaId, telefone])
   @@unique([lojaId, igScopedId])
@@ -749,6 +810,7 @@ model Produto {
   marca     Marca?            @relation(fields: [marcaId], references: [id], onDelete: SetNull)
   colecao   Colecao?          @relation(fields: [colecaoId], references: [id], onDelete: SetNull)
   variacoes VariacaoProduto[]
+  looksProvador LookProvador[]
 
   @@unique([redeId, referencia])
   @@index([redeId, ativo])
@@ -1249,4 +1311,54 @@ model ConfigAfiliados {
   updatedAt        DateTime @updatedAt
 
   @@map("config_afiliados")
+}
+
+// ─────────────────────────── Provador virtual (módulo 13 — Elite) ───────────────────────────
+// Fila no banco: o worker (poller) avança os looks pelos estados, chamando a FASHN e gravando
+// as mídias no R2 (cdn.zaieze.com). A selfie do cliente é dado pessoal sensível: expurgada
+// assim que cumpre a finalidade (foto gerada) e nunca retida além do necessário (LGPD).
+model LookProvador {
+  id            String         @id @default(cuid())
+  redeId        String // escopo de cota/billing
+  lojaId        String // escopo de mídia no R2 (lojaId/pasta)
+  produtoBaseId String // a peça que o cliente vai "vestir"
+  criadoPorId   String // vendedora/gestor que gerou o link
+  comVideo      Boolean        @default(false)
+  status        StatusProvador @default(AGUARDANDO_FOTO)
+
+  // Link público (uso único) para o cliente enviar a selfie + consentir
+  token    String   @unique @default(cuid())
+  expiraEm DateTime // prazo do link (env.PROVADOR_LINK_HORAS)
+
+  // Selfie do cliente — expurgo agressivo após a geração (LGPD)
+  fotoClienteUrl         String?
+  fotoClienteExpurgadaEm DateTime?
+  // Consentimento LGPD do cliente (prova: quando + IP)
+  consentLgpdEm DateTime?
+  consentIp     String?
+
+  // Resultados gerados
+  fotoUrl  String?
+  videoUrl String?
+  viaIa    Boolean @default(false) // true = gerado pela FASHN; false = modo simulado
+  creditos Int     @default(0) // créditos FASHN consumidos (relatório de custo)
+
+  // Polling da FASHN
+  externalFotoId  String?
+  externalVideoId String?
+  tentativas      Int     @default(0)
+  erro            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rede      Rede    @relation(fields: [redeId], references: [id], onDelete: Cascade)
+  loja      Loja    @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  produto   Produto @relation(fields: [produtoBaseId], references: [id], onDelete: Cascade)
+  criadoPor Usuario @relation("LooksProvadorCriados", fields: [criadoPorId], references: [id])
+
+  @@index([status])
+  @@index([redeId, createdAt])
+  @@index([lojaId, createdAt])
+  @@map("looks_provador")
 }

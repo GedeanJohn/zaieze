@@ -135,3 +135,28 @@ export async function limparMidiaExpirada(): Promise<number> {
   }
   return processadas
 }
+
+/**
+ * Expurga as mídias do PROVADOR (foto/vídeo) com mais de PROVADOR_RETENCAO_DIAS — são caras e
+ * efêmeas. Apaga do R2 (e local) e remove o registro do look. Rede de segurança: também limpa
+ * selfies que por algum motivo não foram expurgadas no fluxo do worker. Idempotente.
+ * @returns nº de looks expurgados.
+ */
+export async function limparLooksAntigos(): Promise<number> {
+  const limite = new Date(Date.now() - env.PROVADOR_RETENCAO_DIAS * 24 * 60 * 60 * 1000)
+  const antigos = await prisma.lookProvador.findMany({
+    where: { createdAt: { lt: limite } },
+    select: { id: true, fotoUrl: true, videoUrl: true, fotoClienteUrl: true },
+  })
+  if (antigos.length === 0) return 0
+
+  const urls = antigos.flatMap((l) => [l.fotoUrl, l.videoUrl, l.fotoClienteUrl]).filter((u): u is string => !!u)
+  try {
+    await excluirDoR2(urls) // no-op em dev (sem R2)
+  } catch {
+    return 0 // falha no R2 → tenta de novo no próximo ciclo (não apaga o banco)
+  }
+  await Promise.all(urls.map((u) => removerUploadLocal(u)))
+  await prisma.lookProvador.deleteMany({ where: { id: { in: antigos.map((l) => l.id) } } })
+  return antigos.length
+}

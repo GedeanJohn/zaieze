@@ -1,4 +1,3 @@
-import type { Plano } from '@prisma/client'
 import { env } from '../../env'
 
 /** Sem token configurado, o checkout opera em modo simulado (igual Evolution/Claude no projeto). */
@@ -16,7 +15,7 @@ interface PreapprovalResult {
  * Só é chamada quando MERCADOPAGO_ACCESS_TOKEN está presente.
  */
 export async function criarPreapproval(opts: {
-  plano: Plano
+  reason: string
   valor: number
   email: string
   redeSlug: string
@@ -31,7 +30,7 @@ export async function criarPreapproval(opts: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      reason: `ZAIEZE — Plano ${opts.plano}`,
+      reason: opts.reason,
       external_reference: opts.redeSlug,
       payer_email: opts.email,
       back_url: opts.backUrl,

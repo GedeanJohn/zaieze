@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
-import type { Plano } from '@prisma/client'
+import type { Plano, TipoAddon } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 
 export type Feature =
   | 'vendas' | 'produtos' | 'estoque' | 'clientes' | 'dashboard' | 'forma_recebimento' | 'whatsapp'
@@ -52,6 +53,31 @@ export function requireFeature(feature: Feature) {
       return reply.code(403).send({
         erro: `Recurso disponível no plano ${FEATURE_MIN_PLANO[feature]}. Faça upgrade para liberar.`,
         upgrade: FEATURE_MIN_PLANO[feature],
+      })
+    }
+  }
+}
+
+/**
+ * preHandler que bloqueia a rota quando a rede não tem uma assinatura de ADD-ON ativa —
+ * recurso vendido À PARTE de qualquer plano (não é liberado por upgrade de plano).
+ * SUPER_ADMIN (operador do SaaS) passa sempre.
+ */
+export function requireAddon(tipo: TipoAddon) {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      await request.jwtVerify()
+    } catch {
+      return reply.code(401).send({ erro: 'Token ausente ou inválido' })
+    }
+    if (request.user.role === 'SUPER_ADMIN') return
+    const redeId = request.user.redeId
+    if (!redeId) return reply.code(403).send({ erro: 'Sem rede vinculada' })
+    const addon = await prisma.assinaturaAddon.findUnique({ where: { redeId_tipo: { redeId, tipo } }, select: { status: true } })
+    if (addon?.status !== 'ATIVA') {
+      return reply.code(403).send({
+        erro: 'Recurso disponível apenas com a assinatura deste add-on. Assine em Planos.',
+        addonNecessario: tipo,
       })
     }
   }

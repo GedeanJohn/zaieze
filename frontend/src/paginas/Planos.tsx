@@ -30,6 +30,16 @@ interface Assinatura {
   createdAt: string
 }
 
+interface AddonCatalogo { tipo: string; nome: string; resumo: string; preco: number }
+interface AssinaturaAddon {
+  tipo: string
+  status: 'PENDENTE' | 'ATIVA' | 'CANCELADA'
+  valor: string
+  simulada: boolean
+  cicloFimEm: string | null
+  cancelamentoSolicitadoEm: string | null
+}
+
 function fmtData(iso: string | null): string {
   return iso ? new Date(iso).toLocaleDateString('pt-BR') : '—'
 }
@@ -40,6 +50,8 @@ export default function Planos() {
   const { t } = useIdioma()
   const [dados, setDados] = useState<RespostaPlanos | null>(null)
   const [assinatura, setAssinatura] = useState<Assinatura | null>(null)
+  const [addonsCatalogo, setAddonsCatalogo] = useState<AddonCatalogo[]>([])
+  const [addonsMinha, setAddonsMinha] = useState<AssinaturaAddon[]>([])
   const [mpConfiguradoNoServidor, setMpConfiguradoNoServidor] = useState(false)
   const [contratoAceito, setContratoAceito] = useState(true)
   const [erro, setErro] = useState('')
@@ -51,8 +63,51 @@ export default function Planos() {
     api.get('/planos').then(({ data }) => setDados(data)).catch(() => setErro(t('planosApp.erroCarregarPlanos')))
     api.get('/assinaturas/minha').then(({ data }) => { setAssinatura(data.assinatura); setMpConfiguradoNoServidor(Boolean(data.mpConfigurado)) }).catch(() => setAssinatura(null))
     api.get('/contrato/status').then(({ data }) => setContratoAceito(Boolean(data.aceito))).catch(() => {})
+    api.get('/addons').then(({ data }) => setAddonsCatalogo(data.addons)).catch(() => {})
+    api.get('/addons/minha').then(({ data }) => setAddonsMinha(data.addons)).catch(() => {})
   }
   useEffect(() => { carregar() }, [])
+
+  async function assinarAddon(tipo: string) {
+    setErro(''); setMsg(''); setOcupado(true)
+    try {
+      const { data } = await api.post(`/addons/${tipo}/checkout`, {})
+      if (data.initPoint) { window.location.href = data.initPoint; return }
+      setMsg(t('planosApp.addonAtivadoMsg'))
+      carregar()
+    } catch (e) {
+      setErro(mensagemDeErro(e))
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  async function cancelarAddon(tipo: string) {
+    if (!window.confirm(t('planosApp.confirmCancelarAddon'))) return
+    setErro(''); setMsg(''); setOcupado(true)
+    try {
+      const { data } = await api.post(`/addons/${tipo}/cancelar`, {})
+      setMsg(t('planosApp.cancelamentoAgendadoMsg', { data: fmtData(data.acessoAte) }))
+      carregar()
+    } catch (e) {
+      setErro(mensagemDeErro(e))
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  async function reativarAddon(tipo: string) {
+    setErro(''); setMsg(''); setOcupado(true)
+    try {
+      await api.post(`/addons/${tipo}/reativar`, {})
+      setMsg(t('planosApp.assinaturaReativadaMsg'))
+      carregar()
+    } catch (e) {
+      setErro(mensagemDeErro(e))
+    } finally {
+      setOcupado(false)
+    }
+  }
 
   function reentrar() {
     localStorage.removeItem('modacrm_token')
@@ -244,6 +299,43 @@ export default function Planos() {
           )
         })}
       </div>
+
+      {addonsCatalogo.length > 0 && (
+        <>
+          <header style={{ marginTop: 24 }}><h2>{t('planosApp.addonsTitulo')}</h2></header>
+          <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>{t('planosApp.addonsSubtitulo')}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+            {addonsCatalogo.map((a) => {
+              const minha = addonsMinha.find((x) => x.tipo === a.tipo)
+              const ativa = minha?.status === 'ATIVA'
+              const agendado = ativa && !!minha?.cancelamentoSolicitadoEm
+              return (
+                <div key={a.tipo} className="cartao" style={{ borderTop: `4px solid ${ativa ? 'var(--accent)' : 'var(--border)'}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <h3 style={{ margin: 0 }}>{a.nome}</h3>
+                    {ativa && <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700 }}>{t('planosApp.addonAtivo')}</span>}
+                  </div>
+                  <div style={{ fontSize: 22, fontWeight: 800, margin: '8px 0' }}>
+                    {formataReal(a.preco)}<span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ink-soft)' }}>/{t('unidade.mes')}</span>
+                  </div>
+                  <div style={{ fontSize: 13, marginBottom: 12 }}>{a.resumo}</div>
+                  {ativa && minha?.simulada && <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 8 }}>{t('planosApp.simulada')}</div>}
+                  {ativa && agendado && (
+                    <div style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 8 }}>
+                      {t('planosApp.cancelamentoAgendadoTexto', { data: fmtData(minha?.cicloFimEm ?? null) })}
+                    </div>
+                  )}
+                  {ativa
+                    ? agendado
+                      ? <button className="btn" style={{ width: '100%' }} onClick={() => reativarAddon(a.tipo)} disabled={ocupado}>{t('planosApp.reativarBtn')}</button>
+                      : <button className="btn secundario" style={{ width: '100%' }} onClick={() => cancelarAddon(a.tipo)} disabled={ocupado}>{t('planosApp.cancelarBtn')}</button>
+                    : <button className="btn" style={{ width: '100%' }} onClick={() => assinarAddon(a.tipo)} disabled={ocupado}>{t('planosApp.assinarAddonBtn')}</button>}
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
 
       <div className="cartao" style={{ marginTop: 16, fontSize: 12, color: 'var(--ink-soft)' }}>
         {t('planosApp.rodapeTexto')}

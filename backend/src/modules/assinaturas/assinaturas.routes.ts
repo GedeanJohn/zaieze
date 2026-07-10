@@ -13,6 +13,7 @@ import { temAceiteVigente } from '../contrato/contrato.service'
 import { normalizarTelefone } from '../../lib/telefone'
 import { confirmarCicloEComissionar, gerarComissaoDoCiclo, normalizarCodigo as normalizarCodigoAfiliado } from '../afiliados/afiliado.service'
 import { obterCotacaoAtual } from '../cambio/cambio.service'
+import { confirmarCicloAddon, solicitarCancelamentoAddon } from '../addons/addon.service'
 
 const arred2 = (n: number) => Math.round(n * 100) / 100
 
@@ -183,7 +184,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     // Mercado Pago real: cria a assinatura recorrente e devolve o checkout
     try {
       const pre = await criarPreapproval({
-        plano,
+        reason: `ZAIEZE — Plano ${plano}`,
         valor,
         email,
         redeSlug: slug,
@@ -213,15 +214,27 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     if (!id || !/preapproval|subscription/i.test(topico)) return reply.code(200).send({ ok: true })
 
     const assinatura = await prisma.assinatura.findFirst({ where: { mpPreapprovalId: id } })
-    if (!assinatura) return reply.code(200).send({ ok: true })
+    if (assinatura) {
+      // NÃO confia na notificação: consulta o status real no Mercado Pago
+      const status = await consultarPreapproval(id)
+      if (status === 'authorized') {
+        await confirmarCicloEComissionar(assinatura.redeId) // ativa/renova + estende o ciclo +1 mês + comissão do afiliado
+      } else if (status === 'cancelled' || status === 'paused') {
+        // mesmo vindo do MP: cancela por FIM DE CICLO (mantém acesso até o ciclo pago vencer)
+        await solicitarCancelamento(assinatura.redeId, 'MERCADO_PAGO')
+      }
+      return reply.code(200).send({ ok: true })
+    }
 
-    // NÃO confia na notificação: consulta o status real no Mercado Pago
-    const status = await consultarPreapproval(id)
-    if (status === 'authorized') {
-      await confirmarCicloEComissionar(assinatura.redeId) // ativa/renova + estende o ciclo +1 mês + comissão do afiliado
-    } else if (status === 'cancelled' || status === 'paused') {
-      // mesmo vindo do MP: cancela por FIM DE CICLO (mantém acesso até o ciclo pago vencer)
-      await solicitarCancelamento(assinatura.redeId, 'MERCADO_PAGO')
+    // Não é a assinatura do plano — pode ser a de um add-on (recorrência própria, mesmo webhook).
+    const addon = await prisma.assinaturaAddon.findFirst({ where: { mpPreapprovalId: id } })
+    if (addon) {
+      const status = await consultarPreapproval(id)
+      if (status === 'authorized') {
+        await confirmarCicloAddon(addon.redeId, addon.tipo)
+      } else if (status === 'cancelled' || status === 'paused') {
+        await solicitarCancelamentoAddon(addon.redeId, addon.tipo, 'MERCADO_PAGO')
+      }
     }
     return reply.code(200).send({ ok: true })
   })
@@ -316,7 +329,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     if (assinatura.mpPreapprovalId) await cancelarPreapproval(assinatura.mpPreapprovalId).catch(() => { /* pendente/sem efeito */ })
     const gestor = await prisma.usuario.findFirst({ where: { redeId, role: 'GESTOR' }, orderBy: { createdAt: 'asc' } })
     const pre = await criarPreapproval({
-      plano: assinatura.plano,
+      reason: `ZAIEZE — Plano ${assinatura.plano}`,
       valor,
       email: gestor?.email ?? '',
       redeSlug: rede.slug,
@@ -372,7 +385,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     // NOVO preapproval. O acesso só é (re)ativado quando o pagamento confirma, via webhook.
     const gestor = await prisma.usuario.findFirst({ where: { redeId, role: 'GESTOR' }, orderBy: { createdAt: 'asc' } })
     const pre = await criarPreapproval({
-      plano,
+      reason: `ZAIEZE — Plano ${plano}`,
       valor,
       email: gestor?.email ?? '',
       redeSlug: rede.slug,

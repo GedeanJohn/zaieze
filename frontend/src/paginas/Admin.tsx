@@ -3,6 +3,7 @@ import { api, formataReal, mensagemDeErro, type Plano } from '../api'
 import { useToast } from '../componentes/Toast'
 
 interface PlanoAdmin { plano: Plano; nome: string; limite: string; resumo: string; preco: number }
+interface AddonAdmin { tipo: string; nome: string; resumo: string; preco: number }
 interface RedeAdmin {
   id: string; nome: string; slug: string; plano: Plano; ativo: boolean; criadoEm: string; lojas: number; usuarios: number
   assinatura: { plano: Plano; status: string; valor: number; cicloFimEm: string | null; cancelamentoAgendado: boolean; simulada: boolean } | null
@@ -14,6 +15,8 @@ const fmtData = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(
 export default function Admin() {
   const [planos, setPlanos] = useState<PlanoAdmin[]>([])
   const [precos, setPrecos] = useState<Record<string, string>>({})
+  const [addons, setAddons] = useState<AddonAdmin[]>([])
+  const [precosAddon, setPrecosAddon] = useState<Record<string, string>>({})
   const [descontoAnual, setDescontoAnual] = useState('10')
   const [redes, setRedes] = useState<RedeAdmin[]>([])
   const [promos, setPromos] = useState<Promo[]>([])
@@ -24,6 +27,10 @@ export default function Admin() {
     api.get('/admin/planos').then(({ data }) => {
       setPlanos(data.planos)
       setPrecos(Object.fromEntries(data.planos.map((p: PlanoAdmin) => [p.plano, String(p.preco)])))
+    }).catch((e) => avisar(mensagemDeErro(e), 'erro'))
+    api.get('/admin/addons').then(({ data }) => {
+      setAddons(data.addons)
+      setPrecosAddon(Object.fromEntries(data.addons.map((a: AddonAdmin) => [a.tipo, String(a.preco)])))
     }).catch((e) => avisar(mensagemDeErro(e), 'erro'))
     api.get('/admin/redes').then(({ data }) => setRedes(data.redes)).catch(() => {})
     api.get('/admin/promos').then(({ data }) => setPromos(data.promos)).catch(() => {})
@@ -62,6 +69,15 @@ export default function Admin() {
       const corpo = Object.fromEntries(Object.entries(precos).map(([k, v]) => [k, Number(v)]))
       await api.put('/admin/planos', { precos: corpo })
       avisar('Preços salvos. Valem para novas assinaturas e trocas de plano.')
+      carregar()
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
+  }
+
+  async function salvarPrecoAddon(tipo: string) {
+    setOcupado(true)
+    try {
+      await api.put(`/admin/addons/${tipo}/preco`, { preco: Number(precosAddon[tipo]) })
+      avisar('Preço do add-on salvo. Vale para novas assinaturas.')
       carregar()
     } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
   }
@@ -109,6 +125,25 @@ export default function Admin() {
             <div><button className="btn secundario" onClick={salvarDescontoAnual} disabled={ocupado}>Salvar %</button></div>
           </div>
         </div>
+      </div>
+
+      {/* ── Add-ons (assinaturas à parte de qualquer plano) ── */}
+      <div className="cartao">
+        <h2 style={{ marginTop: 0 }}>🧩 Add-ons & Preços</h2>
+        <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
+          Recursos vendidos <strong>à parte</strong> de qualquer plano, com assinatura própria. O preço vale para <strong>novas assinaturas</strong>.
+        </div>
+        {addons.map((a) => (
+          <div key={a.tipo} className="linha-campos" style={{ alignItems: 'end' }}>
+            <div className="campo" style={{ maxWidth: 220 }}>
+              <label>{a.nome} (R$/mês)</label>
+              <input type="number" step="0.01" min="0" value={precosAddon[a.tipo] ?? ''} onChange={(e) => setPrecosAddon({ ...precosAddon, [a.tipo]: e.target.value })} />
+            </div>
+            <div><button className="btn" onClick={() => salvarPrecoAddon(a.tipo)} disabled={ocupado}>Salvar</button></div>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', maxWidth: 320 }}>{a.resumo}</div>
+          </div>
+        ))}
+        {addons.length === 0 && <div style={{ color: 'var(--ink-soft)' }}>Nenhum add-on cadastrado.</div>}
       </div>
 
       {/* ── Reajuste anual por IGP-M (contratos existentes, por aniversário) ── */}

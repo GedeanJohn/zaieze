@@ -2,7 +2,8 @@ import { buildApp } from './app'
 import { env } from './env'
 import { segmentarTodasAsLojas } from './modules/clientes/segmentacao'
 import { redistribuirAtrasados } from './modules/leads/leads.service'
-import { limparMidiaExpirada, limparAudiosAntigos } from './modules/midia/limpeza.service'
+import { limparMidiaExpirada, limparAudiosAntigos, limparLooksAntigos } from './modules/midia/limpeza.service'
+import { iniciarWorkerProvador } from './modules/provador/provador.worker'
 import { encerrarAssinaturasVencidas } from './modules/assinaturas/assinatura.service'
 import { aplicarReajustesIgpm } from './modules/assinaturas/igpm.service'
 import { aplicarDistratoTermos } from './modules/contrato/contrato.service'
@@ -36,6 +37,16 @@ async function main() {
       .catch((err) => app.log.error({ err }, 'Falha no expurgo de áudios antigos'))
     limparAudios()
     setInterval(limparAudios, UM_DIA_MS).unref()
+
+    // Provador virtual: worker (poller) que avança os looks pela FASHN (foto → vídeo).
+    iniciarWorkerProvador(app.log)
+
+    // Expurgo das mídias do provador (foto/vídeo) além da retenção (env.PROVADOR_RETENCAO_DIAS). Boot + 24h.
+    const limparLooks = () => limparLooksAntigos()
+      .then((n) => { if (n > 0) app.log.info(`Looks do provador expurgados (retenção): ${n}`) })
+      .catch((err) => app.log.error({ err }, 'Falha no expurgo de looks do provador'))
+    limparLooks()
+    setInterval(limparLooks, UM_DIA_MS).unref()
 
     // Termos/distrato + encerramento de assinaturas: roda no boot e a cada 24h.
     // 1) distrata quem não aceitou os termos no prazo (cancela recorrência + fim de ciclo);

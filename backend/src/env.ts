@@ -37,6 +37,16 @@ const envSchema = z.object({
   R2_PUBLIC_URL: z.string().url().optional(), // ex.: https://cdn.zaieze.com
   R2_ACCESS_KEY_ID: z.string().optional(),
   R2_SECRET_ACCESS_KEY: z.string().optional(),
+  // Provador virtual (módulo 13 — FASHN AI: foto try-on + image-to-video).
+  // Ausente → modo simulado (usa a própria foto do produto; não gera vídeo; não gasta API).
+  FASHN_API_KEY: z.string().optional(),
+  FASHN_API_URL: z.string().url().default('https://api.fashn.ai/v1'),
+  // Cota mensal de looks por rede no Elite (controle de custo). 0 = ilimitado.
+  PROVADOR_COTA_MES: z.coerce.number().default(50),
+  // Dias até o link público de envio da selfie expirar.
+  PROVADOR_LINK_HORAS: z.coerce.number().default(48),
+  // Dias de retenção das mídias do provador (foto/vídeo) antes do expurgo automático.
+  PROVADOR_RETENCAO_DIAS: z.coerce.number().default(60),
   // Domínio base do SaaS multi-tenant (wildcard): cada rede vive em <slug>.DOMINIO_BASE
   DOMINIO_BASE: z.string().default('zaieze.com'),
   // Esquema usado para montar as URLs de tenant (http em dev, https em prod)

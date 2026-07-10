@@ -3,6 +3,7 @@ import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { aplicarReajuste, definirPrecos, listarPlanos, listarReajustes, percentualDescontoAnual, definirDescontoAnual } from '../planos/planos.service'
+import { listarAddons, definirPrecoAddon } from '../addons/addon.service'
 import { normalizarCodigo } from '../promo/promo.service'
 import { cancelarPreapproval, mpConfigurado } from '../assinaturas/mercadopago.service'
 import { excluirDoR2 } from '../midia/r2.service'
@@ -52,6 +53,17 @@ export async function adminRoutes(app: FastifyInstance) {
     const { precos } = precosSchema.parse(request.body)
     await definirPrecos(precos)
     return { ok: true, planos: await listarPlanos() }
+  })
+
+  // ── Add-ons (assinaturas à parte dos planos, ex.: Provador Virtual) ──
+  app.get('/addons', async () => ({ addons: await listarAddons() }))
+
+  const precoAddonSchema = z.object({ preco: z.coerce.number().nonnegative() })
+  app.put('/addons/:tipo/preco', async (request) => {
+    const { tipo } = z.object({ tipo: z.enum(['PROVADOR']) }).parse(request.params)
+    const { preco } = precoAddonSchema.parse(request.body)
+    await definirPrecoAddon(tipo, preco)
+    return { ok: true, addons: await listarAddons() }
   })
 
   // Desconto do plano ANUAL (a priori 10%) — vale para novas assinaturas/trocas de periodicidade.

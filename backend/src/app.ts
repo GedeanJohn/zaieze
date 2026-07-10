@@ -23,7 +23,6 @@ import { orcamentosRoutes } from './modules/orcamentos/orcamentos.routes'
 import { estoquistasRoutes } from './modules/estoquistas/estoquistas.routes'
 import { convitesRoutes } from './modules/convites/convites.routes'
 import { whatsappRoutes } from './modules/whatsapp/whatsapp.routes'
-import { instagramRoutes } from './modules/instagram/instagram.routes'
 import { gruposRoutes } from './modules/whatsapp/grupos.routes'
 import { campanhasRoutes } from './modules/whatsapp/campanhas.routes'
 import { reguasRoutes } from './modules/whatsapp/reguas.routes'
@@ -43,7 +42,10 @@ import { marcaRoutes } from './modules/marca/marca.routes'
 import { leadsRoutes } from './modules/leads/leads.routes'
 import { catalogoRoutes } from './modules/catalogo/catalogo.routes'
 import { midiaRoutes } from './modules/midia/midia.routes'
+import { instagramRoutes } from './modules/instagram/instagram.routes'
 import { afiliadosRoutes } from './modules/afiliados/afiliados.routes'
+import { provadorRoutes } from './modules/provador/provador.routes'
+import { addonsRoutes } from './modules/addons/addons.routes'
 
 export async function buildApp() {
   // trustProxy: lê o IP real do cliente via X-Forwarded-For (atrás do nginx) — necessário p/ rate limit por IP
@@ -99,7 +101,6 @@ export async function buildApp() {
   await app.register(estoquistasRoutes, { prefix: '/api/estoquistas' })
   await app.register(convitesRoutes, { prefix: '/api/convites' })
   await app.register(whatsappRoutes, { prefix: '/api/whatsapp' })
-  await app.register(instagramRoutes, { prefix: '/api/instagram' })
   await app.register(gruposRoutes, { prefix: '/api/whatsapp' })
   await app.register(campanhasRoutes, { prefix: '/api/campanhas' })
   await app.register(reguasRoutes, { prefix: '/api/reguas' })
@@ -119,7 +120,10 @@ export async function buildApp() {
   await app.register(leadsRoutes, { prefix: '/api/leads' })
   await app.register(catalogoRoutes, { prefix: '/api/catalogo' })
   await app.register(midiaRoutes, { prefix: '/api/midia' })
+  await app.register(instagramRoutes, { prefix: '/api/instagram' })
   await app.register(afiliadosRoutes, { prefix: '/api/afiliados' })
+  await app.register(provadorRoutes, { prefix: '/api/provador' })
+  await app.register(addonsRoutes, { prefix: '/api/addons' })
 
   return app
 }

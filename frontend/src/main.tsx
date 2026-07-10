@@ -31,7 +31,6 @@ import Contrato from './paginas/Contrato'
 import Admin from './paginas/Admin'
 import WhatsAppOficial from './paginas/WhatsApp'
 import InstagramOficial from './paginas/Instagram'
-import MercadoLivre from './paginas/MercadoLivre'
 import PainelAfiliado from './paginas/afiliado/PainelAfiliado'
 import Conta from './paginas/Conta'
 import Convite from './paginas/Convite'
@@ -113,7 +112,6 @@ function CrmApp() {
         <Route path="admin" element={<Admin />} />
         <Route path="whatsapp-config" element={<WhatsAppOficial />} />
         <Route path="instagram-config" element={<InstagramOficial />} />
-        <Route path="mercadolivre-config" element={<MercadoLivre />} />
         <Route path="conta" element={<Conta />} />
       </Route>
       {/* Catálogo público da vendedora: <marca>.zaieze.com/<vendedora> (sem login) */}

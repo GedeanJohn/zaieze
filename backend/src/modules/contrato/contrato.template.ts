@@ -15,10 +15,10 @@
  * e o job de reaceite/distrato são agnósticos de idioma — o idioma exibido em cada
  * aceite fica registrado à parte (ver AceiteContrato.idioma).
  */
-export const CONTRATO_VERSAO = '1.0-2026-06'
+export const CONTRATO_VERSAO = '1.1-2026-07'
 
 /** Data em que a versão vigente entrou no ar — base do prazo de reaceite. */
-export const CONTRATO_PUBLICADO_EM = new Date('2026-06-27T00:00:00-03:00')
+export const CONTRATO_PUBLICADO_EM = new Date('2026-07-11T00:00:00-03:00')
 
 /** Janela (dias corridos) para aceitar/reaceitar antes do distrato. */
 export const JANELA_REACEITE_DIAS = 30
@@ -266,6 +266,25 @@ const CLAUSULA_BUILDERS: Record<ContratoIdioma, ClausulaBuilder> = {
     },
     {
       n: 11,
+      titulo: 'DO USO DE MATERIAL PARA TREINAMENTO E APRIMORAMENTO DE INTELIGÊNCIA ARTIFICIAL',
+      paragrafos: [
+        `A CONTRATANTE autoriza a CONTRATADA a utilizar fotos, vídeos e demais materiais de produtos e catálogo inseridos na ` +
+          `plataforma — incluindo os fornecidos por marcas, fornecedores, confecções e representantes comerciais da CONTRATANTE ` +
+          `— para o desenvolvimento, treinamento, ajuste fino (fine-tuning) e aprimoramento de modelos de inteligência ` +
+          `artificial da CONTRATADA, incluindo, entre outros, o módulo de Provador Virtual, presente e futuro.`,
+        `A CONTRATANTE declara possuir os direitos necessários (autorais, de imagem e de uso comercial) sobre o material que ` +
+          `insere na plataforma, e se responsabiliza por obter, junto às marcas, fornecedores e eventuais modelos fotografados, ` +
+          `a autorização específica para esse uso quando exigida por contrato ou por lei, isentando a CONTRATADA de qualquer ` +
+          `responsabilidade decorrente do uso de material sem a devida autorização de origem.`,
+        `O uso de fotos de clientes finais (selfies enviadas na funcionalidade de Provador Virtual) para essa mesma finalidade ` +
+          `depende de consentimento específico e separado do próprio cliente final, obtido diretamente pela CONTRATADA no ` +
+          `momento do uso da funcionalidade, nos termos dos arts. 7º e 8º da LGPD, e não está coberto por este item.`,
+        `Este uso não confere à CONTRATANTE qualquer direito sobre os modelos de inteligência artificial resultantes, que ` +
+          `permanecem de propriedade exclusiva da CONTRATADA, nos termos da cláusula de Propriedade Intelectual.`,
+      ],
+    },
+    {
+      n: 12,
       titulo: 'DO ACEITE ELETRÔNICO',
       paragrafos: [
         `As partes reconhecem a validade e a eficácia do aceite eletrônico deste contrato, manifestado pela CONTRATANTE, por meio ` +
@@ -274,7 +293,7 @@ const CLAUSULA_BUILDERS: Record<ContratoIdioma, ClausulaBuilder> = {
       ],
     },
     {
-      n: 12,
+      n: 13,
       titulo: 'DO FORO',
       paragrafos: [
         `As partes elegem o foro da Comarca de ${e.cidadeForo} para dirimir quaisquer dúvidas ou litígios oriundos do presente ` +
@@ -410,6 +429,27 @@ const CLAUSULA_BUILDERS: Record<ContratoIdioma, ClausulaBuilder> = {
     },
     {
       n: 11,
+      titulo: 'USE OF MATERIAL FOR ARTIFICIAL INTELLIGENCE TRAINING AND IMPROVEMENT',
+      paragrafos: [
+        `The CLIENT authorizes the SERVICE PROVIDER to use photos, videos, and other product and catalog materials entered ` +
+          `on the platform — including those supplied by the CLIENT's brands, suppliers, manufacturers, and commercial ` +
+          `representatives — for the development, training, fine-tuning, and improvement of the SERVICE PROVIDER's ` +
+          `artificial intelligence models, including, among others, the Virtual Fitting Room (Provador Virtual) module, ` +
+          `present and future.`,
+        `The CLIENT represents that it holds the necessary rights (copyright, image, and commercial use rights) over the ` +
+          `material it enters on the platform, and is responsible for obtaining, from brands, suppliers, and any ` +
+          `photographed models, the specific authorization for such use where required by contract or by law, holding the ` +
+          `SERVICE PROVIDER harmless from any liability arising from the use of material lacking due authorization at its ` +
+          `source.`,
+        `The use of end-customer photos (selfies submitted through the Virtual Fitting Room feature) for this same purpose ` +
+          `depends on specific, separate consent from the end customer, obtained directly by the SERVICE PROVIDER at the ` +
+          `time the feature is used, pursuant to Articles 7 and 8 of the LGPD, and is not covered by this clause.`,
+        `This use does not grant the CLIENT any right over the resulting artificial intelligence models, which remain the ` +
+          `exclusive property of the SERVICE PROVIDER, pursuant to the Intellectual Property clause.`,
+      ],
+    },
+    {
+      n: 12,
       titulo: 'ELECTRONIC ACCEPTANCE',
       paragrafos: [
         `The parties acknowledge the validity and legal effect of the electronic acceptance of this Agreement, given by the ` +
@@ -419,7 +459,7 @@ const CLAUSULA_BUILDERS: Record<ContratoIdioma, ClausulaBuilder> = {
       ],
     },
     {
-      n: 12,
+      n: 13,
       titulo: 'GOVERNING LAW AND VENUE',
       paragrafos: [
         `The parties elect the courts of the Judicial District (Comarca) of ${e.cidadeForo}, Brazil, to settle any questions ` +
@@ -553,6 +593,26 @@ const CLAUSULA_BUILDERS: Record<ContratoIdioma, ClausulaBuilder> = {
     },
     {
       n: 11,
+      titulo: 'DEL USO DE MATERIAL PARA ENTRENAMIENTO Y MEJORA DE INTELIGENCIA ARTIFICIAL',
+      paragrafos: [
+        `El CLIENTE autoriza al PROVEEDOR a utilizar fotos, videos y demás materiales de productos y catálogo ingresados en ` +
+          `la plataforma — incluidos los suministrados por marcas, proveedores, confecciones y representantes comerciales ` +
+          `del CLIENTE — para el desarrollo, entrenamiento, ajuste fino (fine-tuning) y mejora de los modelos de ` +
+          `inteligencia artificial del PROVEEDOR, incluyendo, entre otros, el módulo de Probador Virtual, presente y futuro.`,
+        `El CLIENTE declara contar con los derechos necesarios (de autor, de imagen y de uso comercial) sobre el material ` +
+          `que ingresa en la plataforma, y se responsabiliza de obtener, ante marcas, proveedores y eventuales modelos ` +
+          `fotografiadas, la autorización específica para ese uso cuando sea exigida por contrato o por ley, eximiendo al ` +
+          `PROVEEDOR de cualquier responsabilidad derivada del uso de material sin la debida autorización de origen.`,
+        `El uso de fotos de clientas finales (selfies enviadas en la funcionalidad de Probador Virtual) para esa misma ` +
+          `finalidad depende del consentimiento específico y separado de la propia clienta final, obtenido directamente por ` +
+          `el PROVEEDOR en el momento del uso de la funcionalidad, en los términos de los arts. 7º y 8º de la LGPD, y no ` +
+          `está cubierto por este apartado.`,
+        `Este uso no confiere al CLIENTE ningún derecho sobre los modelos de inteligencia artificial resultantes, que ` +
+          `permanecen de propiedad exclusiva del PROVEEDOR, en los términos del apartado de Propiedad Intelectual.`,
+      ],
+    },
+    {
+      n: 12,
       titulo: 'DE LA ACEPTACIÓN ELECTRÓNICA',
       paragrafos: [
         `Las partes reconocen la validez y eficacia de la aceptación electrónica de este contrato, manifestada por el ` +
@@ -562,7 +622,7 @@ const CLAUSULA_BUILDERS: Record<ContratoIdioma, ClausulaBuilder> = {
       ],
     },
     {
-      n: 12,
+      n: 13,
       titulo: 'DEL FUERO',
       paragrafos: [
         `Las partes eligen el fuero de la Comarca de ${e.cidadeForo}, Brasil, para dirimir cualquier duda o litigio derivado ` +

@@ -133,12 +133,6 @@ export default function Landing() {
       </header>
 
       <section className="hero">
-        <div className="hero-promo">
-          <span className="tag">{t('assessorPromo.tag')}</span>
-          <strong>{t('assessorPromo.titulo')}</strong>
-          <p>{t('assessorPromo.texto')}</p>
-          <Link className="btn secundario" to="/assessor-de-moda">{t('assessorPromo.cta')}</Link>
-        </div>
         <img className="hero-logo" src="/zaieze-branco.png" alt="ZAIEZE" />
         <h1>{t('hero.titulo')}</h1>
         <p>{t('hero.texto')}</p>
@@ -152,6 +146,17 @@ export default function Landing() {
           <span>🎧 {t('selos.suporte')}</span>
           <span>☁️ {t('selos.nuvem')}</span>
           <span>🔒 {t('selos.seguranca')}</span>
+        </div>
+      </section>
+
+      <section className="assessor-banner">
+        <span className="tag">{t('assessorPromo.tag')}</span>
+        <div className="assessor-banner-corpo">
+          <div>
+            <strong>{t('assessorPromo.titulo')}</strong>
+            <p>{t('assessorPromo.texto')}</p>
+          </div>
+          <Link className="btn secundario grande" to="/assessor-de-moda">{t('assessorPromo.cta')}</Link>
         </div>
       </section>
 

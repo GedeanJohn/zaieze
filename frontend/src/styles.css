@@ -395,18 +395,22 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
 }
 .selos-hero span { display: inline-flex; align-items: center; gap: 6px; }
 
-/* Card promocional flutuante no canto do hero (plano Assessor de Moda) — só em telas largas,
-   onde sobra espaço ao lado do título centralizado; em telas estreitas viraria sobreposição. */
-.hero-promo {
-  position: absolute; top: 30px; right: 8vw; width: 250px; text-align: left;
-  background: var(--zz-surface); border: 1px solid var(--zz-line); border-radius: 10px; padding: 20px;
+/* Banner de largura cheia (plano Assessor de Moda) — entre o hero e a seção "Recursos". */
+.assessor-banner {
+  max-width: 1100px; margin: 40px auto 0; padding: 0 8vw;
 }
-.hero-promo .tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #000; background: #fff; padding: 3px 10px; border-radius: 999px; margin-bottom: 10px; }
-.hero-promo strong { display: block; font-size: 15px; margin-bottom: 6px; letter-spacing: 0.02em; }
-.hero-promo p { font-size: 12px; color: var(--zz-mut); line-height: 1.6; margin: 0 0 14px; text-align: left; }
-.hero-promo a { display: inline-block; font-size: 12px; }
-@media (max-width: 1100px) {
-  .hero-promo { display: none; }
+.assessor-banner .tag {
+  display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #000; background: #fff; padding: 3px 10px; border-radius: 999px; margin-bottom: 12px;
+}
+.assessor-banner-corpo {
+  display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap;
+  background: var(--zz-surface); border: 1px solid var(--zz-line); border-radius: 10px; padding: 28px 32px;
+}
+.assessor-banner-corpo strong { display: block; font-size: 18px; margin-bottom: 6px; letter-spacing: 0.02em; }
+.assessor-banner-corpo p { font-size: 14px; color: var(--zz-mut); line-height: 1.6; margin: 0; max-width: 520px; }
+@media (max-width: 640px) {
+  .assessor-banner-corpo { flex-direction: column; align-items: flex-start; padding: 22px; }
 }
 
 .faixa {

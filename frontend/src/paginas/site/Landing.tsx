@@ -133,6 +133,12 @@ export default function Landing() {
       </header>
 
       <section className="hero">
+        <div className="hero-promo">
+          <span className="tag">{t('assessorPromo.tag')}</span>
+          <strong>{t('assessorPromo.titulo')}</strong>
+          <p>{t('assessorPromo.texto')}</p>
+          <Link className="btn secundario" to="/assessor-de-moda">{t('assessorPromo.cta')}</Link>
+        </div>
         <img className="hero-logo" src="/zaieze-branco.png" alt="ZAIEZE" />
         <h1>{t('hero.titulo')}</h1>
         <p>{t('hero.texto')}</p>

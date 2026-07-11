@@ -10,6 +10,7 @@ import { excluirDoR2 } from '../midia/r2.service'
 import { removerUploadLocal } from '../midia/limpeza.service'
 import { gerarSenhaProvisoria } from '../auth/senha-provisoria'
 import { criarAfiliado } from '../afiliados/afiliado.service'
+import { criarAssessor, slugDisponivel, normalizarSlug } from '../assessores/assessor.service'
 
 const num = (v: unknown) => Number(v ?? 0)
 
@@ -404,5 +405,73 @@ export async function adminRoutes(app: FastifyInstance) {
         ...(b.valorRetencaoFiscal !== undefined ? { valorRetencaoFiscal: b.valorRetencaoFiscal } : {}),
       },
     })
+  })
+
+  // ── Assessores de Moda (subdomínio próprio, representam marcas dentro/fora do ZAIEZE) ──
+  app.get('/assessores', async () => {
+    const assessores = await prisma.assessor.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        usuario: { select: { id: true, nome: true, email: true, telefone: true, ativo: true } },
+        assinatura: { select: { status: true, simulada: true, valor: true } },
+        _count: { select: { marcas: true, vendas: true } },
+      },
+    })
+    return {
+      assessores: assessores.map((a) => ({
+        id: a.id, slug: a.slug, marcas: a._count.marcas, vendas: a._count.vendas, usuario: a.usuario,
+        assinatura: a.assinatura ? { status: a.assinatura.status, simulada: a.assinatura.simulada, valor: num(a.assinatura.valor) } : null,
+      })),
+    }
+  })
+
+  const criarAssessorSchema = z.object({
+    nome: z.string().min(2),
+    email: z.string().email(),
+    telefone: z.string().trim().optional(),
+    slug: z.string().trim().min(2).max(60),
+  })
+  app.post('/assessores', async (request, reply) => {
+    const b = criarAssessorSchema.parse(request.body)
+    const { assessor, senha } = await criarAssessor(b)
+    return reply.code(201).send({ assessor, senha })
+  })
+
+  app.get('/assessores/slug-disponivel', async (request) => {
+    const { slug } = request.query as { slug?: string }
+    const normalizado = normalizarSlug(slug ?? '')
+    return { slug: normalizado, disponivel: normalizado.length >= 2 && (await slugDisponivel(normalizado)) }
+  })
+
+  const editarAssessorSchema = z.object({
+    nome: z.string().min(2).optional(),
+    telefone: z.string().trim().nullable().optional(),
+    ativo: z.boolean().optional(),
+  })
+  app.patch('/assessores/:id', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const b = editarAssessorSchema.parse(request.body)
+    const assessor = await prisma.assessor.findUnique({ where: { id } })
+    if (!assessor) return reply.code(404).send({ erro: 'Assessor(a) não encontrado(a)' })
+    await prisma.usuario.update({
+      where: { id: assessor.usuarioId },
+      data: {
+        ...(b.nome !== undefined ? { nome: b.nome } : {}),
+        ...(b.telefone !== undefined ? { telefone: b.telefone } : {}),
+        ...(b.ativo !== undefined ? { ativo: b.ativo } : {}),
+      },
+    })
+    return { ok: true }
+  })
+
+  // Preço da assinatura mensal do plano "Assessor(a) de Moda" (página comercial).
+  app.get('/assessores/config', async () => {
+    const config = await prisma.configAssessores.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} })
+    return { precoMensal: num(config.precoMensal) }
+  })
+  app.put('/assessores/config', async (request) => {
+    const { precoMensal } = z.object({ precoMensal: z.coerce.number().positive() }).parse(request.body)
+    const config = await prisma.configAssessores.upsert({ where: { id: 1 }, create: { id: 1, precoMensal }, update: { precoMensal } })
+    return { precoMensal: num(config.precoMensal) }
   })
 }

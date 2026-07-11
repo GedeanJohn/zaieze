@@ -50,6 +50,7 @@ enum Role {
   VENDEDORA // atende a própria carteira; vê só o próprio relatório
   CLIENTE // portal do cliente (fase 7)
   AFILIADO // parceiro comercial: renda recorrente por indicação, sem rede/loja
+  ASSESSORA // assessor(a) de moda: representa marcas (dentro ou fora do ZAIEZE) no subdomínio próprio dela, sem rede/loja
 }
 
 enum StatusComissao {
@@ -272,6 +273,7 @@ model Rede {
   aceitesContrato AceiteContrato[]
   afiliadoOrigem Afiliado? @relation(fields: [afiliadoId], references: [id], onDelete: SetNull)
   looksProvador   LookProvador[]
+  assessorMarcas  AssessorMarca[]
 
   @@map("redes")
 }
@@ -564,6 +566,7 @@ model Usuario {
   looksProvador     LookProvador[]     @relation("LooksProvadorCriados")
   solicitacoesSenha SolicitacaoSenha[]
   afiliado          Afiliado?
+  assessor          Assessor?
 
   @@unique([lojaId, slugCatalogo])
   @@index([lojaId, role])
@@ -1311,6 +1314,138 @@ model ConfigAfiliados {
   updatedAt        DateTime @updatedAt
 
   @@map("config_afiliados")
+}
+
+// ─────────────────────────── Assessor(a) de Moda ───────────────────────────
+// Papel sem rede/loja (como o Afiliado), mas com subdomínio PRÓPRIO (<slug>.zaieze.com):
+// representa marcas de moda — algumas já clientes ZAIEZE, outras totalmente externas (só redes
+// sociais/WhatsApp) — numa vitrine pública única. Toda venda é lançada manualmente por ela
+// (mesmo quando a marca é cliente ZAIEZE — v1 não integra automaticamente com o funil da marca).
+model Assessor {
+  id        String   @id @default(cuid())
+  usuarioId String   @unique
+  slug      String   @unique // subdomínio próprio: <slug>.zaieze.com — único também frente a Rede.slug (checado em código, tabelas diferentes)
+  bio       String? // apresentação exibida na capa da vitrine pública
+  whatsapp  String? // contato pessoal dela (distinto do whatsapp de cada marca representada)
+  instagram String?
+  site      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usuario Usuario              @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  marcas  AssessorMarca[]
+  vendas  VendaAssessora[]
+  assinatura      AssinaturaAssessor?
+  aceitesContrato AceiteContratoAssessor[]
+
+  @@map("assessores")
+}
+
+/// Um "cartão de fornecedor" representado pela assessora — campos padronizados no modelo do
+/// catálogo de referência (descrição/pagamento/envio/condições em bullets, 1 item por linha).
+model AssessorMarca {
+  id         String  @id @default(cuid())
+  assessorId String
+  redeId     String? // preenchido quando a marca já é cliente ZAIEZE — hoje é só referência/selo, sem crédito automático de venda
+  nome       String
+  logoUrl    String?
+  descricao       String? // bullets, 1 por linha (ex.: "Fabricação própria")
+  formasPagamento String? // bullets, 1 por linha (ex.: "PIX", "Cartão em até 4x")
+  modoEnvio       String? // bullets, 1 por linha
+  condicoesCompra String? // bullets, 1 por linha (ex.: "Mínimo 12 peças", "Não precisa CNPJ")
+  tamanhos        String?
+  valores         String? // texto livre (ex.: "De R$ 59,90 a R$ 299,90")
+  endereco        String?
+  cnpj            String?
+  instagram String?
+  facebook  String?
+  whatsapp  String?
+  telegram  String?
+  tiktok    String?
+  site      String?
+  percentualComissaoSugerido Decimal? @db.Decimal(5, 2) // pré-preenche o % ao lançar uma venda desta marca
+  ordem     Int      @default(0) // ordem manual de exibição na vitrine
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assessor Assessor         @relation(fields: [assessorId], references: [id], onDelete: Cascade)
+  rede     Rede?            @relation(fields: [redeId], references: [id], onDelete: SetNull)
+  vendas   VendaAssessora[]
+
+  @@index([assessorId, ordem])
+  @@map("assessor_marcas")
+}
+
+/// Lançamento manual de venda (comissão) da assessora para uma marca representada.
+model VendaAssessora {
+  id                 String   @id @default(cuid())
+  assessorId         String
+  assessorMarcaId    String
+  data               DateTime // data da venda informada pela assessora (não é o createdAt)
+  valorVenda         Decimal  @db.Decimal(12, 2)
+  percentualComissao Decimal  @db.Decimal(5, 2)
+  totalComissao      Decimal  @db.Decimal(12, 2) // = valorVenda * percentualComissao/100, congelado no lançamento (sobrevive a mudanças futuras do %)
+  observacao         String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  assessor      Assessor      @relation(fields: [assessorId], references: [id], onDelete: Cascade)
+  assessorMarca AssessorMarca @relation(fields: [assessorMarcaId], references: [id], onDelete: Cascade)
+
+  @@index([assessorId, data])
+  @@map("vendas_assessora")
+}
+
+/// Preço da assinatura mensal do plano "Assessor(a) de Moda" (página comercial) — editável
+/// pelo SUPER_ADMIN no Admin. Linha única (id fixo = 1), mesmo padrão de ConfigAfiliados.
+model ConfigAssessores {
+  id          Int      @id @default(1)
+  precoMensal Decimal  @default(89.99) @db.Decimal(10, 2)
+  updatedAt   DateTime @updatedAt
+
+  @@map("config_assessores")
+}
+
+/// Assinatura mensal recorrente da assessora (Mercado Pago) — mesmo padrão de AssinaturaAddon
+/// (StatusAssinatura: PENDENTE até o pagamento confirmar, ATIVA, CANCELADA). Uma conta criada
+/// pelo admin (sem passar pelo checkout público) simplesmente não tem este registro — login
+/// livre nesse caso (ver auth.routes.ts); só bloqueia quando HÁ registro e ele não está ATIVA.
+model AssinaturaAssessor {
+  id                       String           @id @default(cuid())
+  assessorId               String           @unique
+  status                   StatusAssinatura @default(PENDENTE)
+  valor                    Decimal          @db.Decimal(10, 2)
+  mpPreapprovalId          String?          @unique
+  simulada                 Boolean          @default(false)
+  cicloFimEm               DateTime?
+  cancelamentoSolicitadoEm DateTime?
+  cancelamentoOrigem       String?
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+
+  assessor Assessor @relation(fields: [assessorId], references: [id], onDelete: Cascade)
+
+  @@map("assinaturas_assessor")
+}
+
+/// Aceite eletrônico do contrato do plano Assessor de Moda — registrado no cadastro (checkout
+/// público), antes de seguir para o pagamento. Modelo próprio (não reaproveita AceiteContrato,
+/// que é por Rede) porque a assessora não tem redeId.
+model AceiteContratoAssessor {
+  id             String   @id @default(cuid())
+  assessorId     String
+  versao         String
+  assinanteNome  String
+  assinanteEmail String
+  ip             String?
+  userAgent      String?
+  aceitoEm       DateTime @default(now())
+
+  assessor Assessor @relation(fields: [assessorId], references: [id], onDelete: Cascade)
+
+  @@index([assessorId])
+  @@map("aceites_contrato_assessor")
 }
 
 // ─────────────────────────── Provador virtual (módulo 13 — Elite) ───────────────────────────

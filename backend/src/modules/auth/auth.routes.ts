@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
 import { aplicarFimDeCiclo } from '../assinaturas/assinatura.service'
+import { aplicarFimDeCicloAssessor } from '../assessores/assinatura-assessor.service'
 import { enviarTemplatePlataforma } from '../whatsapp/meta.service'
 import { gerarSenhaProvisoria } from './senha-provisoria'
 import { normalizarTelefone } from '../../lib/telefone'
@@ -59,9 +60,33 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(403).send({ erro: 'Rede desativada' })
     }
 
+    // ASSESSORA tem subdomínio PRÓPRIO (<slug>.zaieze.com, ver módulo assessores) — isolamento
+    // contra o slug dela, não contra uma Rede (ela não pertence a nenhuma).
+    const assessor = usuario.role === 'ASSESSORA'
+      ? await prisma.assessor.findUnique({ where: { usuarioId: usuario.id }, select: { id: true, slug: true } })
+      : null
+    const assessorSlug = assessor?.slug ?? null
+
+    // Assinatura da assessora: conta criada pelo admin (sem checkout) não tem registro — login
+    // livre. Havendo registro, só bloqueia se NÃO estiver ATIVA (pendente de 1º pagamento ou cancelada).
+    if (assessor) {
+      await aplicarFimDeCicloAssessor(assessor.id)
+      const assinatura = await prisma.assinaturaAssessor.findUnique({ where: { assessorId: assessor.id }, select: { status: true } })
+      if (assinatura && assinatura.status !== 'ATIVA') {
+        return reply.code(403).send({
+          erro: assinatura.status === 'PENDENTE'
+            ? 'Sua assinatura ainda não foi confirmada pelo Mercado Pago.'
+            : 'Sua assinatura foi encerrada. Assine novamente para voltar a acessar.',
+        })
+      }
+    }
+
     // Isolamento por subdomínio (wildcard): a conta só entra no seu próprio tenant.
     // SUPER_ADMIN (operador do SaaS) e AFILIADO (sem rede — acessa por /painel) acessam de qualquer endereço.
-    if (body.redeSlug && usuario.role !== 'SUPER_ADMIN' && usuario.role !== 'AFILIADO' && rede?.slug !== body.redeSlug) {
+    if (body.redeSlug && usuario.role === 'ASSESSORA' && assessorSlug !== body.redeSlug) {
+      return reply.code(403).send({ erro: 'Esta conta não pertence a este endereço.' })
+    }
+    if (body.redeSlug && usuario.role !== 'SUPER_ADMIN' && usuario.role !== 'AFILIADO' && usuario.role !== 'ASSESSORA' && rede?.slug !== body.redeSlug) {
       return reply.code(403).send({ erro: 'Esta conta não pertence a este endereço.' })
     }
 
@@ -81,6 +106,7 @@ export async function authRoutes(app: FastifyInstance) {
         idioma: usuario.idioma,
         rede: rede ? { id: rede.id, nome: rede.nome, plano: rede.plano } : null,
         loja: usuario.loja ? { id: usuario.loja.id, nome: usuario.loja.nome, slug: usuario.loja.slug } : null,
+        assessor: assessorSlug ? { slug: assessorSlug } : null,
       },
     }
   })

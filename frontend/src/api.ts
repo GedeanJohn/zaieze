@@ -20,7 +20,7 @@ api.interceptors.response.use(
   },
 )
 
-export type Papel = 'SUPER_ADMIN' | 'GESTOR' | 'ESTOQUISTA' | 'GERENTE' | 'VENDEDORA' | 'CLIENTE' | 'AFILIADO'
+export type Papel = 'SUPER_ADMIN' | 'GESTOR' | 'ESTOQUISTA' | 'GERENTE' | 'VENDEDORA' | 'CLIENTE' | 'AFILIADO' | 'ASSESSORA'
 
 export interface Usuario {
   id: string
@@ -31,6 +31,7 @@ export interface Usuario {
   idioma?: string
   rede: { id: string; nome: string; plano: string } | null
   loja: { id: string; nome: string; slug: string } | null
+  assessor?: { slug: string } | null
 }
 
 /** Atualiza o usuário salvo no localStorage (ex.: após trocar a foto de perfil). */
@@ -55,6 +56,7 @@ export const rotuloPapel: Record<Papel, string> = {
   VENDEDORA: 'Vendedora',
   CLIENTE: 'Cliente',
   AFILIADO: 'Afiliado',
+  ASSESSORA: 'Assessor(a) de Moda',
 }
 
 export const rotuloMovimento: Record<string, string> = {

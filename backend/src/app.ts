@@ -46,6 +46,7 @@ import { instagramRoutes } from './modules/instagram/instagram.routes'
 import { afiliadosRoutes } from './modules/afiliados/afiliados.routes'
 import { provadorRoutes } from './modules/provador/provador.routes'
 import { addonsRoutes } from './modules/addons/addons.routes'
+import { assessoresRoutes } from './modules/assessores/assessores.routes'
 
 export async function buildApp() {
   // trustProxy: lê o IP real do cliente via X-Forwarded-For (atrás do nginx) — necessário p/ rate limit por IP
@@ -124,6 +125,7 @@ export async function buildApp() {
   await app.register(afiliadosRoutes, { prefix: '/api/afiliados' })
   await app.register(provadorRoutes, { prefix: '/api/provador' })
   await app.register(addonsRoutes, { prefix: '/api/addons' })
+  await app.register(assessoresRoutes, { prefix: '/api/assessores' })
 
   return app
 }

@@ -14,6 +14,7 @@ import { normalizarTelefone } from '../../lib/telefone'
 import { confirmarCicloEComissionar, gerarComissaoDoCiclo, normalizarCodigo as normalizarCodigoAfiliado } from '../afiliados/afiliado.service'
 import { obterCotacaoAtual } from '../cambio/cambio.service'
 import { confirmarCicloAddon, solicitarCancelamentoAddon } from '../addons/addon.service'
+import { confirmarCicloAssessor, solicitarCancelamentoAssessor } from '../assessores/assinatura-assessor.service'
 
 const arred2 = (n: number) => Math.round(n * 100) / 100
 
@@ -234,6 +235,18 @@ export async function assinaturasRoutes(app: FastifyInstance) {
         await confirmarCicloAddon(addon.redeId, addon.tipo)
       } else if (status === 'cancelled' || status === 'paused') {
         await solicitarCancelamentoAddon(addon.redeId, addon.tipo, 'MERCADO_PAGO')
+      }
+      return reply.code(200).send({ ok: true })
+    }
+
+    // Nem plano nem add-on de rede — pode ser a assinatura de um(a) Assessor(a) de Moda.
+    const assinaturaAssessor = await prisma.assinaturaAssessor.findFirst({ where: { mpPreapprovalId: id } })
+    if (assinaturaAssessor) {
+      const status = await consultarPreapproval(id)
+      if (status === 'authorized') {
+        await confirmarCicloAssessor(assinaturaAssessor.assessorId)
+      } else if (status === 'cancelled' || status === 'paused') {
+        await solicitarCancelamentoAssessor(assinaturaAssessor.assessorId, 'MERCADO_PAGO')
       }
     }
     return reply.code(200).send({ ok: true })

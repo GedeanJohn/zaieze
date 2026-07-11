@@ -156,6 +156,9 @@ export default function Admin() {
       <AfiliadosSection />
       <ComissoesAfiliadoSection />
 
+      {/* ── Assessores de Moda ── */}
+      <AssessoresSection />
+
       {/* ── Redes (clientes) ── */}
       <div className="cartao">
         <h2 style={{ marginTop: 0 }}>🏢 Redes (clientes) · {redes.length}</h2>
@@ -654,6 +657,113 @@ function ComissoesAfiliadoSection() {
             </tr>
           ))}
           {comissoes.length === 0 && <tr><td colSpan={9} style={{ color: 'var(--ink-soft)' }}>Nenhuma comissão aqui.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+interface AssessorAdmin {
+  id: string; slug: string; marcas: number; vendas: number
+  usuario: { id: string; nome: string; email: string; telefone: string | null; ativo: boolean }
+  assinatura: { status: 'PENDENTE' | 'ATIVA' | 'CANCELADA'; simulada: boolean; valor: number } | null
+}
+
+function AssessoresSection() {
+  const [assessores, setAssessores] = useState<AssessorAdmin[]>([])
+  const [precoMensal, setPrecoMensal] = useState('89.99')
+  const [salvandoPreco, setSalvandoPreco] = useState(false)
+  const [nome, setNome] = useState('')
+  const [email, setEmail] = useState('')
+  const [telefone, setTelefone] = useState('')
+  const [slug, setSlug] = useState('')
+  const [erro, setErro] = useState('')
+  const [ocupado, setOcupado] = useState(false)
+  const [gerado, setGerado] = useState<{ nome: string; slug: string; senha: string } | null>(null)
+
+  function carregar() {
+    api.get('/admin/assessores').then(({ data }) => setAssessores(data.assessores)).catch(() => {})
+    api.get('/admin/assessores/config').then(({ data }) => setPrecoMensal(String(data.precoMensal))).catch(() => {})
+  }
+  useEffect(() => { carregar() }, [])
+
+  async function salvarPreco() {
+    setSalvandoPreco(true)
+    try {
+      await api.put('/admin/assessores/config', { precoMensal: Number(precoMensal) })
+    } catch (e) { setErro(mensagemDeErro(e)) } finally { setSalvandoPreco(false) }
+  }
+
+  async function criar(e: React.FormEvent) {
+    e.preventDefault(); setErro(''); setOcupado(true)
+    try {
+      const { data } = await api.post('/admin/assessores', { nome, email, telefone: telefone || undefined, slug })
+      setGerado({ nome, slug: data.assessor.slug, senha: data.senha })
+      setNome(''); setEmail(''); setTelefone(''); setSlug('')
+      carregar()
+    } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setOcupado(false) }
+  }
+
+  async function alternarAtivo(a: AssessorAdmin) {
+    await api.patch(`/admin/assessores/${a.id}`, { ativo: !a.usuario.ativo }).catch(() => {})
+    carregar()
+  }
+
+  return (
+    <div className="cartao">
+      <h2 style={{ marginTop: 0 }}>👗 Assessores de Moda</h2>
+      <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
+        Papel com <strong>subdomínio próprio</strong> (<code>slug.zaieze.com</code>) que representa marcas de moda
+        (do ZAIEZE ou externas) numa vitrine pública. Lança as próprias vendas/comissão manualmente.
+        Assinatura mensal própria, vendida na página comercial.
+      </div>
+
+      <div className="linha-campos" style={{ alignItems: 'end', marginBottom: 14 }}>
+        <div className="campo" style={{ maxWidth: 160 }}>
+          <label>Preço mensal (R$)</label>
+          <input type="number" min="0" step="0.01" value={precoMensal} onChange={(e) => setPrecoMensal(e.target.value)} />
+        </div>
+        <div><button type="button" className="btn secundario" onClick={salvarPreco} disabled={salvandoPreco}>Salvar preço</button></div>
+      </div>
+
+      <form onSubmit={criar} className="linha-campos" style={{ alignItems: 'end' }}>
+        <div className="campo"><label>Nome</label><input value={nome} onChange={(e) => setNome(e.target.value)} required /></div>
+        <div className="campo"><label>E-mail</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
+        <div className="campo"><label>Telefone (opcional)</label><input value={telefone} onChange={(e) => setTelefone(e.target.value)} /></div>
+        <div className="campo" style={{ maxWidth: 200 }}>
+          <label>Subdomínio (slug)</label>
+          <input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="ex.: joana" required />
+        </div>
+        <div><button className="btn" disabled={ocupado}>Criar assessor(a)</button></div>
+      </form>
+      {erro && <div className="alerta" style={{ marginTop: 8 }}>{erro}</div>}
+      {gerado && (
+        <div className="sucesso" style={{ marginTop: 10 }}>
+          Assessor(a) <strong>{gerado.nome}</strong> criado(a) — endereço <strong>{gerado.slug}.zaieze.com</strong>, senha provisória <strong>{gerado.senha}</strong>. Copie e envie a ele(a).
+        </div>
+      )}
+
+      <table style={{ marginTop: 12 }}>
+        <thead><tr><th>Nome</th><th>Endereço</th><th>Marcas</th><th>Vendas lançadas</th><th>Assinatura</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          {assessores.map((a) => (
+            <tr key={a.id} style={{ opacity: a.usuario.ativo ? 1 : 0.5 }}>
+              <td>{a.usuario.nome}</td>
+              <td><strong>{a.slug}.zaieze.com</strong></td>
+              <td>{a.marcas}</td>
+              <td>{a.vendas}</td>
+              <td>
+                {a.assinatura
+                  ? <span className={`selo ${a.assinatura.status === 'ATIVA' ? 'ok' : a.assinatura.status === 'CANCELADA' ? 'baixo' : 'ATACADO'}`}>
+                      {a.assinatura.status}{a.assinatura.simulada ? ' (sim)' : ''}
+                    </span>
+                  : <span style={{ color: 'var(--ink-soft)' }}>sem assinatura</span>}
+              </td>
+              <td><span className={`selo ${a.usuario.ativo ? 'ok' : 'baixo'}`}>{a.usuario.ativo ? 'ativo' : 'inativo'}</span></td>
+              <td><a href="#" onClick={(e) => { e.preventDefault(); alternarAtivo(a) }}>{a.usuario.ativo ? 'desativar' : 'ativar'}</a></td>
+            </tr>
+          ))}
+          {assessores.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--ink-soft)' }}>Nenhum assessor(a) ainda.</td></tr>}
         </tbody>
       </table>
     </div>

@@ -5,6 +5,7 @@ import { redistribuirAtrasados } from './modules/leads/leads.service'
 import { limparMidiaExpirada, limparAudiosAntigos, limparLooksAntigos } from './modules/midia/limpeza.service'
 import { iniciarWorkerProvador } from './modules/provador/provador.worker'
 import { encerrarAssinaturasVencidas } from './modules/assinaturas/assinatura.service'
+import { encerrarAssessorasVencidas } from './modules/assessores/assinatura-assessor.service'
 import { aplicarReajustesIgpm } from './modules/assinaturas/igpm.service'
 import { aplicarDistratoTermos } from './modules/contrato/contrato.service'
 import { atualizarCotacaoUsd } from './modules/cambio/cambio.service'
@@ -55,6 +56,8 @@ async function main() {
       .then((d) => { if (d > 0) app.log.info(`Distrato por não-aceite dos termos: ${d} rede(s)`) })
       .then(() => encerrarAssinaturasVencidas())
       .then((e) => { if (e > 0) app.log.info(`Assinaturas encerradas (ciclo vencido): ${e}`) })
+      .then(() => encerrarAssessorasVencidas())
+      .then((e) => { if (e > 0) app.log.info(`Assinaturas de assessor(a) encerradas (ciclo vencido): ${e}`) })
       .catch((err) => app.log.error({ err }, 'Falha no job de termos/assinaturas'))
     aplicarTermos()
     setInterval(aplicarTermos, UM_DIA_MS).unref()

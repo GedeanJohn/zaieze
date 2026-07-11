@@ -1,8 +1,8 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import './styles.css'
-import { usuarioLogado } from './api'
+import { api, usuarioLogado } from './api'
 import { HOST } from './host'
 import { ToastProvider } from './componentes/Toast'
 import { IdiomaProvider } from './lib/i18n'
@@ -32,6 +32,8 @@ import Admin from './paginas/Admin'
 import WhatsAppOficial from './paginas/WhatsApp'
 import InstagramOficial from './paginas/Instagram'
 import PainelAfiliado from './paginas/afiliado/PainelAfiliado'
+import PainelAssessora from './paginas/assessora/PainelAssessora'
+import VitrineAssessora from './paginas/assessora/VitrineAssessora'
 import Conta from './paginas/Conta'
 import Convite from './paginas/Convite'
 import Pedido from './paginas/Pedido'
@@ -45,6 +47,8 @@ import Sucesso from './paginas/site/Sucesso'
 import Entrar from './paginas/site/Entrar'
 import Catalogo from './paginas/site/Catalogo'
 import QuemSomos from './paginas/site/QuemSomos'
+import AssessorDeModa from './paginas/site/AssessorDeModa'
+import CadastroAssessor from './paginas/site/CadastroAssessor'
 import Lgpd from './paginas/site/Lgpd'
 import PoliticaPrivacidade from './paginas/site/PoliticaPrivacidade'
 
@@ -52,9 +56,37 @@ function Protegida({ children }: { children: React.ReactElement }) {
   return usuarioLogado() ? children : <Navigate to="/login" replace />
 }
 
-// AFILIADO não pertence a nenhuma Rede/Loja — tem um painel próprio, sem o shell/menu do CRM.
+// AFILIADO e ASSESSORA não pertencem a nenhuma Rede/Loja — têm painel próprio, sem o shell/menu do CRM.
 function Raiz() {
-  return usuarioLogado()?.role === 'AFILIADO' ? <PainelAfiliado /> : <Layout />
+  const role = usuarioLogado()?.role
+  if (role === 'AFILIADO') return <PainelAfiliado />
+  if (role === 'ASSESSORA') return <PainelAssessora />
+  return <Layout />
+}
+
+// Raiz "/" de um subdomínio sem sessão: se o slug pertence a uma assessora, mostra a vitrine
+// pública dela (sem login); senão, cai no comportamento de sempre (login do tenant/rede).
+function RaizOuVitrine() {
+  const [status, setStatus] = useState<'checando' | 'assessora' | 'nenhum'>('checando')
+  useEffect(() => {
+    if (!HOST.slug) { setStatus('nenhum'); return }
+    api.get(`/assessores/publico/${HOST.slug}`)
+      .then(() => setStatus('assessora'))
+      .catch(() => setStatus('nenhum'))
+  }, [])
+  if (status === 'checando') return null
+  if (status === 'assessora') return <VitrineAssessora slug={HOST.slug!} />
+  return <Navigate to="/login" replace />
+}
+
+// Elemento da rota "/": logado entra no painel (Layout/PainelAfiliado/PainelAssessora); deslogado
+// só verifica a vitrine pública da assessora na raiz exata — em qualquer outro caminho, vai
+// direto para o login (sem chamada extra), igual ao comportamento de sempre.
+function RaizProtegida() {
+  const location = useLocation()
+  if (usuarioLogado()) return <Raiz />
+  if (location.pathname === '/') return <RaizOuVitrine />
+  return <Navigate to="/login" replace />
 }
 
 // Site público (www.zaieze.com / zaieze.com): landing comercial + checkout
@@ -66,6 +98,8 @@ function SiteApp() {
       <Route path="/sucesso" element={<Sucesso />} />
       <Route path="/entrar" element={<Entrar />} />
       <Route path="/quem-somos" element={<QuemSomos />} />
+      <Route path="/assessor-de-moda" element={<AssessorDeModa />} />
+      <Route path="/assessor-de-moda/cadastro" element={<CadastroAssessor />} />
       <Route path="/lgpd" element={<Lgpd />} />
       <Route path="/privacidade" element={<PoliticaPrivacidade />} />
       <Route path="*" element={<Navigate to="/" replace />} />
@@ -86,7 +120,7 @@ function CrmApp() {
       <Route path="/orcamento/publico/:token" element={<OrcamentoPublico />} />
       {/* Provador virtual (sem login): a vendedora manda esse link, o cliente consente e envia a selfie */}
       <Route path="/look/:token" element={<LookProvador />} />
-      <Route path="/" element={<Protegida><Raiz /></Protegida>}>
+      <Route path="/" element={<RaizProtegida />}>
         <Route index element={<Dashboard />} />
         <Route path="vendas" element={<Vendas />} />
         <Route path="orcamentos" element={<Orcamentos />} />

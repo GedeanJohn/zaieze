@@ -446,21 +446,31 @@ enum TipoPromocao {
   PERCENTUAL // % de desconto na mensalidade
 }
 
+/// A qual assinatura o cupom se aplica — um mesmo código nunca vale para as duas.
+enum AplicacaoPromo {
+  REDE // assinatura de plano da loja/marca (START/PRO/ELITE)
+  ASSESSOR // assinatura do Assessor(a) de Moda
+}
+
 /// Código promocional aplicado no checkout (criado pelo SUPER_ADMIN).
 model CodigoPromocional {
-  id          String       @id @default(cuid())
-  codigo      String       @unique
+  id          String         @id @default(cuid())
+  codigo      String         @unique
   tipo        TipoPromocao
-  // Plano ao qual o cupom se aplica (oferta completa: o link fica só ?cupom=). Null = qualquer plano.
+  // A qual tipo de assinatura o cupom se aplica — default REDE preserva o comportamento dos
+  // cupons já existentes (todos eram, até aqui, só de plano de loja/marca).
+  aplicaA     AplicacaoPromo @default(REDE)
+  // Plano ao qual o cupom se aplica (oferta completa: o link fica só ?cupom=). Só relevante
+  // quando aplicaA=REDE. Null = qualquer plano.
   plano       Plano?
   dias        Int? // DIAS_GRATIS: dias grátis antes da 1ª cobrança
-  percentual  Decimal?     @db.Decimal(5, 2) // PERCENTUAL: % de desconto na mensalidade
+  percentual  Decimal?       @db.Decimal(5, 2) // PERCENTUAL: % de desconto na mensalidade
   descricao   String?
   validadeAte DateTime? // último dia em que pode ser usado (null = sem prazo)
   maxUsos     Int? // limite de usos (null = ilimitado)
-  usos        Int          @default(0)
-  ativo       Boolean      @default(true)
-  createdAt   DateTime     @default(now())
+  usos        Int            @default(0)
+  ativo       Boolean        @default(true)
+  createdAt   DateTime       @default(now())
 
   @@map("codigos_promocionais")
 }

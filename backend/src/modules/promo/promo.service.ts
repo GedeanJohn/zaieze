@@ -6,11 +6,19 @@ export function normalizarCodigo(codigo: string): string {
   return codigo.trim().toUpperCase()
 }
 
-/** Valida um código no checkout: existe, ativo, dentro da validade e do limite de usos. */
-export async function validarCodigo(codigoRaw?: string | null): Promise<CodigoPromocional | null> {
+/**
+ * Valida um código no checkout: existe, ativo, dentro da validade e do limite de usos, e
+ * corresponde ao tipo de assinatura esperado (`aplicaA`) — um cupom de Rede não vale pra
+ * assinatura de Assessor, e vice-versa.
+ */
+export async function validarCodigo(
+  codigoRaw?: string | null,
+  aplicaA: 'REDE' | 'ASSESSOR' = 'REDE',
+): Promise<CodigoPromocional | null> {
   if (!codigoRaw || !codigoRaw.trim()) return null
   const c = await prisma.codigoPromocional.findUnique({ where: { codigo: normalizarCodigo(codigoRaw) } })
   if (!c || !c.ativo) return null
+  if (c.aplicaA !== aplicaA) return null
   if (c.validadeAte && c.validadeAte.getTime() < Date.now()) return null
   if (c.maxUsos != null && c.usos >= c.maxUsos) return null
   return c

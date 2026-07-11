@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api, formataReal, mensagemDeErro } from '../../api'
 import SeletorIdioma from '../../componentes/SeletorIdioma'
 import { useIdioma } from '../../lib/i18n'
 
 interface ClausulaContrato { n: number; titulo: string; paragrafos: string[] }
 interface ContratoMontado { titulo: string; qualificacao: string[]; clausulas: ClausulaContrato[] }
+interface PromoInfo { valido: boolean; beneficio?: string }
 
 export default function CadastroAssessor() {
   const { t } = useIdioma()
+  const [params] = useSearchParams()
   const [preco, setPreco] = useState<number | null>(null)
   const [dominio] = useState('zaieze.com')
   const [form, setForm] = useState({ nome: '', slug: '', telefone: '', email: '', senha: '' })
@@ -18,6 +20,9 @@ export default function CadastroAssessor() {
   const [aceiteContrato, setAceiteContrato] = useState(false)
   const [contrato, setContrato] = useState<ContratoMontado | null>(null)
   const [contratoAberto, setContratoAberto] = useState(false)
+  // Pré-preenche o cupom pela URL (?cupom=) — permite compartilhar um link já com o cupom.
+  const [cupom, setCupom] = useState((params.get('cupom') || '').toUpperCase())
+  const [promo, setPromo] = useState<PromoInfo | null>(null)
 
   useEffect(() => {
     api.get('/assessores/plano').then(({ data }) => setPreco(data.precoMensal)).catch(() => {})
@@ -42,6 +47,19 @@ export default function CadastroAssessor() {
     return () => clearTimeout(timer)
   }, [form.slug])
 
+  // valida o código promocional (debounce)
+  useEffect(() => {
+    const c = cupom.trim()
+    if (!c) { setPromo(null); return }
+    const t2 = setTimeout(async () => {
+      try {
+        const { data } = await api.get('/assessores/codigo-promo', { params: { codigo: c } })
+        setPromo(data)
+      } catch { setPromo({ valido: false }) }
+    }, 400)
+    return () => clearTimeout(t2)
+  }, [cupom])
+
   const podeEnviar = useMemo(
     () => form.nome && form.slug.length >= 2 && form.email && form.senha.length >= 6 && slugStatus !== 'indisponivel' && aceiteContrato,
     [form, slugStatus, aceiteContrato],
@@ -53,7 +71,7 @@ export default function CadastroAssessor() {
     try {
       const { data } = await api.post('/assessores/cadastro', {
         nome: form.nome, slug: form.slug.toLowerCase(), telefone: form.telefone || undefined,
-        email: form.email, senha: form.senha, aceiteContrato: true,
+        email: form.email, senha: form.senha, cupom: cupom.trim() || undefined, aceiteContrato: true,
       })
       if (data.simulado) window.location.href = `/sucesso?slug=${data.slug}&plano=${encodeURIComponent(t('assessorPlano.tituloPlano'))}&simulado=1`
       else if (data.initPoint) window.location.href = data.initPoint
@@ -113,6 +131,16 @@ export default function CadastroAssessor() {
           <div className="campo">
             <label>{t('assessorCadastro.senhaLabel')}</label>
             <input type="password" value={form.senha} onChange={(e) => setForm({ ...form, senha: e.target.value })} required />
+          </div>
+
+          <div className="campo">
+            <label>{t('assessorCadastro.cupomLabel')}</label>
+            <input value={cupom} onChange={(e) => setCupom(e.target.value.toUpperCase())} placeholder={t('assessorCadastro.cupomPlaceholder')} />
+            {cupom.trim() && promo && (
+              promo.valido
+                ? <small className="dica ok">✓ {promo.beneficio}</small>
+                : <small className="dica erro">{t('assessorCadastro.cupomInvalido')}</small>
+            )}
           </div>
 
           <div className="campo">

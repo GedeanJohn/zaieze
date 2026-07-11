@@ -7,6 +7,7 @@ import { exportarCsv, exportarTxt, exportarXlsx, exportarPdf, type LinhaVendaAss
 import { gerarCatalogoPdf } from './catalogo-pdf.service'
 import { normalizarSlug, slugDisponivel } from './assessor.service'
 import { criarPreapproval, mpConfigurado } from '../assinaturas/mercadopago.service'
+import { validarCodigo, consumirCodigo, descricaoBeneficio } from '../promo/promo.service'
 import { proximoCicloFimAssessor, solicitarCancelamentoAssessor, reativarAssinaturaAssessor } from './assinatura-assessor.service'
 import { montarContratoAssessor, CONTRATO_ASSESSOR_VERSAO } from './contrato-assessor.template'
 
@@ -44,6 +45,14 @@ export async function assessoresRoutes(app: FastifyInstance) {
   // Contrato de credenciamento — lido no cadastro antes do aceite (checkbox) e do pagamento
   app.get('/contrato', async () => montarContratoAssessor())
 
+  // Validação pública de código promocional (cadastro mostra o benefício antes de enviar)
+  app.get('/codigo-promo', async (request) => {
+    const { codigo } = request.query as { codigo?: string }
+    const c = await validarCodigo(codigo, 'ASSESSOR')
+    if (!c) return { valido: false }
+    return { valido: true, beneficio: descricaoBeneficio(c), tipo: c.tipo, dias: c.dias, percentual: c.percentual }
+  })
+
   // Cadastro público (self-service): cria a conta + aceite do contrato + assinatura (real via MP
   // ou simulada) numa transação. Espelha /assinaturas/checkout (fluxo de signup de uma Rede).
   const cadastroSchema = z.object({
@@ -52,6 +61,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
     senha: z.string().min(6),
     telefone: z.string().trim().optional(),
     slug: z.string().trim().min(2).max(60),
+    cupom: z.string().trim().optional(),
     aceiteContrato: z.literal(true, { errorMap: () => ({ message: 'É necessário aceitar o contrato para continuar.' }) }),
   })
   app.post('/cadastro', async (request, reply) => {
@@ -67,9 +77,24 @@ export async function assessoresRoutes(app: FastifyInstance) {
     }
 
     const config = await prisma.configAssessores.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} })
-    const valor = num(config.precoMensal)
+
+    // Código promocional (opcional): % de desconto na mensalidade ou dias grátis.
+    const promo = await validarCodigo(b.cupom, 'ASSESSOR')
+    if (b.cupom && b.cupom.trim() && !promo) {
+      return reply.code(422).send({ erro: 'Código promocional inválido ou expirado.' })
+    }
+    let valor = num(config.precoMensal)
+    if (promo?.tipo === 'PERCENTUAL' && promo.percentual) {
+      valor = Math.round(valor * (1 - Number(promo.percentual) / 100) * 100) / 100
+    }
+    const diasGratis = promo?.tipo === 'DIAS_GRATIS' ? promo.dias ?? 0 : 0
+
     const senhaHash = await bcrypt.hash(b.senha, 10)
     const simulada = !mpConfigurado()
+    // início do 1º ciclo: com dias grátis, o acesso vai até now+dias (depois cobra)
+    const cicloFimComDiasGratis = () => {
+      const d = new Date(); d.setDate(d.getDate() + diasGratis); return d
+    }
 
     const assessor = await prisma.$transaction(async (tx) => {
       const usuario = await tx.usuario.create({ data: { nome: b.nome, email, senhaHash, role: 'ASSESSORA', telefone: b.telefone ?? null } })
@@ -81,19 +106,24 @@ export async function assessoresRoutes(app: FastifyInstance) {
         },
       })
       await tx.assinaturaAssessor.create({
-        data: { assessorId: a.id, valor, simulada, status: simulada ? 'ATIVA' : 'PENDENTE', cicloFimEm: simulada ? proximoCicloFimAssessor() : null },
+        data: {
+          assessorId: a.id, valor, simulada, status: simulada ? 'ATIVA' : 'PENDENTE',
+          cicloFimEm: simulada ? (diasGratis ? cicloFimComDiasGratis() : proximoCicloFimAssessor()) : null,
+        },
       })
       return a
     })
 
     const urlLogin = `${env.TENANT_SCHEME}://${slug}.${env.DOMINIO_BASE}/login`
     if (simulada) {
+      if (promo) await consumirCodigo(promo.id)
       return reply.code(201).send({ simulado: true, slug, redirect: urlLogin })
     }
 
     try {
-      const pre = await criarPreapproval({ reason: 'ZAIEZE — Assessor(a) de Moda', valor, email, redeSlug: slug, backUrl: urlLogin })
+      const pre = await criarPreapproval({ reason: 'ZAIEZE — Assessor(a) de Moda', valor, email, redeSlug: slug, backUrl: urlLogin, diasGratis })
       await prisma.assinaturaAssessor.update({ where: { assessorId: assessor.id }, data: { mpPreapprovalId: pre.id } })
+      if (promo) await consumirCodigo(promo.id)
       return reply.code(201).send({ simulado: false, slug, initPoint: pre.initPoint })
     } catch (e) {
       // Desfaz o provisionamento se o Mercado Pago falhar (cascade: assessor + assinatura + aceite)

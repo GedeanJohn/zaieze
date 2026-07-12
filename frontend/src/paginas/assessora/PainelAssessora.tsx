@@ -10,6 +10,7 @@ interface Marca {
   tamanhos: string | null; valores: string | null; endereco: string | null; cnpj: string | null
   instagram: string | null; facebook: string | null; whatsapp: string | null; telegram: string | null; tiktok: string | null; site: string | null
   percentualComissaoSugerido: number | null; ordem: number; ativo: boolean
+  autorizadoEm: string | null; recusadoEm: string | null
 }
 interface Venda {
   id: string; data: string; marca: string; assessorMarcaId: string
@@ -18,6 +19,7 @@ interface Venda {
 type Assinatura =
   | { existe: false }
   | { existe: true; status: 'PENDENTE' | 'ATIVA' | 'CANCELADA'; valor: number; simulada: boolean; cicloFimEm: string | null; cancelamentoSolicitadoEm: string | null }
+interface Indicacao { slug: string; percentual: number; cliques: number; redesIndicadas: number; pendente: number; paga: number }
 
 const marcaVazia = {
   nome: '', logoUrl: '', descricao: '', formasPagamento: '', modoEnvio: '', condicoesCompra: '',
@@ -36,10 +38,12 @@ function hoje(): string {
 export default function PainelAssessora() {
   const usuario = usuarioLogado()
   const avisar = useToast()
-  const [aba, setAba] = useState<'perfil' | 'marcas' | 'vendas' | 'assinatura'>('marcas')
+  const [aba, setAba] = useState<'perfil' | 'marcas' | 'vendas' | 'indicacao' | 'assinatura'>('marcas')
 
   const [assinatura, setAssinatura] = useState<Assinatura | null>(null)
   const [ocupadoAssinatura, setOcupadoAssinatura] = useState(false)
+
+  const [indicacao, setIndicacao] = useState<Indicacao | null>(null)
 
   const [perfil, setPerfil] = useState<Perfil | null>(null)
   const [bio, setBio] = useState(''); const [whatsapp, setWhatsapp] = useState('')
@@ -71,7 +75,10 @@ export default function PainelAssessora() {
   function carregarAssinatura() {
     api.get('/assessores/minha/assinatura').then(({ data }) => setAssinatura(data)).catch(() => {})
   }
-  useEffect(() => { carregarPerfil(); carregarMarcas(); carregarAssinatura() }, [])
+  function carregarIndicacao() {
+    api.get('/assessores/minha/indicacao').then(({ data }) => setIndicacao(data)).catch(() => {})
+  }
+  useEffect(() => { carregarPerfil(); carregarMarcas(); carregarAssinatura(); carregarIndicacao() }, [])
   useEffect(() => { carregarVendas() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filtroDe, filtroAte, filtroMarca])
 
   async function cancelarAssinatura() {
@@ -185,7 +192,7 @@ export default function PainelAssessora() {
       })
       const url = URL.createObjectURL(data as Blob)
       const a = document.createElement('a')
-      a.href = url; a.download = `vendas-${perfil?.slug ?? 'assessora'}.${formato}`
+      a.href = url; a.download = `vendas-${perfil?.slug ?? 'corretora'}.${formato}`
       document.body.appendChild(a); a.click(); a.remove()
       URL.revokeObjectURL(url)
     } catch (e) { avisar(mensagemDeErro(e), 'erro') }
@@ -200,7 +207,7 @@ export default function PainelAssessora() {
     <div style={{ maxWidth: 1000, margin: '0 auto', padding: '24px 16px' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <h1 style={{ margin: 0 }}>Painel do Assessor de Moda</h1>
+          <h1 style={{ margin: 0 }}>Painel do Corretor de Moda</h1>
           <span style={{ color: 'var(--ink-soft)', fontSize: 13 }}>{usuario?.nome}</span>
         </div>
         <button className="btn secundario" onClick={sair}>Sair</button>
@@ -217,10 +224,43 @@ export default function PainelAssessora() {
       </div>
 
       <nav style={{ display: 'flex', gap: 8, margin: '16px 0', flexWrap: 'wrap' }}>
-        {([['marcas', 'Marcas representadas'], ['vendas', 'Vendas & comissão'], ['perfil', 'Meu perfil'], ['assinatura', 'Minha assinatura']] as const).map(([id, label]) => (
+        {([['marcas', 'Marcas representadas'], ['vendas', 'Vendas & comissão'], ['perfil', 'Meu perfil'], ['indicacao', 'Indicar lojistas'], ['assinatura', 'Minha assinatura']] as const).map(([id, label]) => (
           <button key={id} type="button" className={aba === id ? 'btn' : 'btn secundario'} onClick={() => setAba(id)}>{label}</button>
         ))}
       </nav>
+
+      {aba === 'indicacao' && (
+        <div className="cartao">
+          <h2 style={{ marginTop: 0 }}>Indicar lojistas para o ZAIEZE</h2>
+          {!indicacao ? (
+            <p style={{ color: 'var(--ink-soft)' }}>Carregando…</p>
+          ) : (
+            <>
+              <p style={{ color: 'var(--ink-soft)', fontSize: 13 }}>
+                Compartilhe este link com lojistas que você conhece. Quando um deles assinar um plano
+                ZAIEZE por esse link, você ganha <strong>{indicacao.percentual}%</strong> de comissão{' '}
+                <strong>recorrente</strong> — enquanto a loja continuar assinando, todo ciclo pago gera
+                comissão pra você. O repasse é combinado e feito manualmente pelo ZAIEZE.
+              </p>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
+                <input readOnly value={`https://zaieze.com/checkout?refAssessor=${indicacao.slug}`} style={{ minWidth: 320, flex: 1 }} />
+                <button
+                  type="button" className="btn secundario"
+                  onClick={() => { navigator.clipboard?.writeText(`https://zaieze.com/checkout?refAssessor=${indicacao.slug}`); avisar('Link copiado.') }}
+                >
+                  Copiar
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                <div><div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Cliques no link</div><div style={{ fontSize: 22, fontWeight: 700 }}>{indicacao.cliques}</div></div>
+                <div><div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Lojistas indicados</div><div style={{ fontSize: 22, fontWeight: 700 }}>{indicacao.redesIndicadas}</div></div>
+                <div><div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Comissão pendente</div><div style={{ fontSize: 22, fontWeight: 700 }}>{formataReal(indicacao.pendente)}</div></div>
+                <div><div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Comissão já paga</div><div style={{ fontSize: 22, fontWeight: 700 }}>{formataReal(indicacao.paga)}</div></div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {aba === 'assinatura' && (
         <div className="cartao">
@@ -283,11 +323,17 @@ export default function PainelAssessora() {
           {marcas.length === 0 && <p style={{ color: 'var(--ink-soft)' }}>Nenhuma marca cadastrada ainda.</p>}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
             {marcas.map((m) => (
-              <div key={m.id} className="cartao" style={{ opacity: m.ativo ? 1 : 0.55 }}>
+              <div key={m.id} className="cartao" style={{ opacity: m.ativo && !m.recusadoEm ? 1 : 0.55 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                   <strong>{m.nome}</strong>
                   {!m.ativo && <span style={{ fontSize: 11, color: 'var(--ink-soft)' }}>oculta</span>}
                 </div>
+                {m.redeId && !m.autorizadoEm && !m.recusadoEm && (
+                  <div style={{ fontSize: 12, color: '#d97706', marginTop: 4 }}>Aguardando aprovação da marca</div>
+                )}
+                {m.recusadoEm && (
+                  <div style={{ fontSize: 12, color: '#dc2626', marginTop: 4 }}>Solicitação recusada pela marca</div>
+                )}
                 {m.valores && <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{m.valores}</div>}
                 <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
                   <button type="button" className="btn-link" onClick={() => abrirEditarMarca(m)}>editar</button>

@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { gerarSenhaProvisoria } from '../auth/senha-provisoria'
 import { confirmarCiclo } from '../assinaturas/assinatura.service'
+import { gerarComissaoAssessorDoCiclo } from '../assessores/comissao-assessor.service'
 
 /** Normaliza o código de indicação (maiúsculo, sem espaços) — mesmo padrão do cupom promocional. */
 export function normalizarCodigo(codigo: string): string {
@@ -109,10 +110,11 @@ const MARGEM_FRESCOR_MS = 3 * 24 * 60 * 60 * 1000 // 3 dias
 
 /**
  * Confirma o ciclo da assinatura (ativa/renova) e, só se for um ciclo GENUINAMENTE NOVO,
- * gera a comissão do afiliado. "Genuinamente novo" = cicloFimEm nulo ou já a <= 3 dias de
- * vencer/vencido — blinda contra o webhook do Mercado Pago notificar mais de uma vez o
- * mesmo pagamento (o que, sem essa guarda, estenderia o ciclo +1 mês de graça a cada
- * repetição, com ou sem módulo de afiliados).
+ * gera a comissão do afiliado E/OU do assessor de indicação (uma rede pode ter no máximo um
+ * de cada origem — cada uma gera sua própria linha, independente). "Genuinamente novo" =
+ * cicloFimEm nulo ou já a <= 3 dias de vencer/vencido — blinda contra o webhook do Mercado
+ * Pago notificar mais de uma vez o mesmo pagamento (o que, sem essa guarda, estenderia o
+ * ciclo +1 mês de graça a cada repetição, com ou sem módulo de indicação).
  */
 export async function confirmarCicloEComissionar(redeId: string): Promise<void> {
   const antes = await prisma.assinatura.findUnique({ where: { redeId }, select: { cicloFimEm: true, valor: true } })
@@ -121,10 +123,8 @@ export async function confirmarCicloEComissionar(redeId: string): Promise<void> 
   await confirmarCiclo(redeId)
 
   if (cicloGenuino && antes) {
-    await gerarComissaoDoCiclo({
-      redeId,
-      cicloEm: antes.cicloFimEm ?? new Date(),
-      valorBaseAssinatura: antes.valor,
-    })
+    const cicloEm = antes.cicloFimEm ?? new Date()
+    await gerarComissaoDoCiclo({ redeId, cicloEm, valorBaseAssinatura: antes.valor })
+    await gerarComissaoAssessorDoCiclo({ redeId, cicloEm, valorBaseAssinatura: antes.valor })
   }
 }

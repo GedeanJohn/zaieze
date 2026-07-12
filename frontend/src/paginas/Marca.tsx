@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { api, mensagemDeErro } from '../api'
+import { api, mensagemDeErro, usuarioLogado } from '../api'
 import PreviewLoja from '../componentes/PreviewLoja'
 import { useToast } from '../componentes/Toast'
 import { useIdioma } from '../lib/i18n'
@@ -22,6 +22,11 @@ interface Marca {
 }
 
 interface Sugestao { cor: string; origem: 'logo' | 'banner' }
+
+interface SolicitacaoAssessor {
+  id: string
+  assessor: { slug: string; usuario: { nome: string; fotoUrl: string | null } }
+}
 
 /** Extrai as cores dominantes de uma imagem (arquivo local ou URL) usando canvas — roda no navegador, sem custo de IA.
  *  Para URL de outra origem (ex.: CDN), depende do servidor liberar CORS; se não liberar, falha em silêncio (recurso opcional). */
@@ -73,6 +78,8 @@ export default function Marca() {
   const [sugestoes, setSugestoes] = useState<Sugestao[]>([])
   const [alvoCor, setAlvoCor] = useState<'corPrimaria' | 'corSecundaria'>('corPrimaria')
   const [preview, setPreview] = useState(false)
+  const [solicitacoes, setSolicitacoes] = useState<SolicitacaoAssessor[]>([])
+  const ehGestor = usuarioLogado()?.role === 'GESTOR'
 
   function aplicarSugestoes(origem: 'logo' | 'banner', cores: string[]) {
     setSugestoes((prev) => {
@@ -88,7 +95,16 @@ export default function Marca() {
       if (data.logoUrl) extrairCoresDominantes(data.logoUrl).then((cores) => aplicarSugestoes('logo', cores))
       if (data.bannerUrl) extrairCoresDominantes(data.bannerUrl).then((cores) => aplicarSugestoes('banner', cores))
     })
-  }, [])
+    if (ehGestor) api.get('/marca/solicitacao-assessor').then(({ data }) => setSolicitacoes(data))
+  }, [ehGestor])
+
+  async function responderSolicitacao(id: string, decisao: 'aceitar' | 'recusar') {
+    try {
+      await api.post(`/marca/solicitacao-assessor/${id}/${decisao}`)
+      setSolicitacoes((prev) => prev.filter((s) => s.id !== id))
+      avisar(t(decisao === 'aceitar' ? 'marca.solicitacaoAceita' : 'marca.solicitacaoRecusada'))
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') }
+  }
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault()
@@ -161,6 +177,24 @@ export default function Marca() {
       <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
         {t('marca.explicacao1')} <strong>{t('marca.catalogoPublicoDestaque')}</strong> {t('marca.explicacao2')}
       </div>
+
+      {solicitacoes.map((s) => (
+        <div key={s.id} className="cartao" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', border: '1px solid #0a0a0b22' }}>
+          {s.assessor.usuario.fotoUrl && (
+            <img src={s.assessor.usuario.fotoUrl} alt="" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }} />
+          )}
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <strong>{t('marca.solicitacaoTitulo')}</strong>
+            <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 4 }}>
+              <strong>{s.assessor.usuario.nome}</strong> {t('marca.solicitacaoTexto')}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="btn" onClick={() => responderSolicitacao(s.id, 'aceitar')}>{t('marca.solicitacaoAceitar')}</button>
+            <button type="button" className="btn secundario" onClick={() => responderSolicitacao(s.id, 'recusar')}>{t('marca.solicitacaoRecusar')}</button>
+          </div>
+        </div>
+      ))}
 
       <div className="cartao">
         <h2 style={{ marginTop: 0 }}>{t('marca.logoTitulo')}</h2>

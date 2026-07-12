@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, formataReal, formataUsd, mensagemDeErro, type Plano } from '../../api'
-import { capturarRefAfiliado, refAfiliadoAtivo } from '../../lib/afiliado'
+import { capturarRefAfiliado, refAfiliadoAtivo, capturarRefAssessor, refAssessorAtivo } from '../../lib/afiliado'
 import SeletorPeriodicidade, { type Periodicidade } from '../../componentes/SeletorPeriodicidade'
 import SeletorIdioma from '../../componentes/SeletorIdioma'
 import { useIdioma } from '../../lib/i18n'
@@ -42,6 +42,7 @@ export default function Checkout() {
       setCambio(data.cambio ?? { usdPorBrl: null })
     }).catch(() => {})
     capturarRefAfiliado()
+    capturarRefAssessor()
   }, [])
 
   useEffect(() => {
@@ -105,6 +106,7 @@ export default function Checkout() {
         plano, ...form, slug: form.slug.toLowerCase(),
         codigoPromo: codigoPromo.trim() || undefined,
         refAfiliado: refAfiliadoAtivo(),
+        refAssessor: refAssessorAtivo(),
         periodicidade,
         idioma,
       })

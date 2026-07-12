@@ -1,6 +1,6 @@
 import { prisma } from '../../lib/prisma'
 
-/** Fim do próximo ciclo mensal (assinatura do Assessor de Moda não tem opção anual). */
+/** Fim do próximo ciclo mensal (assinatura do Corretor de Moda não tem opção anual). */
 export function proximoCicloFimAssessor(base = new Date()): Date {
   return new Date(base.getFullYear(), base.getMonth() + 1, base.getDate(), base.getHours(), base.getMinutes(), base.getSeconds())
 }

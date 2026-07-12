@@ -15,6 +15,7 @@ import { confirmarCicloEComissionar, gerarComissaoDoCiclo, normalizarCodigo as n
 import { obterCotacaoAtual } from '../cambio/cambio.service'
 import { confirmarCicloAddon, solicitarCancelamentoAddon } from '../addons/addon.service'
 import { confirmarCicloAssessor, solicitarCancelamentoAssessor } from '../assessores/assinatura-assessor.service'
+import { normalizarSlug as normalizarSlugAssessor } from '../assessores/assessor.service'
 
 const arred2 = (n: number) => Math.round(n * 100) / 100
 
@@ -30,6 +31,8 @@ const checkoutSchema = z.object({
   codigoPromo: z.string().optional(),
   // Programa de Afiliados: código do link de indicação (?ref=), capturado pela landing/checkout.
   refAfiliado: z.string().trim().optional(),
+  // Indicação por Assessor(a) de Moda: slug do link de indicação (?refAssessor=<slug>).
+  refAssessor: z.string().trim().optional(),
   periodicidade: z.enum(['MENSAL', 'ANUAL']).default('MENSAL'),
   // Idioma preferencial escolhido no cadastro (só afeta a UI do gestor; editável depois em "Minha conta").
   idioma: z.enum(['pt', 'en', 'en-gb', 'es']).default('pt'),
@@ -109,6 +112,15 @@ export async function assinaturasRoutes(app: FastifyInstance) {
         })
       : null
 
+    // Indicação por Assessor(a) de Moda: vincula a rede ao assessor do link (?refAssessor=<slug>),
+    // se o slug existir e a assessora estiver ativa. Gravado no ato — base do cálculo de comissão.
+    const assessorIndicador = body.refAssessor
+      ? await prisma.assessor.findFirst({
+          where: { slug: normalizarSlugAssessor(body.refAssessor), usuario: { ativo: true } },
+          select: { id: true },
+        })
+      : null
+
     const senhaHash = await bcrypt.hash(body.senha, 10)
     const simulada = !mpConfigurado()
     // 100% de desconto (valor zerado) → não há o que cobrar: ativa na hora, SEM passar pelo
@@ -134,10 +146,25 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     // Provisiona o tenant. Em modo simulado já nasce ATIVO; em modo real fica inativo
     // até o webhook de pagamento aprovado liberar o acesso.
     const rede = await prisma.$transaction(async (tx) => {
-      const r = await tx.rede.create({ data: { nome: body.redeNome, slug, plano, ativo: semCobranca, afiliadoId: afiliado?.id ?? null } })
+      const r = await tx.rede.create({
+        data: {
+          nome: body.redeNome, slug, plano, ativo: semCobranca,
+          afiliadoId: afiliado?.id ?? null,
+          assessorOrigemId: assessorIndicador?.id ?? null,
+        },
+      })
       await tx.usuario.create({
         data: { redeId: r.id, nome: body.gestorNome, email, senhaHash, role: 'GESTOR', telefone: body.telefone, idioma: body.idioma },
       })
+      // Indicação por Assessor(a): cria o cartão de representação já vinculado à rede, mas
+      // pendente — só entra na vitrine dela depois que o gestor desta rede aceitar (ver
+      // GET/POST /api/marca/solicitacao-assessor).
+      if (assessorIndicador) {
+        const maiorOrdem = await tx.assessorMarca.aggregate({ where: { assessorId: assessorIndicador.id }, _max: { ordem: true } })
+        await tx.assessorMarca.create({
+          data: { assessorId: assessorIndicador.id, redeId: r.id, nome: body.redeNome, ordem: (maiorOrdem._max.ordem ?? -1) + 1 },
+        })
+      }
       // Aceite eletrônico da versão vigente do contrato, firmado no ato da adesão.
       await tx.aceiteContrato.create({
         data: {

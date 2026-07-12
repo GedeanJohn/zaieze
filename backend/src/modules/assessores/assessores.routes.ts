@@ -8,6 +8,7 @@ import { gerarCatalogoPdf } from './catalogo-pdf.service'
 import { normalizarSlug, slugDisponivel } from './assessor.service'
 import { criarPreapproval, mpConfigurado } from '../assinaturas/mercadopago.service'
 import { validarCodigo, consumirCodigo, descricaoBeneficio } from '../promo/promo.service'
+import { percentualEfetivoIndicacao } from './comissao-assessor.service'
 import { proximoCicloFimAssessor, solicitarCancelamentoAssessor, reativarAssinaturaAssessor } from './assinatura-assessor.service'
 import { montarContratoAssessor, CONTRATO_ASSESSOR_VERSAO } from './contrato-assessor.template'
 
@@ -23,8 +24,12 @@ const marcaSelect = {
   descricao: true, formasPagamento: true, modoEnvio: true, condicoesCompra: true,
   tamanhos: true, valores: true, endereco: true, cnpj: true,
   instagram: true, facebook: true, whatsapp: true, telegram: true, tiktok: true, site: true,
-  percentualComissaoSugerido: true, ordem: true, ativo: true,
+  percentualComissaoSugerido: true, ordem: true, ativo: true, autorizadoEm: true, recusadoEm: true,
 } as const
+
+// Vitrine/catálogo público só mostra marcas ativas e já autorizadas pelo gestor (ou externas,
+// que nascem autorizadas — ver POST /minha/marcas e o provisionamento no checkout de Redes).
+const marcaPublicaWhere = { ativo: true, autorizadoEm: { not: null } } as const
 
 /** Painel da assessora de moda (perfil, marcas representadas, lançamento manual de vendas)
  *  + vitrine pública no subdomínio próprio dela. */
@@ -121,7 +126,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
     }
 
     try {
-      const pre = await criarPreapproval({ reason: 'ZAIEZE — Assessor(a) de Moda', valor, email, redeSlug: slug, backUrl: urlLogin, diasGratis })
+      const pre = await criarPreapproval({ reason: 'ZAIEZE — Corretor(a) de Moda', valor, email, redeSlug: slug, backUrl: urlLogin, diasGratis })
       await prisma.assinaturaAssessor.update({ where: { assessorId: assessor.id }, data: { mpPreapprovalId: pre.id } })
       if (promo) await consumirCodigo(promo.id)
       return reply.code(201).send({ simulado: false, slug, initPoint: pre.initPoint })
@@ -132,6 +137,16 @@ export async function assessoresRoutes(app: FastifyInstance) {
     }
   })
 
+  // Clique no link de indicação de lojista (?refAssessor=<slug>), disparado pelo checkout/landing.
+  // Sempre responde ok — não expõe se o slug existe (mesmo critério do clique de afiliado).
+  app.post('/publico/indicacao-clique', async (request) => {
+    const { slug } = request.body as { slug?: string }
+    if (slug?.trim()) {
+      await prisma.assessor.updateMany({ where: { slug: normalizarSlug(slug) }, data: { cliquesIndicacao: { increment: 1 } } })
+    }
+    return { ok: true }
+  })
+
   // ─────────── Público (sem auth) — vitrine no subdomínio <slug>.zaieze.com ───────────
   app.get('/publico/:slug', async (request, reply) => {
     const { slug } = request.params as { slug: string }
@@ -140,7 +155,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
       select: {
         slug: true, bio: true, whatsapp: true, instagram: true, site: true,
         usuario: { select: { nome: true, fotoUrl: true, ativo: true } },
-        marcas: { where: { ativo: true }, orderBy: { ordem: 'asc' }, select: marcaSelect },
+        marcas: { where: marcaPublicaWhere, orderBy: { ordem: 'asc' }, select: marcaSelect },
       },
     })
     if (!assessor || !assessor.usuario.ativo) return reply.code(404).send({ erro: 'Página não encontrada' })
@@ -164,7 +179,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
       select: {
         bio: true, whatsapp: true, instagram: true, site: true,
         usuario: { select: { nome: true, ativo: true } },
-        marcas: { where: { ativo: true }, orderBy: { ordem: 'asc' }, select: marcaSelect },
+        marcas: { where: marcaPublicaWhere, orderBy: { ordem: 'asc' }, select: marcaSelect },
       },
     })
     if (!assessor || !assessor.usuario.ativo) return reply.code(404).send({ erro: 'Página não encontrada' })
@@ -205,6 +220,26 @@ export async function assessoresRoutes(app: FastifyInstance) {
     return prisma.assessor.update({ where: { id: assessor.id }, data: b })
   })
 
+  // ─────────── Indicação de lojistas (link ?refAssessor=<slug>, comissão recorrente) ───────────
+  app.get('/minha/indicacao', protegido, async (request) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const [redesIndicadas, somas, percentualEfetivo] = await Promise.all([
+      prisma.rede.count({ where: { assessorOrigemId: assessor.id } }),
+      prisma.comissaoAssessor.groupBy({ by: ['status'], where: { assessorId: assessor.id }, _sum: { valorComissao: true } }),
+      percentualEfetivoIndicacao(assessor),
+    ])
+    const pendente = somas.find((s) => s.status === 'PENDENTE')?._sum.valorComissao
+    const paga = somas.find((s) => s.status === 'PAGA')?._sum.valorComissao
+    return {
+      slug: assessor.slug,
+      percentual: num(percentualEfetivo),
+      cliques: assessor.cliquesIndicacao,
+      redesIndicadas,
+      pendente: num(pendente),
+      paga: num(paga),
+    }
+  })
+
   // ─────────── Marcas representadas ───────────
   app.get('/minha/marcas', protegido, async (request) => {
     const assessor = await assessorDoUsuario(request.user.sub)
@@ -238,7 +273,8 @@ export async function assessoresRoutes(app: FastifyInstance) {
     const b = marcaSchema.parse(request.body)
     const maiorOrdem = await prisma.assessorMarca.aggregate({ where: { assessorId: assessor.id }, _max: { ordem: true } })
     const marca = await prisma.assessorMarca.create({
-      data: { ...b, assessorId: assessor.id, ordem: (maiorOrdem._max.ordem ?? -1) + 1 },
+      // Cadastro manual = marca externa (sem redeId), nasce autorizada — não há gestor para aceitar.
+      data: { ...b, assessorId: assessor.id, ordem: (maiorOrdem._max.ordem ?? -1) + 1, autorizadoEm: new Date() },
       select: marcaSelect,
     })
     return serializarMarca(marca)

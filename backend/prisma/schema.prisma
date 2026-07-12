@@ -256,6 +256,9 @@ model Rede {
   // Programa de Afiliados: qual afiliado indicou esta rede (se veio por um link ?ref=).
   // Base do cálculo de comissão vitalícia — gravado no ato do checkout, não muda depois.
   afiliadoId               String?
+  // Indicação por Assessor(a) de Moda (link próprio, ?refAssessor=<slug>): mesma mecânica de
+  // comissão vitalícia do afiliado, mas para uma assessora indicar lojistas que ela conhece.
+  assessorOrigemId         String?
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
@@ -272,6 +275,7 @@ model Rede {
   campanhasModelo CampanhaModelo[]
   aceitesContrato AceiteContrato[]
   afiliadoOrigem Afiliado? @relation(fields: [afiliadoId], references: [id], onDelete: SetNull)
+  assessorOrigem Assessor? @relation(fields: [assessorOrigemId], references: [id], onDelete: SetNull)
   looksProvador   LookProvador[]
   assessorMarcas  AssessorMarca[]
 
@@ -1326,6 +1330,44 @@ model ConfigAfiliados {
   @@map("config_afiliados")
 }
 
+/// Percentual padrão da comissão de INDICAÇÃO DE LOJISTAS pelo Assessor(a) de Moda (editável pelo
+/// SUPER_ADMIN, sem deploy) — usado quando o assessor não tem um % individual arbitrado. Uma linha só (id=1).
+model ConfigAssessorIndicacao {
+  id               Int      @id @default(1)
+  percentualPadrao Decimal  @default(2) @db.Decimal(5, 2)
+  updatedAt        DateTime @updatedAt
+
+  @@map("config_assessor_indicacao")
+}
+
+/// Comissão por CICLO PAGO de uma rede indicada por um Assessor(a) de Moda — mesma mecânica da
+/// ComissaoAfiliado (comissão vitalícia, uma linha por ciclo confirmado), mas sem percentual
+/// padrão global: cada assessora tem o % arbitrado individualmente (Assessor.percentualComissaoIndicacao).
+model ComissaoAssessor {
+  id                  String         @id @default(cuid())
+  assessorId          String
+  redeId              String // rede (lojista indicado) que gerou este ciclo pago
+  redeNome            String // snapshot do nome da marca (sobrevive se a rede for excluída depois)
+  cicloEm             DateTime // chave de idempotência: cicloFimEm vigente ANTES da confirmação
+  valorBaseAssinatura Decimal        @db.Decimal(12, 2)
+  percentualComissao  Decimal        @db.Decimal(5, 2) // snapshot do % no momento do ciclo
+  valorComissao       Decimal        @db.Decimal(12, 2)
+  status              StatusComissao @default(PENDENTE)
+  pagoEm              DateTime?
+  pagoPorId           String? // id do SUPER_ADMIN que confirmou o repasse manual (Pix por fora)
+  observacaoPagamento String?
+  // Retenção de IBS/CBS (Reforma Tributária, LC 214/2025) registrada no repasse — informativo,
+  // sem cálculo automático de alíquota (mesmo critério da ComissaoAfiliado).
+  valorRetencaoFiscal Decimal?       @db.Decimal(12, 2)
+  createdAt           DateTime       @default(now())
+
+  assessor Assessor @relation(fields: [assessorId], references: [id], onDelete: Cascade)
+
+  @@unique([redeId, cicloEm])
+  @@index([assessorId, status])
+  @@map("comissoes_assessor")
+}
+
 // ─────────────────────────── Assessor(a) de Moda ───────────────────────────
 // Papel sem rede/loja (como o Afiliado), mas com subdomínio PRÓPRIO (<slug>.zaieze.com):
 // representa marcas de moda — algumas já clientes ZAIEZE, outras totalmente externas (só redes
@@ -1339,6 +1381,10 @@ model Assessor {
   whatsapp  String? // contato pessoal dela (distinto do whatsapp de cada marca representada)
   instagram String?
   site      String?
+  // Indicação de lojistas (link próprio ?refAssessor=<slug>): % arbitrado pelo SUPER_ADMIN por
+  // assessora — null = sem indicação habilitada (nenhuma comissão é gerada até ser definido).
+  percentualComissaoIndicacao Decimal? @db.Decimal(5, 2)
+  cliquesIndicacao            Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1347,6 +1393,8 @@ model Assessor {
   vendas  VendaAssessora[]
   assinatura      AssinaturaAssessor?
   aceitesContrato AceiteContratoAssessor[]
+  redesIndicadas  Rede[]
+  comissoesIndicacao ComissaoAssessor[]
 
   @@map("assessores")
 }
@@ -1376,6 +1424,12 @@ model AssessorMarca {
   percentualComissaoSugerido Decimal? @db.Decimal(5, 2) // pré-preenche o % ao lançar uma venda desta marca
   ordem     Int      @default(0) // ordem manual de exibição na vitrine
   ativo     Boolean  @default(true)
+  // Autorização do gestor da marca — obrigatória quando redeId != null (marca já é cliente ZAIEZE).
+  // Criada automaticamente (pendente) quando a rede se cadastra pelo link ?refAssessor=<slug> do
+  // assessora; só entra na vitrine/catálogo depois que o gestor aceita. Marcas externas (redeId
+  // null, cadastradas manualmente pela assessora) nascem já autorizadas — não há gestor para aceitar.
+  autorizadoEm DateTime?
+  recusadoEm   DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

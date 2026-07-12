@@ -56,7 +56,7 @@ export const rotuloPapel: Record<Papel, string> = {
   VENDEDORA: 'Vendedora',
   CLIENTE: 'Cliente',
   AFILIADO: 'Afiliado',
-  ASSESSORA: 'Assessor(a) de Moda',
+  ASSESSORA: 'Corretor(a) de Moda',
 }
 
 export const rotuloMovimento: Record<string, string> = {

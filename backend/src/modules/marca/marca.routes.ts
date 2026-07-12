@@ -110,4 +110,38 @@ export async function marcaRoutes(app: FastifyInstance) {
     }
     return prisma.rede.update({ where: { id: redeId }, data: { bannerUrl: null }, select: selectMarca })
   })
+
+  // ─────────── Representação por Assessor(a) de Moda ───────────
+  // Quando a rede se cadastra pelo link de indicação (?refAssessor=<slug>) de uma assessora, o
+  // cartão de representação nasce pendente (ver AssessorMarca em assinaturas.routes.ts) — só o
+  // gestor desta marca pode autorizá-la a representá-la publicamente.
+  app.get('/solicitacao-assessor', { preHandler: [app.authorize('GESTOR')] }, async (request) => {
+    const redeId = redeIdDe(request)
+    return prisma.assessorMarca.findMany({
+      where: { redeId, autorizadoEm: null, recusadoEm: null },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true, createdAt: true,
+        assessor: { select: { slug: true, usuario: { select: { nome: true, fotoUrl: true } } } },
+      },
+    })
+  })
+
+  app.post('/solicitacao-assessor/:id/aceitar', { preHandler: [app.authorize('GESTOR')] }, async (request, reply) => {
+    const redeId = redeIdDe(request)
+    const { id } = request.params as { id: string }
+    const solicitacao = await prisma.assessorMarca.findFirst({ where: { id, redeId, autorizadoEm: null, recusadoEm: null } })
+    if (!solicitacao) return reply.code(404).send({ erro: 'Solicitação não encontrada' })
+    await prisma.assessorMarca.update({ where: { id }, data: { autorizadoEm: new Date() } })
+    return { ok: true }
+  })
+
+  app.post('/solicitacao-assessor/:id/recusar', { preHandler: [app.authorize('GESTOR')] }, async (request, reply) => {
+    const redeId = redeIdDe(request)
+    const { id } = request.params as { id: string }
+    const solicitacao = await prisma.assessorMarca.findFirst({ where: { id, redeId, autorizadoEm: null, recusadoEm: null } })
+    if (!solicitacao) return reply.code(404).send({ erro: 'Solicitação não encontrada' })
+    await prisma.assessorMarca.update({ where: { id }, data: { recusadoEm: new Date() } })
+    return { ok: true }
+  })
 }

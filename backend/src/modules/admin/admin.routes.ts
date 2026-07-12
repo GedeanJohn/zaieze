@@ -415,14 +415,25 @@ export async function adminRoutes(app: FastifyInstance) {
       include: {
         usuario: { select: { id: true, nome: true, email: true, telefone: true, ativo: true } },
         assinatura: { select: { status: true, simulada: true, valor: true } },
-        _count: { select: { marcas: true, vendas: true } },
+        _count: { select: { marcas: true, vendas: true, redesIndicadas: true } },
       },
     })
+    const somas = await prisma.comissaoAssessor.groupBy({
+      by: ['assessorId', 'status'],
+      _sum: { valorComissao: true },
+    })
     return {
-      assessores: assessores.map((a) => ({
-        id: a.id, slug: a.slug, marcas: a._count.marcas, vendas: a._count.vendas, usuario: a.usuario,
-        assinatura: a.assinatura ? { status: a.assinatura.status, simulada: a.assinatura.simulada, valor: num(a.assinatura.valor) } : null,
-      })),
+      assessores: assessores.map((a) => {
+        const pendente = somas.find((s) => s.assessorId === a.id && s.status === 'PENDENTE')?._sum.valorComissao
+        const paga = somas.find((s) => s.assessorId === a.id && s.status === 'PAGA')?._sum.valorComissao
+        return {
+          id: a.id, slug: a.slug, marcas: a._count.marcas, vendas: a._count.vendas, usuario: a.usuario,
+          assinatura: a.assinatura ? { status: a.assinatura.status, simulada: a.assinatura.simulada, valor: num(a.assinatura.valor) } : null,
+          percentualComissaoIndicacao: a.percentualComissaoIndicacao != null ? num(a.percentualComissaoIndicacao) : null,
+          cliquesIndicacao: a.cliquesIndicacao, redesIndicadas: a._count.redesIndicadas,
+          pendente: num(pendente), paga: num(paga),
+        }
+      }),
     }
   })
 
@@ -448,24 +459,78 @@ export async function adminRoutes(app: FastifyInstance) {
     nome: z.string().min(2).optional(),
     telefone: z.string().trim().nullable().optional(),
     ativo: z.boolean().optional(),
+    // % arbitrado pelo SUPER_ADMIN para a comissão de indicação de lojistas — null = desabilitada.
+    percentualComissaoIndicacao: z.coerce.number().positive().max(100).nullable().optional(),
   })
   app.patch('/assessores/:id', async (request, reply) => {
     const { id } = request.params as { id: string }
     const b = editarAssessorSchema.parse(request.body)
     const assessor = await prisma.assessor.findUnique({ where: { id } })
-    if (!assessor) return reply.code(404).send({ erro: 'Assessor(a) não encontrado(a)' })
-    await prisma.usuario.update({
-      where: { id: assessor.usuarioId },
-      data: {
-        ...(b.nome !== undefined ? { nome: b.nome } : {}),
-        ...(b.telefone !== undefined ? { telefone: b.telefone } : {}),
-        ...(b.ativo !== undefined ? { ativo: b.ativo } : {}),
-      },
-    })
+    if (!assessor) return reply.code(404).send({ erro: 'Corretor(a) não encontrado(a)' })
+    await prisma.$transaction([
+      prisma.assessor.update({
+        where: { id },
+        data: {
+          ...(b.percentualComissaoIndicacao !== undefined ? { percentualComissaoIndicacao: b.percentualComissaoIndicacao } : {}),
+        },
+      }),
+      prisma.usuario.update({
+        where: { id: assessor.usuarioId },
+        data: {
+          ...(b.nome !== undefined ? { nome: b.nome } : {}),
+          ...(b.telefone !== undefined ? { telefone: b.telefone } : {}),
+          ...(b.ativo !== undefined ? { ativo: b.ativo } : {}),
+        },
+      }),
+    ])
     return { ok: true }
   })
 
-  // Preço da assinatura mensal do plano "Assessor(a) de Moda" (página comercial).
+  // Comissões de indicação de lojistas geradas pelos Assessores de Moda (mesma mecânica das
+  // comissões de afiliado, ver ComissaoAssessor no schema).
+  app.get('/assessores/comissoes', async (request) => {
+    const { status, assessorId } = request.query as { status?: string; assessorId?: string }
+    const comissoes = await prisma.comissaoAssessor.findMany({
+      where: {
+        ...(status === 'PENDENTE' || status === 'PAGA' ? { status } : {}),
+        ...(assessorId ? { assessorId } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 300,
+      include: { assessor: { select: { slug: true, usuario: { select: { nome: true } } } } },
+    })
+    return {
+      comissoes: comissoes.map((c) => ({
+        id: c.id, redeNome: c.redeNome, cicloEm: c.cicloEm,
+        valorBaseAssinatura: num(c.valorBaseAssinatura), percentualComissao: num(c.percentualComissao),
+        valorComissao: num(c.valorComissao), status: c.status, pagoEm: c.pagoEm,
+        valorRetencaoFiscal: c.valorRetencaoFiscal != null ? num(c.valorRetencaoFiscal) : null,
+        assessorSlug: c.assessor.slug, assessorNome: c.assessor.usuario.nome,
+      })),
+    }
+  })
+
+  const pagarComissaoAssessorSchema = z.object({
+    observacaoPagamento: z.string().max(300).optional(),
+    valorRetencaoFiscal: z.coerce.number().nonnegative().optional(),
+  })
+  app.post('/assessores/comissoes/:id/pagar', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const b = pagarComissaoAssessorSchema.parse(request.body ?? {})
+    const comissao = await prisma.comissaoAssessor.findUnique({ where: { id } })
+    if (!comissao) return reply.code(404).send({ erro: 'Comissão não encontrada' })
+    if (comissao.status === 'PAGA') return reply.code(422).send({ erro: 'Esta comissão já está marcada como paga.' })
+    return prisma.comissaoAssessor.update({
+      where: { id },
+      data: {
+        status: 'PAGA', pagoEm: new Date(), pagoPorId: request.user.sub,
+        observacaoPagamento: b.observacaoPagamento ?? null,
+        ...(b.valorRetencaoFiscal !== undefined ? { valorRetencaoFiscal: b.valorRetencaoFiscal } : {}),
+      },
+    })
+  })
+
+  // Preço da assinatura mensal do plano "Corretor(a) de Moda" (página comercial).
   app.get('/assessores/config', async () => {
     const config = await prisma.configAssessores.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} })
     return { precoMensal: num(config.precoMensal) }
@@ -474,5 +539,16 @@ export async function adminRoutes(app: FastifyInstance) {
     const { precoMensal } = z.object({ precoMensal: z.coerce.number().positive() }).parse(request.body)
     const config = await prisma.configAssessores.upsert({ where: { id: 1 }, create: { id: 1, precoMensal }, update: { precoMensal } })
     return { precoMensal: num(config.precoMensal) }
+  })
+
+  // % padrão da comissão de indicação de lojistas (usado quando a assessora não tem % individual).
+  app.get('/assessores/indicacao-config', async () => {
+    const config = await prisma.configAssessorIndicacao.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} })
+    return { percentualPadrao: num(config.percentualPadrao) }
+  })
+  app.put('/assessores/indicacao-config', async (request) => {
+    const { percentualPadrao } = z.object({ percentualPadrao: z.coerce.number().nonnegative().max(100) }).parse(request.body)
+    const config = await prisma.configAssessorIndicacao.upsert({ where: { id: 1 }, create: { id: 1, percentualPadrao }, update: { percentualPadrao } })
+    return { percentualPadrao: num(config.percentualPadrao) }
   })
 }

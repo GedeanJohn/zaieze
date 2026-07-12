@@ -40,7 +40,7 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
       <header className="vit-capa">
         {v.fotoUrl ? <img className="vit-foto" src={v.fotoUrl} alt={v.nome} /> : <div className="vit-fotoPlaceholder">{v.nome.slice(0, 1).toUpperCase()}</div>}
         <h1 className="vit-nome">{v.nome}</h1>
-        <div className="vit-selo">Assessor(a) de Moda</div>
+        <div className="vit-selo">Corretor(a) de Moda</div>
         {v.bio && <p className="vit-bio">{v.bio}</p>}
         <div className="vit-contatos">
           {v.whatsapp && <a className="vit-btnContato" href={linkWhatsapp(v.whatsapp)} target="_blank" rel="noreferrer">WhatsApp</a>}

@@ -156,8 +156,9 @@ export default function Admin() {
       <AfiliadosSection />
       <ComissoesAfiliadoSection />
 
-      {/* ── Assessores de Moda ── */}
+      {/* ── Corretores de Moda ── */}
       <AssessoresSection />
+      <ComissoesAssessorSection />
 
       {/* ── Redes (clientes) ── */}
       <div className="cartao">
@@ -404,7 +405,7 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
           <label>Aplica a</label>
           <select value={aplicaA} onChange={(e) => setAplicaA(e.target.value as 'REDE' | 'ASSESSOR')}>
             <option value="REDE">Lojista (assinatura de plano)</option>
-            <option value="ASSESSOR">Assessor(a) de Moda</option>
+            <option value="ASSESSOR">Corretor(a) de Moda</option>
           </select>
         </div>
         {aplicaA === 'REDE' && (
@@ -437,7 +438,7 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
           {promos.map((p) => (
             <tr key={p.id} style={{ opacity: p.ativo ? 1 : 0.5 }}>
               <td><strong>{p.codigo}</strong>{p.plano ? <span className="selo ATACADO" style={{ marginLeft: 6 }}>{p.plano}</span> : null}</td>
-              <td>{p.aplicaA === 'ASSESSOR' ? 'Assessora' : 'Lojista'}</td>
+              <td>{p.aplicaA === 'ASSESSOR' ? 'Corretora' : 'Lojista'}</td>
               <td>{p.tipo === 'DIAS_GRATIS' ? `${p.dias} dias grátis` : `${Number(p.percentual)}% off`}{p.descricao ? ` · ${p.descricao}` : ''}</td>
               <td style={{ whiteSpace: 'nowrap' }}>{fmtData(p.validadeAte)}</td>
               <td>{p.usos}{p.maxUsos ? `/${p.maxUsos}` : ''}</td>
@@ -680,12 +681,19 @@ interface AssessorAdmin {
   id: string; slug: string; marcas: number; vendas: number
   usuario: { id: string; nome: string; email: string; telefone: string | null; ativo: boolean }
   assinatura: { status: 'PENDENTE' | 'ATIVA' | 'CANCELADA'; simulada: boolean; valor: number } | null
+  percentualComissaoIndicacao: number | null
+  cliquesIndicacao: number
+  redesIndicadas: number
+  pendente: number
+  paga: number
 }
 
 function AssessoresSection() {
   const [assessores, setAssessores] = useState<AssessorAdmin[]>([])
   const [precoMensal, setPrecoMensal] = useState('89.99')
   const [salvandoPreco, setSalvandoPreco] = useState(false)
+  const [percentualPadraoIndicacao, setPercentualPadraoIndicacao] = useState('2')
+  const [salvandoPercentualPadrao, setSalvandoPercentualPadrao] = useState(false)
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
   const [telefone, setTelefone] = useState('')
@@ -697,6 +705,7 @@ function AssessoresSection() {
   function carregar() {
     api.get('/admin/assessores').then(({ data }) => setAssessores(data.assessores)).catch(() => {})
     api.get('/admin/assessores/config').then(({ data }) => setPrecoMensal(String(data.precoMensal))).catch(() => {})
+    api.get('/admin/assessores/indicacao-config').then(({ data }) => setPercentualPadraoIndicacao(String(data.percentualPadrao))).catch(() => {})
   }
   useEffect(() => { carregar() }, [])
 
@@ -705,6 +714,14 @@ function AssessoresSection() {
     try {
       await api.put('/admin/assessores/config', { precoMensal: Number(precoMensal) })
     } catch (e) { setErro(mensagemDeErro(e)) } finally { setSalvandoPreco(false) }
+  }
+
+  async function salvarPercentualPadrao() {
+    setSalvandoPercentualPadrao(true)
+    try {
+      await api.put('/admin/assessores/indicacao-config', { percentualPadrao: Number(percentualPadraoIndicacao) })
+      carregar()
+    } catch (e) { setErro(mensagemDeErro(e)) } finally { setSalvandoPercentualPadrao(false) }
   }
 
   async function criar(e: React.FormEvent) {
@@ -722,13 +739,35 @@ function AssessoresSection() {
     carregar()
   }
 
+  async function arbitrarPercentual(a: AssessorAdmin) {
+    const atual = a.percentualComissaoIndicacao != null ? String(a.percentualComissaoIndicacao) : ''
+    const resp = window.prompt(
+      `% de comissão sobre lojistas indicados por ${a.usuario.nome} (vazio = usa o % padrão, ${percentualPadraoIndicacao}%):`,
+      atual,
+    )
+    if (resp === null) return
+    const valor = resp.trim() ? Number(resp.replace(',', '.')) : null
+    await api.patch(`/admin/assessores/${a.id}`, { percentualComissaoIndicacao: valor }).catch(() => {})
+    carregar()
+  }
+
+  function copiarLinkIndicacao(a: AssessorAdmin) {
+    const url = `https://zaieze.com/checkout?refAssessor=${encodeURIComponent(a.slug)}`
+    navigator.clipboard?.writeText(url).catch(() => {})
+    window.alert(`Link de indicação copiado:\n${url}`)
+  }
+
   return (
     <div className="cartao">
-      <h2 style={{ marginTop: 0 }}>👗 Assessores de Moda</h2>
+      <h2 style={{ marginTop: 0 }}>👗 Corretores de Moda</h2>
       <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
         Papel com <strong>subdomínio próprio</strong> (<code>slug.zaieze.com</code>) que representa marcas de moda
         (do ZAIEZE ou externas) numa vitrine pública. Lança as próprias vendas/comissão manualmente.
-        Assinatura mensal própria, vendida na página comercial.
+        Assinatura mensal própria, vendida na página comercial. Cada corretora também tem um{' '}
+        <strong>link próprio para indicar lojistas</strong> — toda assinatura do lojista indicado gera
+        comissão <strong>recorrente</strong> (mesma mecânica do Programa de Afiliados), repassada
+        manualmente (Pix por fora). Usa o <strong>% padrão</strong> abaixo, a menos que você arbitre um
+        percentual individual para alguma corretora.
       </div>
 
       <div className="linha-campos" style={{ alignItems: 'end', marginBottom: 14 }}>
@@ -737,6 +776,11 @@ function AssessoresSection() {
           <input type="number" min="0" step="0.01" value={precoMensal} onChange={(e) => setPrecoMensal(e.target.value)} />
         </div>
         <div><button type="button" className="btn secundario" onClick={salvarPreco} disabled={salvandoPreco}>Salvar preço</button></div>
+        <div className="campo" style={{ maxWidth: 160 }}>
+          <label>% padrão de indicação</label>
+          <input type="number" min="0" max="100" step="0.01" value={percentualPadraoIndicacao} onChange={(e) => setPercentualPadraoIndicacao(e.target.value)} />
+        </div>
+        <div><button type="button" className="btn secundario" onClick={salvarPercentualPadrao} disabled={salvandoPercentualPadrao}>Salvar % padrão</button></div>
       </div>
 
       <form onSubmit={criar} className="linha-campos" style={{ alignItems: 'end' }}>
@@ -747,17 +791,22 @@ function AssessoresSection() {
           <label>Subdomínio (slug)</label>
           <input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="ex.: joana" required />
         </div>
-        <div><button className="btn" disabled={ocupado}>Criar assessor(a)</button></div>
+        <div><button className="btn" disabled={ocupado}>Criar corretor(a)</button></div>
       </form>
       {erro && <div className="alerta" style={{ marginTop: 8 }}>{erro}</div>}
       {gerado && (
         <div className="sucesso" style={{ marginTop: 10 }}>
-          Assessor(a) <strong>{gerado.nome}</strong> criado(a) — endereço <strong>{gerado.slug}.zaieze.com</strong>, senha provisória <strong>{gerado.senha}</strong>. Copie e envie a ele(a).
+          Corretor(a) <strong>{gerado.nome}</strong> criado(a) — endereço <strong>{gerado.slug}.zaieze.com</strong>, senha provisória <strong>{gerado.senha}</strong>. Copie e envie a ele(a).
         </div>
       )}
 
       <table style={{ marginTop: 12 }}>
-        <thead><tr><th>Nome</th><th>Endereço</th><th>Marcas</th><th>Vendas lançadas</th><th>Assinatura</th><th>Status</th><th></th></tr></thead>
+        <thead>
+          <tr>
+            <th>Nome</th><th>Endereço</th><th>Marcas</th><th>Vendas lançadas</th><th>Assinatura</th><th>Status</th>
+            <th>% indicação</th><th>Cliques</th><th>Lojistas</th><th>Pendente</th><th>Pago</th><th></th>
+          </tr>
+        </thead>
         <tbody>
           {assessores.map((a) => (
             <tr key={a.id} style={{ opacity: a.usuario.ativo ? 1 : 0.5 }}>
@@ -773,10 +822,89 @@ function AssessoresSection() {
                   : <span style={{ color: 'var(--ink-soft)' }}>sem assinatura</span>}
               </td>
               <td><span className={`selo ${a.usuario.ativo ? 'ok' : 'baixo'}`}>{a.usuario.ativo ? 'ativo' : 'inativo'}</span></td>
-              <td><a href="#" onClick={(e) => { e.preventDefault(); alternarAtivo(a) }}>{a.usuario.ativo ? 'desativar' : 'ativar'}</a></td>
+              <td>
+                {a.percentualComissaoIndicacao != null ? `${a.percentualComissaoIndicacao}%` : <span style={{ color: 'var(--ink-soft)' }}>{percentualPadraoIndicacao}% (padrão)</span>}
+                {' '}<a href="#" onClick={(e) => { e.preventDefault(); arbitrarPercentual(a) }}>editar</a>
+              </td>
+              <td>{a.cliquesIndicacao}</td>
+              <td>{a.redesIndicadas}</td>
+              <td>{formataReal(a.pendente)}</td>
+              <td>{formataReal(a.paga)}</td>
+              <td style={{ whiteSpace: 'nowrap' }}>
+                <a href="#" onClick={(e) => { e.preventDefault(); copiarLinkIndicacao(a) }}>copiar link</a>
+                {' · '}<a href="#" onClick={(e) => { e.preventDefault(); alternarAtivo(a) }}>{a.usuario.ativo ? 'desativar' : 'ativar'}</a>
+              </td>
             </tr>
           ))}
-          {assessores.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--ink-soft)' }}>Nenhum assessor(a) ainda.</td></tr>}
+          {assessores.length === 0 && <tr><td colSpan={11} style={{ color: 'var(--ink-soft)' }}>Nenhum corretor(a) ainda.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+interface ComissaoAssessorAdmin {
+  id: string; redeNome: string; cicloEm: string; valorBaseAssinatura: number; percentualComissao: number
+  valorComissao: number; status: 'PENDENTE' | 'PAGA'; pagoEm: string | null
+  valorRetencaoFiscal: number | null; assessorSlug: string; assessorNome: string
+}
+
+function ComissoesAssessorSection() {
+  const [comissoes, setComissoes] = useState<ComissaoAssessorAdmin[]>([])
+  const [filtro, setFiltro] = useState<'' | 'PENDENTE' | 'PAGA'>('PENDENTE')
+  const avisar = useToast()
+
+  function carregar() {
+    api.get('/admin/assessores/comissoes', { params: filtro ? { status: filtro } : {} })
+      .then(({ data }) => setComissoes(data.comissoes)).catch(() => {})
+  }
+  useEffect(() => { carregar() }, [filtro])
+
+  async function marcarPaga(c: ComissaoAssessorAdmin) {
+    const obs = window.prompt(`Marcar a comissão de ${formataReal(c.valorComissao)} (${c.assessorNome}) como paga?\nObservação (opcional, ex.: comprovante/data do Pix):`)
+    if (obs === null) return
+    const retStr = window.prompt('Reteve algum valor de IBS/CBS nesse repasse? Deixe vazio se não.')
+    if (retStr === null) return
+    try {
+      await api.post(`/admin/assessores/comissoes/${c.id}/pagar`, {
+        observacaoPagamento: obs || undefined,
+        valorRetencaoFiscal: retStr.trim() ? Number(retStr.replace(',', '.')) : undefined,
+      })
+      avisar('Comissão marcada como paga.')
+      carregar()
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') }
+  }
+
+  return (
+    <div className="cartao">
+      <h2 style={{ marginTop: 0 }}>💸 Comissões de indicação (Corretores de Moda)</h2>
+      <div className="linha-campos" style={{ marginBottom: 10 }}>
+        <div className="campo" style={{ maxWidth: 200 }}>
+          <label>Status</label>
+          <select value={filtro} onChange={(e) => setFiltro(e.target.value as typeof filtro)}>
+            <option value="PENDENTE">Pendentes</option>
+            <option value="PAGA">Pagas</option>
+            <option value="">Todas</option>
+          </select>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Corretora</th><th>Lojista indicado</th><th>Ciclo</th><th>Base</th><th>%</th><th>Comissão</th><th>Retenção fiscal</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          {comissoes.map((c) => (
+            <tr key={c.id}>
+              <td>{c.assessorNome} <span style={{ color: 'var(--ink-soft)' }}>({c.assessorSlug}.zaieze.com)</span></td>
+              <td>{c.redeNome}</td>
+              <td>{fmtData(c.cicloEm)}</td>
+              <td>{formataReal(c.valorBaseAssinatura)}</td>
+              <td>{c.percentualComissao}%</td>
+              <td><strong>{formataReal(c.valorComissao)}</strong></td>
+              <td>{c.valorRetencaoFiscal != null ? formataReal(c.valorRetencaoFiscal) : <span style={{ color: 'var(--ink-soft)' }}>—</span>}</td>
+              <td><span className={`selo ${c.status === 'PAGA' ? 'ok' : 'ATACADO'}`}>{c.status}</span></td>
+              <td>{c.status === 'PENDENTE' && <a href="#" onClick={(e) => { e.preventDefault(); marcarPaga(c) }}>marcar paga</a>}</td>
+            </tr>
+          ))}
+          {comissoes.length === 0 && <tr><td colSpan={9} style={{ color: 'var(--ink-soft)' }}>Nenhuma comissão aqui.</td></tr>}
         </tbody>
       </table>
     </div>

@@ -151,7 +151,7 @@ const DICIONARIOS: Record<Idioma, Dicionario> = {
     'assessorPlano.selo': 'Plano para Assessores de Moda',
     'assessorPlano.titulo': 'Sua vitrine de marcas, com endereço só seu',
     'assessorPlano.texto': 'Represente marcas de moda — do ZAIEZE ou de fora — numa página profissional própria, com seu subdomínio exclusivo. Gere um catálogo em PDF com links clicáveis e lance suas comissões manualmente, sem depender de planilha.',
-    'assessorPlano.func1': 'Subdomínio próprio (seunome.zaieze.com)',
+    'assessorPlano.func1': 'Seu endereço online próprio (seunome.zaieze.com)',
     'assessorPlano.func2': 'Vitrine pública com apresentação profissional',
     'assessorPlano.func3': 'Cartão padronizado por marca representada',
     'assessorPlano.func4': 'Catálogo em PDF com links clicáveis para enviar aos clientes',

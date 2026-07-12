@@ -200,7 +200,7 @@ export default function PainelAssessora() {
     <div style={{ maxWidth: 1000, margin: '0 auto', padding: '24px 16px' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <h1 style={{ margin: 0 }}>👗 Painel do Assessor de Moda</h1>
+          <h1 style={{ margin: 0 }}>Painel do Assessor de Moda</h1>
           <span style={{ color: 'var(--ink-soft)', fontSize: 13 }}>{usuario?.nome}</span>
         </div>
         <button className="btn secundario" onClick={sair}>Sair</button>

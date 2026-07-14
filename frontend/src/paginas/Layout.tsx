@@ -4,6 +4,7 @@ import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
   Megaphone, Package, Tag, Layers, Boxes, UsersRound, Eye, Receipt,
   Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Wrench, Smartphone, Camera, Store, Shirt,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
 import { useIdioma } from '../lib/i18n'
@@ -20,6 +21,9 @@ export default function Layout() {
   const usuario = usuarioLogado()!
   const navigate = useNavigate()
   const [menuAberto, setMenuAberto] = useState(false)
+  // Sidebar recolhida (só ícones) no desktop — vale para qualquer perfil, preferência salva por navegador
+  const [menuRecolhido, setMenuRecolhido] = useState(() => localStorage.getItem('zaieze_menu_recolhido') === '1')
+  useEffect(() => { localStorage.setItem('zaieze_menu_recolhido', menuRecolhido ? '1' : '0') }, [menuRecolhido])
   const { t } = useIdioma()
 
   // Aviso global de encerramento de acesso (cancelamento agendado) — todos os papéis, todas as telas
@@ -78,44 +82,52 @@ export default function Layout() {
       {menuAberto && <div className="menu-overlay" onClick={() => setMenuAberto(false)} />}
       <div className="shell-corpo">
       <aside
-        className={`sidebar ${menuAberto ? 'aberta' : ''}`}
+        className={`sidebar ${menuAberto ? 'aberta' : ''} ${menuRecolhido ? 'recolhida' : ''}`}
         onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setMenuAberto(false) }}
       >
-        <div className="sidebar-marca">ZAIEZE</div>
+        <button
+          type="button" className="sidebar-recolher"
+          onClick={() => setMenuRecolhido((v) => !v)}
+          title={menuRecolhido ? t('layout.expandirMenu') : t('layout.recolherMenu')}
+          aria-label={menuRecolhido ? t('layout.expandirMenu') : t('layout.recolherMenu')}
+        >
+          {menuRecolhido ? <ChevronRight size={14} strokeWidth={2} /> : <ChevronLeft size={14} strokeWidth={2} />}
+        </button>
+        <div className="sidebar-marca">{menuRecolhido ? 'Z' : 'ZAIEZE'}</div>
         <nav className="sidebar-nav">
-        <NavLink to="/" end className={cls}><LayoutDashboard {...ICON} /><span>{t('layout.dashboard')}</span></NavLink>
-        {podeVendasClientes && <NavLink to="/vendas" className={cls}><ShoppingBag {...ICON} /><span>{t('layout.vendas')}</span></NavLink>}
-        {podeVendasClientes && <NavLink to="/orcamentos" className={cls}><Receipt {...ICON} /><span>{t('layout.orcamentos')}</span></NavLink>}
-        {podeVendasClientes && <NavLink to="/clientes" className={cls}><Users {...ICON} /><span>{t('layout.clientes')}</span></NavLink>}
-        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/caixa" className={cls}><Inbox {...ICON} /><span>{t('layout.chatZaieze')}</span></NavLink>}
-        {podeSupervisionar && temFeature('whatsapp') && <NavLink to="/supervisao" className={cls}><Eye {...ICON} /><span>{t('layout.supervisao')}</span></NavLink>}
-        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/campanhas" className={cls}><MessageCircle {...ICON} /><span>{t('layout.campanhas')}</span></NavLink>}
-        {podeVendasClientes && temFeature('funil') && <NavLink to="/funil" className={cls}><Filter {...ICON} /><span>{t('layout.funil')}</span></NavLink>}
-        {podeVendasClientes && temFeature('radar') && <NavLink to="/radar" className={cls}><Radar {...ICON} /><span>{t('layout.radar')}</span></NavLink>}
-        {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/ranking" className={cls}><Trophy {...ICON} /><span>{t('layout.ranking')}</span></NavLink>}
-        {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/mural" className={cls}><Megaphone {...ICON} /><span>{t('layout.mural')}</span></NavLink>}
-        {podeVendasClientes && temFeature('atacado') && <NavLink to="/atacado" className={cls}><Package {...ICON} /><span>{t('layout.atacado')}</span></NavLink>}
-        {podeVendasClientes && <NavLink to="/provador" className={cls}><Shirt {...ICON} /><span>{t('layout.provador')}</span></NavLink>}
-        {podeEstoque && <NavLink to="/colecoes" className={cls}><Layers {...ICON} /><span>{t('layout.colecoes')}</span></NavLink>}
-        <NavLink to="/produtos" className={cls}><Tag {...ICON} /><span>{t('layout.produtos')}</span></NavLink>
-        {podeEstoque && <NavLink to="/estoque" className={cls}><Boxes {...ICON} /><span>{t('layout.estoque')}</span></NavLink>}
-        {podeSeparacao && <NavLink to="/separacao" className={cls}><ClipboardCheck {...ICON} /><span>{t('layout.separacao')}</span></NavLink>}
-        {podeEquipe && <NavLink to="/equipe" className={cls}><UsersRound {...ICON} /><span>{t('layout.equipe')}</span></NavLink>}
-        {ehDonoRede && temFeature('whatsapp') && <NavLink to="/whatsapp-config" className={cls}><Smartphone {...ICON} /><span>{t('layout.whatsappOficial')}</span></NavLink>}
-        {ehDonoRede && temFeature('whatsapp') && <NavLink to="/instagram-config" className={cls}><Camera {...ICON} /><span>{t('layout.instagramOficial')}</span></NavLink>}
-        {ehDonoRede && temFeature('marketplace') && <NavLink to="/mercadolivre-config" className={cls}><Store {...ICON} /><span>{t('layout.mercadoLivre')}</span></NavLink>}
-        {ehDonoRede && temFeature('portal_cliente') && <NavLink to="/marca" className={cls}><Palette {...ICON} /><span>{t('layout.minhaLoja')}</span></NavLink>}
-        {ehDonoRede && <NavLink to="/manual" className={cls}><BookOpen {...ICON} /><span>{t('layout.manual')}</span></NavLink>}
-        {ehDonoRede && <NavLink to="/planos" className={cls}><CreditCard {...ICON} /><span>{t('layout.planos')}</span></NavLink>}
-        {ehDonoRede && <NavLink to="/contrato" className={cls}><FileText {...ICON} /><span>{t('layout.contrato')}</span></NavLink>}
-        {ehAdmin && <NavLink to="/admin" className={cls}><Wrench {...ICON} /><span>{t('layout.admin')}</span></NavLink>}
-        <NavLink to="/conta" className={cls}><UserCog {...ICON} /><span>{t('layout.minhaConta')}</span></NavLink>
+        <NavLink to="/" end className={cls} title={t('layout.dashboard')}><LayoutDashboard {...ICON} /><span>{t('layout.dashboard')}</span></NavLink>
+        {podeVendasClientes && <NavLink to="/vendas" className={cls} title={t('layout.vendas')}><ShoppingBag {...ICON} /><span>{t('layout.vendas')}</span></NavLink>}
+        {podeVendasClientes && <NavLink to="/orcamentos" className={cls} title={t('layout.orcamentos')}><Receipt {...ICON} /><span>{t('layout.orcamentos')}</span></NavLink>}
+        {podeVendasClientes && <NavLink to="/clientes" className={cls} title={t('layout.clientes')}><Users {...ICON} /><span>{t('layout.clientes')}</span></NavLink>}
+        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/caixa" className={cls} title={t('layout.chatZaieze')}><Inbox {...ICON} /><span>{t('layout.chatZaieze')}</span></NavLink>}
+        {podeSupervisionar && temFeature('whatsapp') && <NavLink to="/supervisao" className={cls} title={t('layout.supervisao')}><Eye {...ICON} /><span>{t('layout.supervisao')}</span></NavLink>}
+        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/campanhas" className={cls} title={t('layout.campanhas')}><MessageCircle {...ICON} /><span>{t('layout.campanhas')}</span></NavLink>}
+        {podeVendasClientes && temFeature('funil') && <NavLink to="/funil" className={cls} title={t('layout.funil')}><Filter {...ICON} /><span>{t('layout.funil')}</span></NavLink>}
+        {podeVendasClientes && temFeature('radar') && <NavLink to="/radar" className={cls} title={t('layout.radar')}><Radar {...ICON} /><span>{t('layout.radar')}</span></NavLink>}
+        {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/ranking" className={cls} title={t('layout.ranking')}><Trophy {...ICON} /><span>{t('layout.ranking')}</span></NavLink>}
+        {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/mural" className={cls} title={t('layout.mural')}><Megaphone {...ICON} /><span>{t('layout.mural')}</span></NavLink>}
+        {podeVendasClientes && temFeature('atacado') && <NavLink to="/atacado" className={cls} title={t('layout.atacado')}><Package {...ICON} /><span>{t('layout.atacado')}</span></NavLink>}
+        {podeVendasClientes && <NavLink to="/provador" className={cls} title={t('layout.provador')}><Shirt {...ICON} /><span>{t('layout.provador')}</span></NavLink>}
+        {podeEstoque && <NavLink to="/colecoes" className={cls} title={t('layout.colecoes')}><Layers {...ICON} /><span>{t('layout.colecoes')}</span></NavLink>}
+        <NavLink to="/produtos" className={cls} title={t('layout.produtos')}><Tag {...ICON} /><span>{t('layout.produtos')}</span></NavLink>
+        {podeEstoque && <NavLink to="/estoque" className={cls} title={t('layout.estoque')}><Boxes {...ICON} /><span>{t('layout.estoque')}</span></NavLink>}
+        {podeSeparacao && <NavLink to="/separacao" className={cls} title={t('layout.separacao')}><ClipboardCheck {...ICON} /><span>{t('layout.separacao')}</span></NavLink>}
+        {podeEquipe && <NavLink to="/equipe" className={cls} title={t('layout.equipe')}><UsersRound {...ICON} /><span>{t('layout.equipe')}</span></NavLink>}
+        {ehDonoRede && temFeature('whatsapp') && <NavLink to="/whatsapp-config" className={cls} title={t('layout.whatsappOficial')}><Smartphone {...ICON} /><span>{t('layout.whatsappOficial')}</span></NavLink>}
+        {ehDonoRede && temFeature('whatsapp') && <NavLink to="/instagram-config" className={cls} title={t('layout.instagramOficial')}><Camera {...ICON} /><span>{t('layout.instagramOficial')}</span></NavLink>}
+        {ehDonoRede && temFeature('marketplace') && <NavLink to="/mercadolivre-config" className={cls} title={t('layout.mercadoLivre')}><Store {...ICON} /><span>{t('layout.mercadoLivre')}</span></NavLink>}
+        {ehDonoRede && temFeature('portal_cliente') && <NavLink to="/marca" className={cls} title={t('layout.minhaLoja')}><Palette {...ICON} /><span>{t('layout.minhaLoja')}</span></NavLink>}
+        {ehDonoRede && <NavLink to="/manual" className={cls} title={t('layout.manual')}><BookOpen {...ICON} /><span>{t('layout.manual')}</span></NavLink>}
+        {ehDonoRede && <NavLink to="/planos" className={cls} title={t('layout.planos')}><CreditCard {...ICON} /><span>{t('layout.planos')}</span></NavLink>}
+        {ehDonoRede && <NavLink to="/contrato" className={cls} title={t('layout.contrato')}><FileText {...ICON} /><span>{t('layout.contrato')}</span></NavLink>}
+        {ehAdmin && <NavLink to="/admin" className={cls} title={t('layout.admin')}><Wrench {...ICON} /><span>{t('layout.admin')}</span></NavLink>}
+        <NavLink to="/conta" className={cls} title={t('layout.minhaConta')}><UserCog {...ICON} /><span>{t('layout.minhaConta')}</span></NavLink>
         </nav>
         <div className="rodape">
           <div className="rodape-nome">{usuario.nome}</div>
           <div>{usuario.loja?.nome ?? usuario.rede?.nome ?? 'SaaS Admin'} · {t(`papel.${usuario.role}`) || rotuloPapel[usuario.role]}</div>
           {usuario.rede && <div style={{ marginTop: 4 }}>{t('layout.plano')} <strong style={{ color: '#e8a87c' }}>{usuario.rede.plano}</strong></div>}
-          <button onClick={sair}><LogOut size={15} strokeWidth={1.75} /> {t('layout.sair')}</button>
+          <button onClick={sair} title={t('layout.sair')}><LogOut size={15} strokeWidth={1.75} /> <span>{t('layout.sair')}</span></button>
         </div>
       </aside>
       <main className="conteudo">

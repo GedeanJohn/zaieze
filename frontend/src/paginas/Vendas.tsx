@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, formataReal, mensagemDeErro, usuarioLogado, FORMAS_RECEBIMENTO, rotuloForma, CANAIS_VENDA, rotuloCanal, type FormaRecebimento, type CanalVenda } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
+import CampoSenha from '../componentes/CampoSenha'
 import { useIdioma } from '../lib/i18n'
 
 interface ItemVendaView {
@@ -722,7 +723,7 @@ export default function Vendas() {
             {autoriz.tipo === 'senha' ? (
               <div className="campo">
                 <label>{t('vendas.suaSenha')}</label>
-                <input type="password" autoFocus value={autoriz.senha} onChange={(e) => setAutoriz({ ...autoriz, senha: e.target.value })} required />
+                <CampoSenha autoFocus value={autoriz.senha} onChange={(e) => setAutoriz({ ...autoriz, senha: e.target.value })} required />
               </div>
             ) : (
               <>
@@ -732,7 +733,7 @@ export default function Vendas() {
                 </div>
                 <div className="campo">
                   <label>{t('vendas.senhaGerente')}</label>
-                  <input type="password" value={autoriz.gSenha} onChange={(e) => setAutoriz({ ...autoriz, gSenha: e.target.value })} required />
+                  <CampoSenha value={autoriz.gSenha} onChange={(e) => setAutoriz({ ...autoriz, gSenha: e.target.value })} required />
                 </div>
               </>
             )}

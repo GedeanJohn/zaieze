@@ -1,14 +1,20 @@
-import { useEffect, useState } from 'react'
-import { api, formataReal, mensagemDeErro, usuarioLogado } from '../../api'
+import { useEffect, useRef, useState } from 'react'
+import { api, formataReal, mensagemDeErro, usuarioLogado, atualizarUsuarioLocal } from '../../api'
 import { useToast } from '../../componentes/Toast'
+import PreviewVitrine from '../../componentes/PreviewVitrine'
 import { HOST } from '../../host'
 
-interface Perfil { slug: string; bio: string | null; whatsapp: string | null; instagram: string | null; site: string | null }
+interface Perfil {
+  slug: string; bio: string | null; tagline: string | null; disponivel: boolean
+  whatsapp: string | null; telefone: string | null; instagram: string | null; site: string | null
+  statProdutos: number | null; statClientes: number | null; statAvaliacao: number | null
+}
 interface Marca {
-  id: string; redeId: string | null; nome: string; logoUrl: string | null
+  id: string; redeId: string | null; nome: string; logoUrl: string | null; bannerUrl: string | null
   descricao: string | null; formasPagamento: string | null; modoEnvio: string | null; condicoesCompra: string | null
   tamanhos: string | null; valores: string | null; endereco: string | null; cnpj: string | null
   instagram: string | null; facebook: string | null; whatsapp: string | null; telegram: string | null; tiktok: string | null; site: string | null
+  linkCatalogo: string | null
   percentualComissaoSugerido: number | null; ordem: number; ativo: boolean
   autorizadoEm: string | null; recusadoEm: string | null
 }
@@ -23,7 +29,7 @@ interface Indicacao { slug: string; percentual: number; cliques: number; redesIn
 
 const marcaVazia = {
   nome: '', logoUrl: '', descricao: '', formasPagamento: '', modoEnvio: '', condicoesCompra: '',
-  tamanhos: '', valores: '', endereco: '', cnpj: '', instagram: '', facebook: '', whatsapp: '', telegram: '', tiktok: '', site: '',
+  tamanhos: '', valores: '', endereco: '', cnpj: '', instagram: '', facebook: '', whatsapp: '', telegram: '', tiktok: '', site: '', linkCatalogo: '',
   percentualComissaoSugerido: '', ativo: true,
 }
 
@@ -48,11 +54,23 @@ export default function PainelAssessora() {
   const [perfil, setPerfil] = useState<Perfil | null>(null)
   const [bio, setBio] = useState(''); const [whatsapp, setWhatsapp] = useState('')
   const [instagram, setInstagram] = useState(''); const [site, setSite] = useState('')
+  const [tagline, setTagline] = useState(''); const [disponivel, setDisponivel] = useState(true)
+  const [telefone, setTelefone] = useState('')
+  const [statProdutos, setStatProdutos] = useState(''); const [statClientes, setStatClientes] = useState(''); const [statAvaliacao, setStatAvaliacao] = useState('')
   const [salvandoPerfil, setSalvandoPerfil] = useState(false)
+  const [preview, setPreview] = useState(false)
+
+  // Foto de perfil (exibida na capa da vitrine pública) — mesmo endpoint genérico de Conta.tsx.
+  const [fotoUrl, setFotoUrl] = useState<string | null>(usuario?.fotoUrl ?? null)
+  const [enviandoFoto, setEnviandoFoto] = useState(false)
+  const fotoRef = useRef<HTMLInputElement>(null)
 
   const [marcas, setMarcas] = useState<Marca[]>([])
   const [formMarca, setFormMarca] = useState<typeof marcaVazia | null>(null)
   const [editandoMarcaId, setEditandoMarcaId] = useState<string | null>(null)
+  const [bannerMarcaAtual, setBannerMarcaAtual] = useState<string | null>(null)
+  const [enviandoBannerMarca, setEnviandoBannerMarca] = useState(false)
+  const bannerMarcaRef = useRef<HTMLInputElement>(null)
   const [salvandoMarca, setSalvandoMarca] = useState(false)
 
   const [vendas, setVendas] = useState<Venda[]>([])
@@ -63,6 +81,10 @@ export default function PainelAssessora() {
   function carregarPerfil() {
     api.get('/assessores/minha').then(({ data }) => {
       setPerfil(data); setBio(data.bio ?? ''); setWhatsapp(data.whatsapp ?? ''); setInstagram(data.instagram ?? ''); setSite(data.site ?? '')
+      setTagline(data.tagline ?? ''); setDisponivel(data.disponivel); setTelefone(data.telefone ?? '')
+      setStatProdutos(data.statProdutos != null ? String(data.statProdutos) : '')
+      setStatClientes(data.statClientes != null ? String(data.statClientes) : '')
+      setStatAvaliacao(data.statAvaliacao != null ? String(data.statAvaliacao) : '')
     }).catch((e) => avisar(mensagemDeErro(e), 'erro'))
   }
   function carregarMarcas() {
@@ -109,22 +131,69 @@ export default function PainelAssessora() {
   async function salvarPerfil(e: React.FormEvent) {
     e.preventDefault(); setSalvandoPerfil(true)
     try {
-      await api.patch('/assessores/minha', { bio: bio || null, whatsapp: whatsapp || null, instagram: instagram || null, site: site || null })
+      await api.patch('/assessores/minha', {
+        bio: bio || null, whatsapp: whatsapp || null, instagram: instagram || null, site: site || null,
+        tagline: tagline || null, disponivel, telefone: telefone || null,
+        statProdutos: statProdutos !== '' ? Number(statProdutos) : null,
+        statClientes: statClientes !== '' ? Number(statClientes) : null,
+        statAvaliacao: statAvaliacao !== '' ? Number(statAvaliacao) : null,
+      })
       avisar('Perfil salvo.')
       carregarPerfil()
     } catch (e2) { avisar(mensagemDeErro(e2), 'erro') } finally { setSalvandoPerfil(false) }
   }
 
-  function abrirNovaMarca() { setEditandoMarcaId(null); setFormMarca(marcaVazia) }
+  async function enviarFoto(arquivo: File) {
+    setEnviandoFoto(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', arquivo)
+      const { data } = await api.post('/usuarios/me/foto', fd)
+      setFotoUrl(data.fotoUrl)
+      atualizarUsuarioLocal({ fotoUrl: data.fotoUrl })
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') } finally { setEnviandoFoto(false) }
+  }
+  async function removerFoto() {
+    setEnviandoFoto(true)
+    try {
+      await api.delete('/usuarios/me/foto')
+      setFotoUrl(null)
+      atualizarUsuarioLocal({ fotoUrl: null })
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') } finally { setEnviandoFoto(false) }
+  }
+
+  function abrirNovaMarca() { setEditandoMarcaId(null); setBannerMarcaAtual(null); setFormMarca(marcaVazia) }
   function abrirEditarMarca(m: Marca) {
     setEditandoMarcaId(m.id)
+    setBannerMarcaAtual(m.bannerUrl)
     setFormMarca({
       nome: m.nome, logoUrl: m.logoUrl ?? '', descricao: m.descricao ?? '', formasPagamento: m.formasPagamento ?? '',
       modoEnvio: m.modoEnvio ?? '', condicoesCompra: m.condicoesCompra ?? '', tamanhos: m.tamanhos ?? '', valores: m.valores ?? '',
       endereco: m.endereco ?? '', cnpj: m.cnpj ?? '', instagram: m.instagram ?? '', facebook: m.facebook ?? '', whatsapp: m.whatsapp ?? '',
-      telegram: m.telegram ?? '', tiktok: m.tiktok ?? '', site: m.site ?? '',
+      telegram: m.telegram ?? '', tiktok: m.tiktok ?? '', site: m.site ?? '', linkCatalogo: m.linkCatalogo ?? '',
       percentualComissaoSugerido: m.percentualComissaoSugerido != null ? String(m.percentualComissaoSugerido) : '', ativo: m.ativo,
     })
+  }
+
+  async function enviarBannerMarca(arquivo: File) {
+    if (!editandoMarcaId) return
+    setEnviandoBannerMarca(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', arquivo)
+      const { data } = await api.post(`/assessores/minha/marcas/${editandoMarcaId}/banner`, fd, { params: { anterior: bannerMarcaAtual ?? undefined } })
+      setBannerMarcaAtual(data.bannerUrl)
+      carregarMarcas()
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') } finally { setEnviandoBannerMarca(false) }
+  }
+  async function removerBannerMarca() {
+    if (!editandoMarcaId) return
+    setEnviandoBannerMarca(true)
+    try {
+      await api.delete(`/assessores/minha/marcas/${editandoMarcaId}/banner`)
+      setBannerMarcaAtual(null)
+      carregarMarcas()
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') } finally { setEnviandoBannerMarca(false) }
   }
 
   async function salvarMarca(e: React.FormEvent) {
@@ -192,7 +261,7 @@ export default function PainelAssessora() {
       })
       const url = URL.createObjectURL(data as Blob)
       const a = document.createElement('a')
-      a.href = url; a.download = `vendas-${perfil?.slug ?? 'corretora'}.${formato}`
+      a.href = url; a.download = `vendas-${perfil?.slug ?? 'brand-partner'}.${formato}`
       document.body.appendChild(a); a.click(); a.remove()
       URL.revokeObjectURL(url)
     } catch (e) { avisar(mensagemDeErro(e), 'erro') }
@@ -207,7 +276,7 @@ export default function PainelAssessora() {
     <div style={{ maxWidth: 1000, margin: '0 auto', padding: '24px 16px' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <h1 style={{ margin: 0 }}>Painel do Corretor de Moda</h1>
+          <h1 style={{ margin: 0 }}>Painel do Brand Partner</h1>
           <span style={{ color: 'var(--ink-soft)', fontSize: 13 }}>{usuario?.nome}</span>
         </div>
         <button className="btn secundario" onClick={sair}>Sair</button>
@@ -219,7 +288,7 @@ export default function PainelAssessora() {
           <input readOnly value={linkPublico} style={{ minWidth: 220 }} />
           <button type="button" className="btn secundario" onClick={() => { navigator.clipboard?.writeText(linkPublico); avisar('Link copiado.') }}>Copiar</button>
           <a className="btn" href={HOST.tipo === 'landing' ? linkPublico : `${linkPublico}?tenant=${perfil.slug}`} target="_blank" rel="noreferrer">Ver vitrine</a>
-          <a className="btn secundario" href={`/api/assessores/publico/${perfil.slug}/catalogo.pdf`} target="_blank" rel="noreferrer">Baixar catálogo em PDF</a>
+          <button type="button" className="btn secundario" onClick={() => setPreview(true)}>Visualizar vitrine</button>
         </div>
       </div>
 
@@ -299,19 +368,55 @@ export default function PainelAssessora() {
       )}
 
       {aba === 'perfil' && (
-        <form className="cartao" onSubmit={salvarPerfil}>
-          <h2 style={{ marginTop: 0 }}>Apresentação (capa da vitrine)</h2>
-          <div className="campo">
-            <label>Bio / apresentação</label>
-            <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} maxLength={600} placeholder="Conte quem você é e como trabalha com as marcas que representa." />
+        <>
+          <div className="cartao" style={{ display: 'flex', alignItems: 'center', gap: 16, maxWidth: 520 }}>
+            {fotoUrl
+              ? <img src={fotoUrl} alt="" style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover' }} />
+              : <span style={{ width: 72, height: 72, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 24, color: '#fff', background: 'linear-gradient(135deg, #c9a25f, #8a6a35)' }}>{(usuario?.nome ?? '?').slice(0, 1).toUpperCase()}</span>}
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>Foto de perfil</div>
+              <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 8 }}>É a foto grande da capa da sua vitrine.</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className="btn" disabled={enviandoFoto} onClick={() => fotoRef.current?.click()}>{enviandoFoto ? 'Enviando…' : '📷 Trocar foto'}</button>
+                {fotoUrl && <button type="button" className="btn secundario" disabled={enviandoFoto} onClick={removerFoto}>Remover</button>}
+              </div>
+              <input ref={fotoRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarFoto(f); e.target.value = '' }} />
+            </div>
           </div>
-          <div className="linha-campos">
-            <div className="campo"><label>WhatsApp pessoal</label><input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Ex.: 5562999999999" /></div>
-            <div className="campo"><label>Instagram pessoal</label><input value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="https://instagram.com/..." /></div>
-            <div className="campo"><label>Site</label><input value={site} onChange={(e) => setSite(e.target.value)} placeholder="https://..." /></div>
-          </div>
-          <div className="acoes"><button className="btn" disabled={salvandoPerfil}>Salvar</button></div>
-        </form>
+
+          <form className="cartao" onSubmit={salvarPerfil}>
+            <h2 style={{ marginTop: 0 }}>Apresentação (capa da vitrine)</h2>
+            <div className="campo">
+              <label>Frase de efeito (tagline)</label>
+              <input value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={140} placeholder="Ex.: Conectando estilos, criando histórias." />
+            </div>
+            <div className="campo">
+              <label>Bio / apresentação</label>
+              <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} maxLength={600} placeholder="Conte quem você é e como trabalha com as marcas que representa." />
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+              <input type="checkbox" checked={disponivel} onChange={(e) => setDisponivel(e.target.checked)} />
+              Disponível (mostra o selo "Disponível" na vitrine)
+            </label>
+            <div className="linha-campos">
+              <div className="campo"><label>WhatsApp pessoal</label><input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Ex.: 5562999999999" /></div>
+              <div className="campo"><label>Telefone (botão "Ligar")</label><input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="Ex.: 5562999999999" /></div>
+              <div className="campo"><label>Instagram pessoal</label><input value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="https://instagram.com/..." /></div>
+              <div className="campo"><label>Site</label><input value={site} onChange={(e) => setSite(e.target.value)} placeholder="https://..." /></div>
+            </div>
+            <div style={{ marginTop: 8, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 8 }}>
+                Estatísticas exibidas na vitrine (autodeclaradas, sem verificação — deixe em branco para não exibir).
+              </div>
+              <div className="linha-campos">
+                <div className="campo"><label>Produtos (número)</label><input type="number" min={0} value={statProdutos} onChange={(e) => setStatProdutos(e.target.value)} /></div>
+                <div className="campo"><label>Clientes (número)</label><input type="number" min={0} value={statClientes} onChange={(e) => setStatClientes(e.target.value)} /></div>
+                <div className="campo"><label>Avaliação (0 a 5)</label><input type="number" min={0} max={5} step="0.1" value={statAvaliacao} onChange={(e) => setStatAvaliacao(e.target.value)} /></div>
+              </div>
+            </div>
+            <div className="acoes"><button className="btn" disabled={salvandoPerfil}>Salvar</button></div>
+          </form>
+        </>
       )}
 
       {aba === 'marcas' && (
@@ -402,6 +507,28 @@ export default function PainelAssessora() {
               <div className="campo"><label>Nome da marca*</label><input value={formMarca.nome} onChange={(e) => setFormMarca({ ...formMarca, nome: e.target.value })} required /></div>
               <div className="campo"><label>Logo (URL)</label><input value={formMarca.logoUrl} onChange={(e) => setFormMarca({ ...formMarca, logoUrl: e.target.value })} /></div>
             </div>
+            <div className="campo">
+              <label>Banner (imagem grande do card na vitrine)</label>
+              {editandoMarcaId ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {bannerMarcaAtual
+                    ? <img src={bannerMarcaAtual} alt="" style={{ width: 120, height: 90, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />
+                    : <div style={{ width: 120, height: 90, borderRadius: 8, border: '1px dashed var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--ink-soft)' }}>sem banner</div>}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button type="button" className="btn secundario" disabled={enviandoBannerMarca} onClick={() => bannerMarcaRef.current?.click()}>{enviandoBannerMarca ? 'Enviando…' : 'Trocar banner'}</button>
+                    {bannerMarcaAtual && <button type="button" className="btn secundario" disabled={enviandoBannerMarca} onClick={removerBannerMarca}>Remover</button>}
+                  </div>
+                  <input ref={bannerMarcaRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarBannerMarca(f); e.target.value = '' }} />
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Salve a marca primeiro para poder enviar o banner.</div>
+              )}
+            </div>
+            <div className="campo">
+              <label>Link do catálogo (se a marca já for cliente ZAIEZE)</label>
+              <input value={formMarca.linkCatalogo} onChange={(e) => setFormMarca({ ...formMarca, linkCatalogo: e.target.value })} placeholder="https://loja.zaieze.com/vendedora" />
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>Aparece como botão "Ver catálogo" na janela de links da vitrine — você ajuda o cliente a fechar direto no site da marca.</div>
+            </div>
             <div className="campo"><label>Descrição (1 item por linha)</label><textarea rows={3} value={formMarca.descricao} onChange={(e) => setFormMarca({ ...formMarca, descricao: e.target.value })} placeholder={'Fabricação própria\nTecido premium'} /></div>
             <div className="linha-campos">
               <div className="campo"><label>Formas de pagamento (1 por linha)</label><textarea rows={2} value={formMarca.formasPagamento} onChange={(e) => setFormMarca({ ...formMarca, formasPagamento: e.target.value })} /></div>
@@ -466,6 +593,14 @@ export default function PainelAssessora() {
             </div>
           </form>
         </div>
+      )}
+
+      {preview && (
+        <PreviewVitrine
+          nome={usuario?.nome ?? ''} fotoUrl={fotoUrl} tagline={tagline} bio={bio} disponivel={disponivel}
+          totalMarcas={marcas.length} statProdutos={statProdutos} statClientes={statClientes} statAvaliacao={statAvaliacao}
+          onClose={() => setPreview(false)}
+        />
       )}
     </div>
   )

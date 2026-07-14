@@ -1378,9 +1378,16 @@ model Assessor {
   usuarioId String   @unique
   slug      String   @unique // subdomínio próprio: <slug>.zaieze.com — único também frente a Rede.slug (checado em código, tabelas diferentes)
   bio       String? // apresentação exibida na capa da vitrine pública
+  tagline   String? // frase de efeito em destaque na vitrine (fonte script), ex.: "Conectando estilos, criando histórias."
+  disponivel Boolean @default(true) // badge "Disponível"/"Indisponível" na vitrine
   whatsapp  String? // contato pessoal dela (distinto do whatsapp de cada marca representada)
+  telefone  String? // número para o botão "Ligar" (distinto do whatsapp)
   instagram String?
   site      String?
+  // Estatísticas exibidas na vitrine — autodeclaradas, sem validação (só "marcas" é contagem real)
+  statProdutos   Int?
+  statClientes   Int?
+  statAvaliacao  Decimal? @db.Decimal(2, 1)
   // Indicação de lojistas (link próprio ?refAssessor=<slug>): % arbitrado pelo SUPER_ADMIN por
   // assessora — null = sem indicação habilitada (nenhuma comissão é gerada até ser definido).
   percentualComissaoIndicacao Decimal? @db.Decimal(5, 2)
@@ -1407,6 +1414,7 @@ model AssessorMarca {
   redeId     String? // preenchido quando a marca já é cliente ZAIEZE — hoje é só referência/selo, sem crédito automático de venda
   nome       String
   logoUrl    String?
+  bannerUrl  String? // imagem grande do card na grade "Marcas que represento" (distinta da logoUrl pequena)
   descricao       String? // bullets, 1 por linha (ex.: "Fabricação própria")
   formasPagamento String? // bullets, 1 por linha (ex.: "PIX", "Cartão em até 4x")
   modoEnvio       String? // bullets, 1 por linha
@@ -1421,6 +1429,7 @@ model AssessorMarca {
   telegram  String?
   tiktok    String?
   site      String?
+  linkCatalogo String? // link do catálogo público de verdade da marca (quando ela é cliente ZAIEZE) — preenchido manualmente, sem vínculo automático com nenhuma vendedora
   percentualComissaoSugerido Decimal? @db.Decimal(5, 2) // pré-preenche o % ao lançar uma venda desta marca
   ordem     Int      @default(0) // ordem manual de exibição na vitrine
   ativo     Boolean  @default(true)

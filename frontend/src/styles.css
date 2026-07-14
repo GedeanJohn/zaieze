@@ -73,9 +73,34 @@ a { color: var(--accent); text-decoration: none; }
 .menu-overlay { display: none; }
 
 .sidebar {
+  position: relative;
   width: 230px; background: #0a0a0b; color: #ececec; padding: 18px 14px;
   display: flex; flex-direction: column; gap: 3px; flex-shrink: 0;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
+  transition: width 0.18s ease;
+}
+
+/* Botão de recolher/expandir o menu (desktop, todos os perfis) — meia-lua na borda direita da sidebar */
+.sidebar-recolher {
+  position: absolute; top: 22px; right: -12px; z-index: 5;
+  width: 24px; height: 24px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #1c1c1e; color: #ccc; border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer; padding: 0; transition: background 0.15s ease, color 0.15s ease;
+}
+.sidebar-recolher:hover { background: #2a2a2d; color: #fff; }
+
+/* Recolher é um recurso só de desktop (no mobile a sidebar já é um drawer off-canvas próprio). */
+@media (min-width: 861px) {
+  .sidebar.recolhida { width: 72px; }
+  .sidebar.recolhida .sidebar-marca { text-align: center; margin-left: 0; margin-right: 0; }
+  .sidebar.recolhida a { justify-content: center; padding: 10px; }
+  .sidebar.recolhida a span, .sidebar.recolhida .rodape-nome ~ div, .sidebar.recolhida .rodape button span {
+    display: none;
+  }
+  .sidebar.recolhida .rodape { text-align: center; }
+  .sidebar.recolhida .rodape .rodape-nome { display: none; }
+  .sidebar.recolhida .rodape button { width: auto; padding: 8px; }
 }
 /* Marca ZAIEZE no topo do menu (fonte NUSAR) — só no drawer mobile (no desktop já está na barra de topo) */
 .sidebar-marca { display: block; font-family: var(--marca); font-weight: 600; font-size: 26px; letter-spacing: 0.12em; color: #fff; margin: 2px 8px 18px; }
@@ -117,6 +142,9 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th { text-align: left; color: var(--ink-soft); font-weight: 600; padding: 10px 12px; border-bottom: 2px solid var(--border); }
 td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
 tr:hover td { background: #fdfaf6; }
+/* Tabelas largas (colunas com nowrap) rolam na horizontal dentro do próprio card em vez de
+   estourar o layout — sem isso o overflow-x: clip do body (linha 21) corta o conteúdo à direita. */
+.conteudo table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
 
 .btn {
   background: #0a0a0b; color: #fff; border: none; border-radius: 8px;
@@ -131,6 +159,9 @@ input, select, textarea {
   width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
   font-size: 14px; background: #fff; color: var(--ink);
 }
+/* Sem isto, checkbox/radio herdam width:100% da regra acima — a caixa de clique fica gigante
+   (invisível) e empurra o texto do label para longe, mesmo com o label em flex. */
+input[type="checkbox"], input[type="radio"] { width: auto; padding: 0; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
 label { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 4px; }
 .campo { margin-bottom: 14px; }
@@ -259,12 +290,14 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   .topbar-nome { display: none; }
   .sidebar-marca { display: block; }
 
-  /* sidebar fora de tela; entra com .aberta */
-  .sidebar {
+  /* sidebar fora de tela; entra com .aberta. O "recolher" é um recurso só de desktop —
+     no drawer mobile a sidebar sempre abre completa, ignorando a preferência salva. */
+  .sidebar, .sidebar.recolhida {
     position: fixed; top: 0; left: 0; bottom: 0; width: 264px; z-index: 60;
     transform: translateX(-100%); transition: transform 0.25s ease; overflow-y: auto;
   }
   .sidebar.aberta { transform: translateX(0); box-shadow: 0 0 40px rgba(0, 0, 0, 0.5); }
+  .sidebar-recolher { display: none; }
   .menu-overlay {
     display: block; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 50;
   }
@@ -295,11 +328,6 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   /* grades densas empilham em coluna única (evita estouro horizontal) */
   .grade-paineis { grid-template-columns: 1fr; }
 
-  /* tabelas largas rolam na horizontal em vez de espremer as colunas */
-  .conteudo table {
-    display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap;
-  }
-
   /* campos lado a lado empilham em coluna única no celular (evita estouro) */
   .linha-campos { grid-template-columns: 1fr; }
 
@@ -326,7 +354,6 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   font-weight: 100 900;
   font-display: swap;
 }
-
 :root {
   --zz-bg: #000;
   --zz-surface: #0c0c0d;
@@ -336,6 +363,8 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   --marca: 'NUSAR', 'Century Gothic', 'Futura', 'Questrial', 'Segoe UI', system-ui, sans-serif;
   /* Fonte de leitura: corpo de texto, planos, botões — mais amigável para ler. */
   --leitura: 'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif;
+  /* Fonte script: frases de efeito em destaque (ex.: tagline da vitrine do Brand Partner). */
+  --fonte-script: 'Allura', cursive;
 }
 
 .site {
@@ -816,6 +845,9 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   min-height: calc(100dvh - 64px);
   display: flex; flex-direction: column;
 }
+/* Quando há aviso (termos/encerramento) acima, a margem negativa do full-bleed não deve sobrepor o texto do aviso. */
+.aviso-encerramento ~ .cz-pagina { margin-top: 0; }
+
 /* Título "Chat Zaieze" em caixa branca, fonte NUSAR da marca, centralizado. */
 .cz-cabec { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 18px; }
 .cz-marca {

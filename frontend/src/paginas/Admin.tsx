@@ -156,7 +156,7 @@ export default function Admin() {
       <AfiliadosSection />
       <ComissoesAfiliadoSection />
 
-      {/* ── Corretores de Moda ── */}
+      {/* ── Brand Partners ── */}
       <AssessoresSection />
       <ComissoesAssessorSection />
 
@@ -405,7 +405,7 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
           <label>Aplica a</label>
           <select value={aplicaA} onChange={(e) => setAplicaA(e.target.value as 'REDE' | 'ASSESSOR')}>
             <option value="REDE">Lojista (assinatura de plano)</option>
-            <option value="ASSESSOR">Corretor(a) de Moda</option>
+            <option value="ASSESSOR">Brand Partner</option>
           </select>
         </div>
         {aplicaA === 'REDE' && (
@@ -438,7 +438,7 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
           {promos.map((p) => (
             <tr key={p.id} style={{ opacity: p.ativo ? 1 : 0.5 }}>
               <td><strong>{p.codigo}</strong>{p.plano ? <span className="selo ATACADO" style={{ marginLeft: 6 }}>{p.plano}</span> : null}</td>
-              <td>{p.aplicaA === 'ASSESSOR' ? 'Corretora' : 'Lojista'}</td>
+              <td>{p.aplicaA === 'ASSESSOR' ? 'Brand Partner' : 'Lojista'}</td>
               <td>{p.tipo === 'DIAS_GRATIS' ? `${p.dias} dias grátis` : `${Number(p.percentual)}% off`}{p.descricao ? ` · ${p.descricao}` : ''}</td>
               <td style={{ whiteSpace: 'nowrap' }}>{fmtData(p.validadeAte)}</td>
               <td>{p.usos}{p.maxUsos ? `/${p.maxUsos}` : ''}</td>
@@ -759,15 +759,15 @@ function AssessoresSection() {
 
   return (
     <div className="cartao">
-      <h2 style={{ marginTop: 0 }}>👗 Corretores de Moda</h2>
+      <h2 style={{ marginTop: 0 }}>👗 Brand Partners</h2>
       <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
         Papel com <strong>subdomínio próprio</strong> (<code>slug.zaieze.com</code>) que representa marcas de moda
         (do ZAIEZE ou externas) numa vitrine pública. Lança as próprias vendas/comissão manualmente.
-        Assinatura mensal própria, vendida na página comercial. Cada corretora também tem um{' '}
+        Assinatura mensal própria, vendida na página comercial. Cada Brand Partner também tem um{' '}
         <strong>link próprio para indicar lojistas</strong> — toda assinatura do lojista indicado gera
         comissão <strong>recorrente</strong> (mesma mecânica do Programa de Afiliados), repassada
         manualmente (Pix por fora). Usa o <strong>% padrão</strong> abaixo, a menos que você arbitre um
-        percentual individual para alguma corretora.
+        percentual individual para algum Brand Partner.
       </div>
 
       <div className="linha-campos" style={{ alignItems: 'end', marginBottom: 14 }}>
@@ -791,12 +791,12 @@ function AssessoresSection() {
           <label>Subdomínio (slug)</label>
           <input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="ex.: joana" required />
         </div>
-        <div><button className="btn" disabled={ocupado}>Criar corretor(a)</button></div>
+        <div><button className="btn" disabled={ocupado}>Criar Brand Partner</button></div>
       </form>
       {erro && <div className="alerta" style={{ marginTop: 8 }}>{erro}</div>}
       {gerado && (
         <div className="sucesso" style={{ marginTop: 10 }}>
-          Corretor(a) <strong>{gerado.nome}</strong> criado(a) — endereço <strong>{gerado.slug}.zaieze.com</strong>, senha provisória <strong>{gerado.senha}</strong>. Copie e envie a ele(a).
+          Brand Partner <strong>{gerado.nome}</strong> criado(a) — endereço <strong>{gerado.slug}.zaieze.com</strong>, senha provisória <strong>{gerado.senha}</strong>. Copie e envie a ele(a).
         </div>
       )}
 
@@ -836,7 +836,7 @@ function AssessoresSection() {
               </td>
             </tr>
           ))}
-          {assessores.length === 0 && <tr><td colSpan={11} style={{ color: 'var(--ink-soft)' }}>Nenhum corretor(a) ainda.</td></tr>}
+          {assessores.length === 0 && <tr><td colSpan={11} style={{ color: 'var(--ink-soft)' }}>Nenhum Brand Partner ainda.</td></tr>}
         </tbody>
       </table>
     </div>
@@ -877,7 +877,7 @@ function ComissoesAssessorSection() {
 
   return (
     <div className="cartao">
-      <h2 style={{ marginTop: 0 }}>💸 Comissões de indicação (Corretores de Moda)</h2>
+      <h2 style={{ marginTop: 0 }}>💸 Comissões de indicação (Brand Partners)</h2>
       <div className="linha-campos" style={{ marginBottom: 10 }}>
         <div className="campo" style={{ maxWidth: 200 }}>
           <label>Status</label>
@@ -889,7 +889,7 @@ function ComissoesAssessorSection() {
         </div>
       </div>
       <table>
-        <thead><tr><th>Corretora</th><th>Lojista indicado</th><th>Ciclo</th><th>Base</th><th>%</th><th>Comissão</th><th>Retenção fiscal</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Brand Partner</th><th>Lojista indicado</th><th>Ciclo</th><th>Base</th><th>%</th><th>Comissão</th><th>Retenção fiscal</th><th>Status</th><th></th></tr></thead>
         <tbody>
           {comissoes.map((c) => (
             <tr key={c.id}>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, mensagemDeErro } from '../api'
+import CampoSenha from '../componentes/CampoSenha'
 import { useIdioma } from '../lib/i18n'
 
 interface InfoConvite {
@@ -96,11 +97,11 @@ export default function Convite() {
         </div>
         <div className="campo">
           <label>{t('convite.crieSenhaLabel')}</label>
-          <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required autoFocus placeholder={t('convite.senhaMinPlaceholder')} />
+          <CampoSenha value={senha} onChange={(e) => setSenha(e.target.value)} required autoFocus placeholder={t('convite.senhaMinPlaceholder')} />
         </div>
         <div className="campo">
           <label>{t('convite.confirmeSenhaLabel')}</label>
-          <input type="password" value={confirma} onChange={(e) => setConfirma(e.target.value)} required />
+          <CampoSenha value={confirma} onChange={(e) => setConfirma(e.target.value)} required />
         </div>
         <button className="btn" style={{ width: '100%' }} disabled={salvando}>
           {salvando ? t('convite.criando') : t('convite.criarAcesso')}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, mensagemDeErro, usuarioLogado, atualizarUsuarioLocal } from '../api'
 import { useToast } from '../componentes/Toast'
+import CampoSenha from '../componentes/CampoSenha'
 import { useIdioma, type Idioma } from '../lib/i18n'
 
 /** Iniciais do nome para o avatar. */
@@ -122,7 +123,7 @@ export default function Conta() {
       <form className="cartao" onSubmit={salvar} style={{ maxWidth: 520 }}>
         <div className="campo"><label>Nome</label><input value={nome} onChange={(e) => setNome(e.target.value)} required /></div>
         <div className="campo"><label>E-mail (seu login)</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
-        <div className="campo"><label>Nova senha (deixe vazio para manter)</label><input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} minLength={6} placeholder="mínimo 6 caracteres" /></div>
+        <div className="campo"><label>Nova senha (deixe vazio para manter)</label><CampoSenha value={senha} onChange={(e) => setSenha(e.target.value)} minLength={6} placeholder="mínimo 6 caracteres" /></div>
         {ehVendedora && (
           <div className="campo">
             <label>Bio da sua loja (catálogo)</label>

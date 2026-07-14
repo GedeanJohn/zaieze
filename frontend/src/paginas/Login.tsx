@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, mensagemDeErro } from '../api'
 import { HOST } from '../host'
 import { useIdioma, ehIdiomaValido } from '../lib/i18n'
+import CampoSenha from '../componentes/CampoSenha'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -45,7 +46,7 @@ export default function Login() {
         </div>
         <div className="campo">
           <label>{t('login.senha')}</label>
-          <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required />
+          <CampoSenha value={senha} onChange={(e) => setSenha(e.target.value)} required />
         </div>
         <button className="btn" style={{ width: '100%' }} disabled={carregando}>
           {carregando ? t('login.entrando') : t('login.entrar')}

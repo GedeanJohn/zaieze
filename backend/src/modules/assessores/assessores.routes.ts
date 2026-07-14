@@ -1,10 +1,12 @@
+import path from 'node:path'
+import fs from 'node:fs/promises'
+import crypto from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
 import { exportarCsv, exportarTxt, exportarXlsx, exportarPdf, type LinhaVendaAssessora } from './exportar-vendas'
-import { gerarCatalogoPdf } from './catalogo-pdf.service'
 import { normalizarSlug, slugDisponivel } from './assessor.service'
 import { criarPreapproval, mpConfigurado } from '../assinaturas/mercadopago.service'
 import { validarCodigo, consumirCodigo, descricaoBeneficio } from '../promo/promo.service'
@@ -19,11 +21,13 @@ function serializarMarca<T extends { percentualComissaoSugerido: unknown }>(m: T
   return { ...m, percentualComissaoSugerido: m.percentualComissaoSugerido != null ? Number(m.percentualComissaoSugerido) : null }
 }
 
+const TIPOS_LOGO: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/svg+xml': 'svg' }
+
 const marcaSelect = {
-  id: true, redeId: true, nome: true, logoUrl: true,
+  id: true, redeId: true, nome: true, logoUrl: true, bannerUrl: true,
   descricao: true, formasPagamento: true, modoEnvio: true, condicoesCompra: true,
   tamanhos: true, valores: true, endereco: true, cnpj: true,
-  instagram: true, facebook: true, whatsapp: true, telegram: true, tiktok: true, site: true,
+  instagram: true, facebook: true, whatsapp: true, telegram: true, tiktok: true, site: true, linkCatalogo: true,
   percentualComissaoSugerido: true, ordem: true, ativo: true, autorizadoEm: true, recusadoEm: true,
 } as const
 
@@ -153,7 +157,8 @@ export async function assessoresRoutes(app: FastifyInstance) {
     const assessor = await prisma.assessor.findUnique({
       where: { slug },
       select: {
-        slug: true, bio: true, whatsapp: true, instagram: true, site: true,
+        slug: true, bio: true, tagline: true, disponivel: true, whatsapp: true, telefone: true, instagram: true, site: true,
+        statProdutos: true, statClientes: true, statAvaliacao: true,
         usuario: { select: { nome: true, fotoUrl: true, ativo: true } },
         marcas: { where: marcaPublicaWhere, orderBy: { ordem: 'asc' }, select: marcaSelect },
       },
@@ -163,33 +168,18 @@ export async function assessoresRoutes(app: FastifyInstance) {
       nome: assessor.usuario.nome,
       fotoUrl: assessor.usuario.fotoUrl,
       bio: assessor.bio,
+      tagline: assessor.tagline,
+      disponivel: assessor.disponivel,
       whatsapp: assessor.whatsapp,
+      telefone: assessor.telefone,
       instagram: assessor.instagram,
       site: assessor.site,
+      statMarcas: assessor.marcas.length,
+      statProdutos: assessor.statProdutos,
+      statClientes: assessor.statClientes,
+      statAvaliacao: assessor.statAvaliacao != null ? Number(assessor.statAvaliacao) : null,
       marcas: assessor.marcas.map(serializarMarca),
     }
-  })
-
-  // Catálogo em PDF (1 página por marca ativa, links clicáveis) — mesma fonte de dados da
-  // vitrine web; ela baixa no painel e manda pelo WhatsApp, e também fica linkado na vitrine.
-  app.get('/publico/:slug/catalogo.pdf', async (request, reply) => {
-    const { slug } = request.params as { slug: string }
-    const assessor = await prisma.assessor.findUnique({
-      where: { slug },
-      select: {
-        bio: true, whatsapp: true, instagram: true, site: true,
-        usuario: { select: { nome: true, ativo: true } },
-        marcas: { where: marcaPublicaWhere, orderBy: { ordem: 'asc' }, select: marcaSelect },
-      },
-    })
-    if (!assessor || !assessor.usuario.ativo) return reply.code(404).send({ erro: 'Página não encontrada' })
-    const buffer = await gerarCatalogoPdf(
-      { nome: assessor.usuario.nome, bio: assessor.bio, whatsapp: assessor.whatsapp, instagram: assessor.instagram, site: assessor.site },
-      assessor.marcas,
-    )
-    reply.header('Content-Type', 'application/pdf')
-    reply.header('Content-Disposition', `attachment; filename="catalogo-${slug}.pdf"`)
-    return reply.send(buffer)
   })
 
   // preHandler por rota (não addHook): este módulo mistura a vitrine pública acima com o
@@ -204,15 +194,24 @@ export async function assessoresRoutes(app: FastifyInstance) {
   app.get('/minha', protegido, async (request) => {
     const assessor = await assessorDoUsuario(request.user.sub)
     return {
-      slug: assessor.slug, bio: assessor.bio, whatsapp: assessor.whatsapp, instagram: assessor.instagram, site: assessor.site,
+      slug: assessor.slug, bio: assessor.bio, tagline: assessor.tagline, disponivel: assessor.disponivel,
+      whatsapp: assessor.whatsapp, telefone: assessor.telefone, instagram: assessor.instagram, site: assessor.site,
+      statProdutos: assessor.statProdutos, statClientes: assessor.statClientes,
+      statAvaliacao: assessor.statAvaliacao != null ? Number(assessor.statAvaliacao) : null,
     }
   })
 
   const perfilSchema = z.object({
     bio: z.string().trim().max(600).nullable().optional(),
+    tagline: z.string().trim().max(140).nullable().optional(),
+    disponivel: z.boolean().optional(),
     whatsapp: z.string().trim().max(30).nullable().optional(),
+    telefone: z.string().trim().max(30).nullable().optional(),
     instagram: z.string().trim().max(200).nullable().optional(),
     site: z.string().trim().max(200).nullable().optional(),
+    statProdutos: z.coerce.number().int().min(0).nullable().optional(),
+    statClientes: z.coerce.number().int().min(0).nullable().optional(),
+    statAvaliacao: z.coerce.number().min(0).max(5).nullable().optional(),
   })
   app.patch('/minha', protegido, async (request) => {
     const assessor = await assessorDoUsuario(request.user.sub)
@@ -264,6 +263,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
     telegram: z.string().trim().max(200).nullable().optional(),
     tiktok: z.string().trim().max(200).nullable().optional(),
     site: z.string().trim().max(200).nullable().optional(),
+    linkCatalogo: z.string().trim().max(300).nullable().optional(),
     percentualComissaoSugerido: z.coerce.number().positive().max(100).nullable().optional(),
     ativo: z.boolean().optional(),
   })
@@ -297,6 +297,48 @@ export async function assessoresRoutes(app: FastifyInstance) {
     if (!marca) return reply.code(404).send({ erro: 'Marca não encontrada' })
     await prisma.assessorMarca.delete({ where: { id } })
     return { ok: true }
+  })
+
+  // Upload do banner (imagem grande do card na vitrine) de uma marca representada — mesma
+  // lógica de backend/src/modules/marca/marca.routes.ts (disco local, não usa R2).
+  app.post('/minha/marcas/:id/banner', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { id } = request.params as { id: string }
+    const marca = await prisma.assessorMarca.findFirst({ where: { id, assessorId: assessor.id } })
+    if (!marca) return reply.code(404).send({ erro: 'Marca não encontrada' })
+
+    const arquivo = await request.file()
+    if (!arquivo) return reply.code(422).send({ erro: 'Envie um arquivo de imagem no campo "file"' })
+    const ext = TIPOS_LOGO[arquivo.mimetype]
+    if (!ext) return reply.code(422).send({ erro: 'Formato inválido. Use PNG, JPG, WEBP ou SVG.' })
+
+    const buffer = await arquivo.toBuffer()
+    const nome = `banner-assessor-${id}-${crypto.randomBytes(6).toString('hex')}.${ext}`
+    const dir = path.resolve(process.cwd(), env.UPLOAD_DIR)
+    await fs.mkdir(dir, { recursive: true })
+    await fs.writeFile(path.join(dir, nome), buffer)
+
+    const bannerUrl = `/api/uploads/${nome}`
+    const atualizada = await prisma.assessorMarca.update({ where: { id }, data: { bannerUrl }, select: marcaSelect })
+
+    const anterior = (request.query as { anterior?: string }).anterior
+    if (anterior?.startsWith('/api/uploads/') && anterior !== bannerUrl) {
+      fs.unlink(path.join(dir, path.basename(anterior))).catch(() => {})
+    }
+    return serializarMarca(atualizada)
+  })
+
+  app.delete('/minha/marcas/:id/banner', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { id } = request.params as { id: string }
+    const marca = await prisma.assessorMarca.findFirst({ where: { id, assessorId: assessor.id } })
+    if (!marca) return reply.code(404).send({ erro: 'Marca não encontrada' })
+    if (marca.bannerUrl?.startsWith('/api/uploads/')) {
+      const dir = path.resolve(process.cwd(), env.UPLOAD_DIR)
+      fs.unlink(path.join(dir, path.basename(marca.bannerUrl))).catch(() => {})
+    }
+    const atualizada = await prisma.assessorMarca.update({ where: { id }, data: { bannerUrl: null }, select: marcaSelect })
+    return serializarMarca(atualizada)
   })
 
   // ─────────── Vendas (lançamento manual de comissão) ───────────

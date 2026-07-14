@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, mensagemDeErro, temFeature, usuarioLogado } from '../api'
 import ConvidarModal from '../componentes/ConvidarModal'
 import { useToast } from '../componentes/Toast'
+import CampoSenha from '../componentes/CampoSenha'
 import { useIdioma } from '../lib/i18n'
 
 interface Membro {
@@ -444,7 +445,7 @@ export default function Equipe() {
                 <div className="campo"><label>{t('equipe.nomeNovoTitular')}</label><input value={gForm.nome} onChange={(e) => setGForm({ ...gForm, nome: e.target.value })} required /></div>
                 <div className="linha-campos">
                   <div className="campo"><label>{t('equipe.emailNovoLogin')}</label><input type="email" value={gForm.email} onChange={(e) => setGForm({ ...gForm, email: e.target.value })} required /></div>
-                  <div className="campo"><label>{t('equipe.senhaMin6')}</label><input type="password" value={gForm.senha} onChange={(e) => setGForm({ ...gForm, senha: e.target.value })} minLength={6} required /></div>
+                  <div className="campo"><label>{t('equipe.senhaMin6')}</label><CampoSenha value={gForm.senha} onChange={(e) => setGForm({ ...gForm, senha: e.target.value })} minLength={6} required /></div>
                 </div>
                 <div className="acoes">
                   <button type="button" className="btn secundario" onClick={() => setGerenciar(null)}>{t('comum.cancelar')}</button>
@@ -505,7 +506,7 @@ export default function Equipe() {
             <div className="linha-campos">
               <div className="campo">
                 <label>{form.id ? t('equipe.novaSenhaOpcional') : t('equipe.senhaMin6')}</label>
-                <input type="password" value={form.senha ?? ''} onChange={(e) => setForm({ ...form, senha: e.target.value })} required={!form.id} minLength={6} />
+                <CampoSenha value={form.senha ?? ''} onChange={(e) => setForm({ ...form, senha: e.target.value })} required={!form.id} minLength={6} />
               </div>
               <div className="campo">
                 <label>{form.id ? t('equipe.telefoneWhatsapp') : t('equipe.telefoneWhatsappObrig')}</label>
@@ -570,7 +571,7 @@ export default function Equipe() {
               </div>
               <div className="campo">
                 <label>{t('equipe.senhaMin6')}</label>
-                <input type="password" value={formLoja.gerente.senha} onChange={(e) => setFormLoja({ ...formLoja, gerente: { ...formLoja.gerente, senha: e.target.value } })} minLength={6} required />
+                <CampoSenha value={formLoja.gerente.senha} onChange={(e) => setFormLoja({ ...formLoja, gerente: { ...formLoja.gerente, senha: e.target.value } })} minLength={6} required />
               </div>
             </div>
             <div className="campo">
@@ -641,7 +642,7 @@ export default function Equipe() {
             </div>
             <div className="campo">
               <label>{formE.id ? t('equipe.novaSenhaDeixeVazio') : t('equipe.senhaObrig')}</label>
-              <input type="password" value={formE.senha ?? ''} onChange={(e) => setFormE({ ...formE, senha: e.target.value })} required={!formE.id} minLength={6} placeholder={t('equipe.senhaMinPlaceholder')} />
+              <CampoSenha value={formE.senha ?? ''} onChange={(e) => setFormE({ ...formE, senha: e.target.value })} required={!formE.id} minLength={6} placeholder={t('equipe.senhaMinPlaceholder')} />
             </div>
             <div className="acoes">
               <button type="button" className="btn secundario" onClick={() => setFormE(null)}>{t('comum.cancelar')}</button>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, formataReal, mensagemDeErro } from '../../api'
 import SeletorIdioma from '../../componentes/SeletorIdioma'
+import CampoSenha from '../../componentes/CampoSenha'
 import { useIdioma } from '../../lib/i18n'
 
 interface ClausulaContrato { n: number; titulo: string; paragrafos: string[] }
@@ -130,7 +131,7 @@ export default function CadastroAssessor() {
           </div>
           <div className="campo">
             <label>{t('assessorCadastro.senhaLabel')}</label>
-            <input type="password" value={form.senha} onChange={(e) => setForm({ ...form, senha: e.target.value })} required />
+            <CampoSenha value={form.senha} onChange={(e) => setForm({ ...form, senha: e.target.value })} required />
           </div>
 
           <div className="campo">

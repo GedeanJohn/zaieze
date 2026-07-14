@@ -4,6 +4,7 @@ import { api, formataReal, formataUsd, mensagemDeErro, type Plano } from '../../
 import { capturarRefAfiliado, refAfiliadoAtivo, capturarRefAssessor, refAssessorAtivo } from '../../lib/afiliado'
 import SeletorPeriodicidade, { type Periodicidade } from '../../componentes/SeletorPeriodicidade'
 import SeletorIdioma from '../../componentes/SeletorIdioma'
+import CampoSenha from '../../componentes/CampoSenha'
 import { useIdioma } from '../../lib/i18n'
 
 const NOME: Record<Plano, string> = { START: 'Start', PRO: 'Pro', ELITE: 'Elite' }
@@ -194,7 +195,7 @@ export default function Checkout() {
           </div>
           <div className="campo">
             <label>Senha (mín. 6 caracteres)*</label>
-            <input type="password" value={form.senha} onChange={(e) => setForm({ ...form, senha: e.target.value })} required />
+            <CampoSenha value={form.senha} onChange={(e) => setForm({ ...form, senha: e.target.value })} required />
           </div>
 
           <div className="campo">

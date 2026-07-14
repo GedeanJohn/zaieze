@@ -6,13 +6,13 @@
  * texto para fins legais. Ao alterar de forma relevante, incremente CONTRATO_ASSESSOR_VERSAO.
  *
  * Ponto central pedido pelo negócio: a ZAIEZE é só a plataforma tecnológica (subdomínio,
- * vitrine, catálogo em PDF, painel de comissões) — não participa, não intermedeia e não se
+ * vitrine, painel de comissões) — não participa, não intermedeia e não se
  * responsabiliza pela relação comercial entre a corretora e as marcas que ela representa
  * (compra, venda, comissão combinada, entrega, qualidade, garantia, tributos etc.).
  */
 import { EMPRESA } from '../contrato/contrato.template'
 
-export const CONTRATO_ASSESSOR_VERSAO = '1.1-2026-07'
+export const CONTRATO_ASSESSOR_VERSAO = '1.2-2026-07'
 
 export interface ClausulaContratoAssessor {
   n: number
@@ -42,7 +42,7 @@ export function montarContratoAssessor(): ContratoAssessorMontado {
         n: 1,
         titulo: 'Objeto',
         paragrafos: [
-          'A ZAIEZE disponibiliza à CORRETOR(A), mediante assinatura mensal, uma ferramenta de tecnologia composta por: um subdomínio próprio (endereço.zaieze.com), uma página pública ("vitrine") para apresentação e divulgação das marcas que a CORRETOR(A) representa, geração de catálogo em PDF com links de contato, e um painel para lançamento manual de vendas e comissões.',
+          'A ZAIEZE disponibiliza à CORRETOR(A), mediante assinatura mensal, uma ferramenta de tecnologia composta por: um subdomínio próprio (endereço.zaieze.com), uma página pública ("vitrine") para apresentação e divulgação das marcas que a CORRETOR(A) representa — incluindo os links de contato configurados por cada marca —, e um painel para lançamento manual de vendas e comissões.',
           'O serviço da ZAIEZE limita-se à disponibilização dessa ferramenta. A ZAIEZE não é fornecedora, fabricante, distribuidora, representante comercial ou intermediária de nenhuma marca ou produto divulgado pela CORRETOR(A).',
         ],
       },

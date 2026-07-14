@@ -8,6 +8,3 @@ ADD COLUMN     "statClientes" INTEGER,
 ADD COLUMN     "statProdutos" INTEGER,
 ADD COLUMN     "tagline" TEXT,
 ADD COLUMN     "telefone" TEXT;
-
--- RenameIndex
-ALTER INDEX "pedidos_marketplace_pendentes_redeId_marketplace_pedidoExt_key" RENAME TO "pedidos_marketplace_pendentes_redeId_marketplace_pedidoExte_key";

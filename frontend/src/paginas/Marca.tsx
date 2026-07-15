@@ -208,7 +208,7 @@ export default function Marca() {
               : <span style={{ color: '#999', fontSize: 12 }}>{t('marca.semLogo')}</span>}
           </div>
           <div>
-            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={enviarLogo} />
+            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={enviarLogo} />
             <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 6 }}>{t('marca.logoFormatos')}</div>
           </div>
         </div>
@@ -228,7 +228,7 @@ export default function Marca() {
             : <span style={{ color: '#999', fontSize: 12 }}>{t('marca.semBanner')}</span>}
         </div>
         <div style={{ marginTop: 10, display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-          <input ref={bannerRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={enviarBanner} />
+          <input ref={bannerRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={enviarBanner} />
           {marca.bannerUrl && (
             <button type="button" onClick={removerBanner}
               style={{ background: 'none', border: '1px solid #00000033', color: 'var(--ink-soft)', padding: '7px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>

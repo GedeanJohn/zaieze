@@ -279,6 +279,14 @@ export async function assessoresRoutes(app: FastifyInstance) {
     return marcas.map(serializarMarca)
   })
 
+  // Campos que a vitrine pública renderiza direto como href (VitrineAssessora.tsx) — sem exigir
+  // http(s), um valor tipo "javascript:..." viraria link clicável e executaria script na origem
+  // do app pra qualquer visitante, sem autenticação nenhuma. Vazio continua permitido (campo opcional).
+  const linkSeguro = (max: number) =>
+    z.string().trim().max(max)
+      .refine((v) => v === '' || /^https?:\/\//i.test(v), { message: 'Informe um link começando com http:// ou https://' })
+      .nullable().optional()
+
   const marcaSchema = z.object({
     nome: z.string().trim().min(1).max(120),
     descricao: z.string().trim().max(2000).nullable().optional(),
@@ -289,13 +297,13 @@ export async function assessoresRoutes(app: FastifyInstance) {
     valores: z.string().trim().max(200).nullable().optional(),
     endereco: z.string().trim().max(500).nullable().optional(),
     cnpj: z.string().trim().max(30).nullable().optional(),
-    instagram: z.string().trim().max(200).nullable().optional(),
-    facebook: z.string().trim().max(200).nullable().optional(),
+    instagram: linkSeguro(200),
+    facebook: linkSeguro(200),
     whatsapp: z.string().trim().max(30).nullable().optional(),
-    telegram: z.string().trim().max(200).nullable().optional(),
-    tiktok: z.string().trim().max(200).nullable().optional(),
-    site: z.string().trim().max(200).nullable().optional(),
-    linkCatalogo: z.string().trim().max(300).nullable().optional(),
+    telegram: linkSeguro(200),
+    tiktok: linkSeguro(200),
+    site: linkSeguro(200),
+    linkCatalogo: linkSeguro(300),
     percentualComissaoSugerido: z.coerce.number().positive().max(100).nullable().optional(),
     ativo: z.boolean().optional(),
   })

@@ -89,6 +89,9 @@ export async function redeIdDeQualquer(request: FastifyRequest): Promise<string>
     const loja = await prisma.loja.findUnique({ where: { id: user.lojaId }, select: { redeId: true } })
     if (loja) return loja.redeId
   }
+  // Só SUPER_ADMIN pode resolver a rede por query param. Qualquer outro papel sem redeId/lojaId
+  // no token (ex.: ASSESSORA, AFILIADO) não tem posse de nenhuma rede — nunca deve cair aqui.
+  if (user.role !== 'SUPER_ADMIN') throw erroHttp(403, 'Usuário sem rede/loja vinculada')
   const q = request.query as { redeId?: string; lojaId?: string }
   if (q?.redeId) return q.redeId
   if (q?.lojaId) {

@@ -13,7 +13,11 @@ import { env } from '../../env'
  */
 
 const HEX = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
-const TIPOS_LOGO: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/svg+xml': 'svg' }
+// SVG propositalmente FORA da lista: é gravado cru em disco (sem sharp/sanitização) e servido
+// como image/svg+xml em /api/uploads/ — um SVG com <script> aberto direto pelo navegador (ex.:
+// "abrir imagem em nova guia") executa na origem do app. Os demais módulos de upload do projeto
+// já não aceitam SVG por esse motivo.
+const TIPOS_LOGO: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }
 
 const atualizarSchema = z.object({
   nome: z.string().trim().min(2).max(80).optional(),
@@ -57,7 +61,7 @@ export async function marcaRoutes(app: FastifyInstance) {
     const arquivo = await request.file()
     if (!arquivo) return reply.code(422).send({ erro: 'Envie um arquivo de imagem no campo "file"' })
     const ext = TIPOS_LOGO[arquivo.mimetype]
-    if (!ext) return reply.code(422).send({ erro: 'Formato inválido. Use PNG, JPG, WEBP ou SVG.' })
+    if (!ext) return reply.code(422).send({ erro: 'Formato inválido. Use PNG, JPG ou WEBP.' })
 
     const buffer = await arquivo.toBuffer()
     const nome = `logo-${redeId}-${crypto.randomBytes(6).toString('hex')}.${ext}`
@@ -82,7 +86,7 @@ export async function marcaRoutes(app: FastifyInstance) {
     const arquivo = await request.file()
     if (!arquivo) return reply.code(422).send({ erro: 'Envie um arquivo de imagem no campo "file"' })
     const ext = TIPOS_LOGO[arquivo.mimetype]
-    if (!ext) return reply.code(422).send({ erro: 'Formato inválido. Use PNG, JPG, WEBP ou SVG.' })
+    if (!ext) return reply.code(422).send({ erro: 'Formato inválido. Use PNG, JPG ou WEBP.' })
 
     const buffer = await arquivo.toBuffer()
     const nome = `banner-${redeId}-${crypto.randomBytes(6).toString('hex')}.${ext}`

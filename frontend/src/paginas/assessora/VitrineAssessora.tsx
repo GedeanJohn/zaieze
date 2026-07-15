@@ -24,6 +24,14 @@ function linkWhatsapp(numero: string): string {
   return `https://wa.me/${numero.replace(/\D/g, '')}`
 }
 
+/** Defesa em profundidade: mesmo com validação no cadastro (backend), nunca renderiza um href
+ *  de esquema perigoso (ex.: "javascript:") vindo de campo livre da marca — página pública,
+ *  sem autenticação, clicável por qualquer visitante. */
+function linkPublicoSeguro(url: string | null | undefined): string | null {
+  if (url && /^https?:\/\//i.test(url)) return url
+  return null
+}
+
 const NAV_ITENS = [
   { id: 'inicio', rotulo: 'Início', Icone: Home },
   { id: 'catalogo', rotulo: 'Catálogo', Icone: ShoppingBag },
@@ -186,11 +194,17 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
 
   const links: { rotulo: string; href: string; Icone: (p: { size?: number }) => JSX.Element }[] = []
   if (marca.whatsapp) links.push({ rotulo: 'WhatsApp', href: linkWhatsapp(marca.whatsapp), Icone: (p) => <MessageCircle {...p} /> })
-  if (marca.instagram) links.push({ rotulo: 'Instagram', href: marca.instagram, Icone: (p) => <IconeInstagram {...p} /> })
-  if (marca.facebook) links.push({ rotulo: 'Facebook', href: marca.facebook, Icone: (p) => <IconeFacebook {...p} /> })
-  if (marca.tiktok) links.push({ rotulo: 'TikTok', href: marca.tiktok, Icone: (p) => <IconeTiktok {...p} /> })
-  if (marca.telegram) links.push({ rotulo: 'Telegram', href: marca.telegram, Icone: (p) => <Send {...p} /> })
-  if (marca.site) links.push({ rotulo: 'Site', href: marca.site, Icone: (p) => <Globe {...p} /> })
+  const instagramHref = linkPublicoSeguro(marca.instagram)
+  if (instagramHref) links.push({ rotulo: 'Instagram', href: instagramHref, Icone: (p) => <IconeInstagram {...p} /> })
+  const facebookHref = linkPublicoSeguro(marca.facebook)
+  if (facebookHref) links.push({ rotulo: 'Facebook', href: facebookHref, Icone: (p) => <IconeFacebook {...p} /> })
+  const tiktokHref = linkPublicoSeguro(marca.tiktok)
+  if (tiktokHref) links.push({ rotulo: 'TikTok', href: tiktokHref, Icone: (p) => <IconeTiktok {...p} /> })
+  const telegramHref = linkPublicoSeguro(marca.telegram)
+  if (telegramHref) links.push({ rotulo: 'Telegram', href: telegramHref, Icone: (p) => <Send {...p} /> })
+  const siteHref = linkPublicoSeguro(marca.site)
+  if (siteHref) links.push({ rotulo: 'Site', href: siteHref, Icone: (p) => <Globe {...p} /> })
+  const linkCatalogoHref = linkPublicoSeguro(marca.linkCatalogo)
 
   const midias = marca.midias.map((m) => ({ tipo: m.tipo === 'FOTO' ? ('imagem' as const) : ('video' as const), url: m.url }))
 
@@ -200,8 +214,8 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
         <button type="button" className="vit-modal-fechar" onClick={onClose} aria-label="Fechar"><X size={18} /></button>
         {marca.logoUrl && <img className="vit-modal-logo" src={marca.logoUrl} alt={marca.nome} />}
         <h3 className="vit-modal-nome">{marca.nome}</h3>
-        {marca.linkCatalogo && (
-          <a className="vit-modal-catalogo" href={marca.linkCatalogo} target="_blank" rel="noreferrer">
+        {linkCatalogoHref && (
+          <a className="vit-modal-catalogo" href={linkCatalogoHref} target="_blank" rel="noreferrer">
             <ShoppingBag size={18} /> Ver catálogo
           </a>
         )}
@@ -219,7 +233,7 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
             ))}
           </div>
         )}
-        {links.length === 0 && !marca.linkCatalogo && (
+        {links.length === 0 && !linkCatalogoHref && (
           <p className="vit-modal-vazio">Essa marca ainda não cadastrou links de contato.</p>
         )}
         {links.length > 0 && (

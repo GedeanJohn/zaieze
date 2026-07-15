@@ -406,7 +406,10 @@ export async function whatsappRoutes(app: FastifyInstance) {
   // ─────────── Webhooks ───────────
 
   // Webhook NORMALIZADO (sem auth) — payload simples {telefone,texto}. Útil para testes locais.
+  // Desligado em produção: sem redeId, a busca de cliente por telefone é global entre tenants —
+  // não pode ficar acessível publicamente fora de dev.
   app.post('/webhook', async (request, reply) => {
+    if (process.env.NODE_ENV === 'production') return reply.code(404).send()
     const b = z.object({ telefone: z.string().optional(), numero: z.string().optional(), texto: z.string().min(1) }).parse(request.body)
     const numero = (b.telefone ?? b.numero ?? '').replace(/\D/g, '')
     if (!numero) return reply.code(400).send({ erro: 'telefone ausente' })

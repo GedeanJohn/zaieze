@@ -678,7 +678,7 @@ function ComissoesAfiliadoSection() {
 }
 
 interface AssessorAdmin {
-  id: string; slug: string; marcas: number; vendas: number
+  id: string; slug: string; plano: 'BASICO' | 'AVANCADO'; marcas: number; vendas: number
   usuario: { id: string; nome: string; email: string; telefone: string | null; ativo: boolean }
   assinatura: { status: 'PENDENTE' | 'ATIVA' | 'CANCELADA'; simulada: boolean; valor: number } | null
   percentualComissaoIndicacao: number | null
@@ -690,7 +690,8 @@ interface AssessorAdmin {
 
 function AssessoresSection() {
   const [assessores, setAssessores] = useState<AssessorAdmin[]>([])
-  const [precoMensal, setPrecoMensal] = useState('89.99')
+  const [precoMensalBasico, setPrecoMensalBasico] = useState('89.99')
+  const [precoMensalAvancado, setPrecoMensalAvancado] = useState('149.99')
   const [salvandoPreco, setSalvandoPreco] = useState(false)
   const [percentualPadraoIndicacao, setPercentualPadraoIndicacao] = useState('2')
   const [salvandoPercentualPadrao, setSalvandoPercentualPadrao] = useState(false)
@@ -704,7 +705,9 @@ function AssessoresSection() {
 
   function carregar() {
     api.get('/admin/assessores').then(({ data }) => setAssessores(data.assessores)).catch(() => {})
-    api.get('/admin/assessores/config').then(({ data }) => setPrecoMensal(String(data.precoMensal))).catch(() => {})
+    api.get('/admin/assessores/config').then(({ data }) => {
+      setPrecoMensalBasico(String(data.precoMensalBasico)); setPrecoMensalAvancado(String(data.precoMensalAvancado))
+    }).catch(() => {})
     api.get('/admin/assessores/indicacao-config').then(({ data }) => setPercentualPadraoIndicacao(String(data.percentualPadrao))).catch(() => {})
   }
   useEffect(() => { carregar() }, [])
@@ -712,7 +715,7 @@ function AssessoresSection() {
   async function salvarPreco() {
     setSalvandoPreco(true)
     try {
-      await api.put('/admin/assessores/config', { precoMensal: Number(precoMensal) })
+      await api.put('/admin/assessores/config', { precoMensalBasico: Number(precoMensalBasico), precoMensalAvancado: Number(precoMensalAvancado) })
     } catch (e) { setErro(mensagemDeErro(e)) } finally { setSalvandoPreco(false) }
   }
 
@@ -772,10 +775,14 @@ function AssessoresSection() {
 
       <div className="linha-campos" style={{ alignItems: 'end', marginBottom: 14 }}>
         <div className="campo" style={{ maxWidth: 160 }}>
-          <label>Preço mensal (R$)</label>
-          <input type="number" min="0" step="0.01" value={precoMensal} onChange={(e) => setPrecoMensal(e.target.value)} />
+          <label>Preço Básico (R$/mês)</label>
+          <input type="number" min="0" step="0.01" value={precoMensalBasico} onChange={(e) => setPrecoMensalBasico(e.target.value)} />
         </div>
-        <div><button type="button" className="btn secundario" onClick={salvarPreco} disabled={salvandoPreco}>Salvar preço</button></div>
+        <div className="campo" style={{ maxWidth: 160 }}>
+          <label>Preço Avançado (R$/mês)</label>
+          <input type="number" min="0" step="0.01" value={precoMensalAvancado} onChange={(e) => setPrecoMensalAvancado(e.target.value)} />
+        </div>
+        <div><button type="button" className="btn secundario" onClick={salvarPreco} disabled={salvandoPreco}>Salvar preços</button></div>
         <div className="campo" style={{ maxWidth: 160 }}>
           <label>% padrão de indicação</label>
           <input type="number" min="0" max="100" step="0.01" value={percentualPadraoIndicacao} onChange={(e) => setPercentualPadraoIndicacao(e.target.value)} />
@@ -803,7 +810,7 @@ function AssessoresSection() {
       <table style={{ marginTop: 12 }}>
         <thead>
           <tr>
-            <th>Nome</th><th>Endereço</th><th>Marcas</th><th>Vendas lançadas</th><th>Assinatura</th><th>Status</th>
+            <th>Nome</th><th>Endereço</th><th>Plano</th><th>Marcas</th><th>Vendas lançadas</th><th>Assinatura</th><th>Status</th>
             <th>% indicação</th><th>Cliques</th><th>Lojistas</th><th>Pendente</th><th>Pago</th><th></th>
           </tr>
         </thead>
@@ -812,6 +819,7 @@ function AssessoresSection() {
             <tr key={a.id} style={{ opacity: a.usuario.ativo ? 1 : 0.5 }}>
               <td>{a.usuario.nome}</td>
               <td><strong>{a.slug}.zaieze.com</strong></td>
+              <td><span className={`selo ${a.plano === 'AVANCADO' ? 'ATACADO' : 'ok'}`}>{a.plano === 'AVANCADO' ? 'Avançado' : 'Básico'}</span></td>
               <td>{a.marcas}</td>
               <td>{a.vendas}</td>
               <td>
@@ -836,7 +844,7 @@ function AssessoresSection() {
               </td>
             </tr>
           ))}
-          {assessores.length === 0 && <tr><td colSpan={11} style={{ color: 'var(--ink-soft)' }}>Nenhum Brand Partner ainda.</td></tr>}
+          {assessores.length === 0 && <tr><td colSpan={12} style={{ color: 'var(--ink-soft)' }}>Nenhum Brand Partner ainda.</td></tr>}
         </tbody>
       </table>
     </div>

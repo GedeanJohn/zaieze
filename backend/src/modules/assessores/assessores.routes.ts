@@ -22,9 +22,19 @@ function serializarMarca<T extends { percentualComissaoSugerido: unknown }>(m: T
 }
 
 const TIPOS_LOGO: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg' }
+const TIPOS_VIDEO: Record<string, string> = { 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' }
+
+/** Limite de mídia de destaque por marca, conforme o plano do Brand Partner. */
+const LIMITES_GALERIA: Record<'BASICO' | 'AVANCADO', { fotos: number; videos: number }> = {
+  BASICO: { fotos: 3, videos: 0 },
+  AVANCADO: { fotos: 10, videos: 5 },
+}
+
+const midiaSelect = { id: true, tipo: true, url: true, ordem: true } as const
 
 const marcaSelect = {
   id: true, redeId: true, nome: true, logoUrl: true, bannerUrl: true,
+  midias: { select: midiaSelect, orderBy: { ordem: 'asc' } },
   descricao: true, formasPagamento: true, modoEnvio: true, condicoesCompra: true,
   tamanhos: true, valores: true, endereco: true, cnpj: true,
   instagram: true, facebook: true, whatsapp: true, telegram: true, tiktok: true, site: true, linkCatalogo: true,
@@ -38,10 +48,13 @@ const marcaPublicaWhere = { ativo: true, autorizadoEm: { not: null } } as const
 /** Painel da assessora de moda (perfil, marcas representadas, lançamento manual de vendas)
  *  + vitrine pública no subdomínio próprio dela. */
 export async function assessoresRoutes(app: FastifyInstance) {
-  // Preço do plano "Assessor(a) de Moda" (página comercial) — editável em /admin/assessores/config.
+  // Preços dos 2 planos "Brand Partner" (página comercial) — editáveis em /admin/assessores/config.
   app.get('/plano', async () => {
     const config = await prisma.configAssessores.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} })
-    return { precoMensal: num(config.precoMensal) }
+    return {
+      precoMensalBasico: num(config.precoMensalBasico), precoMensalAvancado: num(config.precoMensalAvancado),
+      limites: LIMITES_GALERIA,
+    }
   })
 
   // Verifica disponibilidade do endereço (slug) — usado pelo formulário de cadastro em tempo real
@@ -70,6 +83,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
     senha: z.string().min(6),
     telefone: z.string().trim().optional(),
     slug: z.string().trim().min(2).max(60),
+    plano: z.enum(['BASICO', 'AVANCADO']).default('BASICO'),
     cupom: z.string().trim().optional(),
     aceiteContrato: z.literal(true, { errorMap: () => ({ message: 'É necessário aceitar o contrato para continuar.' }) }),
   })
@@ -92,7 +106,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
     if (b.cupom && b.cupom.trim() && !promo) {
       return reply.code(422).send({ erro: 'Código promocional inválido ou expirado.' })
     }
-    let valor = num(config.precoMensal)
+    let valor = b.plano === 'BASICO' ? num(config.precoMensalBasico) : num(config.precoMensalAvancado)
     if (promo?.tipo === 'PERCENTUAL' && promo.percentual) {
       valor = Math.round(valor * (1 - Number(promo.percentual) / 100) * 100) / 100
     }
@@ -107,7 +121,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
 
     const assessor = await prisma.$transaction(async (tx) => {
       const usuario = await tx.usuario.create({ data: { nome: b.nome, email, senhaHash, role: 'ASSESSORA', telefone: b.telefone ?? null } })
-      const a = await tx.assessor.create({ data: { usuarioId: usuario.id, slug } })
+      const a = await tx.assessor.create({ data: { usuarioId: usuario.id, slug, plano: b.plano } })
       await tx.aceiteContratoAssessor.create({
         data: {
           assessorId: a.id, versao: CONTRATO_ASSESSOR_VERSAO, assinanteNome: b.nome, assinanteEmail: email,
@@ -198,7 +212,26 @@ export async function assessoresRoutes(app: FastifyInstance) {
       whatsapp: assessor.whatsapp, telefone: assessor.telefone, instagram: assessor.instagram, site: assessor.site,
       statProdutos: assessor.statProdutos, statClientes: assessor.statClientes,
       statAvaliacao: assessor.statAvaliacao != null ? Number(assessor.statAvaliacao) : null,
+      plano: assessor.plano, limites: LIMITES_GALERIA[assessor.plano],
     }
+  })
+
+  const trocarPlanoSchema = z.object({ plano: z.enum(['BASICO', 'AVANCADO']) })
+  // Troca de plano self-service — mesmo padrão de POST /assinaturas/trocar-plano (Rede): aplica
+  // imediatamente, sem interação com o Mercado Pago (a próxima cobrança reflete o novo valor).
+  app.post('/minha/trocar-plano', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { plano } = trocarPlanoSchema.parse(request.body)
+    if (plano === assessor.plano) return reply.code(422).send({ erro: 'Você já está nesse plano.' })
+    const assinatura = await prisma.assinaturaAssessor.findUnique({ where: { assessorId: assessor.id } })
+    if (!assinatura) return reply.code(404).send({ erro: 'Assinatura não encontrada.' })
+    const config = await prisma.configAssessores.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} })
+    const valor = plano === 'BASICO' ? num(config.precoMensalBasico) : num(config.precoMensalAvancado)
+    await prisma.$transaction([
+      prisma.assessor.update({ where: { id: assessor.id }, data: { plano } }),
+      prisma.assinaturaAssessor.update({ where: { assessorId: assessor.id }, data: { valor } }),
+    ])
+    return { ok: true, plano, valor, limites: LIMITES_GALERIA[plano] }
   })
 
   const perfilSchema = z.object({
@@ -379,6 +412,61 @@ export async function assessoresRoutes(app: FastifyInstance) {
     }
     const atualizada = await prisma.assessorMarca.update({ where: { id }, data: { bannerUrl: null }, select: marcaSelect })
     return serializarMarca(atualizada)
+  })
+
+  // Galeria de destaque dos produtos (fotos/vídeos) — aparece na janela de links da vitrine.
+  // Limite por tipo definido pelo plano do Brand Partner (ver LIMITES_GALERIA).
+  app.post('/minha/marcas/:id/midia', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { id } = request.params as { id: string }
+    const { tipo } = request.query as { tipo?: string }
+    if (tipo !== 'FOTO' && tipo !== 'VIDEO') return reply.code(400).send({ erro: 'Tipo inválido.' })
+    const marca = await prisma.assessorMarca.findFirst({ where: { id, assessorId: assessor.id } })
+    if (!marca) return reply.code(404).send({ erro: 'Marca não encontrada' })
+
+    const limite = LIMITES_GALERIA[assessor.plano][tipo === 'FOTO' ? 'fotos' : 'videos']
+    const atuais = await prisma.assessorMarcaMidia.count({ where: { assessorMarcaId: id, tipo } })
+    if (atuais >= limite) {
+      return reply.code(422).send({
+        erro: limite === 0
+          ? 'Seu plano atual não inclui vídeo — faça upgrade para o plano Avançado.'
+          : `Seu plano permite até ${limite} ${tipo === 'FOTO' ? 'fotos' : 'vídeos'} por marca. Remova um item ou faça upgrade.`,
+      })
+    }
+
+    const arquivo = await request.file()
+    if (!arquivo) return reply.code(422).send({ erro: 'Envie um arquivo no campo "file"' })
+    const tipos = tipo === 'FOTO' ? TIPOS_LOGO : TIPOS_VIDEO
+    const ext = tipos[arquivo.mimetype]
+    if (!ext) return reply.code(422).send({ erro: tipo === 'FOTO' ? 'Formato inválido. Use PNG ou JPG.' : 'Formato inválido. Use MP4, WEBM ou MOV.' })
+
+    const buffer = await arquivo.toBuffer()
+    const nome = `midia-assessor-${id}-${crypto.randomBytes(6).toString('hex')}.${ext}`
+    const dir = path.resolve(process.cwd(), env.UPLOAD_DIR)
+    await fs.mkdir(dir, { recursive: true })
+    await fs.writeFile(path.join(dir, nome), buffer)
+
+    const url = `/api/uploads/${nome}`
+    const maiorOrdem = await prisma.assessorMarcaMidia.aggregate({ where: { assessorMarcaId: id, tipo }, _max: { ordem: true } })
+    return prisma.assessorMarcaMidia.create({
+      data: { assessorMarcaId: id, tipo, url, ordem: (maiorOrdem._max.ordem ?? -1) + 1 },
+      select: midiaSelect,
+    })
+  })
+
+  app.delete('/minha/marcas/:id/midia/:midiaId', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { id, midiaId } = request.params as { id: string; midiaId: string }
+    const marca = await prisma.assessorMarca.findFirst({ where: { id, assessorId: assessor.id } })
+    if (!marca) return reply.code(404).send({ erro: 'Marca não encontrada' })
+    const midia = await prisma.assessorMarcaMidia.findFirst({ where: { id: midiaId, assessorMarcaId: id } })
+    if (!midia) return reply.code(404).send({ erro: 'Mídia não encontrada' })
+    if (midia.url.startsWith('/api/uploads/')) {
+      const dir = path.resolve(process.cwd(), env.UPLOAD_DIR)
+      fs.unlink(path.join(dir, path.basename(midia.url))).catch(() => {})
+    }
+    await prisma.assessorMarcaMidia.delete({ where: { id: midiaId } })
+    return { ok: true }
   })
 
   // ─────────── Vendas (lançamento manual de comissão) ───────────

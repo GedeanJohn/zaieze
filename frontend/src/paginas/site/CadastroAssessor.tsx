@@ -12,9 +12,11 @@ interface PromoInfo { valido: boolean; beneficio?: string }
 export default function CadastroAssessor() {
   const { t } = useIdioma()
   const [params] = useSearchParams()
-  const [preco, setPreco] = useState<number | null>(null)
+  const [precos, setPrecos] = useState<{ precoMensalBasico: number; precoMensalAvancado: number } | null>(null)
   const [dominio] = useState('zaieze.com')
-  const [form, setForm] = useState({ nome: '', slug: '', telefone: '', email: '', senha: '' })
+  const [form, setForm] = useState<{ nome: string; slug: string; telefone: string; email: string; senha: string; plano: 'BASICO' | 'AVANCADO' }>(
+    { nome: '', slug: '', telefone: '', email: '', senha: '', plano: params.get('plano') === 'AVANCADO' ? 'AVANCADO' : 'BASICO' },
+  )
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checando' | 'ok' | 'indisponivel'>('idle')
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -26,7 +28,7 @@ export default function CadastroAssessor() {
   const [promo, setPromo] = useState<PromoInfo | null>(null)
 
   useEffect(() => {
-    api.get('/assessores/plano').then(({ data }) => setPreco(data.precoMensal)).catch(() => {})
+    api.get('/assessores/plano').then(({ data }) => setPrecos(data)).catch(() => {})
     api.get('/assessores/contrato').then(({ data }) => setContrato(data)).catch(() => {})
   }, [])
 
@@ -72,7 +74,7 @@ export default function CadastroAssessor() {
     try {
       const { data } = await api.post('/assessores/cadastro', {
         nome: form.nome, slug: form.slug.toLowerCase(), telefone: form.telefone || undefined,
-        email: form.email, senha: form.senha, cupom: cupom.trim() || undefined, aceiteContrato: true,
+        email: form.email, senha: form.senha, plano: form.plano, cupom: cupom.trim() || undefined, aceiteContrato: true,
       })
       if (data.simulado) window.location.href = `/sucesso?slug=${data.slug}&plano=${encodeURIComponent(t('assessorPlano.tituloPlano'))}&simulado=1`
       else if (data.initPoint) window.location.href = data.initPoint
@@ -92,13 +94,41 @@ export default function CadastroAssessor() {
       <div className="checkout-card">
         <div className="checkout-resumo">
           <h2>{t('assessorPlano.tituloPlano')}</h2>
-          {preco != null && <div className="preco">{formataReal(preco)}<span>/{t('unidade.mes')}</span></div>}
+          {precos != null && (
+            <div className="preco">
+              {formataReal(form.plano === 'BASICO' ? precos.precoMensalBasico : precos.precoMensalAvancado)}<span>/{t('unidade.mes')}</span>
+            </div>
+          )}
           <p>{t('assessorCadastro.resumoTexto')}</p>
         </div>
 
         <form className="checkout-form" onSubmit={cadastrar}>
           <h3>{t('assessorCadastro.tituloForm')}</h3>
           {erro && <div className="alerta">{erro}</div>}
+
+          <div className="campo">
+            <label>Plano</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {(['BASICO', 'AVANCADO'] as const).map((p) => (
+                <button
+                  key={p} type="button" onClick={() => setForm({ ...form, plano: p })}
+                  style={{
+                    textAlign: 'left', padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
+                    border: form.plano === p ? '2px solid #fff' : '1px solid rgba(255,255,255,0.25)',
+                    background: form.plano === p ? 'rgba(255,255,255,0.08)' : 'transparent', color: '#fff',
+                  }}
+                >
+                  <div style={{ fontWeight: 700 }}>{p === 'BASICO' ? 'Básico' : 'Avançado'}</div>
+                  {precos != null && (
+                    <div style={{ fontSize: 13, opacity: 0.85 }}>{formataReal(p === 'BASICO' ? precos.precoMensalBasico : precos.precoMensalAvancado)}/mês</div>
+                  )}
+                  <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                    {p === 'BASICO' ? 'Até 3 fotos por marca' : 'Até 10 fotos + 5 vídeos por marca'}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="campo">
             <label>{t('assessorCadastro.nomeLabel')}</label>

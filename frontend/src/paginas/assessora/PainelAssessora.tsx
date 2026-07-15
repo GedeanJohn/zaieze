@@ -5,13 +5,17 @@ import { useToast } from '../../componentes/Toast'
 import PreviewVitrine from '../../componentes/PreviewVitrine'
 import { HOST } from '../../host'
 
+type PlanoAssessor = 'BASICO' | 'AVANCADO'
 interface Perfil {
   slug: string; bio: string | null; tagline: string | null; disponivel: boolean
   whatsapp: string | null; telefone: string | null; instagram: string | null; site: string | null
   statProdutos: number | null; statClientes: number | null; statAvaliacao: number | null
+  plano: PlanoAssessor; limites: { fotos: number; videos: number }
 }
+interface Midia { id: string; tipo: 'FOTO' | 'VIDEO'; url: string; ordem: number }
 interface Marca {
   id: string; redeId: string | null; nome: string; logoUrl: string | null; bannerUrl: string | null
+  midias: Midia[]
   descricao: string | null; formasPagamento: string | null; modoEnvio: string | null; condicoesCompra: string | null
   tamanhos: string | null; valores: string | null; endereco: string | null; cnpj: string | null
   instagram: string | null; facebook: string | null; whatsapp: string | null; telegram: string | null; tiktok: string | null; site: string | null
@@ -49,6 +53,8 @@ export default function PainelAssessora() {
 
   const [assinatura, setAssinatura] = useState<Assinatura | null>(null)
   const [ocupadoAssinatura, setOcupadoAssinatura] = useState(false)
+  const [precosPlano, setPrecosPlano] = useState<{ precoMensalBasico: number; precoMensalAvancado: number } | null>(null)
+  const [trocandoPlano, setTrocandoPlano] = useState(false)
 
   const [indicacao, setIndicacao] = useState<Indicacao | null>(null)
 
@@ -75,6 +81,11 @@ export default function PainelAssessora() {
   const [bannerMarcaAtual, setBannerMarcaAtual] = useState<string | null>(null)
   const [enviandoBannerMarca, setEnviandoBannerMarca] = useState(false)
   const bannerMarcaRef = useRef<HTMLInputElement>(null)
+  const [midiasAtual, setMidiasAtual] = useState<Midia[]>([])
+  const [enviandoFotoMidia, setEnviandoFotoMidia] = useState(false)
+  const [enviandoVideo, setEnviandoVideo] = useState(false)
+  const fotoMidiaRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLInputElement>(null)
   const [salvandoMarca, setSalvandoMarca] = useState(false)
 
   const [vendas, setVendas] = useState<Venda[]>([])
@@ -105,6 +116,17 @@ export default function PainelAssessora() {
     api.get('/assessores/minha/indicacao').then(({ data }) => setIndicacao(data)).catch(() => {})
   }
   useEffect(() => { carregarPerfil(); carregarMarcas(); carregarAssinatura(); carregarIndicacao() }, [])
+  useEffect(() => { api.get('/assessores/plano').then(({ data }) => setPrecosPlano(data)).catch(() => {}) }, [])
+
+  async function trocarPlano(novoPlano: PlanoAssessor) {
+    if (!window.confirm(`Trocar para o plano ${novoPlano === 'AVANCADO' ? 'Avançado' : 'Básico'}? O valor da sua assinatura muda a partir da próxima cobrança.`)) return
+    setTrocandoPlano(true)
+    try {
+      await api.post('/assessores/minha/trocar-plano', { plano: novoPlano })
+      avisar('Plano atualizado.')
+      carregarPerfil(); carregarAssinatura()
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setTrocandoPlano(false) }
+  }
   useEffect(() => { carregarVendas() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filtroDe, filtroAte, filtroMarca])
 
   async function cancelarAssinatura() {
@@ -166,11 +188,15 @@ export default function PainelAssessora() {
     } catch (err) { avisar(mensagemDeErro(err), 'erro') } finally { setEnviandoFoto(false) }
   }
 
-  function abrirNovaMarca() { setEditandoMarcaId(null); setLogoMarcaAtual(null); setBannerMarcaAtual(null); setFormMarca(marcaVazia) }
+  function abrirNovaMarca() {
+    setEditandoMarcaId(null); setLogoMarcaAtual(null); setBannerMarcaAtual(null); setMidiasAtual([])
+    setFormMarca(marcaVazia)
+  }
   function abrirEditarMarca(m: Marca) {
     setEditandoMarcaId(m.id)
     setLogoMarcaAtual(m.logoUrl)
     setBannerMarcaAtual(m.bannerUrl)
+    setMidiasAtual(m.midias)
     setFormMarca({
       nome: m.nome, descricao: m.descricao ?? '', formasPagamento: m.formasPagamento ?? '',
       modoEnvio: m.modoEnvio ?? '', condicoesCompra: m.condicoesCompra ?? '', tamanhos: m.tamanhos ?? '', valores: m.valores ?? '',
@@ -220,6 +246,58 @@ export default function PainelAssessora() {
       setBannerMarcaAtual(null)
       carregarMarcas()
     } catch (err) { avisar(mensagemDeErro(err), 'erro') } finally { setEnviandoBannerMarca(false) }
+  }
+
+  const fotosAtual = midiasAtual.filter((m) => m.tipo === 'FOTO')
+  const videosAtual = midiasAtual.filter((m) => m.tipo === 'VIDEO')
+  const limites = perfil?.limites ?? { fotos: 3, videos: 0 }
+
+  async function enviarFotoMidia(arquivo: File) {
+    if (!editandoMarcaId) return
+    setEnviandoFotoMidia(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', arquivo)
+      const { data } = await api.post(`/assessores/minha/marcas/${editandoMarcaId}/midia`, fd, { params: { tipo: 'FOTO' } })
+      setMidiasAtual((atual) => [...atual, data])
+      carregarMarcas()
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') } finally { setEnviandoFotoMidia(false) }
+  }
+  async function removerMidia(midiaId: string) {
+    if (!editandoMarcaId) return
+    try {
+      await api.delete(`/assessores/minha/marcas/${editandoMarcaId}/midia/${midiaId}`)
+      setMidiasAtual((atual) => atual.filter((m) => m.id !== midiaId))
+      carregarMarcas()
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') }
+  }
+
+  /** Lê a duração do vídeo no navegador antes de enviar (limite de 30s pedido pelo usuário). */
+  function duracaoDoVideo(arquivo: File): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video')
+      video.preload = 'metadata'
+      video.onloadedmetadata = () => { URL.revokeObjectURL(video.src); resolve(video.duration) }
+      video.onerror = () => { URL.revokeObjectURL(video.src); reject(new Error('Não foi possível ler o vídeo.')) }
+      video.src = URL.createObjectURL(arquivo)
+    })
+  }
+
+  async function enviarVideo(arquivo: File) {
+    if (!editandoMarcaId) return
+    setEnviandoVideo(true)
+    try {
+      const duracao = await duracaoDoVideo(arquivo)
+      if (duracao > 30.5) {
+        avisar(`O vídeo tem ${Math.round(duracao)}s — o limite é 30 segundos.`, 'erro')
+        return
+      }
+      const fd = new FormData()
+      fd.append('file', arquivo)
+      const { data } = await api.post(`/assessores/minha/marcas/${editandoMarcaId}/midia`, fd, { params: { tipo: 'VIDEO' } })
+      setMidiasAtual((atual) => [...atual, data])
+      carregarMarcas()
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') } finally { setEnviandoVideo(false) }
   }
 
   async function salvarMarca(e: React.FormEvent) {
@@ -403,6 +481,34 @@ export default function PainelAssessora() {
         </div>
       )}
 
+      {aba === 'assinatura' && perfil && (
+        <div className="cartao">
+          <h2 style={{ marginTop: 0 }}>Meu plano</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+            {(['BASICO', 'AVANCADO'] as const).map((p) => {
+              const atual = perfil.plano === p
+              const preco = p === 'BASICO' ? precosPlano?.precoMensalBasico : precosPlano?.precoMensalAvancado
+              const lim = p === 'BASICO' ? { fotos: 3, videos: 0 } : { fotos: 10, videos: 5 }
+              return (
+                <div key={p} className="cartao" style={{ margin: 0, border: atual ? '2px solid var(--accent)' : undefined }}>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>{p === 'BASICO' ? 'Básico' : 'Avançado'} {atual && <span className="selo ok">atual</span>}</div>
+                  {preco != null && <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>{formataReal(preco)}<span style={{ fontSize: 12, fontWeight: 400, color: 'var(--ink-soft)' }}>/mês</span></div>}
+                  <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
+                    Até {lim.fotos} fotos por marca<br />
+                    {lim.videos > 0 ? `Até ${lim.videos} vídeos (30s) por marca` : 'Sem vídeos'}
+                  </div>
+                  {!atual && (
+                    <button type="button" className="btn secundario" disabled={trocandoPlano} onClick={() => trocarPlano(p)}>
+                      {p === 'AVANCADO' ? 'Fazer upgrade' : 'Mudar para este'}
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {aba === 'perfil' && (
         <>
           <div className="cartao" style={{ display: 'flex', alignItems: 'center', gap: 16, maxWidth: 520 }}>
@@ -573,6 +679,62 @@ export default function PainelAssessora() {
               ) : (
                 <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Salve a marca primeiro para poder enviar o banner.</div>
               )}
+            </div>
+            <div className="campo">
+              <label>Fotos de destaque dos produtos (até {limites.fotos} no plano {perfil?.plano === 'AVANCADO' ? 'Avançado' : 'Básico'})</label>
+              {editandoMarcaId ? (
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                  {fotosAtual.map((m) => (
+                    <div key={m.id} style={{ textAlign: 'center' }}>
+                      <img src={m.url} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', display: 'block' }} />
+                      <button type="button" className="btn-link" onClick={() => removerMidia(m.id)}>excluir</button>
+                    </div>
+                  ))}
+                  {fotosAtual.length < limites.fotos ? (
+                    <div style={{ textAlign: 'center' }}>
+                      <button
+                        type="button" onClick={() => fotoMidiaRef.current?.click()} disabled={enviandoFotoMidia}
+                        style={{ width: 80, height: 80, borderRadius: 8, border: '1px dashed var(--border)', background: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: 'var(--ink-soft)', cursor: 'pointer' }}
+                      >
+                        {enviandoFotoMidia ? '…' : '+'}
+                      </button>
+                      <input ref={fotoMidiaRef} type="file" accept="image/png,image/jpeg" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarFotoMidia(f); e.target.value = '' }} />
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: 'var(--ink-soft)', maxWidth: 140, alignSelf: 'center' }}>
+                      Limite de {limites.fotos} fotos do plano atingido{perfil?.plano === 'BASICO' ? ' — faça upgrade pra Avançado pra ter mais.' : '.'}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Salve a marca primeiro para poder enviar as fotos.</div>
+              )}
+            </div>
+            <div className="campo">
+              <label>Vídeos curtos de destaque (até 30s cada{limites.videos > 0 ? `, até ${limites.videos} no plano ${perfil?.plano === 'AVANCADO' ? 'Avançado' : 'Básico'}` : ''})</label>
+              {!editandoMarcaId ? (
+                <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Salve a marca primeiro para poder enviar vídeos.</div>
+              ) : limites.videos === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Vídeos são exclusivos do plano Avançado — veja em "Minha assinatura".</div>
+              ) : (
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                  {videosAtual.map((m) => (
+                    <div key={m.id} style={{ textAlign: 'center' }}>
+                      <video src={m.url} controls style={{ width: 140, height: 90, borderRadius: 8, border: '1px solid var(--border)', background: '#000' }} />
+                      <div><button type="button" className="btn-link" onClick={() => removerMidia(m.id)}>excluir</button></div>
+                    </div>
+                  ))}
+                  {videosAtual.length < limites.videos ? (
+                    <div style={{ textAlign: 'center' }}>
+                      <button type="button" className="btn secundario" disabled={enviandoVideo} onClick={() => videoRef.current?.click()}>{enviandoVideo ? 'Enviando…' : '+ Vídeo'}</button>
+                      <input ref={videoRef} type="file" accept="video/mp4,video/webm,video/quicktime" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarVideo(f); e.target.value = '' }} />
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: 'var(--ink-soft)', maxWidth: 140, alignSelf: 'center' }}>Limite de {limites.videos} vídeos do plano atingido.</div>
+                  )}
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>Limite de 30 segundos por vídeo, verificado no navegador antes do envio.</div>
             </div>
             <div className="campo">
               <label>Link do catálogo (se a marca já for cliente ZAIEZE)</label>

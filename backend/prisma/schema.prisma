@@ -1377,6 +1377,7 @@ model Assessor {
   id        String   @id @default(cuid())
   usuarioId String   @unique
   slug      String   @unique // subdomínio próprio: <slug>.zaieze.com — único também frente a Rede.slug (checado em código, tabelas diferentes)
+  plano     PlanoAssessor @default(BASICO)
   bio       String? // apresentação exibida na capa da vitrine pública
   tagline   String? // frase de efeito em destaque na vitrine (fonte script), ex.: "Conectando estilos, criando histórias."
   disponivel Boolean @default(true) // badge "Disponível"/"Indisponível" na vitrine
@@ -1404,6 +1405,13 @@ model Assessor {
   comissoesIndicacao ComissaoAssessor[]
 
   @@map("assessores")
+}
+
+/// Plano da assinatura do Brand Partner — define o limite de mídia de destaque por marca
+/// representada (ver LIMITES_GALERIA em assessores.routes.ts). Ela mesma escolhe/troca no painel.
+enum PlanoAssessor {
+  BASICO
+  AVANCADO
 }
 
 /// Um "cartão de fornecedor" representado pela assessora — campos padronizados no modelo do
@@ -1442,12 +1450,34 @@ model AssessorMarca {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  assessor Assessor         @relation(fields: [assessorId], references: [id], onDelete: Cascade)
-  rede     Rede?            @relation(fields: [redeId], references: [id], onDelete: SetNull)
+  assessor Assessor              @relation(fields: [assessorId], references: [id], onDelete: Cascade)
+  rede     Rede?                 @relation(fields: [redeId], references: [id], onDelete: SetNull)
   vendas   VendaAssessora[]
+  midias   AssessorMarcaMidia[]
 
   @@index([assessorId, ordem])
   @@map("assessor_marcas")
+}
+
+enum TipoMidiaAssessorMarca {
+  FOTO
+  VIDEO
+}
+
+/// Fotos/vídeo de destaque dos produtos de uma marca representada — mostrados na janela de
+/// links da vitrine. Quantidade permitida por tipo depende do PlanoAssessor (ver LIMITES_GALERIA).
+model AssessorMarcaMidia {
+  id              String                  @id @default(cuid())
+  assessorMarcaId String
+  tipo            TipoMidiaAssessorMarca
+  url             String
+  ordem           Int                     @default(0)
+  createdAt       DateTime                @default(now())
+
+  assessorMarca AssessorMarca @relation(fields: [assessorMarcaId], references: [id], onDelete: Cascade)
+
+  @@index([assessorMarcaId, tipo, ordem])
+  @@map("assessor_marca_midias")
 }
 
 /// Lançamento manual de venda (comissão) da assessora para uma marca representada.
@@ -1473,9 +1503,10 @@ model VendaAssessora {
 /// Preço da assinatura mensal do plano "Assessor(a) de Moda" (página comercial) — editável
 /// pelo SUPER_ADMIN no Admin. Linha única (id fixo = 1), mesmo padrão de ConfigAfiliados.
 model ConfigAssessores {
-  id          Int      @id @default(1)
-  precoMensal Decimal  @default(89.99) @db.Decimal(10, 2)
-  updatedAt   DateTime @updatedAt
+  id                   Int      @id @default(1)
+  precoMensalBasico    Decimal  @default(89.99) @db.Decimal(10, 2)
+  precoMensalAvancado  Decimal  @default(149.99) @db.Decimal(10, 2)
+  updatedAt            DateTime @updatedAt
 
   @@map("config_assessores")
 }

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Search, Share2, MessageCircle, Menu, X, Tag, Shirt, Users, Star, Gift, Megaphone, Truck,
-  Headphones, Home, ShoppingBag, UserRound, FileText, MoreHorizontal, Globe, Send, Phone,
+  Headphones, Home, ShoppingBag, UserRound, FileText, MoreHorizontal, Globe, Send, Phone, Play,
 } from 'lucide-react'
 import { api } from '../../api'
 import { useToast } from '../../componentes/Toast'
 
+interface Midia { id: string; tipo: 'FOTO' | 'VIDEO'; url: string; ordem: number }
 interface Marca {
   id: string; redeId: string | null; nome: string; logoUrl: string | null; bannerUrl: string | null
+  midias: Midia[]
   instagram: string | null; facebook: string | null; whatsapp: string | null; telegram: string | null; tiktok: string | null; site: string | null
   linkCatalogo: string | null
 }
@@ -180,6 +182,8 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
 }
 
 function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void }) {
+  const [midiaAberta, setMidiaAberta] = useState<{ tipo: 'imagem' | 'video'; url: string } | null>(null)
+
   const links: { rotulo: string; href: string; Icone: (p: { size?: number }) => JSX.Element }[] = []
   if (marca.whatsapp) links.push({ rotulo: 'WhatsApp', href: linkWhatsapp(marca.whatsapp), Icone: (p) => <MessageCircle {...p} /> })
   if (marca.instagram) links.push({ rotulo: 'Instagram', href: marca.instagram, Icone: (p) => <IconeInstagram {...p} /> })
@@ -187,6 +191,8 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
   if (marca.tiktok) links.push({ rotulo: 'TikTok', href: marca.tiktok, Icone: (p) => <IconeTiktok {...p} /> })
   if (marca.telegram) links.push({ rotulo: 'Telegram', href: marca.telegram, Icone: (p) => <Send {...p} /> })
   if (marca.site) links.push({ rotulo: 'Site', href: marca.site, Icone: (p) => <Globe {...p} /> })
+
+  const midias = marca.midias.map((m) => ({ tipo: m.tipo === 'FOTO' ? ('imagem' as const) : ('video' as const), url: m.url }))
 
   return (
     <div className="vit-modal-fundo" onClick={onClose}>
@@ -198,6 +204,20 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
           <a className="vit-modal-catalogo" href={marca.linkCatalogo} target="_blank" rel="noreferrer">
             <ShoppingBag size={18} /> Ver catálogo
           </a>
+        )}
+        {midias.length > 0 && (
+          <div className="vit-modal-galeria">
+            {midias.map((m, i) => (
+              <button key={i} type="button" className="vit-modal-galeriaItem" onClick={() => setMidiaAberta(m)}>
+                {m.tipo === 'imagem'
+                  ? <img src={m.url} alt="" />
+                  : <>
+                      <video src={m.url} muted playsInline />
+                      <span className="vit-modal-galeriaPlay"><Play size={16} fill="currentColor" /></span>
+                    </>}
+              </button>
+            ))}
+          </div>
         )}
         {links.length === 0 && !marca.linkCatalogo && (
           <p className="vit-modal-vazio">Essa marca ainda não cadastrou links de contato.</p>
@@ -212,6 +232,15 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
           </div>
         )}
       </div>
+
+      {midiaAberta && (
+        <div className="vit-lightbox-fundo" onClick={(e) => { e.stopPropagation(); setMidiaAberta(null) }}>
+          <button type="button" className="vit-lightbox-fechar" onClick={() => setMidiaAberta(null)} aria-label="Fechar"><X size={22} /></button>
+          {midiaAberta.tipo === 'imagem'
+            ? <img src={midiaAberta.url} alt="" onClick={(e) => e.stopPropagation()} />
+            : <video src={midiaAberta.url} controls autoPlay onClick={(e) => e.stopPropagation()} />}
+        </div>
+      )}
     </div>
   )
 }
@@ -352,7 +381,10 @@ export function VitrineEstilos() {
       .vit-nav-icone { display: flex; }
 
       .vit-modal-fundo { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; z-index: 70; padding: 16px; }
-      .vit-modal { background: #141414; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 28px; width: min(360px, 100%); position: relative; text-align: center; }
+      .vit-modal {
+        background: #141414; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 28px;
+        width: min(400px, 100%); max-height: 88vh; overflow-y: auto; position: relative; text-align: center;
+      }
       .vit-modal-fechar { position: absolute; top: 14px; right: 14px; background: none; border: none; color: #ccc; cursor: pointer; }
       .vit-modal-logo { width: 56px; height: 56px; object-fit: contain; border-radius: 10px; margin: 0 auto 10px; display: block; background: #1e1e1e; }
       .vit-modal-nome { margin: 0 0 18px; font-size: 18px; }
@@ -361,6 +393,22 @@ export function VitrineEstilos() {
         padding: 12px 14px; border-radius: 10px; background: linear-gradient(135deg, #d6b06f, #b8863f);
         color: #14100a; text-decoration: none; font-size: 14px; font-weight: 700;
       }
+      .vit-modal-galeria { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+      .vit-modal-galeriaItem {
+        position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);
+        background: #0a0a0a; padding: 0; cursor: pointer;
+      }
+      .vit-modal-galeriaItem img, .vit-modal-galeriaItem video { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .vit-modal-galeriaPlay {
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        background: rgba(0,0,0,0.35); color: #fff;
+      }
+      .vit-lightbox-fundo {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 80;
+        display: flex; align-items: center; justify-content: center; padding: 24px;
+      }
+      .vit-lightbox-fundo img, .vit-lightbox-fundo video { max-width: 100%; max-height: 90vh; border-radius: 8px; }
+      .vit-lightbox-fechar { position: absolute; top: 18px; right: 18px; background: none; border: none; color: #fff; cursor: pointer; }
       .vit-modal-vazio { color: #999; font-size: 13px; }
       .vit-modal-links { display: flex; flex-direction: column; gap: 8px; }
       .vit-modal-link {

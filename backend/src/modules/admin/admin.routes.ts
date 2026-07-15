@@ -427,7 +427,7 @@ export async function adminRoutes(app: FastifyInstance) {
         const pendente = somas.find((s) => s.assessorId === a.id && s.status === 'PENDENTE')?._sum.valorComissao
         const paga = somas.find((s) => s.assessorId === a.id && s.status === 'PAGA')?._sum.valorComissao
         return {
-          id: a.id, slug: a.slug, marcas: a._count.marcas, vendas: a._count.vendas, usuario: a.usuario,
+          id: a.id, slug: a.slug, plano: a.plano, marcas: a._count.marcas, vendas: a._count.vendas, usuario: a.usuario,
           assinatura: a.assinatura ? { status: a.assinatura.status, simulada: a.assinatura.simulada, valor: num(a.assinatura.valor) } : null,
           percentualComissaoIndicacao: a.percentualComissaoIndicacao != null ? num(a.percentualComissaoIndicacao) : null,
           cliquesIndicacao: a.cliquesIndicacao, redesIndicadas: a._count.redesIndicadas,
@@ -530,15 +530,22 @@ export async function adminRoutes(app: FastifyInstance) {
     })
   })
 
-  // Preço da assinatura mensal do plano "Corretor(a) de Moda" (página comercial).
+  // Preço mensal dos 2 planos "Brand Partner" (página comercial).
   app.get('/assessores/config', async () => {
     const config = await prisma.configAssessores.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} })
-    return { precoMensal: num(config.precoMensal) }
+    return { precoMensalBasico: num(config.precoMensalBasico), precoMensalAvancado: num(config.precoMensalAvancado) }
   })
   app.put('/assessores/config', async (request) => {
-    const { precoMensal } = z.object({ precoMensal: z.coerce.number().positive() }).parse(request.body)
-    const config = await prisma.configAssessores.upsert({ where: { id: 1 }, create: { id: 1, precoMensal }, update: { precoMensal } })
-    return { precoMensal: num(config.precoMensal) }
+    const { precoMensalBasico, precoMensalAvancado } = z.object({
+      precoMensalBasico: z.coerce.number().positive(),
+      precoMensalAvancado: z.coerce.number().positive(),
+    }).parse(request.body)
+    const config = await prisma.configAssessores.upsert({
+      where: { id: 1 },
+      create: { id: 1, precoMensalBasico, precoMensalAvancado },
+      update: { precoMensalBasico, precoMensalAvancado },
+    })
+    return { precoMensalBasico: num(config.precoMensalBasico), precoMensalAvancado: num(config.precoMensalAvancado) }
   })
 
   // % padrão da comissão de indicação de lojistas (usado quando a assessora não tem % individual).

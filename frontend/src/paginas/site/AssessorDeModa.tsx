@@ -7,7 +7,7 @@ import { useIdioma } from '../../lib/i18n'
 export default function AssessorDeModa() {
   const { t } = useIdioma()
   const navigate = useNavigate()
-  const [preco, setPreco] = useState<number | null>(null)
+  const [precos, setPrecos] = useState<{ precoMensalBasico: number; precoMensalAvancado: number } | null>(null)
 
   useMetaTags({
     titulo: t('assessorPlano.metaTitulo'),
@@ -16,7 +16,7 @@ export default function AssessorDeModa() {
   })
 
   useEffect(() => {
-    api.get('/assessores/plano').then(({ data }) => setPreco(data.precoMensal)).catch(() => {})
+    api.get('/assessores/plano').then(({ data }) => setPrecos(data)).catch(() => {})
   }, [])
 
   const funcionalidades = [
@@ -52,14 +52,18 @@ export default function AssessorDeModa() {
       </section>
 
       <section className="planos-site">
-        <div className="planos-grid" style={{ maxWidth: 340, margin: '0 auto' }}>
+        <div className="planos-grid" style={{ maxWidth: 680, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+          <div className="plano-card">
+            <h3>Básico</h3>
+            {precos != null && <div className="preco">{formataReal(precos.precoMensalBasico)}<span>/{t('unidade.mes')}</span></div>}
+            <div className="limite">Até 3 fotos de destaque por marca</div>
+            <button className="btn grande" onClick={() => navigate('/assessor-de-moda/cadastro?plano=BASICO')}>{t('assessorPlano.cta')}</button>
+          </div>
           <div className="plano-card destaque">
-            <h3>{t('assessorPlano.tituloPlano')}</h3>
-            {preco != null && (
-              <div className="preco">{formataReal(preco)}<span>/{t('unidade.mes')}</span></div>
-            )}
-            <div className="limite">{t('assessorPlano.subPlano')}</div>
-            <button className="btn grande" onClick={() => navigate('/assessor-de-moda/cadastro')}>{t('assessorPlano.cta')}</button>
+            <h3>Avançado</h3>
+            {precos != null && <div className="preco">{formataReal(precos.precoMensalAvancado)}<span>/{t('unidade.mes')}</span></div>}
+            <div className="limite">Até 10 fotos + 5 vídeos (30s) por marca</div>
+            <button className="btn grande" onClick={() => navigate('/assessor-de-moda/cadastro?plano=AVANCADO')}>{t('assessorPlano.cta')}</button>
           </div>
         </div>
       </section>

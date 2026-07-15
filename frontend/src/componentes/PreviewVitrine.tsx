@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { VitrineEstilos } from '../paginas/assessora/VitrineAssessora'
 
 interface Props {
@@ -18,6 +19,7 @@ const PLACEHOLDERS = ['Marca A', 'Marca B', 'Marca C']
 
 /** Prévia (mobile + desktop) de como a vitrine pública fica com os dados atuais do formulário. */
 export default function PreviewVitrine({ nome, fotoUrl, tagline, bio, disponivel, totalMarcas, statProdutos, statClientes, statAvaliacao, onClose }: Props) {
+  const [modo, setModo] = useState<'mobile' | 'desktop'>('mobile')
   const [primeiroNome, ...resto] = (nome || 'Seu Nome').split(' ')
 
   const conteudo = (
@@ -71,15 +73,30 @@ export default function PreviewVitrine({ nome, fotoUrl, tagline, bio, disponivel
           <strong>Pré-visualização — como fica com suas alterações (ainda não salvas)</strong>
           <button type="button" className="btn secundario" onClick={onClose}>Fechar</button>
         </div>
+        <div style={{ display: 'inline-flex', gap: 4, padding: 4, border: '1px solid var(--border)', borderRadius: 999, margin: '0 auto 16px', alignSelf: 'center' }}>
+          <button
+            type="button" onClick={() => setModo('mobile')}
+            style={{ padding: '7px 18px', borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: modo === 'mobile' ? 'var(--accent)' : 'transparent', color: modo === 'mobile' ? '#fff' : 'inherit' }}
+          >
+            📱 Mobile
+          </button>
+          <button
+            type="button" onClick={() => setModo('desktop')}
+            style={{ padding: '7px 18px', borderRadius: 999, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: modo === 'desktop' ? 'var(--accent)' : 'transparent', color: modo === 'desktop' ? '#fff' : 'inherit' }}
+          >
+            🖥️ Desktop
+          </button>
+        </div>
         <div className="preview-loja-frames">
-          <div className="preview-loja-frame mobile">
-            <div className="preview-loja-rotulo">📱 Mobile</div>
-            <div className="preview-loja-tela">{conteudo}</div>
-          </div>
-          <div className="preview-loja-frame desktop">
-            <div className="preview-loja-rotulo">🖥️ Desktop</div>
-            <div className="preview-loja-tela">{conteudo}</div>
-          </div>
+          {modo === 'mobile' ? (
+            <div className="preview-loja-frame mobile">
+              <div className="preview-loja-tela">{conteudo}</div>
+            </div>
+          ) : (
+            <div className="preview-loja-frame desktop">
+              <div className="preview-loja-tela">{conteudo}</div>
+            </div>
+          )}
         </div>
       </div>
     </div>

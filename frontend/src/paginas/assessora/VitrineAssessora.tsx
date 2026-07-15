@@ -121,31 +121,33 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
       )}
 
       <section className="vit-hero">
-        <div className="vit-hero-foto">
-          {v.fotoUrl
-            ? <img src={v.fotoUrl} alt={v.nome} />
-            : <div className="vit-hero-fotoVazia">{v.nome.slice(0, 1).toUpperCase()}</div>}
-          <span className="vit-disponivel"><span className={`vit-disponivel-bolha${v.disponivel ? '' : ' off'}`} /> {v.disponivel ? 'Disponível' : 'Indisponível'}</span>
+        <div className="vit-hero-topo">
+          <div className="vit-hero-foto">
+            {v.fotoUrl
+              ? <img src={v.fotoUrl} alt={v.nome} />
+              : <div className="vit-hero-fotoVazia">{v.nome.slice(0, 1).toUpperCase()}</div>}
+            <span className="vit-disponivel"><span className={`vit-disponivel-bolha${v.disponivel ? '' : ' off'}`} /> {v.disponivel ? 'Disponível' : 'Indisponível'}</span>
+          </div>
+
+          <div className="vit-hero-info">
+            <div className="vit-selo">Brand Partner</div>
+            <h1 className="vit-nome"><strong>{primeiroNome}</strong>{resto.length > 0 ? ` ${resto.join(' ')}` : ''}</h1>
+            {v.tagline && <p className="vit-tagline">{v.tagline}</p>}
+            {v.bio && <p className="vit-bio">{v.bio}</p>}
+
+            <div className="vit-stats">
+              <div className="vit-stat"><Tag size={20} /><strong>{v.statMarcas}</strong><span>Marcas</span></div>
+              {v.statProdutos != null && <div className="vit-stat"><Shirt size={20} /><strong>{v.statProdutos}+</strong><span>Produtos</span></div>}
+              {v.statClientes != null && <div className="vit-stat"><Users size={20} /><strong>{v.statClientes}+</strong><span>Clientes</span></div>}
+              {v.statAvaliacao != null && <div className="vit-stat"><Star size={20} /><strong>{v.statAvaliacao.toFixed(1)}</strong><span>Avaliação</span></div>}
+            </div>
+          </div>
         </div>
 
-        <div className="vit-hero-info">
-          <div className="vit-selo">Brand Partner</div>
-          <h1 className="vit-nome"><strong>{primeiroNome}</strong>{resto.length > 0 ? ` ${resto.join(' ')}` : ''}</h1>
-          {v.tagline && <p className="vit-tagline">{v.tagline}</p>}
-          {v.bio && <p className="vit-bio">{v.bio}</p>}
-
-          <div className="vit-stats">
-            <div className="vit-stat"><Tag size={20} /><strong>{v.statMarcas}</strong><span>Marcas</span></div>
-            {v.statProdutos != null && <div className="vit-stat"><Shirt size={20} /><strong>{v.statProdutos}+</strong><span>Produtos</span></div>}
-            {v.statClientes != null && <div className="vit-stat"><Users size={20} /><strong>{v.statClientes}+</strong><span>Clientes</span></div>}
-            {v.statAvaliacao != null && <div className="vit-stat"><Star size={20} /><strong>{v.statAvaliacao.toFixed(1)}</strong><span>Avaliação</span></div>}
-          </div>
-
-          <div className="vit-acoes">
-            {v.whatsapp && <a className="vit-btn-primario" href={linkWhatsapp(v.whatsapp)} target="_blank" rel="noreferrer"><MessageCircle size={18} /> Falar no WhatsApp</a>}
-            {v.telefone && <a className="vit-btn-secundario" href={`tel:${v.telefone}`}><Phone size={18} /> Ligar</a>}
-            <button type="button" className="vit-btn-secundario" onClick={compartilhar}><Share2 size={18} /> Compartilhar</button>
-          </div>
+        <div className="vit-acoes">
+          {v.whatsapp && <a className="vit-btn-primario" href={linkWhatsapp(v.whatsapp)} target="_blank" rel="noreferrer"><MessageCircle size={18} /> Falar no WhatsApp</a>}
+          {v.telefone && <a className="vit-btn-secundario" href={`tel:${v.telefone}`}><Phone size={18} /> Ligar</a>}
+          <button type="button" className="vit-btn-secundario" onClick={compartilhar}><Share2 size={18} /> Compartilhar</button>
         </div>
       </section>
 
@@ -323,7 +325,8 @@ export function VitrineEstilos() {
       }
       .vit-drawer-item:hover { background: rgba(255,255,255,0.06); }
 
-      .vit-hero { max-width: 1100px; margin: 0 auto; padding: 32px 24px 8px; display: grid; grid-template-columns: 340px 1fr; gap: 40px; }
+      .vit-hero { max-width: 1100px; margin: 0 auto; padding: 32px 24px 8px; }
+      .vit-hero-topo { display: grid; grid-template-columns: 340px 1fr; gap: 40px; }
       .vit-hero-foto { position: relative; border-radius: 16px; overflow: hidden; aspect-ratio: 3/3.5; background: #1a1a1a; }
       .vit-hero-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
       .vit-hero-fotoVazia { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 64px; font-weight: 800; color: #555; }
@@ -432,11 +435,21 @@ export function VitrineEstilos() {
       .vit-modal-link:hover { background: rgba(255,255,255,0.1); }
 
       @media (max-width: 860px) {
-        .vit-hero { grid-template-columns: 1fr; gap: 20px; padding: 20px 16px 8px; }
-        .vit-hero-foto { aspect-ratio: 16/10; }
-        .vit-nome { font-size: 30px; }
-        .vit-tagline { font-size: 24px; }
-        .vit-stats { gap: 24px; }
+        .vit-hero { padding: 20px 16px 8px; }
+        .vit-hero-topo { grid-template-columns: 34% 1fr; gap: 14px; align-items: start; }
+        .vit-hero-foto { aspect-ratio: 3/4; border-radius: 12px; }
+        .vit-hero-fotoVazia { font-size: 36px; }
+        .vit-disponivel { left: 6px; bottom: 6px; padding: 4px 8px; gap: 4px; font-size: 10px; }
+        .vit-disponivel-bolha { width: 6px; height: 6px; }
+        .vit-selo { font-size: 10px; }
+        .vit-nome { font-size: 19px; margin-top: 4px; }
+        .vit-tagline { font-size: 16px; margin-top: 6px; }
+        .vit-bio { font-size: 12.5px; line-height: 1.5; margin-top: 10px; }
+        .vit-stats { gap: 10px 18px; margin-top: 12px; }
+        .vit-stat strong { font-size: 15px; }
+        .vit-stat span { font-size: 8.5px; }
+        .vit-acoes { margin-top: 16px; gap: 8px; }
+        .vit-btn-primario, .vit-btn-secundario { padding: 10px 10px; font-size: 12px; flex: 1; justify-content: center; }
         .vit-grid { grid-template-columns: repeat(2, 1fr); }
         .vit-faixa { grid-template-columns: repeat(2, 1fr); }
         .vit-marcas-secao { margin-top: 28px; }

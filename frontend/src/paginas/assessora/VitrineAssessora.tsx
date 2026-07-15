@@ -126,7 +126,7 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
             {v.fotoUrl
               ? <img src={v.fotoUrl} alt={v.nome} />
               : <div className="vit-hero-fotoVazia">{v.nome.slice(0, 1).toUpperCase()}</div>}
-            <span className="vit-disponivel"><span className={`vit-disponivel-bolha${v.disponivel ? '' : ' off'}`} /> {v.disponivel ? 'Disponível' : 'Indisponível'}</span>
+            <span className="vit-disponivel"><span className={`vit-disponivel-bolha${v.disponivel ? '' : ' off'}`} /> {v.disponivel ? 'Disponível' : 'Offline'}</span>
           </div>
 
           <div className="vit-hero-info">
@@ -147,7 +147,6 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
         <div className="vit-acoes">
           {v.whatsapp && <a className="vit-btn-primario" href={linkWhatsapp(v.whatsapp)} target="_blank" rel="noreferrer"><MessageCircle size={18} /> Falar no WhatsApp</a>}
           {v.telefone && <a className="vit-btn-secundario" href={`tel:${v.telefone}`}><Phone size={18} /> Ligar</a>}
-          <button type="button" className="vit-btn-secundario" onClick={compartilhar}><Share2 size={18} /> Compartilhar</button>
         </div>
       </section>
 

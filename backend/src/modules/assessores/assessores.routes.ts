@@ -13,6 +13,7 @@ import { validarCodigo, consumirCodigo, descricaoBeneficio } from '../promo/prom
 import { percentualEfetivoIndicacao } from './comissao-assessor.service'
 import { proximoCicloFimAssessor, solicitarCancelamentoAssessor, reativarAssinaturaAssessor } from './assinatura-assessor.service'
 import { montarContratoAssessor, CONTRATO_ASSESSOR_VERSAO } from './contrato-assessor.template'
+import { calcularDisponivelPorAgenda, agruparPorDia } from './agenda-disponibilidade.service'
 
 const num = (v: unknown) => Number(v ?? 0)
 
@@ -171,10 +172,11 @@ export async function assessoresRoutes(app: FastifyInstance) {
     const assessor = await prisma.assessor.findUnique({
       where: { slug },
       select: {
-        slug: true, bio: true, tagline: true, disponivel: true, whatsapp: true, telefone: true, instagram: true, site: true,
+        slug: true, bio: true, tagline: true, disponivel: true, seguirAgenda: true, whatsapp: true, telefone: true, instagram: true, site: true,
         statProdutos: true, statClientes: true, statAvaliacao: true,
         usuario: { select: { nome: true, fotoUrl: true, ativo: true } },
         marcas: { where: marcaPublicaWhere, orderBy: { ordem: 'asc' }, select: marcaSelect },
+        horarios: { select: { diaSemana: true, inicio: true, fim: true } },
       },
     })
     if (!assessor || !assessor.usuario.ativo) return reply.code(404).send({ erro: 'Página não encontrada' })
@@ -183,7 +185,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
       fotoUrl: assessor.usuario.fotoUrl,
       bio: assessor.bio,
       tagline: assessor.tagline,
-      disponivel: assessor.disponivel,
+      disponivel: assessor.seguirAgenda ? calcularDisponivelPorAgenda(assessor.horarios) : assessor.disponivel,
       whatsapp: assessor.whatsapp,
       telefone: assessor.telefone,
       instagram: assessor.instagram,
@@ -207,8 +209,16 @@ export async function assessoresRoutes(app: FastifyInstance) {
   // ─────────── Perfil ───────────
   app.get('/minha', protegido, async (request) => {
     const assessor = await assessorDoUsuario(request.user.sub)
+    const horarios = await prisma.assessorHorario.findMany({
+      where: { assessorId: assessor.id },
+      orderBy: [{ diaSemana: 'asc' }, { ordem: 'asc' }],
+      select: { diaSemana: true, inicio: true, fim: true },
+    })
     return {
-      slug: assessor.slug, bio: assessor.bio, tagline: assessor.tagline, disponivel: assessor.disponivel,
+      slug: assessor.slug, bio: assessor.bio, tagline: assessor.tagline,
+      disponivel: assessor.disponivel, seguirAgenda: assessor.seguirAgenda,
+      disponivelAgora: assessor.seguirAgenda ? calcularDisponivelPorAgenda(horarios) : assessor.disponivel,
+      horarios: agruparPorDia(horarios),
       whatsapp: assessor.whatsapp, telefone: assessor.telefone, instagram: assessor.instagram, site: assessor.site,
       statProdutos: assessor.statProdutos, statClientes: assessor.statClientes,
       statAvaliacao: assessor.statAvaliacao != null ? Number(assessor.statAvaliacao) : null,
@@ -238,6 +248,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
     bio: z.string().trim().max(600).nullable().optional(),
     tagline: z.string().trim().max(140).nullable().optional(),
     disponivel: z.boolean().optional(),
+    seguirAgenda: z.boolean().optional(),
     whatsapp: z.string().trim().max(30).nullable().optional(),
     telefone: z.string().trim().max(30).nullable().optional(),
     instagram: z.string().trim().max(200).nullable().optional(),
@@ -250,6 +261,37 @@ export async function assessoresRoutes(app: FastifyInstance) {
     const assessor = await assessorDoUsuario(request.user.sub)
     const b = perfilSchema.parse(request.body)
     return prisma.assessor.update({ where: { id: assessor.id }, data: b })
+  })
+
+  // Agenda semanal (7 dias fixos, domingo a sábado) — controla o badge Disponível/Offline da
+  // vitrine quando seguirAgenda=true. Cada dia pode ter vários períodos (ex.: manhã e tarde).
+  // Substitui a semana inteira de uma vez (mais simples que CRUD individual por período).
+  const periodoSchema = z.object({
+    inicio: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+    fim: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  }).refine((p) => p.inicio < p.fim, { message: 'O início precisa ser antes do fim.' })
+  const horarioDiaSchema = z.object({
+    diaSemana: z.number().int().min(0).max(6),
+    periodos: z.array(periodoSchema).max(6), // limite generoso — dificilmente passa de 2-3 na prática
+  })
+  const horariosSchema = z.array(horarioDiaSchema).length(7)
+
+  app.put('/minha/horarios', protegido, async (request) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const b = horariosSchema.parse(request.body)
+    const linhas = b.flatMap((d) => d.periodos.map((p, i) => ({
+      assessorId: assessor.id, diaSemana: d.diaSemana, ordem: i, inicio: p.inicio, fim: p.fim,
+    })))
+    await prisma.$transaction([
+      prisma.assessorHorario.deleteMany({ where: { assessorId: assessor.id } }),
+      ...(linhas.length > 0 ? [prisma.assessorHorario.createMany({ data: linhas })] : []),
+    ])
+    const horarios = await prisma.assessorHorario.findMany({
+      where: { assessorId: assessor.id },
+      orderBy: [{ diaSemana: 'asc' }, { ordem: 'asc' }],
+      select: { diaSemana: true, inicio: true, fim: true },
+    })
+    return { horarios: agruparPorDia(horarios), disponivelAgora: calcularDisponivelPorAgenda(horarios) }
   })
 
   // ─────────── Indicação de lojistas (link ?refAssessor=<slug>, comissão recorrente) ───────────

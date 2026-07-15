@@ -34,7 +34,7 @@ export default function PreviewVitrine({ nome, fotoUrl, tagline, bio, disponivel
       <section className="vit-hero">
         <div className="vit-hero-foto">
           {fotoUrl ? <img src={fotoUrl} alt={nome} /> : <div className="vit-hero-fotoVazia">{(nome || '?').slice(0, 1).toUpperCase()}</div>}
-          <span className="vit-disponivel"><span className={`vit-disponivel-bolha${disponivel ? '' : ' off'}`} /> {disponivel ? 'Disponível' : 'Indisponível'}</span>
+          <span className="vit-disponivel"><span className={`vit-disponivel-bolha${disponivel ? '' : ' off'}`} /> {disponivel ? 'Disponível' : 'Offline'}</span>
         </div>
         <div className="vit-hero-info">
           <div className="vit-selo">Brand Partner</div>

@@ -6,12 +6,16 @@ import PreviewVitrine from '../../componentes/PreviewVitrine'
 import { HOST } from '../../host'
 
 type PlanoAssessor = 'BASICO' | 'AVANCADO'
+interface Periodo { inicio: string; fim: string }
+interface HorarioDia { diaSemana: number; periodos: Periodo[] }
 interface Perfil {
-  slug: string; bio: string | null; tagline: string | null; disponivel: boolean
+  slug: string; bio: string | null; tagline: string | null
+  disponivel: boolean; seguirAgenda: boolean; disponivelAgora: boolean; horarios: HorarioDia[]
   whatsapp: string | null; telefone: string | null; instagram: string | null; site: string | null
   statProdutos: number | null; statClientes: number | null; statAvaliacao: number | null
   plano: PlanoAssessor; limites: { fotos: number; videos: number }
 }
+const DIAS_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 interface Midia { id: string; tipo: 'FOTO' | 'VIDEO'; url: string; ordem: number }
 interface Marca {
   id: string; redeId: string | null; nome: string; logoUrl: string | null; bannerUrl: string | null
@@ -62,6 +66,10 @@ export default function PainelAssessora() {
   const [bio, setBio] = useState(''); const [whatsapp, setWhatsapp] = useState('')
   const [instagram, setInstagram] = useState(''); const [site, setSite] = useState('')
   const [tagline, setTagline] = useState(''); const [disponivel, setDisponivel] = useState(true)
+  const [seguirAgenda, setSeguirAgenda] = useState(true)
+  const [disponivelAgora, setDisponivelAgora] = useState(true)
+  const [horarios, setHorarios] = useState<HorarioDia[]>([])
+  const [salvandoHorarios, setSalvandoHorarios] = useState(false)
   const [telefone, setTelefone] = useState('')
   const [statProdutos, setStatProdutos] = useState(''); const [statClientes, setStatClientes] = useState(''); const [statAvaliacao, setStatAvaliacao] = useState('')
   const [salvandoPerfil, setSalvandoPerfil] = useState(false)
@@ -97,6 +105,7 @@ export default function PainelAssessora() {
     api.get('/assessores/minha').then(({ data }) => {
       setPerfil(data); setBio(data.bio ?? ''); setWhatsapp(data.whatsapp ?? ''); setInstagram(data.instagram ?? ''); setSite(data.site ?? '')
       setTagline(data.tagline ?? ''); setDisponivel(data.disponivel); setTelefone(data.telefone ?? '')
+      setSeguirAgenda(data.seguirAgenda); setDisponivelAgora(data.disponivelAgora); setHorarios(data.horarios)
       setStatProdutos(data.statProdutos != null ? String(data.statProdutos) : '')
       setStatClientes(data.statClientes != null ? String(data.statClientes) : '')
       setStatAvaliacao(data.statAvaliacao != null ? String(data.statAvaliacao) : '')
@@ -159,7 +168,7 @@ export default function PainelAssessora() {
     try {
       await api.patch('/assessores/minha', {
         bio: bio || null, whatsapp: whatsapp || null, instagram: instagram || null, site: site || null,
-        tagline: tagline || null, disponivel, telefone: telefone || null,
+        tagline: tagline || null, disponivel, seguirAgenda, telefone: telefone || null,
         statProdutos: statProdutos !== '' ? Number(statProdutos) : null,
         statClientes: statClientes !== '' ? Number(statClientes) : null,
         statAvaliacao: statAvaliacao !== '' ? Number(statAvaliacao) : null,
@@ -167,6 +176,25 @@ export default function PainelAssessora() {
       avisar('Perfil salvo.')
       carregarPerfil()
     } catch (e2) { avisar(mensagemDeErro(e2), 'erro') } finally { setSalvandoPerfil(false) }
+  }
+
+  function adicionarPeriodo(diaSemana: number) {
+    setHorarios((hs) => hs.map((h) => (h.diaSemana === diaSemana ? { ...h, periodos: [...h.periodos, { inicio: '09:00', fim: '18:00' }] } : h)))
+  }
+  function atualizarPeriodo(diaSemana: number, indice: number, patch: Partial<Periodo>) {
+    setHorarios((hs) => hs.map((h) => (h.diaSemana === diaSemana ? { ...h, periodos: h.periodos.map((p, i) => (i === indice ? { ...p, ...patch } : p)) } : h)))
+  }
+  function removerPeriodo(diaSemana: number, indice: number) {
+    setHorarios((hs) => hs.map((h) => (h.diaSemana === diaSemana ? { ...h, periodos: h.periodos.filter((_, i) => i !== indice) } : h)))
+  }
+
+  async function salvarHorarios() {
+    setSalvandoHorarios(true)
+    try {
+      const { data } = await api.put('/assessores/minha/horarios', horarios)
+      setHorarios(data.horarios); setDisponivelAgora(data.disponivelAgora)
+      avisar('Agenda salva.')
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setSalvandoHorarios(false) }
   }
 
   async function enviarFoto(arquivo: File) {
@@ -536,10 +564,22 @@ export default function PainelAssessora() {
               <label>Bio / apresentação</label>
               <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} maxLength={600} placeholder="Conte quem você é e como trabalha com as marcas que representa." />
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-              <input type="checkbox" checked={disponivel} onChange={(e) => setDisponivel(e.target.checked)} />
-              Disponível (mostra o selo "Disponível" na vitrine)
-            </label>
+            <div style={{ marginBottom: 14, padding: 12, borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: (seguirAgenda ? disponivelAgora : disponivel) ? '#2e7d32' : '#999' }} />
+                <strong style={{ fontSize: 14 }}>Agora: {(seguirAgenda ? disponivelAgora : disponivel) ? 'Disponível' : 'Offline'}</strong>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 400 }}>
+                <input type="checkbox" checked={seguirAgenda} onChange={(e) => setSeguirAgenda(e.target.checked)} />
+                Seguir a agenda semanal automaticamente (configure abaixo)
+              </label>
+              {!seguirAgenda && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 400, marginTop: 8 }}>
+                  <input type="checkbox" checked={disponivel} onChange={(e) => setDisponivel(e.target.checked)} />
+                  Marcar manualmente como Disponível agora
+                </label>
+              )}
+            </div>
             <div className="linha-campos">
               <div className="campo"><label>WhatsApp pessoal</label><input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Ex.: 5562999999999" /></div>
               <div className="campo"><label>Telefone (botão "Ligar")</label><input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="Ex.: 5562999999999" /></div>
@@ -558,6 +598,36 @@ export default function PainelAssessora() {
             </div>
             <div className="acoes"><button className="btn" disabled={salvandoPerfil}>Salvar</button></div>
           </form>
+
+          <div className="cartao">
+            <h2 style={{ marginTop: 0 }}>Agenda semanal</h2>
+            <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
+              Defina os horários em que você atende. Quando "Seguir a agenda semanal" estiver marcado acima,
+              o selo da vitrine muda sozinho entre Disponível e Offline conforme esse horário (fuso de Brasília).
+            </p>
+            {horarios.map((h) => (
+              <div key={h.diaSemana} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
+                <div style={{ width: 100, fontWeight: 600, fontSize: 14, paddingTop: 6 }}>{DIAS_SEMANA[h.diaSemana]}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 260 }}>
+                  {h.periodos.length === 0 && <span style={{ fontSize: 13, color: 'var(--ink-soft)', paddingTop: 6 }}>Fechado</span>}
+                  {h.periodos.map((p, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input type="time" value={p.inicio} onChange={(e) => atualizarPeriodo(h.diaSemana, i, { inicio: e.target.value })} style={{ width: 110 }} />
+                      <span style={{ color: 'var(--ink-soft)' }}>até</span>
+                      <input type="time" value={p.fim} onChange={(e) => atualizarPeriodo(h.diaSemana, i, { fim: e.target.value })} style={{ width: 110 }} />
+                      <button type="button" onClick={() => removerPeriodo(h.diaSemana, i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-soft)', fontSize: 13 }}>remover</button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => adicionarPeriodo(h.diaSemana)} className="btn secundario" style={{ alignSelf: 'flex-start', padding: '4px 10px', fontSize: 12 }}>
+                    + Adicionar horário
+                  </button>
+                </div>
+              </div>
+            ))}
+            <div className="acoes">
+              <button type="button" className="btn" disabled={salvandoHorarios} onClick={salvarHorarios}>{salvandoHorarios ? 'Salvando…' : 'Salvar agenda'}</button>
+            </div>
+          </div>
         </>
       )}
 
@@ -809,7 +879,7 @@ export default function PainelAssessora() {
 
       {preview && (
         <PreviewVitrine
-          nome={usuario?.nome ?? ''} fotoUrl={fotoUrl} tagline={tagline} bio={bio} disponivel={disponivel}
+          nome={usuario?.nome ?? ''} fotoUrl={fotoUrl} tagline={tagline} bio={bio} disponivel={seguirAgenda ? disponivelAgora : disponivel}
           totalMarcas={marcas.length} statProdutos={statProdutos} statClientes={statClientes} statAvaliacao={statAvaliacao}
           onClose={() => setPreview(false)}
         />

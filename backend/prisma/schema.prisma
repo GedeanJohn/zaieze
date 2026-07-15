@@ -1380,7 +1380,12 @@ model Assessor {
   plano     PlanoAssessor @default(BASICO)
   bio       String? // apresentação exibida na capa da vitrine pública
   tagline   String? // frase de efeito em destaque na vitrine (fonte script), ex.: "Conectando estilos, criando histórias."
-  disponivel Boolean @default(true) // badge "Disponível"/"Indisponível" na vitrine
+  // Badge "Disponível"/"Offline" na vitrine. Quando seguirAgenda=true (padrão), o valor exibido
+  // é CALCULADO a partir de AssessorHorario (dia da semana + horário atual, fuso America/Sao_Paulo)
+  // e este campo vira só o override manual — ela pode marcar Offline fora da agenda (ex.: imprevisto)
+  // desligando seguirAgenda, ou voltar a seguir a agenda normalmente.
+  disponivel   Boolean @default(true)
+  seguirAgenda Boolean @default(true)
   whatsapp  String? // contato pessoal dela (distinto do whatsapp de cada marca representada)
   telefone  String? // número para o botão "Ligar" (distinto do whatsapp)
   instagram String?
@@ -1403,8 +1408,27 @@ model Assessor {
   aceitesContrato AceiteContratoAssessor[]
   redesIndicadas  Rede[]
   comissoesIndicacao ComissaoAssessor[]
+  horarios        AssessorHorario[]
 
   @@map("assessores")
+}
+
+/// Agenda semanal recorrente do Brand Partner — cada linha é UM período de atendimento dentro
+/// de um dia da semana (0=domingo..6=sábado); um dia pode ter vários períodos (ex.: manhã e
+/// tarde, com intervalo de almoço no meio). Dia sem nenhuma linha = fechado o dia todo.
+/// Usada para calcular o badge "Disponível"/"Offline" da vitrine quando Assessor.seguirAgenda=true.
+model AssessorHorario {
+  id         String @id @default(cuid())
+  assessorId String
+  diaSemana  Int // 0=domingo, 1=segunda, ..., 6=sábado
+  ordem      Int    @default(0) // ordem dos períodos dentro do mesmo dia (ex.: manhã=0, tarde=1)
+  inicio     String // "HH:mm", ex.: "09:00"
+  fim        String // "HH:mm", ex.: "12:00"
+
+  assessor Assessor @relation(fields: [assessorId], references: [id], onDelete: Cascade)
+
+  @@index([assessorId, diaSemana])
+  @@map("assessor_horarios")
 }
 
 /// Plano da assinatura do Brand Partner — define o limite de mídia de destaque por marca

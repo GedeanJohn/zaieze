@@ -21,7 +21,7 @@ function serializarMarca<T extends { percentualComissaoSugerido: unknown }>(m: T
   return { ...m, percentualComissaoSugerido: m.percentualComissaoSugerido != null ? Number(m.percentualComissaoSugerido) : null }
 }
 
-const TIPOS_LOGO: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/svg+xml': 'svg' }
+const TIPOS_LOGO: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg' }
 
 const marcaSelect = {
   id: true, redeId: true, nome: true, logoUrl: true, bannerUrl: true,
@@ -248,7 +248,6 @@ export async function assessoresRoutes(app: FastifyInstance) {
 
   const marcaSchema = z.object({
     nome: z.string().trim().min(1).max(120),
-    logoUrl: z.string().trim().max(500).nullable().optional(),
     descricao: z.string().trim().max(2000).nullable().optional(),
     formasPagamento: z.string().trim().max(1000).nullable().optional(),
     modoEnvio: z.string().trim().max(1000).nullable().optional(),
@@ -299,6 +298,47 @@ export async function assessoresRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
+  // Upload da logo de uma marca representada — mesma lógica do banner abaixo (disco local).
+  app.post('/minha/marcas/:id/logo', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { id } = request.params as { id: string }
+    const marca = await prisma.assessorMarca.findFirst({ where: { id, assessorId: assessor.id } })
+    if (!marca) return reply.code(404).send({ erro: 'Marca não encontrada' })
+
+    const arquivo = await request.file()
+    if (!arquivo) return reply.code(422).send({ erro: 'Envie um arquivo de imagem no campo "file"' })
+    const ext = TIPOS_LOGO[arquivo.mimetype]
+    if (!ext) return reply.code(422).send({ erro: 'Formato inválido. Use PNG ou JPG.' })
+
+    const buffer = await arquivo.toBuffer()
+    const nome = `logo-assessor-${id}-${crypto.randomBytes(6).toString('hex')}.${ext}`
+    const dir = path.resolve(process.cwd(), env.UPLOAD_DIR)
+    await fs.mkdir(dir, { recursive: true })
+    await fs.writeFile(path.join(dir, nome), buffer)
+
+    const logoUrl = `/api/uploads/${nome}`
+    const atualizada = await prisma.assessorMarca.update({ where: { id }, data: { logoUrl }, select: marcaSelect })
+
+    const anterior = (request.query as { anterior?: string }).anterior
+    if (anterior?.startsWith('/api/uploads/') && anterior !== logoUrl) {
+      fs.unlink(path.join(dir, path.basename(anterior))).catch(() => {})
+    }
+    return serializarMarca(atualizada)
+  })
+
+  app.delete('/minha/marcas/:id/logo', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { id } = request.params as { id: string }
+    const marca = await prisma.assessorMarca.findFirst({ where: { id, assessorId: assessor.id } })
+    if (!marca) return reply.code(404).send({ erro: 'Marca não encontrada' })
+    if (marca.logoUrl?.startsWith('/api/uploads/')) {
+      const dir = path.resolve(process.cwd(), env.UPLOAD_DIR)
+      fs.unlink(path.join(dir, path.basename(marca.logoUrl))).catch(() => {})
+    }
+    const atualizada = await prisma.assessorMarca.update({ where: { id }, data: { logoUrl: null }, select: marcaSelect })
+    return serializarMarca(atualizada)
+  })
+
   // Upload do banner (imagem grande do card na vitrine) de uma marca representada — mesma
   // lógica de backend/src/modules/marca/marca.routes.ts (disco local, não usa R2).
   app.post('/minha/marcas/:id/banner', protegido, async (request, reply) => {
@@ -310,7 +350,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
     const arquivo = await request.file()
     if (!arquivo) return reply.code(422).send({ erro: 'Envie um arquivo de imagem no campo "file"' })
     const ext = TIPOS_LOGO[arquivo.mimetype]
-    if (!ext) return reply.code(422).send({ erro: 'Formato inválido. Use PNG, JPG, WEBP ou SVG.' })
+    if (!ext) return reply.code(422).send({ erro: 'Formato inválido. Use PNG ou JPG.' })
 
     const buffer = await arquivo.toBuffer()
     const nome = `banner-assessor-${id}-${crypto.randomBytes(6).toString('hex')}.${ext}`

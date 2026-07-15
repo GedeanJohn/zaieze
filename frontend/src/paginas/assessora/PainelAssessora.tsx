@@ -28,7 +28,7 @@ type Assinatura =
 interface Indicacao { slug: string; percentual: number; cliques: number; redesIndicadas: number; pendente: number; paga: number }
 
 const marcaVazia = {
-  nome: '', logoUrl: '', descricao: '', formasPagamento: '', modoEnvio: '', condicoesCompra: '',
+  nome: '', descricao: '', formasPagamento: '', modoEnvio: '', condicoesCompra: '',
   tamanhos: '', valores: '', endereco: '', cnpj: '', instagram: '', facebook: '', whatsapp: '', telegram: '', tiktok: '', site: '', linkCatalogo: '',
   percentualComissaoSugerido: '', ativo: true,
 }
@@ -68,6 +68,9 @@ export default function PainelAssessora() {
   const [marcas, setMarcas] = useState<Marca[]>([])
   const [formMarca, setFormMarca] = useState<typeof marcaVazia | null>(null)
   const [editandoMarcaId, setEditandoMarcaId] = useState<string | null>(null)
+  const [logoMarcaAtual, setLogoMarcaAtual] = useState<string | null>(null)
+  const [enviandoLogoMarca, setEnviandoLogoMarca] = useState(false)
+  const logoMarcaRef = useRef<HTMLInputElement>(null)
   const [bannerMarcaAtual, setBannerMarcaAtual] = useState<string | null>(null)
   const [enviandoBannerMarca, setEnviandoBannerMarca] = useState(false)
   const bannerMarcaRef = useRef<HTMLInputElement>(null)
@@ -162,17 +165,39 @@ export default function PainelAssessora() {
     } catch (err) { avisar(mensagemDeErro(err), 'erro') } finally { setEnviandoFoto(false) }
   }
 
-  function abrirNovaMarca() { setEditandoMarcaId(null); setBannerMarcaAtual(null); setFormMarca(marcaVazia) }
+  function abrirNovaMarca() { setEditandoMarcaId(null); setLogoMarcaAtual(null); setBannerMarcaAtual(null); setFormMarca(marcaVazia) }
   function abrirEditarMarca(m: Marca) {
     setEditandoMarcaId(m.id)
+    setLogoMarcaAtual(m.logoUrl)
     setBannerMarcaAtual(m.bannerUrl)
     setFormMarca({
-      nome: m.nome, logoUrl: m.logoUrl ?? '', descricao: m.descricao ?? '', formasPagamento: m.formasPagamento ?? '',
+      nome: m.nome, descricao: m.descricao ?? '', formasPagamento: m.formasPagamento ?? '',
       modoEnvio: m.modoEnvio ?? '', condicoesCompra: m.condicoesCompra ?? '', tamanhos: m.tamanhos ?? '', valores: m.valores ?? '',
       endereco: m.endereco ?? '', cnpj: m.cnpj ?? '', instagram: m.instagram ?? '', facebook: m.facebook ?? '', whatsapp: m.whatsapp ?? '',
       telegram: m.telegram ?? '', tiktok: m.tiktok ?? '', site: m.site ?? '', linkCatalogo: m.linkCatalogo ?? '',
       percentualComissaoSugerido: m.percentualComissaoSugerido != null ? String(m.percentualComissaoSugerido) : '', ativo: m.ativo,
     })
+  }
+
+  async function enviarLogoMarca(arquivo: File) {
+    if (!editandoMarcaId) return
+    setEnviandoLogoMarca(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', arquivo)
+      const { data } = await api.post(`/assessores/minha/marcas/${editandoMarcaId}/logo`, fd, { params: { anterior: logoMarcaAtual ?? undefined } })
+      setLogoMarcaAtual(data.logoUrl)
+      carregarMarcas()
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') } finally { setEnviandoLogoMarca(false) }
+  }
+  async function removerLogoMarca() {
+    if (!editandoMarcaId) return
+    setEnviandoLogoMarca(true)
+    try {
+      await api.delete(`/assessores/minha/marcas/${editandoMarcaId}/logo`)
+      setLogoMarcaAtual(null)
+      carregarMarcas()
+    } catch (err) { avisar(mensagemDeErro(err), 'erro') } finally { setEnviandoLogoMarca(false) }
   }
 
   async function enviarBannerMarca(arquivo: File) {
@@ -503,9 +528,23 @@ export default function PainelAssessora() {
         <div className="modal-fundo" onClick={() => setFormMarca(null)}>
           <form className="modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()} onSubmit={salvarMarca}>
             <h2>{editandoMarcaId ? 'Editar marca' : 'Nova marca'}</h2>
-            <div className="linha-campos">
-              <div className="campo"><label>Nome da marca*</label><input value={formMarca.nome} onChange={(e) => setFormMarca({ ...formMarca, nome: e.target.value })} required /></div>
-              <div className="campo"><label>Logo (URL)</label><input value={formMarca.logoUrl} onChange={(e) => setFormMarca({ ...formMarca, logoUrl: e.target.value })} /></div>
+            <div className="campo"><label>Nome da marca*</label><input value={formMarca.nome} onChange={(e) => setFormMarca({ ...formMarca, nome: e.target.value })} required /></div>
+            <div className="campo">
+              <label>Logo (imagem pequena da marca)</label>
+              {editandoMarcaId ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {logoMarcaAtual
+                    ? <img src={logoMarcaAtual} alt="" style={{ width: 72, height: 72, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--border)', background: '#fafafa' }} />
+                    : <div style={{ width: 72, height: 72, borderRadius: 8, border: '1px dashed var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'var(--ink-soft)', textAlign: 'center' }}>sem logo</div>}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button type="button" className="btn secundario" disabled={enviandoLogoMarca} onClick={() => logoMarcaRef.current?.click()}>{enviandoLogoMarca ? 'Enviando…' : 'Trocar logo'}</button>
+                    {logoMarcaAtual && <button type="button" className="btn secundario" disabled={enviandoLogoMarca} onClick={removerLogoMarca}>Remover</button>}
+                  </div>
+                  <input ref={logoMarcaRef} type="file" accept="image/png,image/jpeg" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarLogoMarca(f); e.target.value = '' }} />
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Salve a marca primeiro para poder enviar a logo.</div>
+              )}
             </div>
             <div className="campo">
               <label>Banner (imagem grande do card na vitrine)</label>
@@ -518,7 +557,7 @@ export default function PainelAssessora() {
                     <button type="button" className="btn secundario" disabled={enviandoBannerMarca} onClick={() => bannerMarcaRef.current?.click()}>{enviandoBannerMarca ? 'Enviando…' : 'Trocar banner'}</button>
                     {bannerMarcaAtual && <button type="button" className="btn secundario" disabled={enviandoBannerMarca} onClick={removerBannerMarca}>Remover</button>}
                   </div>
-                  <input ref={bannerMarcaRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarBannerMarca(f); e.target.value = '' }} />
+                  <input ref={bannerMarcaRef} type="file" accept="image/png,image/jpeg" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarBannerMarca(f); e.target.value = '' }} />
                 </div>
               ) : (
                 <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Salve a marca primeiro para poder enviar o banner.</div>

@@ -68,7 +68,7 @@ export default function PreviewVitrine({ nome, fotoUrl, tagline, bio, disponivel
       <VitrineEstilos />
       <div className="preview-loja" onClick={(e) => e.stopPropagation()}>
         <div className="preview-loja-topo">
-          <strong>Como sua vitrine vai aparecer</strong>
+          <strong>Pré-visualização — como fica com suas alterações (ainda não salvas)</strong>
           <button type="button" className="btn secundario" onClick={onClose}>Fechar</button>
         </div>
         <div className="preview-loja-frames">

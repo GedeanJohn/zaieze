@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ExternalLink, Eye } from 'lucide-react'
 import { api, formataReal, mensagemDeErro, usuarioLogado, atualizarUsuarioLocal } from '../../api'
 import { useToast } from '../../componentes/Toast'
 import PreviewVitrine from '../../componentes/PreviewVitrine'
@@ -312,8 +313,18 @@ export default function PainelAssessora() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input readOnly value={linkPublico} style={{ flex: '1 1 220px', minWidth: 0 }} />
           <button type="button" className="btn secundario" onClick={() => { navigator.clipboard?.writeText(linkPublico); avisar('Link copiado.') }}>Copiar</button>
-          <a className="btn" href={HOST.tipo === 'landing' ? `${linkPublico}?vitrine=1` : `${linkPublico}?tenant=${perfil.slug}&vitrine=1`} target="_blank" rel="noreferrer">Ver vitrine</a>
-          <button type="button" className="btn secundario" onClick={() => setPreview(true)}>Visualizar vitrine</button>
+          <a
+            className="btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            href={HOST.tipo === 'landing' ? `${linkPublico}?vitrine=1` : `${linkPublico}?tenant=${perfil.slug}&vitrine=1`} target="_blank" rel="noreferrer"
+          >
+            <ExternalLink size={15} strokeWidth={2} /> Ver página publicada
+          </a>
+          <button
+            type="button" className="btn secundario" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            onClick={() => setPreview(true)}
+          >
+            <Eye size={15} strokeWidth={2} /> Pré-visualizar alterações
+          </button>
         </div>
       </div>
 

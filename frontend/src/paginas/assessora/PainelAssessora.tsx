@@ -284,10 +284,10 @@ export default function PainelAssessora() {
 
       <div className="cartao" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Sua vitrine pública:</div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input readOnly value={linkPublico} style={{ minWidth: 220 }} />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input readOnly value={linkPublico} style={{ flex: '1 1 220px', minWidth: 0 }} />
           <button type="button" className="btn secundario" onClick={() => { navigator.clipboard?.writeText(linkPublico); avisar('Link copiado.') }}>Copiar</button>
-          <a className="btn" href={HOST.tipo === 'landing' ? linkPublico : `${linkPublico}?tenant=${perfil.slug}`} target="_blank" rel="noreferrer">Ver vitrine</a>
+          <a className="btn" href={HOST.tipo === 'landing' ? `${linkPublico}?vitrine=1` : `${linkPublico}?tenant=${perfil.slug}&vitrine=1`} target="_blank" rel="noreferrer">Ver vitrine</a>
           <button type="button" className="btn secundario" onClick={() => setPreview(true)}>Visualizar vitrine</button>
         </div>
       </div>

@@ -82,8 +82,11 @@ function RaizOuVitrine() {
 // Elemento da rota "/": logado entra no painel (Layout/PainelAfiliado/PainelAssessora); deslogado
 // só verifica a vitrine pública da assessora na raiz exata — em qualquer outro caminho, vai
 // direto para o login (sem chamada extra), igual ao comportamento de sempre.
+// ?vitrine=1 força a vitrine pública mesmo logada — usado pelo botão "Ver vitrine" do painel dela,
+// que abre o mesmo subdomínio numa aba nova (mesma sessão) e cairia de volta no painel sem isso.
 function RaizProtegida() {
   const location = useLocation()
+  if (new URLSearchParams(location.search).get('vitrine') === '1') return <RaizOuVitrine />
   if (usuarioLogado()) return <Raiz />
   if (location.pathname === '/') return <RaizOuVitrine />
   return <Navigate to="/login" replace />

@@ -166,20 +166,39 @@ export async function assessoresRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
+  /** Média (1 casa decimal), total de avaliações APROVADAS e até 3 depoimentos mais recentes —
+   *  usado na vitrine pública. Sem nenhuma aprovada ainda, statAvaliacao vem null (esconde o selo
+   *  em vez de mostrar nota zerada). */
+  async function resumoAvaliacoes(assessorId: string) {
+    const [agregado, amostras] = await Promise.all([
+      prisma.assessorAvaliacao.aggregate({ where: { assessorId, status: 'APROVADA' }, _avg: { nota: true }, _count: true }),
+      prisma.assessorAvaliacao.findMany({
+        where: { assessorId, status: 'APROVADA' }, orderBy: { moderadoEm: 'desc' }, take: 3,
+        select: { nota: true, comentario: true, nomeCliente: true, createdAt: true },
+      }),
+    ])
+    return {
+      statAvaliacao: agregado._avg.nota != null ? Math.round(agregado._avg.nota * 10) / 10 : null,
+      totalAvaliacoes: agregado._count,
+      depoimentos: amostras,
+    }
+  }
+
   // ─────────── Público (sem auth) — vitrine no subdomínio <slug>.zaieze.com ───────────
   app.get('/publico/:slug', async (request, reply) => {
     const { slug } = request.params as { slug: string }
     const assessor = await prisma.assessor.findUnique({
       where: { slug },
       select: {
-        slug: true, bio: true, tagline: true, disponivel: true, seguirAgenda: true, whatsapp: true, telefone: true, instagram: true, site: true,
-        statProdutos: true, statClientes: true, statAvaliacao: true,
+        id: true, slug: true, bio: true, tagline: true, disponivel: true, seguirAgenda: true, whatsapp: true, telefone: true, instagram: true, site: true,
+        statProdutos: true, statClientes: true,
         usuario: { select: { nome: true, fotoUrl: true, ativo: true } },
         marcas: { where: marcaPublicaWhere, orderBy: { ordem: 'asc' }, select: marcaSelect },
         horarios: { select: { diaSemana: true, inicio: true, fim: true } },
       },
     })
     if (!assessor || !assessor.usuario.ativo) return reply.code(404).send({ erro: 'Página não encontrada' })
+    const { statAvaliacao, totalAvaliacoes, depoimentos } = await resumoAvaliacoes(assessor.id)
     return {
       nome: assessor.usuario.nome,
       fotoUrl: assessor.usuario.fotoUrl,
@@ -193,9 +212,44 @@ export async function assessoresRoutes(app: FastifyInstance) {
       statMarcas: assessor.marcas.length,
       statProdutos: assessor.statProdutos,
       statClientes: assessor.statClientes,
-      statAvaliacao: assessor.statAvaliacao != null ? Number(assessor.statAvaliacao) : null,
+      statAvaliacao, totalAvaliacoes, depoimentos,
       marcas: assessor.marcas.map(serializarMarca),
     }
+  })
+
+  // Envio de avaliação pelo cliente — público, sem login. Nasce PENDENTE (só entra na média/
+  // depoimentos depois que a Brand Partner aprova). Rate-limit contra spam/flood.
+  const avaliacaoSchema = z.object({
+    nota: z.number().int().min(1).max(5),
+    comentario: z.string().trim().max(400).nullable().optional(),
+    nomeCliente: z.string().trim().max(80).nullable().optional(),
+  })
+  app.post('/publico/:slug/avaliacao', { config: { rateLimit: { max: 5, timeWindow: '10 minutes' } } }, async (request, reply) => {
+    const { slug } = request.params as { slug: string }
+    const assessor = await prisma.assessor.findUnique({ where: { slug }, select: { id: true } })
+    if (!assessor) return reply.code(404).send({ erro: 'Página não encontrada' })
+    const b = avaliacaoSchema.parse(request.body)
+    await prisma.assessorAvaliacao.create({
+      data: { assessorId: assessor.id, nota: b.nota, comentario: b.comentario || null, nomeCliente: b.nomeCliente || null },
+    })
+    return reply.code(201).send({ ok: true })
+  })
+
+  // Lançamentos ativos, ordenados pela comissão sugerida da marca (quem paga mais aparece
+  // primeiro) e, dentro do mesmo nível, pelo mais recente. Só de marcas públicas/autorizadas.
+  app.get('/publico/:slug/lancamentos', async (request, reply) => {
+    const { slug } = request.params as { slug: string }
+    const assessor = await prisma.assessor.findUnique({ where: { slug }, select: { id: true } })
+    if (!assessor) return reply.code(404).send({ erro: 'Página não encontrada' })
+    const lancamentos = await prisma.assessorLancamento.findMany({
+      where: { assessorId: assessor.id, ativo: true, fotoUrl: { not: null }, assessorMarca: marcaPublicaWhere },
+      orderBy: [{ assessorMarca: { percentualComissaoSugerido: 'desc' } }, { createdAt: 'desc' }],
+      select: {
+        id: true, nome: true, fotoUrl: true, preco: true, descricao: true,
+        assessorMarca: { select: { id: true, nome: true, linkCatalogo: true, whatsapp: true } },
+      },
+    })
+    return lancamentos.map((l) => ({ ...l, preco: l.preco != null ? num(l.preco) : null }))
   })
 
   // preHandler por rota (não addHook): este módulo mistura a vitrine pública acima com o
@@ -221,7 +275,6 @@ export async function assessoresRoutes(app: FastifyInstance) {
       horarios: agruparPorDia(horarios),
       whatsapp: assessor.whatsapp, telefone: assessor.telefone, instagram: assessor.instagram, site: assessor.site,
       statProdutos: assessor.statProdutos, statClientes: assessor.statClientes,
-      statAvaliacao: assessor.statAvaliacao != null ? Number(assessor.statAvaliacao) : null,
       plano: assessor.plano, limites: LIMITES_GALERIA[assessor.plano],
     }
   })
@@ -255,12 +308,124 @@ export async function assessoresRoutes(app: FastifyInstance) {
     site: z.string().trim().max(200).nullable().optional(),
     statProdutos: z.coerce.number().int().min(0).nullable().optional(),
     statClientes: z.coerce.number().int().min(0).nullable().optional(),
-    statAvaliacao: z.coerce.number().min(0).max(5).nullable().optional(),
   })
   app.patch('/minha', protegido, async (request) => {
     const assessor = await assessorDoUsuario(request.user.sub)
     const b = perfilSchema.parse(request.body)
     return prisma.assessor.update({ where: { id: assessor.id }, data: b })
+  })
+
+  // ─────────── Avaliações de atendimento (moderação) ───────────
+  app.get('/minha/avaliacoes', protegido, async (request) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { status } = request.query as { status?: string }
+    const avaliacoes = await prisma.assessorAvaliacao.findMany({
+      where: { assessorId: assessor.id, ...(status ? { status: status as 'PENDENTE' | 'APROVADA' | 'RECUSADA' } : {}) },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, nota: true, comentario: true, nomeCliente: true, status: true, createdAt: true },
+    })
+    return avaliacoes
+  })
+
+  app.post('/minha/avaliacoes/:id/aprovar', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { id } = request.params as { id: string }
+    const avaliacao = await prisma.assessorAvaliacao.findFirst({ where: { id, assessorId: assessor.id } })
+    if (!avaliacao) return reply.code(404).send({ erro: 'Avaliação não encontrada' })
+    return prisma.assessorAvaliacao.update({ where: { id }, data: { status: 'APROVADA', moderadoEm: new Date() } })
+  })
+
+  app.post('/minha/avaliacoes/:id/recusar', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { id } = request.params as { id: string }
+    const avaliacao = await prisma.assessorAvaliacao.findFirst({ where: { id, assessorId: assessor.id } })
+    if (!avaliacao) return reply.code(404).send({ erro: 'Avaliação não encontrada' })
+    return prisma.assessorAvaliacao.update({ where: { id }, data: { status: 'RECUSADA', moderadoEm: new Date() } })
+  })
+
+  // ─────────── Lançamentos (modelos das marcas que ela quer destacar) ───────────
+  function serializarLancamento<T extends { preco: unknown }>(l: T) {
+    return { ...l, preco: (l as { preco: unknown }).preco != null ? num((l as { preco: unknown }).preco) : null }
+  }
+  const lancamentoSelect = {
+    id: true, nome: true, fotoUrl: true, preco: true, descricao: true, ativo: true, createdAt: true,
+    assessorMarcaId: true, assessorMarca: { select: { id: true, nome: true } },
+  } as const
+
+  app.get('/minha/lancamentos', protegido, async (request) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const lancamentos = await prisma.assessorLancamento.findMany({
+      where: { assessorId: assessor.id }, orderBy: { createdAt: 'desc' }, select: lancamentoSelect,
+    })
+    return lancamentos.map(serializarLancamento)
+  })
+
+  const lancamentoSchema = z.object({
+    assessorMarcaId: z.string().min(1),
+    nome: z.string().trim().min(1).max(120),
+    preco: z.coerce.number().positive().nullable().optional(),
+    descricao: z.string().trim().max(300).nullable().optional(),
+    ativo: z.boolean().optional(),
+  })
+  app.post('/minha/lancamentos', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const b = lancamentoSchema.parse(request.body)
+    const marca = await prisma.assessorMarca.findFirst({ where: { id: b.assessorMarcaId, assessorId: assessor.id } })
+    if (!marca) return reply.code(404).send({ erro: 'Marca não encontrada' })
+    const lancamento = await prisma.assessorLancamento.create({
+      data: { assessorId: assessor.id, assessorMarcaId: b.assessorMarcaId, nome: b.nome, preco: b.preco ?? null, descricao: b.descricao ?? null },
+      select: lancamentoSelect,
+    })
+    return reply.code(201).send(serializarLancamento(lancamento))
+  })
+
+  app.patch('/minha/lancamentos/:id', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { id } = request.params as { id: string }
+    const lancamento = await prisma.assessorLancamento.findFirst({ where: { id, assessorId: assessor.id } })
+    if (!lancamento) return reply.code(404).send({ erro: 'Lançamento não encontrado' })
+    const b = lancamentoSchema.partial().parse(request.body)
+    const atualizado = await prisma.assessorLancamento.update({ where: { id }, data: b, select: lancamentoSelect })
+    return serializarLancamento(atualizado)
+  })
+
+  app.delete('/minha/lancamentos/:id', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { id } = request.params as { id: string }
+    const lancamento = await prisma.assessorLancamento.findFirst({ where: { id, assessorId: assessor.id } })
+    if (!lancamento) return reply.code(404).send({ erro: 'Lançamento não encontrado' })
+    if (lancamento.fotoUrl?.startsWith('/api/uploads/')) {
+      const dir = path.resolve(process.cwd(), env.UPLOAD_DIR)
+      fs.unlink(path.join(dir, path.basename(lancamento.fotoUrl))).catch(() => {})
+    }
+    await prisma.assessorLancamento.delete({ where: { id } })
+    return { ok: true }
+  })
+
+  app.post('/minha/lancamentos/:id/foto', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { id } = request.params as { id: string }
+    const lancamento = await prisma.assessorLancamento.findFirst({ where: { id, assessorId: assessor.id } })
+    if (!lancamento) return reply.code(404).send({ erro: 'Lançamento não encontrado' })
+
+    const arquivo = await request.file()
+    if (!arquivo) return reply.code(422).send({ erro: 'Envie um arquivo de imagem no campo "file"' })
+    const ext = TIPOS_LOGO[arquivo.mimetype]
+    if (!ext) return reply.code(422).send({ erro: 'Formato inválido. Use PNG ou JPG.' })
+
+    const buffer = await arquivo.toBuffer()
+    const nome = `lancamento-${id}-${crypto.randomBytes(6).toString('hex')}.${ext}`
+    const dir = path.resolve(process.cwd(), env.UPLOAD_DIR)
+    await fs.mkdir(dir, { recursive: true })
+    await fs.writeFile(path.join(dir, nome), buffer)
+
+    const fotoUrl = `/api/uploads/${nome}`
+    const atualizado = await prisma.assessorLancamento.update({ where: { id }, data: { fotoUrl }, select: lancamentoSelect })
+
+    if (lancamento.fotoUrl?.startsWith('/api/uploads/') && lancamento.fotoUrl !== fotoUrl) {
+      fs.unlink(path.join(dir, path.basename(lancamento.fotoUrl))).catch(() => {})
+    }
+    return serializarLancamento(atualizado)
   })
 
   // Agenda semanal (7 dias fixos, domingo a sábado) — controla o badge Disponível/Offline da

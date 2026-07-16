@@ -12,10 +12,18 @@ interface Perfil {
   slug: string; bio: string | null; tagline: string | null
   disponivel: boolean; seguirAgenda: boolean; disponivelAgora: boolean; horarios: HorarioDia[]
   whatsapp: string | null; telefone: string | null; instagram: string | null; site: string | null
-  statProdutos: number | null; statClientes: number | null; statAvaliacao: number | null
+  statProdutos: number | null; statClientes: number | null
   plano: PlanoAssessor; limites: { fotos: number; videos: number }
 }
 const DIAS_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+interface Avaliacao {
+  id: string; nota: number; comentario: string | null; nomeCliente: string | null
+  status: 'PENDENTE' | 'APROVADA' | 'RECUSADA'; createdAt: string
+}
+interface Lancamento {
+  id: string; nome: string; fotoUrl: string | null; preco: number | null; descricao: string | null
+  ativo: boolean; createdAt: string; assessorMarcaId: string; assessorMarca: { id: string; nome: string }
+}
 interface Midia { id: string; tipo: 'FOTO' | 'VIDEO'; url: string; ordem: number }
 interface Marca {
   id: string; redeId: string | null; nome: string; logoUrl: string | null; bannerUrl: string | null
@@ -53,7 +61,7 @@ function hoje(): string {
 export default function PainelAssessora() {
   const usuario = usuarioLogado()
   const avisar = useToast()
-  const [aba, setAba] = useState<'perfil' | 'marcas' | 'vendas' | 'indicacao' | 'assinatura'>('marcas')
+  const [aba, setAba] = useState<'perfil' | 'marcas' | 'vendas' | 'avaliacoes' | 'lancamentos' | 'indicacao' | 'assinatura'>('marcas')
 
   const [assinatura, setAssinatura] = useState<Assinatura | null>(null)
   const [ocupadoAssinatura, setOcupadoAssinatura] = useState(false)
@@ -71,9 +79,11 @@ export default function PainelAssessora() {
   const [horarios, setHorarios] = useState<HorarioDia[]>([])
   const [salvandoHorarios, setSalvandoHorarios] = useState(false)
   const [telefone, setTelefone] = useState('')
-  const [statProdutos, setStatProdutos] = useState(''); const [statClientes, setStatClientes] = useState(''); const [statAvaliacao, setStatAvaliacao] = useState('')
+  const [statProdutos, setStatProdutos] = useState(''); const [statClientes, setStatClientes] = useState('')
   const [salvandoPerfil, setSalvandoPerfil] = useState(false)
   const [preview, setPreview] = useState(false)
+  const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([])
+  const [ocupadoAvaliacaoId, setOcupadoAvaliacaoId] = useState<string | null>(null)
 
   // Foto de perfil (exibida na capa da vitrine pública) — mesmo endpoint genérico de Conta.tsx.
   const [fotoUrl, setFotoUrl] = useState<string | null>(usuario?.fotoUrl ?? null)
@@ -96,6 +106,12 @@ export default function PainelAssessora() {
   const videoRef = useRef<HTMLInputElement>(null)
   const [salvandoMarca, setSalvandoMarca] = useState(false)
 
+  const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
+  const [formLancamento, setFormLancamento] = useState<{ assessorMarcaId: string; nome: string; preco: string; descricao: string } | null>(null)
+  const [editandoLancamentoId, setEditandoLancamentoId] = useState<string | null>(null)
+  const [salvandoLancamento, setSalvandoLancamento] = useState(false)
+  const fotoLancamentoRef = useRef<HTMLInputElement>(null)
+
   const [vendas, setVendas] = useState<Venda[]>([])
   const [filtroDe, setFiltroDe] = useState(''); const [filtroAte, setFiltroAte] = useState(''); const [filtroMarca, setFiltroMarca] = useState('')
   const [formVenda, setFormVenda] = useState<{ assessorMarcaId: string; data: string; valorVenda: string; percentualComissao: string; observacao: string } | null>(null)
@@ -108,7 +124,6 @@ export default function PainelAssessora() {
       setSeguirAgenda(data.seguirAgenda); setDisponivelAgora(data.disponivelAgora); setHorarios(data.horarios)
       setStatProdutos(data.statProdutos != null ? String(data.statProdutos) : '')
       setStatClientes(data.statClientes != null ? String(data.statClientes) : '')
-      setStatAvaliacao(data.statAvaliacao != null ? String(data.statAvaliacao) : '')
     }).catch((e) => avisar(mensagemDeErro(e), 'erro'))
   }
   function carregarMarcas() {
@@ -124,7 +139,61 @@ export default function PainelAssessora() {
   function carregarIndicacao() {
     api.get('/assessores/minha/indicacao').then(({ data }) => setIndicacao(data)).catch(() => {})
   }
-  useEffect(() => { carregarPerfil(); carregarMarcas(); carregarAssinatura(); carregarIndicacao() }, [])
+  function carregarAvaliacoes() {
+    api.get('/assessores/minha/avaliacoes').then(({ data }) => setAvaliacoes(data)).catch(() => {})
+  }
+  async function moderarAvaliacao(id: string, acao: 'aprovar' | 'recusar') {
+    setOcupadoAvaliacaoId(id)
+    try {
+      await api.post(`/assessores/minha/avaliacoes/${id}/${acao}`)
+      carregarAvaliacoes()
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupadoAvaliacaoId(null) }
+  }
+  function carregarLancamentos() {
+    api.get('/assessores/minha/lancamentos').then(({ data }) => setLancamentos(data)).catch(() => {})
+  }
+  function abrirNovoLancamento() {
+    setEditandoLancamentoId(null)
+    setFormLancamento({ assessorMarcaId: marcas[0]?.id ?? '', nome: '', preco: '', descricao: '' })
+  }
+  function abrirEditarLancamento(l: Lancamento) {
+    setEditandoLancamentoId(l.id)
+    setFormLancamento({ assessorMarcaId: l.assessorMarcaId, nome: l.nome, preco: l.preco != null ? String(l.preco) : '', descricao: l.descricao ?? '' })
+  }
+  async function salvarLancamento(e: React.FormEvent) {
+    e.preventDefault()
+    if (!formLancamento) return
+    setSalvandoLancamento(true)
+    try {
+      const payload = {
+        assessorMarcaId: formLancamento.assessorMarcaId, nome: formLancamento.nome,
+        preco: formLancamento.preco !== '' ? Number(formLancamento.preco) : null,
+        descricao: formLancamento.descricao || null,
+      }
+      if (editandoLancamentoId) {
+        await api.patch(`/assessores/minha/lancamentos/${editandoLancamentoId}`, payload)
+        setFormLancamento(null); setEditandoLancamentoId(null)
+      } else {
+        // Fica no modal, agora em modo edição, pra ela poder subir a foto na sequência.
+        const { data } = await api.post('/assessores/minha/lancamentos', payload)
+        setEditandoLancamentoId(data.id)
+      }
+      carregarLancamentos()
+      avisar('Lançamento salvo.')
+    } catch (e2) { avisar(mensagemDeErro(e2), 'erro') } finally { setSalvandoLancamento(false) }
+  }
+  async function excluirLancamento(id: string) {
+    if (!window.confirm('Excluir este lançamento?')) return
+    try { await api.delete(`/assessores/minha/lancamentos/${id}`); carregarLancamentos() } catch (e) { avisar(mensagemDeErro(e), 'erro') }
+  }
+  async function alternarAtivoLancamento(l: Lancamento) {
+    try { await api.patch(`/assessores/minha/lancamentos/${l.id}`, { ativo: !l.ativo }); carregarLancamentos() } catch (e) { avisar(mensagemDeErro(e), 'erro') }
+  }
+  async function enviarFotoLancamento(id: string, arquivo: File) {
+    const fd = new FormData(); fd.append('file', arquivo)
+    try { await api.post(`/assessores/minha/lancamentos/${id}/foto`, fd); carregarLancamentos() } catch (e) { avisar(mensagemDeErro(e), 'erro') }
+  }
+  useEffect(() => { carregarPerfil(); carregarMarcas(); carregarAssinatura(); carregarIndicacao(); carregarAvaliacoes(); carregarLancamentos() }, [])
   useEffect(() => { api.get('/assessores/plano').then(({ data }) => setPrecosPlano(data)).catch(() => {}) }, [])
 
   async function trocarPlano(novoPlano: PlanoAssessor) {
@@ -171,7 +240,6 @@ export default function PainelAssessora() {
         tagline: tagline || null, disponivel, seguirAgenda, telefone: telefone || null,
         statProdutos: statProdutos !== '' ? Number(statProdutos) : null,
         statClientes: statClientes !== '' ? Number(statClientes) : null,
-        statAvaliacao: statAvaliacao !== '' ? Number(statAvaliacao) : null,
       })
       avisar('Perfil salvo.')
       carregarPerfil()
@@ -435,7 +503,7 @@ export default function PainelAssessora() {
       </div>
 
       <nav style={{ display: 'flex', gap: 8, margin: '16px 0', flexWrap: 'wrap' }}>
-        {([['marcas', 'Marcas representadas'], ['vendas', 'Vendas & comissão'], ['perfil', 'Meu perfil'], ['indicacao', 'Indicar lojistas'], ['assinatura', 'Minha assinatura']] as const).map(([id, label]) => (
+        {([['marcas', 'Marcas representadas'], ['lancamentos', 'Lançamentos'], ['vendas', 'Vendas & comissão'], ['avaliacoes', 'Avaliações'], ['perfil', 'Meu perfil'], ['indicacao', 'Indicar lojistas'], ['assinatura', 'Minha assinatura']] as const).map(([id, label]) => (
           <button key={id} type="button" className={aba === id ? 'btn' : 'btn secundario'} onClick={() => setAba(id)}>{label}</button>
         ))}
       </nav>
@@ -589,11 +657,12 @@ export default function PainelAssessora() {
             <div style={{ marginTop: 8, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
               <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 8 }}>
                 Estatísticas exibidas na vitrine (autodeclaradas, sem verificação — deixe em branco para não exibir).
+                A nota de avaliação não é editável aqui: ela é calculada automaticamente a partir das
+                avaliações de clientes aprovadas na aba "Avaliações".
               </div>
               <div className="linha-campos">
                 <div className="campo"><label>Produtos (número)</label><input type="number" min={0} value={statProdutos} onChange={(e) => setStatProdutos(e.target.value)} /></div>
                 <div className="campo"><label>Clientes (número)</label><input type="number" min={0} value={statClientes} onChange={(e) => setStatClientes(e.target.value)} /></div>
-                <div className="campo"><label>Avaliação (0 a 5)</label><input type="number" min={0} max={5} step="0.1" value={statAvaliacao} onChange={(e) => setStatAvaliacao(e.target.value)} /></div>
               </div>
             </div>
             <div className="acoes"><button className="btn" disabled={salvandoPerfil}>Salvar</button></div>
@@ -709,6 +778,115 @@ export default function PainelAssessora() {
             </table>
           </div>
         </>
+      )}
+
+      {aba === 'avaliacoes' && (
+        <div className="cartao">
+          <h2 style={{ marginTop: 0 }}>Avaliações de atendimento</h2>
+          <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
+            Avaliações enviadas pelos clientes na sua vitrine pública (nota de 1 a 5 + comentário curto).
+            Aprove para que entrem na sua nota exibida e nos depoimentos públicos.
+          </p>
+          {avaliacoes.length === 0 && <p className="dica">Nenhuma avaliação recebida ainda.</p>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {avaliacoes.map((a) => (
+              <div key={a.id} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <div>
+                    <strong style={{ color: '#c9a25f' }}>{'★'.repeat(a.nota)}{'☆'.repeat(5 - a.nota)}</strong>{' '}
+                    <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+                      {a.nomeCliente || 'Cliente anônimo'} · {new Date(a.createdAt).toLocaleDateString('pt-BR')}
+                    </span>
+                  </div>
+                  <span style={{
+                    fontSize: 12, fontWeight: 700,
+                    color: a.status === 'APROVADA' ? 'var(--ok)' : a.status === 'RECUSADA' ? 'var(--danger)' : 'var(--warn)',
+                  }}>
+                    {a.status === 'PENDENTE' ? 'Pendente' : a.status === 'APROVADA' ? 'Aprovada' : 'Recusada'}
+                  </span>
+                </div>
+                {a.comentario && <p style={{ margin: '8px 0 0', fontSize: 14 }}>{a.comentario}</p>}
+                {a.status === 'PENDENTE' && (
+                  <div className="acoes" style={{ marginTop: 10 }}>
+                    <button type="button" className="btn secundario" disabled={ocupadoAvaliacaoId === a.id} onClick={() => moderarAvaliacao(a.id, 'recusar')}>Recusar</button>
+                    <button type="button" className="btn" disabled={ocupadoAvaliacaoId === a.id} onClick={() => moderarAvaliacao(a.id, 'aprovar')}>Aprovar</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {aba === 'lancamentos' && (
+        <div className="cartao">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ marginTop: 0 }}>Lançamentos</h2>
+            <button className="btn" onClick={abrirNovoLancamento} disabled={marcas.length === 0}>+ Novo lançamento</button>
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
+            Destaque modelos das marcas que você representa na página de Lançamentos da sua vitrine pública.
+            Na vitrine, aparecem primeiro os lançamentos das marcas com maior comissão sugerida.
+          </p>
+          {marcas.length === 0 && <p style={{ color: 'var(--ink-soft)' }}>Cadastre uma marca representada antes de criar um lançamento.</p>}
+          {marcas.length > 0 && lancamentos.length === 0 && <p style={{ color: 'var(--ink-soft)' }}>Nenhum lançamento cadastrado ainda.</p>}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+            {lancamentos.map((l) => (
+              <div key={l.id} className="cartao" style={{ opacity: l.ativo ? 1 : 0.55 }}>
+                {l.fotoUrl
+                  ? <img src={l.fotoUrl} alt={l.nome} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 8, marginBottom: 8 }} />
+                  : <div style={{ width: '100%', aspectRatio: '1', borderRadius: 8, marginBottom: 8, background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-soft)', fontSize: 12 }}>sem foto</div>}
+                <strong>{l.nome}</strong>
+                <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{l.assessorMarca.nome}{l.preco != null ? ` · ${formataReal(l.preco)}` : ''}</div>
+                {!l.ativo && <div style={{ fontSize: 11, color: 'var(--ink-soft)' }}>oculto</div>}
+                <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+                  <button type="button" className="btn-link" onClick={() => abrirEditarLancamento(l)}>editar</button>
+                  <button type="button" className="btn-link" onClick={() => alternarAtivoLancamento(l)}>{l.ativo ? 'ocultar' : 'exibir'}</button>
+                  <button type="button" className="btn-link" onClick={() => excluirLancamento(l.id)}>excluir</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {formLancamento && (
+        <div className="modal-fundo" onClick={() => setFormLancamento(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>{editandoLancamentoId ? 'Editar lançamento' : 'Novo lançamento'}</h2>
+            <form onSubmit={salvarLancamento} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="campo">
+                <label>Marca*</label>
+                <select value={formLancamento.assessorMarcaId} onChange={(e) => setFormLancamento({ ...formLancamento, assessorMarcaId: e.target.value })} required>
+                  {marcas.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                </select>
+              </div>
+              <div className="campo"><label>Nome da peça*</label><input value={formLancamento.nome} onChange={(e) => setFormLancamento({ ...formLancamento, nome: e.target.value })} required /></div>
+              <div className="campo"><label>Preço (opcional)</label><input type="number" step="0.01" min="0" value={formLancamento.preco} onChange={(e) => setFormLancamento({ ...formLancamento, preco: e.target.value })} /></div>
+              <div className="campo"><label>Descrição (opcional)</label><textarea rows={2} value={formLancamento.descricao} onChange={(e) => setFormLancamento({ ...formLancamento, descricao: e.target.value })} /></div>
+              <div className="acoes">
+                <button type="button" className="btn secundario" onClick={() => setFormLancamento(null)}>Cancelar</button>
+                <button className="btn" disabled={salvandoLancamento}>{salvandoLancamento ? 'Salvando…' : 'Salvar'}</button>
+              </div>
+            </form>
+            {editandoLancamentoId && (
+              <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                <label>Foto</label>
+                <div className="upload-caixa">
+                  {(() => {
+                    const atual = lancamentos.find((l) => l.id === editandoLancamentoId)
+                    return atual?.fotoUrl ? <img className="upload-preview" src={atual.fotoUrl} alt="" /> : <div className="upload-preview sem-imagem">sem foto</div>
+                  })()}
+                  <button type="button" className="btn secundario" onClick={() => fotoLancamentoRef.current?.click()}>Trocar foto</button>
+                  <input
+                    ref={fotoLancamentoRef} type="file" accept="image/png,image/jpeg" hidden
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f && editandoLancamentoId) enviarFotoLancamento(editandoLancamentoId, f); e.target.value = '' }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {formMarca && (
@@ -880,7 +1058,7 @@ export default function PainelAssessora() {
       {preview && (
         <PreviewVitrine
           nome={usuario?.nome ?? ''} fotoUrl={fotoUrl} tagline={tagline} bio={bio} disponivel={seguirAgenda ? disponivelAgora : disponivel}
-          totalMarcas={marcas.length} statProdutos={statProdutos} statClientes={statClientes} statAvaliacao={statAvaliacao}
+          totalMarcas={marcas.length} statProdutos={statProdutos} statClientes={statClientes}
           onClose={() => setPreview(false)}
         />
       )}

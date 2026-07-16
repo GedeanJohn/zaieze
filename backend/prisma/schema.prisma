@@ -1390,10 +1390,10 @@ model Assessor {
   telefone  String? // número para o botão "Ligar" (distinto do whatsapp)
   instagram String?
   site      String?
-  // Estatísticas exibidas na vitrine — autodeclaradas, sem validação (só "marcas" é contagem real)
+  // Estatísticas exibidas na vitrine — autodeclaradas, sem validação (só "marcas" é contagem real).
+  // "Avaliação" NÃO está aqui — é calculada a partir de AssessorAvaliacao (nota real de cliente).
   statProdutos   Int?
   statClientes   Int?
-  statAvaliacao  Decimal? @db.Decimal(2, 1)
   // Indicação de lojistas (link próprio ?refAssessor=<slug>): % arbitrado pelo SUPER_ADMIN por
   // assessora — null = sem indicação habilitada (nenhuma comissão é gerada até ser definido).
   percentualComissaoIndicacao Decimal? @db.Decimal(5, 2)
@@ -1409,8 +1409,57 @@ model Assessor {
   redesIndicadas  Rede[]
   comissoesIndicacao ComissaoAssessor[]
   horarios        AssessorHorario[]
+  avaliacoes      AssessorAvaliacao[]
+  lancamentos     AssessorLancamento[]
 
   @@map("assessores")
+}
+
+/// "Lançamento" — modelo/peça de uma marca representada que o Brand Partner escolhe destacar
+/// na página de Lançamentos da vitrine pública (vitrine ordena por comissão sugerida da marca
+/// primeiro — dá mais visibilidade pra quem paga mais — depois por mais recente).
+model AssessorLancamento {
+  id              String   @id @default(cuid())
+  assessorId      String
+  assessorMarcaId String
+  nome            String
+  fotoUrl         String?
+  preco           Decimal? @db.Decimal(12, 2)
+  descricao       String?  @db.VarChar(300)
+  ativo           Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  assessor      Assessor      @relation(fields: [assessorId], references: [id], onDelete: Cascade)
+  assessorMarca AssessorMarca @relation(fields: [assessorMarcaId], references: [id], onDelete: Cascade)
+
+  @@index([assessorId, ativo])
+  @@map("assessor_lancamentos")
+}
+
+enum StatusAvaliacaoAssessor {
+  PENDENTE
+  APROVADA
+  RECUSADA
+}
+
+/// Avaliação de atendimento enviada pelo CLIENTE (sem login, formulário público na vitrine) —
+/// nota 1-5 + comentário curto. Nasce PENDENTE; só entra na média/depoimentos públicos depois
+/// que a própria Brand Partner aprova no painel (evita golpe/spam indo direto ao ar).
+model AssessorAvaliacao {
+  id          String                   @id @default(cuid())
+  assessorId  String
+  nota        Int // 1 a 5
+  comentario  String?                  @db.VarChar(400)
+  nomeCliente String? // opcional, texto livre (não é um Cliente cadastrado — não há login)
+  status      StatusAvaliacaoAssessor  @default(PENDENTE)
+  createdAt   DateTime                 @default(now())
+  moderadoEm  DateTime?
+
+  assessor Assessor @relation(fields: [assessorId], references: [id], onDelete: Cascade)
+
+  @@index([assessorId, status])
+  @@map("assessor_avaliacoes")
 }
 
 /// Agenda semanal recorrente do Brand Partner — cada linha é UM período de atendimento dentro
@@ -1478,6 +1527,7 @@ model AssessorMarca {
   rede     Rede?                 @relation(fields: [redeId], references: [id], onDelete: SetNull)
   vendas   VendaAssessora[]
   midias   AssessorMarcaMidia[]
+  lancamentos AssessorLancamento[]
 
   @@index([assessorId, ordem])
   @@map("assessor_marcas")

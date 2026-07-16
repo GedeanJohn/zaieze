@@ -1,10 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Search, Share2, MessageCircle, Menu, X, Tag, Shirt, Users, Star, Gift, Megaphone, Truck,
-  Headphones, Home, ShoppingBag, UserRound, FileText, MoreHorizontal, Globe, Send, Phone, Play,
+  Search, Share2, Menu, X, Tag, Shirt, Users, Star, Gift, Megaphone, Truck,
+  Headphones, Home, ShoppingBag, UserRound, FileText, MoreHorizontal, Globe, Phone, Play, Sparkles, ArrowLeft,
 } from 'lucide-react'
-import { api } from '../../api'
+import { siInstagram, siFacebook, siTiktok, siTelegram, siWhatsapp } from 'simple-icons'
+import { api, formataReal } from '../../api'
 import { useToast } from '../../componentes/Toast'
+
+/** Logo real da rede social (simple-icons, SVG vetorial) — sempre na cor atual do texto
+ *  (currentColor), pra combinar com o resto do visual dourado/monocromático da vitrine. */
+function IconeMarca({ icone, size = 20 }: { icone: { path: string; title: string }; size?: number }) {
+  return (
+    <svg role="img" aria-label={icone.title} viewBox="0 0 24 24" width={size} height={size} fill="currentColor">
+      <path d={icone.path} />
+    </svg>
+  )
+}
 
 interface Midia { id: string; tipo: 'FOTO' | 'VIDEO'; url: string; ordem: number }
 interface Marca {
@@ -13,10 +24,16 @@ interface Marca {
   instagram: string | null; facebook: string | null; whatsapp: string | null; telegram: string | null; tiktok: string | null; site: string | null
   linkCatalogo: string | null
 }
+interface Depoimento { nota: number; comentario: string | null; nomeCliente: string | null; createdAt: string }
+interface Lancamento {
+  id: string; nome: string; fotoUrl: string | null; preco: number | null; descricao: string | null
+  assessorMarca: { id: string; nome: string; linkCatalogo: string | null; whatsapp: string | null }
+}
 interface Vitrine {
   nome: string; fotoUrl: string | null; bio: string | null; tagline: string | null; disponivel: boolean
   whatsapp: string | null; telefone: string | null; instagram: string | null; site: string | null
   statMarcas: number; statProdutos: number | null; statClientes: number | null; statAvaliacao: number | null
+  totalAvaliacoes: number; depoimentos: Depoimento[]
   marcas: Marca[]
 }
 
@@ -47,11 +64,20 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
   const [buscaAberta, setBuscaAberta] = useState(false)
   const [drawerAberto, setDrawerAberto] = useState(false)
   const [marcaModal, setMarcaModal] = useState<Marca | null>(null)
+  const [avaliacaoAberta, setAvaliacaoAberta] = useState(false)
+  const [lancamentosAberto, setLancamentosAberto] = useState(false)
+  const [lancamentos, setLancamentos] = useState<Lancamento[] | null>(null)
   const avisar = useToast()
 
   useEffect(() => {
     api.get(`/assessores/publico/${slug}`).then(({ data }) => setV(data)).catch(() => setErro('Página não encontrada.'))
   }, [slug])
+
+  useEffect(() => {
+    if (lancamentosAberto && lancamentos === null) {
+      api.get(`/assessores/publico/${slug}/lancamentos`).then(({ data }) => setLancamentos(data)).catch(() => setLancamentos([]))
+    }
+  }, [lancamentosAberto, lancamentos, slug])
 
   const marcasFiltradas = useMemo(() => {
     if (!v) return []
@@ -71,7 +97,8 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
 
   function irPara(id: (typeof NAV_ITENS)[number]['id']) {
     setDrawerAberto(false)
-    if (id === 'inicio' || id === 'perfil') { window.scrollTo({ top: 0, behavior: 'smooth' }); return }
+    if (id === 'inicio') { window.scrollTo({ top: 0, behavior: 'smooth' }); return }
+    if (id === 'perfil') { setAvaliacaoAberta(true); return }
     if (id === 'mais') { setDrawerAberto(true); return }
     avisar('Em breve.')
   }
@@ -94,7 +121,7 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
           <button type="button" className="vit-icone-botao" aria-label="Buscar marca" onClick={() => setBuscaAberta((a) => !a)}><Search size={18} /></button>
           <button type="button" className="vit-icone-botao" aria-label="Compartilhar" onClick={compartilhar}><Share2 size={18} /></button>
           {v.whatsapp && (
-            <a className="vit-icone-botao" aria-label="Falar no WhatsApp" href={linkWhatsapp(v.whatsapp)} target="_blank" rel="noreferrer"><MessageCircle size={18} /></a>
+            <a className="vit-icone-botao" aria-label="Falar no WhatsApp" href={linkWhatsapp(v.whatsapp)} target="_blank" rel="noreferrer"><IconeMarca icone={siWhatsapp} size={18} /></a>
           )}
           <button type="button" className="vit-icone-botao" aria-label="Menu" onClick={() => setDrawerAberto(true)}><Menu size={18} /></button>
         </div>
@@ -145,8 +172,9 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
         </div>
 
         <div className="vit-acoes">
-          {v.whatsapp && <a className="vit-btn-primario" href={linkWhatsapp(v.whatsapp)} target="_blank" rel="noreferrer"><MessageCircle size={18} /> Falar no WhatsApp</a>}
+          {v.whatsapp && <a className="vit-btn-primario" href={linkWhatsapp(v.whatsapp)} target="_blank" rel="noreferrer"><IconeMarca icone={siWhatsapp} size={18} /> Falar no WhatsApp</a>}
           {v.telefone && <a className="vit-btn-secundario" href={`tel:${v.telefone}`}><Phone size={18} /> Ligar</a>}
+          <button type="button" className="vit-btn-secundario" onClick={() => setLancamentosAberto(true)}><Sparkles size={18} /> Lançamentos</button>
         </div>
       </section>
 
@@ -176,6 +204,31 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
         <div className="vit-faixaItem"><Headphones size={20} /><div>Atendimento<br />Personalizado</div></div>
       </section>
 
+      {v.totalAvaliacoes > 0 && (
+        <section className="vit-marcas-secao">
+          <div className="vit-marcas-cabec">
+            <h2>Avaliações</h2>
+            <button type="button" className="vit-avaliar-link" onClick={() => setAvaliacaoAberta(true)}>Avaliar</button>
+          </div>
+          <div className="vit-avaliacoes-resumo">
+            <strong>{(v.statAvaliacao ?? 0).toFixed(1)}</strong>
+            <div>
+              <div className="vit-estrelas">{'★'.repeat(Math.round(v.statAvaliacao ?? 0))}{'☆'.repeat(5 - Math.round(v.statAvaliacao ?? 0))}</div>
+              <span>Baseado em {v.totalAvaliacoes} avaliaç{v.totalAvaliacoes === 1 ? 'ão' : 'ões'}</span>
+            </div>
+          </div>
+          <div className="vit-depoimentos">
+            {v.depoimentos.map((d, i) => (
+              <div className="vit-depoimento" key={i}>
+                <div className="vit-estrelas">{'★'.repeat(d.nota)}{'☆'.repeat(5 - d.nota)}</div>
+                {d.comentario && <p>&ldquo;{d.comentario}&rdquo;</p>}
+                <span>{d.nomeCliente || 'Cliente'}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <nav className="vit-bottom-nav">
         {NAV_ITENS.map(({ id, rotulo, Icone }) => (
           <button key={id} type="button" className={`vit-nav-item${id === 'perfil' ? ' ativo' : ''}`} onClick={() => irPara(id)}>
@@ -186,6 +239,8 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
       </nav>
 
       {marcaModal && <ModalLinksMarca marca={marcaModal} onClose={() => setMarcaModal(null)} />}
+      {avaliacaoAberta && <ModalAvaliacao slug={slug} onClose={() => setAvaliacaoAberta(false)} />}
+      {lancamentosAberto && <PaginaLancamentos lancamentos={lancamentos} onClose={() => setLancamentosAberto(false)} />}
     </div>
   )
 }
@@ -194,15 +249,15 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
   const [midiaAberta, setMidiaAberta] = useState<{ tipo: 'imagem' | 'video'; url: string } | null>(null)
 
   const links: { rotulo: string; href: string; Icone: (p: { size?: number }) => JSX.Element }[] = []
-  if (marca.whatsapp) links.push({ rotulo: 'WhatsApp', href: linkWhatsapp(marca.whatsapp), Icone: (p) => <MessageCircle {...p} /> })
+  if (marca.whatsapp) links.push({ rotulo: 'WhatsApp', href: linkWhatsapp(marca.whatsapp), Icone: (p) => <IconeMarca icone={siWhatsapp} {...p} /> })
   const instagramHref = linkPublicoSeguro(marca.instagram)
-  if (instagramHref) links.push({ rotulo: 'Instagram', href: instagramHref, Icone: (p) => <IconeInstagram {...p} /> })
+  if (instagramHref) links.push({ rotulo: 'Instagram', href: instagramHref, Icone: (p) => <IconeMarca icone={siInstagram} {...p} /> })
   const facebookHref = linkPublicoSeguro(marca.facebook)
-  if (facebookHref) links.push({ rotulo: 'Facebook', href: facebookHref, Icone: (p) => <IconeFacebook {...p} /> })
+  if (facebookHref) links.push({ rotulo: 'Facebook', href: facebookHref, Icone: (p) => <IconeMarca icone={siFacebook} {...p} /> })
   const tiktokHref = linkPublicoSeguro(marca.tiktok)
-  if (tiktokHref) links.push({ rotulo: 'TikTok', href: tiktokHref, Icone: (p) => <IconeTiktok {...p} /> })
+  if (tiktokHref) links.push({ rotulo: 'TikTok', href: tiktokHref, Icone: (p) => <IconeMarca icone={siTiktok} {...p} /> })
   const telegramHref = linkPublicoSeguro(marca.telegram)
-  if (telegramHref) links.push({ rotulo: 'Telegram', href: telegramHref, Icone: (p) => <Send {...p} /> })
+  if (telegramHref) links.push({ rotulo: 'Telegram', href: telegramHref, Icone: (p) => <IconeMarca icone={siTelegram} {...p} /> })
   const siteHref = linkPublicoSeguro(marca.site)
   if (siteHref) links.push({ rotulo: 'Site', href: siteHref, Icone: (p) => <Globe {...p} /> })
   const linkCatalogoHref = linkPublicoSeguro(marca.linkCatalogo)
@@ -260,27 +315,129 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
   )
 }
 
-function IconeInstagram({ size = 20 }: { size?: number }) {
+/** Formulário público (sem login) pra cliente avaliar o atendimento — nota 1-5 + comentário
+ *  curto. Nasce PENDENTE no backend; só entra na média/depoimentos depois de aprovada. */
+function ModalAvaliacao({ slug, onClose }: { slug: string; onClose: () => void }) {
+  const [nota, setNota] = useState(0)
+  const [notaHover, setNotaHover] = useState(0)
+  const [comentario, setComentario] = useState('')
+  const [nomeCliente, setNomeCliente] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [enviado, setEnviado] = useState(false)
+  const [erro, setErro] = useState('')
+
+  async function enviar() {
+    if (nota === 0) { setErro('Escolha de 1 a 5 estrelas.'); return }
+    setErro(''); setEnviando(true)
+    try {
+      await api.post(`/assessores/publico/${slug}/avaliacao`, {
+        nota, comentario: comentario.trim() || undefined, nomeCliente: nomeCliente.trim() || undefined,
+      })
+      setEnviado(true)
+    } catch {
+      setErro('Não deu pra enviar agora. Tente de novo em alguns minutos.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="3" width="18" height="18" rx="5" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="17.3" cy="6.7" r="1.1" fill="currentColor" stroke="none" />
-    </svg>
+    <div className="vit-modal-fundo" onClick={onClose}>
+      <div className="vit-modal" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="vit-modal-fechar" onClick={onClose} aria-label="Fechar"><X size={18} /></button>
+        {enviado ? (
+          <>
+            <h3 className="vit-modal-nome">Obrigado!</h3>
+            <p className="vit-modal-vazio">Sua avaliação foi enviada e vai aparecer aqui assim que for aprovada.</p>
+          </>
+        ) : (
+          <>
+            <h3 className="vit-modal-nome">Avalie o atendimento</h3>
+            <div className="vit-estrelas-input">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n} type="button" aria-label={`${n} estrela${n > 1 ? 's' : ''}`}
+                  onClick={() => setNota(n)} onMouseEnter={() => setNotaHover(n)} onMouseLeave={() => setNotaHover(0)}
+                >
+                  {(notaHover || nota) >= n ? '★' : '☆'}
+                </button>
+              ))}
+            </div>
+            <textarea
+              className="vit-avaliacao-textarea" placeholder="Conte rapidinho como foi o atendimento (opcional)"
+              maxLength={400} rows={3} value={comentario} onChange={(e) => setComentario(e.target.value)}
+            />
+            <input
+              className="vit-avaliacao-input" placeholder="Seu nome (opcional)" maxLength={80}
+              value={nomeCliente} onChange={(e) => setNomeCliente(e.target.value)}
+            />
+            {erro && <p className="vit-modal-vazio" style={{ color: '#e5484d' }}>{erro}</p>}
+            <button type="button" className="vit-modal-catalogo" disabled={enviando} onClick={enviar} style={{ width: '100%', border: 'none' }}>
+              {enviando ? 'Enviando…' : 'Enviar avaliação'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   )
 }
-function IconeFacebook({ size = 20 }: { size?: number }) {
+
+/** Tela cheia (não é uma rota própria — a vitrine é um app de página única) com os modelos que
+ *  o Brand Partner escolheu destacar. Vem ordenada pelo backend (comissão da marca, depois mais
+ *  recente) — não reordena no cliente. */
+function PaginaLancamentos({ lancamentos, onClose }: { lancamentos: Lancamento[] | null; onClose: () => void }) {
+  const [itemAberto, setItemAberto] = useState<Lancamento | null>(null)
+
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M13.5 21v-8h2.7l.4-3.1h-3.1V7.9c0-.9.25-1.5 1.53-1.5H16.7V3.6C16.4 3.56 15.4 3.47 14.2 3.47c-2.4 0-4.1 1.47-4.1 4.17v2.32H7.4v3.1h2.7V21h3.4Z" />
-    </svg>
-  )
-}
-function IconeTiktok({ size = 20 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M14.5 3c.3 1.8 1.6 3.3 3.4 3.7v2.6c-1.2-.1-2.4-.5-3.4-1.2v6.4c0 3-2.4 5.4-5.4 5.4S3.7 17.5 3.7 14.5c0-2.8 2.1-5.1 4.8-5.4v2.7c-1.2.3-2.1 1.4-2.1 2.7 0 1.5 1.3 2.8 2.8 2.8s2.8-1.3 2.8-2.8V3h2.5Z" />
-    </svg>
+    <div className="vit-pagina-fundo">
+      <header className="vit-topo">
+        <button type="button" className="vit-icone-botao" aria-label="Voltar" onClick={onClose}><ArrowLeft size={18} /></button>
+        <strong style={{ fontSize: 15 }}>Lançamentos</strong>
+        <span style={{ width: 38 }} />
+      </header>
+
+      {lancamentos === null && <div className="vit-vazio">Carregando…</div>}
+      {lancamentos?.length === 0 && <div className="vit-vazio">Nenhum lançamento no momento.</div>}
+      {lancamentos != null && lancamentos.length > 0 && (
+        <div className="vit-lancamentos-grid">
+          {lancamentos.map((l) => (
+            <button key={l.id} type="button" className="vit-lancamentoCard" onClick={() => setItemAberto(l)}>
+              {l.fotoUrl && <img src={l.fotoUrl} alt={l.nome} />}
+              <div className="vit-lancamentoCard-info">
+                <strong>{l.nome}</strong>
+                <span>{l.assessorMarca.nome}</span>
+                {l.preco != null && <span className="vit-lancamentoCard-preco">{formataReal(l.preco)}</span>}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {itemAberto && (
+        <div className="vit-modal-fundo" onClick={() => setItemAberto(null)}>
+          <div className="vit-modal" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="vit-modal-fechar" onClick={() => setItemAberto(null)} aria-label="Fechar"><X size={18} /></button>
+            {itemAberto.fotoUrl && <img className="vit-detalhe-foto" src={itemAberto.fotoUrl} alt={itemAberto.nome} />}
+            <h3 className="vit-modal-nome" style={{ marginTop: 14 }}>{itemAberto.nome}</h3>
+            <p className="vit-modal-vazio" style={{ marginBottom: 10 }}>{itemAberto.assessorMarca.nome}</p>
+            {itemAberto.preco != null && <div className="vit-lancamentoCard-preco" style={{ fontSize: 22, marginBottom: 10 }}>{formataReal(itemAberto.preco)}</div>}
+            {itemAberto.descricao && <p style={{ color: '#d8d3ca', fontSize: 14, lineHeight: 1.5 }}>{itemAberto.descricao}</p>}
+            <div className="vit-modal-links">
+              {itemAberto.assessorMarca.whatsapp && (
+                <a className="vit-modal-link" href={linkWhatsapp(itemAberto.assessorMarca.whatsapp)} target="_blank" rel="noreferrer">
+                  <IconeMarca icone={siWhatsapp} /> Perguntar no WhatsApp
+                </a>
+              )}
+              {linkPublicoSeguro(itemAberto.assessorMarca.linkCatalogo) && (
+                <a className="vit-modal-link" href={linkPublicoSeguro(itemAberto.assessorMarca.linkCatalogo)!} target="_blank" rel="noreferrer">
+                  <ShoppingBag size={20} /> Ver no catálogo da marca
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -362,6 +519,23 @@ export function VitrineEstilos() {
       .vit-marcas-cabec { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
       .vit-marcas-cabec h2 { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; margin: 0; }
       .vit-vazio-secao { color: #888; font-size: 14px; padding: 12px 0 24px; }
+      .vit-avaliar-link { background: none; border: none; color: #c9a25f; font-size: 12px; font-weight: 700; cursor: pointer; padding: 0; }
+
+      .vit-avaliacoes-resumo { display: flex; align-items: center; gap: 16px; padding: 16px; background: #141414; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; margin-bottom: 14px; }
+      .vit-avaliacoes-resumo > strong { font-size: 34px; font-family: var(--leitura); }
+      .vit-avaliacoes-resumo span { display: block; font-size: 12px; color: #9a9a9a; margin-top: 2px; }
+      .vit-estrelas { color: #c9a25f; font-size: 15px; letter-spacing: 1px; }
+      .vit-depoimentos { display: flex; flex-direction: column; gap: 10px; }
+      .vit-depoimento { padding: 12px 14px; background: #141414; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; }
+      .vit-depoimento p { margin: 6px 0; font-size: 14px; color: #d8d3ca; line-height: 1.5; }
+      .vit-depoimento span { font-size: 12px; color: #9a9a9a; font-weight: 600; }
+
+      .vit-estrelas-input { display: flex; gap: 6px; justify-content: center; margin: 4px 0 16px; }
+      .vit-estrelas-input button { background: none; border: none; color: #c9a25f; font-size: 32px; line-height: 1; cursor: pointer; padding: 2px; }
+      .vit-avaliacao-textarea, .vit-avaliacao-input {
+        width: 100%; background: #0a0a0a; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+        color: #f2efe9; padding: 10px 12px; font-size: 14px; font-family: inherit; margin-bottom: 10px; resize: vertical;
+      }
 
       .vit-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
       .vit-cardMarca {
@@ -376,6 +550,18 @@ export function VitrineEstilos() {
         position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 10px;
         background: linear-gradient(to top, rgba(0,0,0,0.75), transparent); font-size: 12px; font-weight: 700; text-align: left; color: #fff;
       }
+
+      .vit-pagina-fundo { position: fixed; inset: 0; background: #0a0a0a; z-index: 90; overflow-y: auto; }
+      .vit-lancamentos-grid { max-width: 1100px; margin: 0 auto; padding: 20px 24px 40px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+      .vit-lancamentoCard {
+        display: block; text-align: left; padding: 0; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; overflow: hidden;
+        background: #141414; cursor: pointer;
+      }
+      .vit-lancamentoCard img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+      .vit-lancamentoCard-info { padding: 10px 12px; color: #f2efe9; }
+      .vit-lancamentoCard-info strong { display: block; font-size: 13px; }
+      .vit-lancamentoCard-info span { display: block; font-size: 11px; color: #9a9a9a; margin-top: 2px; }
+      .vit-lancamentoCard-preco { color: #c9a25f; font-weight: 800; font-family: var(--leitura); }
 
       .vit-faixa {
         max-width: 1100px; margin: 40px auto 0; padding: 22px 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
@@ -449,9 +635,12 @@ export function VitrineEstilos() {
         .vit-stat span { font-size: 8.5px; }
         .vit-acoes { margin-top: 16px; gap: 8px; }
         .vit-btn-primario, .vit-btn-secundario { padding: 10px 10px; font-size: 12px; flex: 1; justify-content: center; }
-        .vit-grid { grid-template-columns: repeat(2, 1fr); }
+        .vit-grid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .vit-lancamentos-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 16px 16px 32px; }
+        .vit-cardMarca-nome { padding: 5px 6px; font-size: 9px; line-height: 1.2; }
+        .vit-cardMarca-semImagem { font-size: 10px; padding: 6px; }
         .vit-faixa { grid-template-columns: repeat(2, 1fr); }
-        .vit-marcas-secao { margin-top: 28px; }
+        .vit-marcas-secao { margin-top: 28px; padding: 0 16px; }
         .vit-topo { padding: 12px 16px; }
       }
     `}</style>

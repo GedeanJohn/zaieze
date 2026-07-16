@@ -533,7 +533,7 @@ export function VitrineEstilos() {
       .vit-nome strong { font-weight: 800; }
       .vit-nome { font-weight: 300; }
       .vit-tagline { font-family: var(--fonte-script); color: #c9a25f; font-size: 30px; margin: 10px 0 0; line-height: 1; }
-      .vit-bio { color: #b8b3ac; font-size: 15px; line-height: 1.6; margin: 18px 0 0; max-width: 480px; }
+      .vit-bio { color: #b8b3ac; font-size: 13px; line-height: 1.6; margin: 18px 0 0; max-width: 480px; }
 
       .vit-stats { display: flex; gap: 40px; margin-top: 28px; flex-wrap: wrap; }
       .vit-stat { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; color: #c9a25f; }
@@ -663,7 +663,7 @@ export function VitrineEstilos() {
         .vit-selo { font-size: 10px; }
         .vit-nome { font-size: 19px; margin-top: 4px; }
         .vit-tagline { font-size: 16px; margin-top: 6px; }
-        .vit-bio { font-size: 12.5px; line-height: 1.5; margin-top: 10px; }
+        .vit-bio { font-size: 11px; line-height: 1.5; margin-top: 10px; }
         .vit-stats { gap: 10px 18px; margin-top: 12px; }
         .vit-stat strong { font-size: 15px; }
         .vit-stat span { font-size: 8.5px; }

@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma'
 import { criarVenda, VendaError } from '../vendas/vendas.service'
+import { criarLook, ProvadorError } from '../provador/provador.service'
 
 /** Contexto fixo da conversa (não muda entre chamadas de ferramenta de um mesmo turno). */
 export interface ContextoIA {
@@ -12,7 +13,7 @@ export interface ContextoIA {
 /** Descrição das ferramentas no formato esperado pela Messages API da Anthropic
  *  (JSON Schema em `input_schema`). Mantém a orquestração do prompt (service) separada
  *  da definição/execução das ferramentas, pra ficar testável isoladamente. */
-export const FERRAMENTAS = [
+export const FERRAMENTAS_BASE = [
   {
     name: 'buscar_colecoes',
     description: 'Lista as coleções (categorias de produtos) atualmente disponíveis para venda nesta loja.',
@@ -72,6 +73,28 @@ export const FERRAMENTAS = [
     },
   },
 ]
+
+/** Provador Virtual — só entra na lista de ferramentas quando a marca tem o add-on PROVADOR
+ *  ativo (checado em vendedora-zaieze.service.ts antes de montar a chamada à Claude). Cota
+ *  mensal compartilhada com o uso humano do Provador (mesmo controle de gasto). */
+const FERRAMENTA_PROVADOR = {
+  name: 'gerar_provador',
+  description:
+    'Gera um link do Provador Virtual (prova de roupa por IA) pra uma peça específica: o cliente abre o link, autoriza e manda uma selfie, e recebe uma foto dele(a) vestindo a peça. Use quando o cliente perguntar "como ficaria em mim" ou pedir pra "ver como fica". Depois de chamar, inclua o link retornado na sua próxima mensagem de texto.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      produtoId: { type: 'string', description: 'id do produto, vindo de buscar_produtos ou checar_estoque' },
+      comVideo: { type: 'boolean', description: 'gerar também um vídeo do try-on (opcional, mais lento)' },
+    },
+    required: ['produtoId'],
+  },
+}
+
+/** Monta a lista de ferramentas pro turno atual — Provador entra só se o add-on estiver ativo. */
+export function ferramentasDisponiveis(provadorAtivo: boolean) {
+  return provadorAtivo ? [...FERRAMENTAS_BASE, FERRAMENTA_PROVADOR] : FERRAMENTAS_BASE
+}
 
 async function buscarColecoes(ctx: ContextoIA) {
   const colecoes = await prisma.colecao.findMany({
@@ -153,6 +176,22 @@ async function fecharVenda(ctx: ContextoIA, input: { itens: { variacaoId: string
   }
 }
 
+async function gerarProvador(ctx: ContextoIA, input: { produtoId: string; comVideo?: boolean }) {
+  try {
+    const look = await criarLook({
+      redeId: ctx.redeId, lojaId: ctx.lojaId, produtoBaseId: input.produtoId,
+      criadoPorId: ctx.usuarioIaId, comVideo: input.comVideo,
+    })
+    return {
+      sucesso: true, url: look.url, produto: look.produtoNome,
+      instrucao: 'Inclua esse link na sua próxima mensagem pro cliente, explicando que é pra ele abrir, autorizar e mandar uma selfie.',
+    }
+  } catch (err) {
+    if (err instanceof ProvadorError) return { sucesso: false, erro: err.message }
+    throw err
+  }
+}
+
 async function transferirParaHumano(ctx: ContextoIA, input: { motivo?: string }) {
   await prisma.cliente.update({
     where: { id: ctx.clienteId },
@@ -172,6 +211,7 @@ export async function executarFerramenta(nome: string, input: unknown, ctx: Cont
     case 'buscar_produtos': return buscarProdutos(ctx, input as { colecaoId?: string; busca?: string })
     case 'checar_estoque': return checarEstoque(ctx, input as { produtoId: string })
     case 'fechar_venda': return fecharVenda(ctx, input as { itens: { variacaoId: string; quantidade: number }[]; observacao?: string })
+    case 'gerar_provador': return gerarProvador(ctx, input as { produtoId: string; comVideo?: boolean })
     case 'transferir_para_humano': return transferirParaHumano(ctx, input as { motivo?: string })
     default: return { erro: `Ferramenta desconhecida: ${nome}` }
   }

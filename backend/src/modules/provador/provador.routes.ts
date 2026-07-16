@@ -2,12 +2,12 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import sharp from 'sharp'
 import { prisma } from '../../lib/prisma'
-import { env } from '../../env'
 import { lojaIdDe, redeIdDeQualquer } from '../../plugins/auth'
 import { requireAddon } from '../../plugins/planos'
 import { enviarParaR2 } from '../midia/r2.service'
 import { salvarUploadLocal } from '../midia/midia.routes'
 import { statusCota } from './cota.service'
+import { criarLook, ProvadorError } from './provador.service'
 
 /**
  * Provador virtual — add-on vendido À PARTE de qualquer plano (START/PRO/ELITE), com
@@ -20,11 +20,6 @@ import { statusCota } from './cota.service'
 
 const MUTACAO = ['SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA'] as const
 const TIPOS_IMG = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/avif'])
-
-/** URL pública para o cliente enviar a selfie: <scheme>://<rede>.<dominio>/look/<token>. */
-function urlProvadorPublica(redeSlug: string, token: string): string {
-  return `${env.TENANT_SCHEME}://${redeSlug}.${env.DOMINIO_BASE}/look/${token}`
-}
 
 const criarSchema = z.object({
   produtoBaseId: z.string().min(1),
@@ -46,29 +41,14 @@ export async function provadorRoutes(app: FastifyInstance) {
     const lojaId = await lojaIdDe(request)
     const redeId = await redeIdDeQualquer(request)
 
-    const cota = await statusCota(redeId)
-    if (!cota.ok) return reply.code(429).send({ erro: `Cota mensal de looks atingida (${cota.usados}/${cota.limite}).`, cota })
-
-    // A peça precisa existir na rede e ter ao menos uma foto (entrada do try-on).
-    const produto = await prisma.produto.findFirst({
-      where: { id: body.produtoBaseId, redeId },
-      select: { id: true, nome: true, fotos: true },
-    })
-    if (!produto) return reply.code(404).send({ erro: 'Produto não encontrado nesta marca' })
-    if (produto.fotos.length === 0) return reply.code(422).send({ erro: 'A peça precisa ter ao menos uma foto para o provador' })
-
-    const expiraEm = new Date(Date.now() + env.PROVADOR_LINK_HORAS * 60 * 60 * 1000)
-    const look = await prisma.lookProvador.create({
-      data: { redeId, lojaId, produtoBaseId: produto.id, criadoPorId: request.user.sub, comVideo: body.comVideo, expiraEm },
-      select: { id: true, token: true, expiraEm: true },
-    })
-
-    const rede = await prisma.rede.findUnique({ where: { id: redeId }, select: { slug: true } })
-    return {
-      id: look.id,
-      token: look.token,
-      url: rede ? urlProvadorPublica(rede.slug, look.token) : null,
-      expiraEm: look.expiraEm,
+    try {
+      const look = await criarLook({
+        redeId, lojaId, produtoBaseId: body.produtoBaseId, criadoPorId: request.user.sub, comVideo: body.comVideo,
+      })
+      return { id: look.id, token: look.token, url: look.url, expiraEm: look.expiraEm }
+    } catch (err) {
+      if (err instanceof ProvadorError) return reply.code(err.statusCode).send({ erro: err.message, cota: err.detalhe })
+      throw err
     }
   })
 

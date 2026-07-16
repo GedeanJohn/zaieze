@@ -5,7 +5,7 @@ import { prisma } from '../../lib/prisma'
 import { addonAtivo } from '../addons/addon.service'
 import { enviarTexto } from '../whatsapp/meta.service'
 import { enviarTextoIg } from '../instagram/instagram.service'
-import { FERRAMENTAS, executarFerramenta, type ContextoIA } from './vendedora-zaieze.tools'
+import { ferramentasDisponiveis, executarFerramenta, type ContextoIA } from './vendedora-zaieze.tools'
 
 // Mesmo modelo usado no restante do sistema (backend/src/modules/whatsapp/ia.service.ts) —
 // via API oficial da Anthropic, não Bedrock. Trocar aqui se mudar de modelo.
@@ -25,7 +25,7 @@ function linkPagamentoSeguro(url: string | null): string | null {
   return url && /^https?:\/\//i.test(url) ? url : null
 }
 
-function montarSistema(pagamento: DadosPagamento): string {
+function montarSistema(pagamento: DadosPagamento, provadorAtivo: boolean): string {
   const formasDisponiveis: string[] = []
   if (pagamento.chavePix) formasDisponiveis.push(`- PIX (chave ${pagamento.chavePixTipo ?? ''}): ${pagamento.chavePix}`)
   const linkCartao = linkPagamentoSeguro(pagamento.linkPagamentoCartao)
@@ -33,6 +33,10 @@ function montarSistema(pagamento: DadosPagamento): string {
   const blocoPagamento = formasDisponiveis.length > 0
     ? `Formas de pagamento que você PODE informar ao cliente (exatamente como estão aqui, não invente outras):\n${formasDisponiveis.join('\n')}`
     : 'A loja ainda não cadastrou PIX nem link de pagamento por cartão — se o cliente perguntar como pagar, use "transferir_para_humano".'
+
+  const blocoProvador = provadorAtivo
+    ? '\nVocê TEM a ferramenta "gerar_provador" disponível: se o cliente perguntar como uma peça ficaria nele(a)/pedir pra "ver como fica", use-a.'
+    : ''
 
   return `Você é a Vendedora ZAIEZE, atendente virtual de uma loja de moda no WhatsApp/Instagram.
 Fale em português do Brasil, tom caloroso e direto, poucas frases por mensagem, sem parecer um robô lendo script.
@@ -44,7 +48,7 @@ Regras rígidas:
 - Se o cliente pedir algo fora do que você resolve (reclamação, negociação, trocar/cancelar pedido antigo, boleto, dúvida que você não sabe), use "transferir_para_humano".
 - Pagamento é sempre combinado FORA do sistema — você nunca processa pagamento, só informa a forma certa e aguarda a confirmação do cliente.
 
-${blocoPagamento}`
+${blocoPagamento}${blocoProvador}`
 }
 
 /** Loja + Usuario sintético da Vendedora ZAIEZE para a rede, se o addon estiver ativo e
@@ -102,7 +106,7 @@ async function carregarHistorico(clienteId: string, canal: 'WHATSAPP' | 'INSTAGR
 /** Roda a conversa com o Claude (tool-calling) até ele responder com texto final ou estourar o
  *  limite de rodadas de ferramenta. Sem ANTHROPIC_API_KEY (ou em qualquer erro), cai num aviso
  *  de fallback — nunca deixa o cliente sem resposta nenhuma. */
-async function gerarResposta(ctx: ContextoIA, historico: HistoricoItem[], pagamento: DadosPagamento): Promise<string> {
+async function gerarResposta(ctx: ContextoIA, historico: HistoricoItem[], pagamento: DadosPagamento, provadorAtivo: boolean): Promise<string> {
   const fallback = 'Recebi sua mensagem! Já já alguém da equipe te responde por aqui. 🙏'
   if (!env.ANTHROPIC_API_KEY) return fallback
 
@@ -118,8 +122,8 @@ async function gerarResposta(ctx: ContextoIA, historico: HistoricoItem[], pagame
       const resp = await client.messages.create({
         model: MODELO_IA,
         max_tokens: 700,
-        system: montarSistema(pagamento),
-        tools: FERRAMENTAS,
+        system: montarSistema(pagamento, provadorAtivo),
+        tools: ferramentasDisponiveis(provadorAtivo),
         messages: mensagens as never,
       })
 
@@ -161,7 +165,8 @@ export async function responderVendedoraZaieze(params: { clienteId: string; cana
     chavePixTipo: cliente.loja.rede.chavePixTipo, chavePix: cliente.loja.rede.chavePix,
     linkPagamentoCartao: cliente.loja.rede.linkPagamentoCartao,
   }
-  const texto = await gerarResposta(ctx, historico, pagamento)
+  const provadorAtivo = await addonAtivo(cliente.loja.redeId, 'PROVADOR')
+  const texto = await gerarResposta(ctx, historico, pagamento, provadorAtivo)
 
   if (params.canal === 'WHATSAPP' && cliente.telefone) {
     const r = await enviarTexto({ rede: cliente.loja.rede, telefone: cliente.telefone, texto })

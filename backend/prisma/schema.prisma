@@ -1412,13 +1412,14 @@ model Assessor {
   disponivel   Boolean @default(true)
   seguirAgenda Boolean @default(true)
   whatsapp  String? // contato pessoal dela (distinto do whatsapp de cada marca representada)
-  telefone  String? // número para o botão "Ligar" (distinto do whatsapp)
+  // Botão "Ligar" da vitrine usa o MESMO número do whatsapp (só troca a ação: tel: em vez de wa.me)
+  // — não existe mais um campo de telefone separado pra isso.
   instagram String?
   site      String?
-  // Estatísticas exibidas na vitrine — autodeclaradas, sem validação (só "marcas" é contagem real).
-  // "Avaliação" NÃO está aqui — é calculada a partir de AssessorAvaliacao (nota real de cliente).
+  // Estatística exibida na vitrine — autodeclarada, sem validação.
+  // "Clientes" NÃO é mais autodeclarado: é a contagem de AssessorCliente (ela marca quem virou
+  // cliente). "Avaliação" também não está aqui — calculada a partir de AssessorAvaliacao.
   statProdutos   Int?
-  statClientes   Int?
   // Indicação de lojistas (link próprio ?refAssessor=<slug>): % arbitrado pelo SUPER_ADMIN por
   // assessora — null = sem indicação habilitada (nenhuma comissão é gerada até ser definido).
   percentualComissaoIndicacao Decimal? @db.Decimal(5, 2)
@@ -1436,8 +1437,26 @@ model Assessor {
   horarios        AssessorHorario[]
   avaliacoes      AssessorAvaliacao[]
   lancamentos     AssessorLancamento[]
+  clientes        AssessorCliente[]
 
   @@map("assessores")
+}
+
+// Registro manual da assessora: ela marca quem "virou cliente" a partir de uma conversa (o
+// WhatsApp abre por fora do sistema, sem rastreio automático — isso é o jeito dela contabilizar).
+// A contagem exibida na vitrine (statClientes) é o total desses registros, não mais um número
+// autodeclarado livre.
+model AssessorCliente {
+  id         String   @id @default(cuid())
+  assessorId String
+  nome       String
+  telefone   String?
+  createdAt  DateTime @default(now())
+
+  assessor Assessor @relation(fields: [assessorId], references: [id], onDelete: Cascade)
+
+  @@index([assessorId])
+  @@map("assessor_clientes")
 }
 
 /// "Lançamento" — modelo/peça de uma marca representada que o Brand Partner escolhe destacar

@@ -190,11 +190,12 @@ export async function assessoresRoutes(app: FastifyInstance) {
     const assessor = await prisma.assessor.findUnique({
       where: { slug },
       select: {
-        id: true, slug: true, bio: true, tagline: true, disponivel: true, seguirAgenda: true, whatsapp: true, telefone: true, instagram: true, site: true,
-        statProdutos: true, statClientes: true,
+        id: true, slug: true, bio: true, tagline: true, disponivel: true, seguirAgenda: true, whatsapp: true, instagram: true, site: true,
+        statProdutos: true,
         usuario: { select: { nome: true, fotoUrl: true, ativo: true } },
         marcas: { where: marcaPublicaWhere, orderBy: { ordem: 'asc' }, select: marcaSelect },
         horarios: { select: { diaSemana: true, inicio: true, fim: true } },
+        _count: { select: { clientes: true } },
       },
     })
     if (!assessor || !assessor.usuario.ativo) return reply.code(404).send({ erro: 'Página não encontrada' })
@@ -206,15 +207,28 @@ export async function assessoresRoutes(app: FastifyInstance) {
       tagline: assessor.tagline,
       disponivel: assessor.seguirAgenda ? calcularDisponivelPorAgenda(assessor.horarios) : assessor.disponivel,
       whatsapp: assessor.whatsapp,
-      telefone: assessor.telefone,
       instagram: assessor.instagram,
       site: assessor.site,
       statMarcas: assessor.marcas.length,
       statProdutos: assessor.statProdutos,
-      statClientes: assessor.statClientes,
+      statClientes: assessor._count.clientes,
       statAvaliacao, totalAvaliacoes, depoimentos,
       marcas: assessor.marcas.map(serializarMarca),
     }
+  })
+
+  // Lista completa dos depoimentos aprovados (pro "ver mais" na vitrine — o resumo acima só
+  // manda os 3 mais recentes).
+  app.get('/publico/:slug/avaliacoes', async (request, reply) => {
+    const { slug } = request.params as { slug: string }
+    const assessor = await prisma.assessor.findUnique({ where: { slug }, select: { id: true } })
+    if (!assessor) return reply.code(404).send({ erro: 'Página não encontrada' })
+    return prisma.assessorAvaliacao.findMany({
+      where: { assessorId: assessor.id, status: 'APROVADA' },
+      orderBy: { moderadoEm: 'desc' },
+      take: 50,
+      select: { nota: true, comentario: true, nomeCliente: true, createdAt: true },
+    })
   })
 
   // Envio de avaliação pelo cliente — público, sem login. Nasce PENDENTE (só entra na média/
@@ -263,18 +277,21 @@ export async function assessoresRoutes(app: FastifyInstance) {
   // ─────────── Perfil ───────────
   app.get('/minha', protegido, async (request) => {
     const assessor = await assessorDoUsuario(request.user.sub)
-    const horarios = await prisma.assessorHorario.findMany({
-      where: { assessorId: assessor.id },
-      orderBy: [{ diaSemana: 'asc' }, { ordem: 'asc' }],
-      select: { diaSemana: true, inicio: true, fim: true },
-    })
+    const [horarios, totalClientes] = await Promise.all([
+      prisma.assessorHorario.findMany({
+        where: { assessorId: assessor.id },
+        orderBy: [{ diaSemana: 'asc' }, { ordem: 'asc' }],
+        select: { diaSemana: true, inicio: true, fim: true },
+      }),
+      prisma.assessorCliente.count({ where: { assessorId: assessor.id } }),
+    ])
     return {
       slug: assessor.slug, bio: assessor.bio, tagline: assessor.tagline,
       disponivel: assessor.disponivel, seguirAgenda: assessor.seguirAgenda,
       disponivelAgora: assessor.seguirAgenda ? calcularDisponivelPorAgenda(horarios) : assessor.disponivel,
       horarios: agruparPorDia(horarios),
-      whatsapp: assessor.whatsapp, telefone: assessor.telefone, instagram: assessor.instagram, site: assessor.site,
-      statProdutos: assessor.statProdutos, statClientes: assessor.statClientes,
+      whatsapp: assessor.whatsapp, instagram: assessor.instagram, site: assessor.site,
+      statProdutos: assessor.statProdutos, statClientes: totalClientes,
       plano: assessor.plano, limites: LIMITES_GALERIA[assessor.plano],
     }
   })
@@ -303,16 +320,49 @@ export async function assessoresRoutes(app: FastifyInstance) {
     disponivel: z.boolean().optional(),
     seguirAgenda: z.boolean().optional(),
     whatsapp: z.string().trim().max(30).nullable().optional(),
-    telefone: z.string().trim().max(30).nullable().optional(),
     instagram: z.string().trim().max(200).nullable().optional(),
     site: z.string().trim().max(200).nullable().optional(),
     statProdutos: z.coerce.number().int().min(0).nullable().optional(),
-    statClientes: z.coerce.number().int().min(0).nullable().optional(),
   })
   app.patch('/minha', protegido, async (request) => {
     const assessor = await assessorDoUsuario(request.user.sub)
     const b = perfilSchema.parse(request.body)
     return prisma.assessor.update({ where: { id: assessor.id }, data: b })
+  })
+
+  // ─────────── Meus Clientes (contagem real da vitrine) ───────────
+  // Sem rastreio automático de conversa (o WhatsApp abre por fora do sistema) — a assessora
+  // marca manualmente quem virou cliente dela. statClientes na vitrine é o total desses registros.
+  app.get('/minha/clientes', protegido, async (request) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    return prisma.assessorCliente.findMany({
+      where: { assessorId: assessor.id },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, nome: true, telefone: true, createdAt: true },
+    })
+  })
+
+  const clienteSchema = z.object({
+    nome: z.string().trim().min(1).max(120),
+    telefone: z.string().trim().max(30).nullable().optional(),
+  })
+  app.post('/minha/clientes', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const b = clienteSchema.parse(request.body)
+    const cliente = await prisma.assessorCliente.create({
+      data: { assessorId: assessor.id, nome: b.nome, telefone: b.telefone || null },
+      select: { id: true, nome: true, telefone: true, createdAt: true },
+    })
+    return reply.code(201).send(cliente)
+  })
+
+  app.delete('/minha/clientes/:id', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { id } = request.params as { id: string }
+    const existente = await prisma.assessorCliente.findFirst({ where: { id, assessorId: assessor.id } })
+    if (!existente) return reply.code(404).send({ erro: 'Cliente não encontrado' })
+    await prisma.assessorCliente.delete({ where: { id } })
+    return { ok: true }
   })
 
   // ─────────── Avaliações de atendimento (moderação) ───────────

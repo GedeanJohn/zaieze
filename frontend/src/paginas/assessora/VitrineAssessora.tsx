@@ -31,14 +31,20 @@ interface Lancamento {
 }
 interface Vitrine {
   nome: string; fotoUrl: string | null; bio: string | null; tagline: string | null; disponivel: boolean
-  whatsapp: string | null; telefone: string | null; instagram: string | null; site: string | null
-  statMarcas: number; statProdutos: number | null; statClientes: number | null; statAvaliacao: number | null
+  whatsapp: string | null; instagram: string | null; site: string | null
+  statMarcas: number; statProdutos: number | null; statClientes: number; statAvaliacao: number | null
   totalAvaliacoes: number; depoimentos: Depoimento[]
   marcas: Marca[]
 }
 
 function linkWhatsapp(numero: string): string {
   return `https://wa.me/${numero.replace(/\D/g, '')}`
+}
+
+/** Botão "Ligar" usa o MESMO número do WhatsApp (não um campo separado) — só muda a ação
+ *  (abre o discador do telefone via tel:, em vez do WhatsApp). */
+function linkLigar(numero: string): string {
+  return `tel:${numero.replace(/\D/g, '')}`
 }
 
 /** Defesa em profundidade: mesmo com validação no cadastro (backend), nunca renderiza um href
@@ -65,6 +71,9 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
   const [drawerAberto, setDrawerAberto] = useState(false)
   const [marcaModal, setMarcaModal] = useState<Marca | null>(null)
   const [avaliacaoAberta, setAvaliacaoAberta] = useState(false)
+  const [depoimentosExpandidos, setDepoimentosExpandidos] = useState(false)
+  const [todosDepoimentos, setTodosDepoimentos] = useState<Depoimento[] | null>(null)
+  const [carregandoDepoimentos, setCarregandoDepoimentos] = useState(false)
   const [lancamentosAberto, setLancamentosAberto] = useState(false)
   const [lancamentos, setLancamentos] = useState<Lancamento[] | null>(null)
   const avisar = useToast()
@@ -84,6 +93,21 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
     const q = busca.trim().toLowerCase()
     return q ? v.marcas.filter((m) => m.nome.toLowerCase().includes(q)) : v.marcas
   }, [v, busca])
+
+  async function verMaisDepoimentos() {
+    if (todosDepoimentos === null) {
+      setCarregandoDepoimentos(true)
+      try {
+        const { data } = await api.get(`/assessores/publico/${slug}/avaliacoes`)
+        setTodosDepoimentos(data)
+      } catch {
+        setTodosDepoimentos(v?.depoimentos ?? [])
+      } finally {
+        setCarregandoDepoimentos(false)
+      }
+    }
+    setDepoimentosExpandidos(true)
+  }
 
   function compartilhar() {
     const url = window.location.href
@@ -165,15 +189,15 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
             <div className="vit-stats">
               <div className="vit-stat"><Tag size={20} /><strong>{v.statMarcas}</strong><span>Marcas</span></div>
               {v.statProdutos != null && <div className="vit-stat"><Shirt size={20} /><strong>{v.statProdutos}+</strong><span>Produtos</span></div>}
-              {v.statClientes != null && <div className="vit-stat"><Users size={20} /><strong>{v.statClientes}+</strong><span>Clientes</span></div>}
+              {v.statClientes > 0 && <div className="vit-stat"><Users size={20} /><strong>{v.statClientes}+</strong><span>Clientes</span></div>}
               {v.statAvaliacao != null && <div className="vit-stat"><Star size={20} /><strong>{v.statAvaliacao.toFixed(1)}</strong><span>Avaliação</span></div>}
             </div>
           </div>
         </div>
 
         <div className="vit-acoes">
-          {v.whatsapp && <a className="vit-btn-primario" href={linkWhatsapp(v.whatsapp)} target="_blank" rel="noreferrer"><IconeMarca icone={siWhatsapp} size={18} /> Falar no WhatsApp</a>}
-          {v.telefone && <a className="vit-btn-secundario" href={`tel:${v.telefone}`}><Phone size={18} /> Ligar</a>}
+          {v.whatsapp && <a className="vit-btn-primario" href={linkWhatsapp(v.whatsapp)} target="_blank" rel="noreferrer"><IconeMarca icone={siWhatsapp} size={18} /> WhatsApp</a>}
+          {v.whatsapp && <a className="vit-btn-secundario" href={linkLigar(v.whatsapp)}><Phone size={18} /> Ligar</a>}
           <button type="button" className="vit-btn-secundario" onClick={() => setLancamentosAberto(true)}><Sparkles size={18} /> Lançamentos</button>
         </div>
       </section>
@@ -218,7 +242,7 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
             </div>
           </div>
           <div className="vit-depoimentos">
-            {v.depoimentos.map((d, i) => (
+            {(depoimentosExpandidos ? (todosDepoimentos ?? v.depoimentos) : v.depoimentos).map((d, i) => (
               <div className="vit-depoimento" key={i}>
                 <div className="vit-estrelas">{'★'.repeat(d.nota)}{'☆'.repeat(5 - d.nota)}</div>
                 {d.comentario && <p>&ldquo;{d.comentario}&rdquo;</p>}
@@ -226,6 +250,16 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
               </div>
             ))}
           </div>
+          {!depoimentosExpandidos && v.totalAvaliacoes > v.depoimentos.length && (
+            <button type="button" className="vit-avaliar-link" style={{ marginTop: 10 }} disabled={carregandoDepoimentos} onClick={verMaisDepoimentos}>
+              {carregandoDepoimentos ? 'Carregando…' : `Ver mais avaliações (${v.totalAvaliacoes})`}
+            </button>
+          )}
+          {depoimentosExpandidos && (
+            <button type="button" className="vit-avaliar-link" style={{ marginTop: 10 }} onClick={() => setDepoimentosExpandidos(false)}>
+              Recolher
+            </button>
+          )}
         </section>
       )}
 
@@ -633,8 +667,12 @@ export function VitrineEstilos() {
         .vit-stats { gap: 10px 18px; margin-top: 12px; }
         .vit-stat strong { font-size: 15px; }
         .vit-stat span { font-size: 8.5px; }
-        .vit-acoes { margin-top: 16px; gap: 8px; }
-        .vit-btn-primario, .vit-btn-secundario { padding: 10px 10px; font-size: 12px; flex: 1; justify-content: center; }
+        .vit-acoes { margin-top: 12px; gap: 8px; }
+        .vit-btn-primario, .vit-btn-secundario { padding: 10px 10px; font-size: 12px; justify-content: center; }
+        /* Botão do WhatsApp alinhado com a largura da foto (mesma fração da coluna no
+           .vit-hero-topo); Ligar/Lançamentos dividem o espaço restante. */
+        .vit-btn-primario { flex: 0 0 34%; }
+        .vit-btn-secundario { flex: 1; }
         .vit-grid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
         .vit-lancamentos-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 16px 16px 32px; }
         .vit-cardMarca-nome { padding: 5px 6px; font-size: 9px; line-height: 1.2; }

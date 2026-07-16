@@ -11,10 +11,11 @@ interface HorarioDia { diaSemana: number; periodos: Periodo[] }
 interface Perfil {
   slug: string; bio: string | null; tagline: string | null
   disponivel: boolean; seguirAgenda: boolean; disponivelAgora: boolean; horarios: HorarioDia[]
-  whatsapp: string | null; telefone: string | null; instagram: string | null; site: string | null
-  statProdutos: number | null; statClientes: number | null
+  whatsapp: string | null; instagram: string | null; site: string | null
+  statProdutos: number | null; statClientes: number
   plano: PlanoAssessor; limites: { fotos: number; videos: number }
 }
+interface AssessorCliente { id: string; nome: string; telefone: string | null; createdAt: string }
 const DIAS_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 interface Avaliacao {
   id: string; nota: number; comentario: string | null; nomeCliente: string | null
@@ -61,7 +62,7 @@ function hoje(): string {
 export default function PainelAssessora() {
   const usuario = usuarioLogado()
   const avisar = useToast()
-  const [aba, setAba] = useState<'perfil' | 'marcas' | 'vendas' | 'avaliacoes' | 'lancamentos' | 'indicacao' | 'assinatura'>('marcas')
+  const [aba, setAba] = useState<'perfil' | 'marcas' | 'vendas' | 'avaliacoes' | 'lancamentos' | 'clientes' | 'indicacao' | 'assinatura'>('marcas')
 
   const [assinatura, setAssinatura] = useState<Assinatura | null>(null)
   const [ocupadoAssinatura, setOcupadoAssinatura] = useState(false)
@@ -78,12 +79,15 @@ export default function PainelAssessora() {
   const [disponivelAgora, setDisponivelAgora] = useState(true)
   const [horarios, setHorarios] = useState<HorarioDia[]>([])
   const [salvandoHorarios, setSalvandoHorarios] = useState(false)
-  const [telefone, setTelefone] = useState('')
-  const [statProdutos, setStatProdutos] = useState(''); const [statClientes, setStatClientes] = useState('')
+  const [statProdutos, setStatProdutos] = useState('')
   const [salvandoPerfil, setSalvandoPerfil] = useState(false)
   const [preview, setPreview] = useState(false)
   const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([])
   const [ocupadoAvaliacaoId, setOcupadoAvaliacaoId] = useState<string | null>(null)
+  const [clientes, setClientes] = useState<AssessorCliente[]>([])
+  const [novoClienteNome, setNovoClienteNome] = useState('')
+  const [novoClienteTelefone, setNovoClienteTelefone] = useState('')
+  const [salvandoCliente, setSalvandoCliente] = useState(false)
 
   // Foto de perfil (exibida na capa da vitrine pública) — mesmo endpoint genérico de Conta.tsx.
   const [fotoUrl, setFotoUrl] = useState<string | null>(usuario?.fotoUrl ?? null)
@@ -120,11 +124,28 @@ export default function PainelAssessora() {
   function carregarPerfil() {
     api.get('/assessores/minha').then(({ data }) => {
       setPerfil(data); setBio(data.bio ?? ''); setWhatsapp(data.whatsapp ?? ''); setInstagram(data.instagram ?? ''); setSite(data.site ?? '')
-      setTagline(data.tagline ?? ''); setDisponivel(data.disponivel); setTelefone(data.telefone ?? '')
+      setTagline(data.tagline ?? ''); setDisponivel(data.disponivel)
       setSeguirAgenda(data.seguirAgenda); setDisponivelAgora(data.disponivelAgora); setHorarios(data.horarios)
       setStatProdutos(data.statProdutos != null ? String(data.statProdutos) : '')
-      setStatClientes(data.statClientes != null ? String(data.statClientes) : '')
     }).catch((e) => avisar(mensagemDeErro(e), 'erro'))
+  }
+  function carregarClientes() {
+    api.get('/assessores/minha/clientes').then(({ data }) => setClientes(data)).catch(() => {})
+  }
+  async function adicionarCliente(e: React.FormEvent) {
+    e.preventDefault()
+    if (!novoClienteNome.trim()) return
+    setSalvandoCliente(true)
+    try {
+      await api.post('/assessores/minha/clientes', { nome: novoClienteNome.trim(), telefone: novoClienteTelefone.trim() || null })
+      setNovoClienteNome(''); setNovoClienteTelefone('')
+      carregarClientes(); carregarPerfil()
+    } catch (e2) { avisar(mensagemDeErro(e2), 'erro') } finally { setSalvandoCliente(false) }
+  }
+  async function removerCliente(id: string) {
+    if (!window.confirm('Remover este cliente da contagem do seu perfil?')) return
+    try { await api.delete(`/assessores/minha/clientes/${id}`); carregarClientes(); carregarPerfil() }
+    catch (e) { avisar(mensagemDeErro(e), 'erro') }
   }
   function carregarMarcas() {
     api.get('/assessores/minha/marcas').then(({ data }) => setMarcas(data)).catch(() => {})
@@ -193,7 +214,7 @@ export default function PainelAssessora() {
     const fd = new FormData(); fd.append('file', arquivo)
     try { await api.post(`/assessores/minha/lancamentos/${id}/foto`, fd); carregarLancamentos() } catch (e) { avisar(mensagemDeErro(e), 'erro') }
   }
-  useEffect(() => { carregarPerfil(); carregarMarcas(); carregarAssinatura(); carregarIndicacao(); carregarAvaliacoes(); carregarLancamentos() }, [])
+  useEffect(() => { carregarPerfil(); carregarMarcas(); carregarAssinatura(); carregarIndicacao(); carregarAvaliacoes(); carregarLancamentos(); carregarClientes() }, [])
   useEffect(() => { api.get('/assessores/plano').then(({ data }) => setPrecosPlano(data)).catch(() => {}) }, [])
 
   async function trocarPlano(novoPlano: PlanoAssessor) {
@@ -237,9 +258,8 @@ export default function PainelAssessora() {
     try {
       await api.patch('/assessores/minha', {
         bio: bio || null, whatsapp: whatsapp || null, instagram: instagram || null, site: site || null,
-        tagline: tagline || null, disponivel, seguirAgenda, telefone: telefone || null,
+        tagline: tagline || null, disponivel, seguirAgenda,
         statProdutos: statProdutos !== '' ? Number(statProdutos) : null,
-        statClientes: statClientes !== '' ? Number(statClientes) : null,
       })
       avisar('Perfil salvo.')
       carregarPerfil()
@@ -503,7 +523,7 @@ export default function PainelAssessora() {
       </div>
 
       <nav style={{ display: 'flex', gap: 8, margin: '16px 0', flexWrap: 'wrap' }}>
-        {([['marcas', 'Marcas representadas'], ['lancamentos', 'Lançamentos'], ['vendas', 'Vendas & comissão'], ['avaliacoes', 'Avaliações'], ['perfil', 'Meu perfil'], ['indicacao', 'Indicar lojistas'], ['assinatura', 'Minha assinatura']] as const).map(([id, label]) => (
+        {([['marcas', 'Marcas representadas'], ['lancamentos', 'Lançamentos'], ['vendas', 'Vendas & comissão'], ['avaliacoes', 'Avaliações'], ['clientes', 'Meus Clientes'], ['perfil', 'Meu perfil'], ['indicacao', 'Indicar lojistas'], ['assinatura', 'Minha assinatura']] as const).map(([id, label]) => (
           <button key={id} type="button" className={aba === id ? 'btn' : 'btn secundario'} onClick={() => setAba(id)}>{label}</button>
         ))}
       </nav>
@@ -650,19 +670,21 @@ export default function PainelAssessora() {
             </div>
             <div className="linha-campos">
               <div className="campo"><label>WhatsApp pessoal</label><input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="Ex.: 5562999999999" /></div>
-              <div className="campo"><label>Telefone (botão "Ligar")</label><input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="Ex.: 5562999999999" /></div>
               <div className="campo"><label>Instagram pessoal</label><input value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="https://instagram.com/..." /></div>
               <div className="campo"><label>Site</label><input value={site} onChange={(e) => setSite(e.target.value)} placeholder="https://..." /></div>
             </div>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: -6 }}>
+              O botão "Ligar" da vitrine usa este mesmo número do WhatsApp.
+            </div>
             <div style={{ marginTop: 8, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
               <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 8 }}>
-                Estatísticas exibidas na vitrine (autodeclaradas, sem verificação — deixe em branco para não exibir).
+                Estatística exibida na vitrine (autodeclarada, sem verificação — deixe em branco para não exibir).
                 A nota de avaliação não é editável aqui: ela é calculada automaticamente a partir das
-                avaliações de clientes aprovadas na aba "Avaliações".
+                avaliações de clientes aprovadas na aba "Avaliações". Já "Clientes" também não é mais
+                digitado aqui — é a contagem de quem você marcar na aba "Meus Clientes".
               </div>
               <div className="linha-campos">
                 <div className="campo"><label>Produtos (número)</label><input type="number" min={0} value={statProdutos} onChange={(e) => setStatProdutos(e.target.value)} /></div>
-                <div className="campo"><label>Clientes (número)</label><input type="number" min={0} value={statClientes} onChange={(e) => setStatClientes(e.target.value)} /></div>
               </div>
             </div>
             <div className="acoes"><button className="btn" disabled={salvandoPerfil}>Salvar</button></div>
@@ -812,6 +834,35 @@ export default function PainelAssessora() {
                     <button type="button" className="btn" disabled={ocupadoAvaliacaoId === a.id} onClick={() => moderarAvaliacao(a.id, 'aprovar')}>Aprovar</button>
                   </div>
                 )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {aba === 'clientes' && (
+        <div className="cartao">
+          <h2 style={{ marginTop: 0 }}>Meus Clientes</h2>
+          <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
+            O WhatsApp da vitrine abre a conversa fora do sistema, sem rastreio automático — marque aqui
+            quem virou cliente pra contar no "{clientes.length}+" exibido no seu perfil público. Quem você
+            não marcar, não entra na contagem.
+          </p>
+          <form onSubmit={adicionarCliente} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+            <input value={novoClienteNome} onChange={(e) => setNovoClienteNome(e.target.value)} placeholder="Nome do cliente" style={{ flex: 1, minWidth: 160 }} />
+            <input value={novoClienteTelefone} onChange={(e) => setNovoClienteTelefone(e.target.value)} placeholder="Telefone (opcional)" style={{ flex: 1, minWidth: 160 }} />
+            <button type="submit" className="btn" disabled={salvandoCliente || !novoClienteNome.trim()}>{salvandoCliente ? 'Salvando…' : '+ Adicionar cliente'}</button>
+          </form>
+          {clientes.length === 0 && <p className="dica">Nenhum cliente marcado ainda.</p>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {clientes.map((c) => (
+              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px' }}>
+                <div>
+                  <strong>{c.nome}</strong>
+                  {c.telefone && <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}> · {c.telefone}</span>}
+                  <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>desde {new Date(c.createdAt).toLocaleDateString('pt-BR')}</div>
+                </div>
+                <button type="button" className="btn-link" onClick={() => removerCliente(c.id)}>remover</button>
               </div>
             ))}
           </div>
@@ -1058,7 +1109,7 @@ export default function PainelAssessora() {
       {preview && (
         <PreviewVitrine
           nome={usuario?.nome ?? ''} fotoUrl={fotoUrl} tagline={tagline} bio={bio} disponivel={seguirAgenda ? disponivelAgora : disponivel}
-          totalMarcas={marcas.length} statProdutos={statProdutos} statClientes={statClientes}
+          totalMarcas={marcas.length} statProdutos={statProdutos} statClientes={perfil?.statClientes ? String(perfil.statClientes) : ''}
           onClose={() => setPreview(false)}
         />
       )}

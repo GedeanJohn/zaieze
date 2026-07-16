@@ -61,7 +61,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
   const precoAddonSchema = z.object({ preco: z.coerce.number().nonnegative() })
   app.put('/addons/:tipo/preco', async (request) => {
-    const { tipo } = z.object({ tipo: z.enum(['PROVADOR']) }).parse(request.params)
+    const { tipo } = z.object({ tipo: z.enum(['PROVADOR', 'VENDEDORA_ZAIEZE']) }).parse(request.params)
     const { preco } = precoAddonSchema.parse(request.body)
     await definirPrecoAddon(tipo, preco)
     return { ok: true, addons: await listarAddons() }

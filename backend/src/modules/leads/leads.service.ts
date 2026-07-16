@@ -1,4 +1,4 @@
-import type { Prisma, StatusLead } from '@prisma/client'
+import type { OrigemLead, Prisma, StatusLead } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 
 // Etapas "abertas" do funil (em andamento) × "fechadas" (encerradas).
@@ -113,6 +113,7 @@ export async function garantirCicloAberto(params: {
   nome?: string | null
   slugCatalogo?: string | null
   produtoId?: string | null
+  origem?: OrigemLead // default do schema (CATALOGO) quando omitido
 }): Promise<{ leadId: string; novo: boolean }> {
   const filtroCliente = params.clienteId
     ? { clienteId: params.clienteId }
@@ -135,6 +136,7 @@ export async function garantirCicloAberto(params: {
       lojaId: params.lojaId, vendedoraId: params.vendedoraId, clienteId: params.clienteId ?? undefined,
       telefone: params.telefone ?? undefined, nome: params.nome ?? undefined,
       slugCatalogo: params.slugCatalogo ?? undefined, produtoId: params.produtoId ?? undefined,
+      origem: params.origem ?? undefined,
       status: 'ENTROU', etapaDesde: new Date(), prazoEm,
     },
     select: { id: true },

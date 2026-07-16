@@ -1,10 +1,11 @@
 import type { TipoAddon } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 
-const PADRAO: Record<TipoAddon, number> = { PROVADOR: 59.99 }
-const NOMES: Record<TipoAddon, string> = { PROVADOR: 'Provador Virtual' }
+const PADRAO: Record<TipoAddon, number> = { PROVADOR: 59.99, VENDEDORA_ZAIEZE: 297 }
+const NOMES: Record<TipoAddon, string> = { PROVADOR: 'Provador Virtual', VENDEDORA_ZAIEZE: 'Vendedora ZAIEZE' }
 const RESUMOS: Record<TipoAddon, string> = {
   PROVADOR: 'Prova virtual com IA (foto e vídeo) — disponível para qualquer plano, cobrada à parte.',
+  VENDEDORA_ZAIEZE: 'Loja 100% automatizada por IA: atende WhatsApp/Instagram, recomenda produtos e fecha vendas sozinha — disponível para qualquer plano, cobrada à parte.',
 }
 
 /** Preço vigente de um add-on (banco; cai no padrão se ainda não houver registro). */

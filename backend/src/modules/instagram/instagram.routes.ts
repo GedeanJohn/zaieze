@@ -7,6 +7,7 @@ import { lojaIdDe, redeIdDe } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
 import { igConfigurado, cifrar, decifrar, podeCifrar, assinaturaValida, verificarContaIg, enviarTextoIg, type RedeIG } from './instagram.service'
 import { marcarLeadAtendido, garantirCicloAberto } from '../leads/leads.service'
+import { contextoVendedoraIa, usuarioEhAgenteIa, responderVendedoraZaieze } from '../vendedora-zaieze/vendedora-zaieze.service'
 
 const JANELA_MS = 24 * 60 * 60 * 1000
 
@@ -53,13 +54,33 @@ async function rotearMensagemInstagramRecebida(params: { igScopedId: string; tex
       }
     }
   }
+  // Vendedora ZAIEZE: ninguém humano casou (nem igScopedId, nem ref de catálogo) — se a rede
+  // tem o addon ativo e uma loja padrão configurada, ela assume o atendimento a partir daqui.
+  if (!cliente || !cliente.vendedoraId) {
+    const ctxIa = await contextoVendedoraIa(params.redeId)
+    if (ctxIa) {
+      cliente = await prisma.cliente.upsert({
+        where: { lojaId_igScopedId: { lojaId: ctxIa.lojaId, igScopedId: params.igScopedId } },
+        create: {
+          lojaId: ctxIa.lojaId, igScopedId: params.igScopedId, nome: params.nome?.trim() || 'Cliente do Instagram',
+          vendedoraId: ctxIa.usuarioIaId, consentimentoLgpd: true,
+          observacoes: 'Entrou pelo Instagram — atendido pela Vendedora ZAIEZE',
+        },
+        update: {},
+        select: sel,
+      })
+    }
+  }
+
   if (!cliente || !cliente.vendedoraId) return { roteado: false }
 
   await prisma.cliente.update({ where: { id: cliente.id }, data: { igUltimaEntradaEm: new Date() } })
 
+  const atendidoPelaIa = await usuarioEhAgenteIa(cliente.vendedoraId)
   const ciclo = await garantirCicloAberto({
     lojaId: cliente.lojaId, vendedoraId: cliente.vendedoraId, redeId: cliente.loja.redeId,
     clienteId: cliente.id, nome: params.nome,
+    origem: atendidoPelaIa ? 'VENDEDORA_IA' : undefined,
   })
   const msg = await prisma.mensagemInstagram.create({
     data: {
@@ -67,6 +88,12 @@ async function rotearMensagemInstagramRecebida(params: { igScopedId: string; tex
       direcao: 'RECEBIDA', status: 'RECEBIDA', origem: 'ENTRADA', igScopedId: params.igScopedId, texto: params.texto,
     },
   })
+
+  if (atendidoPelaIa) {
+    const clienteId = cliente.id
+    responderVendedoraZaieze({ clienteId, canal: 'INSTAGRAM' }).catch((e) => console.error('[vendedora-zaieze]', e))
+  }
+
   return { roteado: true, mensagemId: msg.id, lojaId: cliente.lojaId, novoLead: ciclo.novo }
 }
 

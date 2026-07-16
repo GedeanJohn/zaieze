@@ -29,6 +29,7 @@ enum StatusAssinatura {
 // independente do plano em que está. Cada tipo tem sua própria recorrência no Mercado Pago.
 enum TipoAddon {
   PROVADOR // Provador Virtual (FASHN AI — try-on de foto e vídeo)
+  VENDEDORA_ZAIEZE // Vendedora ZAIEZE — loja 100% automatizada por IA (WhatsApp/Instagram → fecha venda)
 }
 
 enum StatusAddon {
@@ -135,6 +136,7 @@ enum OrigemMensagem {
   CAMPANHA // disparo de campanha por segmento
   REGUA // régua de inatividade
   ENTRADA // recebida do cliente
+  VENDEDORA_IA // resposta automática da Vendedora ZAIEZE
 }
 
 enum EscopoComissao {
@@ -172,6 +174,7 @@ enum StatusLead {
 
 enum OrigemLead {
   CATALOGO // entrou pelo link do catálogo da vendedora
+  VENDEDORA_IA // entrou por WhatsApp/Instagram e foi atendido pela Vendedora ZAIEZE
 }
 
 // Provador virtual (módulo 13 — Elite). Ciclo de vida de um "look": a vendedora gera o
@@ -259,6 +262,18 @@ model Rede {
   // Indicação por Assessor(a) de Moda (link próprio, ?refAssessor=<slug>): mesma mecânica de
   // comissão vitalícia do afiliado, mas para uma assessora indicar lojistas que ela conhece.
   assessorOrigemId         String?
+  // Vendedora ZAIEZE (addon VENDEDORA_ZAIEZE) — loja onde toda venda fechada pela IA é lançada
+  // (estoque/preço são por loja; o WhatsApp/Instagram da marca é único pra rede inteira, então
+  // precisa de uma loja padrão definida pelo gestor ao ativar o addon). Sem relação Prisma
+  // formal, validada em código.
+  lojaVendedoraIaId        String?
+  // Recebimento das vendas: dados que o gestor cadastra pra loja receber diretamente do cliente
+  // (fora do sistema — ZAIEZE não processa pagamento). Usado hoje pela Vendedora ZAIEZE pra
+  // informar o cliente na hora de fechar a venda; cartão vira um link de cobrança externo
+  // (gateway próprio do lojista) — sem boleto por enquanto.
+  chavePixTipo             String? // EMAIL | CPF | TELEFONE | ALEATORIA
+  chavePix                 String?
+  linkPagamentoCartao      String? // link de cobrança de um gateway externo (Mercado Pago, PagSeguro etc.)
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
@@ -558,6 +573,11 @@ model Usuario {
   // Idioma preferencial da interface (pt | en | es). Escolhido no cadastro (checkout do GESTOR)
   // e editável depois em "Minha conta". Só afeta a UI — não traduz dados do usuário/catálogo.
   idioma         String   @default("pt")
+  // Vendedora SINTÉTICA (não é uma pessoa real): representa a Vendedora ZAIEZE (addon
+  // VENDEDORA_ZAIEZE) na loja padrão da rede. Existe pra reaproveitar toda a validação/lógica
+  // de Venda (que exige um Usuario VENDEDORA de verdade) sem precisar de um "cliente especial"
+  // à parte. Nunca gera comissão (comissaoPadrao fica null) nem faz login humano.
+  ehAgenteIa     Boolean  @default(false)
   ativo          Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -883,6 +903,11 @@ model Venda {
   // gestor marca como separado. O gerente acompanha/cobra os pendentes na tela "Pedidos a separar".
   separado         Boolean          @default(false)
   separadoEm       DateTime?
+  // Conferência do recebimento (bater com o extrato bancário) — passo manual ANTES da separação
+  // física. Hoje é opcional/informativo (não bloqueia "separado"); mais relevante para vendas da
+  // Vendedora ZAIEZE (canal ONLINE, ninguém humano viu o pagamento até aqui).
+  pagamentoConferido   Boolean      @default(false)
+  pagamentoConferidoEm DateTime?
   createdAt        DateTime         @default(now())
 
   loja             Loja        @relation(fields: [lojaId], references: [id], onDelete: Cascade)

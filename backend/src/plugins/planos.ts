@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Plano, TipoAddon } from '@prisma/client'
-import { prisma } from '../lib/prisma'
+import { addonAtivo } from '../modules/addons/addon.service'
 
 export type Feature =
   | 'vendas' | 'produtos' | 'estoque' | 'clientes' | 'dashboard' | 'forma_recebimento' | 'whatsapp'
@@ -73,8 +73,7 @@ export function requireAddon(tipo: TipoAddon) {
     if (request.user.role === 'SUPER_ADMIN') return
     const redeId = request.user.redeId
     if (!redeId) return reply.code(403).send({ erro: 'Sem rede vinculada' })
-    const addon = await prisma.assinaturaAddon.findUnique({ where: { redeId_tipo: { redeId, tipo } }, select: { status: true } })
-    if (addon?.status !== 'ATIVA') {
+    if (!(await addonAtivo(redeId, tipo))) {
       return reply.code(403).send({
         erro: 'Recurso disponível apenas com a assinatura deste add-on. Assine em Planos.',
         addonNecessario: tipo,
@@ -82,3 +81,7 @@ export function requireAddon(tipo: TipoAddon) {
     }
   }
 }
+
+// addonAtivo (import acima) já existe em addon.service.ts e é reexportado por conveniência —
+// utilizável fora de um preHandler do Fastify (ex.: dentro do processamento de um webhook).
+export { addonAtivo }

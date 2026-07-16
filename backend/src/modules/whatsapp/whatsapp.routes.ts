@@ -10,6 +10,7 @@ import { metaConfigurado, cifrar, decifrar, podeCifrar, verificarNumero, enviarT
 import { marcarLeadAtendido, garantirCicloAberto } from '../leads/leads.service'
 import { transcodificarAudioOpus, salvarUploadLocal } from '../midia/midia.routes'
 import { enviarParaR2 } from '../midia/r2.service'
+import { contextoVendedoraIa, usuarioEhAgenteIa, responderVendedoraZaieze } from '../vendedora-zaieze/vendedora-zaieze.service'
 
 const JANELA_MS = 24 * 60 * 60 * 1000
 
@@ -67,14 +68,34 @@ async function rotearMensagemRecebida(params: { numero: string; texto: string; r
       }
     }
   }
+  // Vendedora ZAIEZE: ninguém humano casou (nem telefone, nem ref de catálogo) — se a rede tem
+  // o addon ativo e uma loja padrão configurada, ela assume o atendimento a partir daqui.
+  if ((!cliente || !cliente.vendedoraId) && params.redeId) {
+    const ctxIa = await contextoVendedoraIa(params.redeId)
+    if (ctxIa) {
+      cliente = await prisma.cliente.upsert({
+        where: { lojaId_telefone: { lojaId: ctxIa.lojaId, telefone: numero } },
+        create: {
+          lojaId: ctxIa.lojaId, telefone: numero, nome: params.nome?.trim() || 'Cliente do WhatsApp',
+          vendedoraId: ctxIa.usuarioIaId, consentimentoLgpd: true,
+          observacoes: 'Entrou pelo WhatsApp — atendido pela Vendedora ZAIEZE',
+        },
+        update: {},
+        select: sel,
+      })
+    }
+  }
+
   if (!cliente || !cliente.vendedoraId) return { roteado: false }
 
   // Janela de 24h: marca o instante da última entrada do cliente.
   await prisma.cliente.update({ where: { id: cliente.id }, data: { waUltimaEntradaEm: new Date() } })
 
+  const atendidoPelaIa = await usuarioEhAgenteIa(cliente.vendedoraId)
   const ciclo = await garantirCicloAberto({
     lojaId: cliente.lojaId, vendedoraId: cliente.vendedoraId, redeId: cliente.loja.redeId,
     clienteId: cliente.id, telefone: numero, nome: params.nome,
+    origem: atendidoPelaIa ? 'VENDEDORA_IA' : undefined,
   })
   const msg = await prisma.mensagemWhatsapp.create({
     data: {
@@ -82,6 +103,13 @@ async function rotearMensagemRecebida(params: { numero: string; texto: string; r
       direcao: 'RECEBIDA', status: 'RECEBIDA', origem: 'ENTRADA', telefone: numero, texto: params.texto,
     },
   })
+
+  // Dispara a resposta automática sem atrasar o retorno do webhook à Meta; falha vira log.
+  if (atendidoPelaIa) {
+    const clienteId = cliente.id
+    responderVendedoraZaieze({ clienteId, canal: 'WHATSAPP' }).catch((e) => console.error('[vendedora-zaieze]', e))
+  }
+
   return { roteado: true, mensagemId: msg.id, lojaId: cliente.lojaId, novoLead: ciclo.novo }
 }
 

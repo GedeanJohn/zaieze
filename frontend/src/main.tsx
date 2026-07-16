@@ -40,6 +40,8 @@ import Pedido from './paginas/Pedido'
 import Orcamentos from './paginas/Orcamentos'
 import OrcamentoPublico from './paginas/OrcamentoPublico'
 import Provador from './paginas/Provador'
+import VendedoraZaieze from './paginas/VendedoraZaieze'
+import RecebimentoVendas from './paginas/RecebimentoVendas'
 import LookProvador from './paginas/LookProvador'
 import Landing from './paginas/site/Landing'
 import Checkout from './paginas/site/Checkout'
@@ -149,6 +151,8 @@ function CrmApp() {
         <Route path="admin" element={<Admin />} />
         <Route path="whatsapp-config" element={<WhatsAppOficial />} />
         <Route path="instagram-config" element={<InstagramOficial />} />
+        <Route path="vendedora-zaieze" element={<VendedoraZaieze />} />
+        <Route path="recebimento-vendas" element={<RecebimentoVendas />} />
         <Route path="conta" element={<Conta />} />
       </Route>
       {/* Catálogo público da vendedora: <marca>.zaieze.com/<vendedora> (sem login) */}

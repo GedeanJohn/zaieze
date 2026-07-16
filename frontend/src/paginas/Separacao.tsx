@@ -9,8 +9,11 @@ interface PedidoSep {
   createdAt: string
   total: string
   atacado: boolean
+  canal: 'BALCAO' | 'ONLINE' | 'MERCADO_LIVRE'
   separado: boolean
   separadoEm: string | null
+  pagamentoConferido: boolean
+  pagamentoConferidoEm: string | null
   cliente: string
   vendedora: string
   pecas: number
@@ -55,6 +58,14 @@ export default function Separacao() {
     } catch (err) { setErro(mensagemDeErro(err)) } finally { setSalvando('') }
   }
 
+  async function alternarPagamento(p: PedidoSep) {
+    setSalvando(`pg-${p.id}`); setErro('')
+    try {
+      await api.patch(`/vendas/${p.id}/pagamento-conferido`, { pagamentoConferido: !p.pagamentoConferido }, { params: escopo.params })
+      carregar()
+    } catch (err) { setErro(mensagemDeErro(err)) } finally { setSalvando('') }
+  }
+
   function abrirComprovante(token: string) {
     window.open(`${window.location.origin}/pedido/publico/${token}`, '_blank', 'noreferrer')
   }
@@ -92,9 +103,13 @@ export default function Separacao() {
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <strong>{t('sep.pedidoLabel')} {p.id.slice(-6).toUpperCase()}</strong>
                 <span className={`selo ${p.atacado ? 'baixo' : ''}`} style={{ fontSize: 11 }}>{p.atacado ? 'ATACADO' : 'VAREJO'}</span>
+                {p.canal === 'ONLINE' && <span className="selo" style={{ fontSize: 11 }}>{t('sep.canalOnline')}</span>}
                 {p.separado
                   ? <span className="selo ok" style={{ fontSize: 11 }}>{t('sep.separadoStatus')}</span>
                   : <span className="selo" style={{ fontSize: 11, background: '#e8a87c33', color: '#a85a2b' }}>{t('sep.pendenteHa')} {tempoDecorrido(p.createdAt, t)}</span>}
+                {p.pagamentoConferido
+                  ? <span className="selo ok" style={{ fontSize: 11 }}>{t('sep.pagamentoConferidoStatus')}</span>
+                  : <span className="selo" style={{ fontSize: 11, background: '#e5484d22', color: '#c2352b' }}>{t('sep.pagamentoPendenteStatus')}</span>}
               </div>
               <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 4 }}>
                 {dataBR(p.createdAt)} · {p.cliente} · {t('sep.pecasSufixo', { n: p.pecas })} · {formataReal(p.total)}
@@ -105,6 +120,9 @@ export default function Separacao() {
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn secundario" onClick={() => abrirComprovante(p.tokenPublico)}>{t('sep.comprovante')}</button>
+              <button className={`btn ${p.pagamentoConferido ? 'secundario' : ''}`} disabled={salvando === `pg-${p.id}`} onClick={() => alternarPagamento(p)}>
+                {salvando === `pg-${p.id}` ? '…' : p.pagamentoConferido ? t('sep.desmarcarConferido') : t('sep.marcarConferido')}
+              </button>
               <button className={`btn ${p.separado ? 'secundario' : ''}`} disabled={salvando === p.id} onClick={() => alternar(p)}>
                 {salvando === p.id ? '…' : p.separado ? t('sep.reabrir') : t('sep.marcarSeparado')}
               </button>

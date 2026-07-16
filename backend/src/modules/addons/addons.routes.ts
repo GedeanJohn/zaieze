@@ -6,8 +6,8 @@ import { redeIdDe } from '../../plugins/auth'
 import { criarPreapproval, mpConfigurado } from '../assinaturas/mercadopago.service'
 import { listarAddons, precoDoAddon, proximoCicloFimAddon, solicitarCancelamentoAddon, reativarAddon } from './addon.service'
 
-const TIPOS = ['PROVADOR'] as const
-const NOMES: Record<(typeof TIPOS)[number], string> = { PROVADOR: 'Provador Virtual' }
+const TIPOS = ['PROVADOR', 'VENDEDORA_ZAIEZE'] as const
+const NOMES: Record<(typeof TIPOS)[number], string> = { PROVADOR: 'Provador Virtual', VENDEDORA_ZAIEZE: 'Vendedora ZAIEZE' }
 const tipoParamSchema = z.object({ tipo: z.enum(TIPOS) })
 
 function urlTenant(slug: string): string {

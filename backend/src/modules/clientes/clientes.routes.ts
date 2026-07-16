@@ -74,10 +74,13 @@ export async function obterOuCriarConsumidorOutro(lojaId: string) {
 export async function clientesRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: [app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
-    const { busca, segmento, cidade, uf, regiao, ddd } = request.query as
-      { busca?: string; segmento?: string; cidade?: string; uf?: string; regiao?: string; ddd?: string }
+    const { busca, segmento, cidade, uf, regiao, ddd, vendedoraId } = request.query as
+      { busca?: string; segmento?: string; cidade?: string; uf?: string; regiao?: string; ddd?: string; vendedoraId?: string }
 
     const where = filtroCarteira(request, lojaId)
+    // Filtro explícito por vendedora (ex.: pipeline da Vendedora ZAIEZE) — só pra quem já vê a
+    // loja inteira; VENDEDORA já está travada na própria carteira por filtroCarteira acima.
+    if (vendedoraId && request.user.role !== 'VENDEDORA') where.vendedoraId = vendedoraId
     if (segmento) where.segmento = segmento as never
     if (cidade) where.cidade = { equals: cidade, mode: 'insensitive' }
     if (uf) where.uf = uf.toUpperCase()

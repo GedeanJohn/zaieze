@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
   Megaphone, Package, Tag, Layers, Boxes, UsersRound, Eye, Receipt,
   Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Wrench, Smartphone, Camera, Store, Shirt,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Bot, Landmark,
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
 import { useIdioma } from '../lib/i18n'
@@ -115,6 +115,8 @@ export default function Layout() {
         {podeEquipe && <NavLink to="/equipe" className={cls} title={t('layout.equipe')}><UsersRound {...ICON} /><span>{t('layout.equipe')}</span></NavLink>}
         {ehDonoRede && temFeature('whatsapp') && <NavLink to="/whatsapp-config" className={cls} title={t('layout.whatsappOficial')}><Smartphone {...ICON} /><span>{t('layout.whatsappOficial')}</span></NavLink>}
         {ehDonoRede && temFeature('whatsapp') && <NavLink to="/instagram-config" className={cls} title={t('layout.instagramOficial')}><Camera {...ICON} /><span>{t('layout.instagramOficial')}</span></NavLink>}
+        {ehDonoRede && <NavLink to="/vendedora-zaieze" className={cls} title={t('layout.vendedoraZaieze')}><Bot {...ICON} /><span>{t('layout.vendedoraZaieze')}</span></NavLink>}
+        {ehDonoRede && <NavLink to="/recebimento-vendas" className={cls} title={t('layout.recebimentoVendas')}><Landmark {...ICON} /><span>{t('layout.recebimentoVendas')}</span></NavLink>}
         {ehDonoRede && temFeature('marketplace') && <NavLink to="/mercadolivre-config" className={cls} title={t('layout.mercadoLivre')}><Store {...ICON} /><span>{t('layout.mercadoLivre')}</span></NavLink>}
         {ehDonoRede && temFeature('portal_cliente') && <NavLink to="/marca" className={cls} title={t('layout.minhaLoja')}><Palette {...ICON} /><span>{t('layout.minhaLoja')}</span></NavLink>}
         {ehDonoRede && <NavLink to="/manual" className={cls} title={t('layout.manual')}><BookOpen {...ICON} /><span>{t('layout.manual')}</span></NavLink>}

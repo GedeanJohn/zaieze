@@ -26,12 +26,13 @@ interface Lancamento {
   ativo: boolean; createdAt: string; assessorMarcaId: string; assessorMarca: { id: string; nome: string }
 }
 interface Midia { id: string; tipo: 'FOTO' | 'VIDEO'; url: string; ordem: number }
+interface WhatsappMarca { id: string; numero: string; rotulo: string | null }
 interface Marca {
   id: string; redeId: string | null; nome: string; logoUrl: string | null; bannerUrl: string | null
   midias: Midia[]
   descricao: string | null; formasPagamento: string | null; modoEnvio: string | null; condicoesCompra: string | null
   tamanhos: string | null; valores: string | null; endereco: string | null; cnpj: string | null
-  instagram: string | null; facebook: string | null; whatsapp: string | null; telegram: string | null; tiktok: string | null; site: string | null
+  instagram: string | null; facebook: string | null; whatsapps: WhatsappMarca[]; telegram: string | null; tiktok: string | null; site: string | null
   linkCatalogo: string | null
   percentualComissaoSugerido: number | null; ordem: number; ativo: boolean
   autorizadoEm: string | null; recusadoEm: string | null
@@ -47,7 +48,7 @@ interface Indicacao { slug: string; percentual: number; cliques: number; redesIn
 
 const marcaVazia = {
   nome: '', descricao: '', formasPagamento: '', modoEnvio: '', condicoesCompra: '',
-  tamanhos: '', valores: '', endereco: '', cnpj: '', instagram: '', facebook: '', whatsapp: '', telegram: '', tiktok: '', site: '', linkCatalogo: '',
+  tamanhos: '', valores: '', endereco: '', cnpj: '', instagram: '', facebook: '', telegram: '', tiktok: '', site: '', linkCatalogo: '',
   percentualComissaoSugerido: '', ativo: true,
 }
 
@@ -109,6 +110,10 @@ export default function PainelAssessora() {
   const fotoMidiaRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLInputElement>(null)
   const [salvandoMarca, setSalvandoMarca] = useState(false)
+  const [whatsappsAtual, setWhatsappsAtual] = useState<WhatsappMarca[]>([])
+  const [novoWhatsappNumero, setNovoWhatsappNumero] = useState('')
+  const [novoWhatsappRotulo, setNovoWhatsappRotulo] = useState('')
+  const [salvandoWhatsappMarca, setSalvandoWhatsappMarca] = useState(false)
 
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
   const [formLancamento, setFormLancamento] = useState<{ assessorMarcaId: string; nome: string; preco: string; descricao: string } | null>(null)
@@ -305,7 +310,7 @@ export default function PainelAssessora() {
   }
 
   function abrirNovaMarca() {
-    setEditandoMarcaId(null); setLogoMarcaAtual(null); setBannerMarcaAtual(null); setMidiasAtual([])
+    setEditandoMarcaId(null); setLogoMarcaAtual(null); setBannerMarcaAtual(null); setMidiasAtual([]); setWhatsappsAtual([])
     setFormMarca(marcaVazia)
   }
   function abrirEditarMarca(m: Marca) {
@@ -313,13 +318,34 @@ export default function PainelAssessora() {
     setLogoMarcaAtual(m.logoUrl)
     setBannerMarcaAtual(m.bannerUrl)
     setMidiasAtual(m.midias)
+    setWhatsappsAtual(m.whatsapps)
     setFormMarca({
       nome: m.nome, descricao: m.descricao ?? '', formasPagamento: m.formasPagamento ?? '',
       modoEnvio: m.modoEnvio ?? '', condicoesCompra: m.condicoesCompra ?? '', tamanhos: m.tamanhos ?? '', valores: m.valores ?? '',
-      endereco: m.endereco ?? '', cnpj: m.cnpj ?? '', instagram: m.instagram ?? '', facebook: m.facebook ?? '', whatsapp: m.whatsapp ?? '',
+      endereco: m.endereco ?? '', cnpj: m.cnpj ?? '', instagram: m.instagram ?? '', facebook: m.facebook ?? '',
       telegram: m.telegram ?? '', tiktok: m.tiktok ?? '', site: m.site ?? '', linkCatalogo: m.linkCatalogo ?? '',
       percentualComissaoSugerido: m.percentualComissaoSugerido != null ? String(m.percentualComissaoSugerido) : '', ativo: m.ativo,
     })
+  }
+  async function adicionarWhatsappMarca() {
+    if (!editandoMarcaId || !novoWhatsappNumero.trim()) return
+    setSalvandoWhatsappMarca(true)
+    try {
+      const { data } = await api.post(`/assessores/minha/marcas/${editandoMarcaId}/whatsapps`, {
+        numero: novoWhatsappNumero.trim(), rotulo: novoWhatsappRotulo.trim() || null,
+      })
+      setWhatsappsAtual((atual) => [...atual, data])
+      setNovoWhatsappNumero(''); setNovoWhatsappRotulo('')
+      carregarMarcas()
+    } catch (e2) { avisar(mensagemDeErro(e2), 'erro') } finally { setSalvandoWhatsappMarca(false) }
+  }
+  async function removerWhatsappMarca(whatsappId: string) {
+    if (!editandoMarcaId) return
+    try {
+      await api.delete(`/assessores/minha/marcas/${editandoMarcaId}/whatsapps/${whatsappId}`)
+      setWhatsappsAtual((atual) => atual.filter((w) => w.id !== whatsappId))
+      carregarMarcas()
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') }
   }
 
   async function enviarLogoMarca(arquivo: File) {
@@ -1058,8 +1084,30 @@ export default function PainelAssessora() {
               <div className="campo"><label>Instagram</label><input value={formMarca.instagram} onChange={(e) => setFormMarca({ ...formMarca, instagram: e.target.value })} placeholder="https://instagram.com/..." /></div>
               <div className="campo"><label>Facebook</label><input value={formMarca.facebook} onChange={(e) => setFormMarca({ ...formMarca, facebook: e.target.value })} /></div>
             </div>
+            <div className="campo">
+              <label>WhatsApp (um ou mais números)</label>
+              {editandoMarcaId ? (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                    {whatsappsAtual.map((w) => (
+                      <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px' }}>
+                        <span>{w.numero}{w.rotulo && <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}> — {w.rotulo}</span>}</span>
+                        <button type="button" className="btn-link" onClick={() => removerWhatsappMarca(w.id)}>remover</button>
+                      </div>
+                    ))}
+                    {whatsappsAtual.length === 0 && <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Nenhum número cadastrado ainda.</span>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <input value={novoWhatsappNumero} onChange={(e) => setNovoWhatsappNumero(e.target.value)} placeholder="5562999999999" style={{ flex: 1, minWidth: 140 }} />
+                    <input value={novoWhatsappRotulo} onChange={(e) => setNovoWhatsappRotulo(e.target.value)} placeholder="Rótulo (opcional, ex.: Atendimento)" style={{ flex: 1, minWidth: 140 }} />
+                    <button type="button" className="btn secundario" disabled={salvandoWhatsappMarca || !novoWhatsappNumero.trim()} onClick={adicionarWhatsappMarca}>{salvandoWhatsappMarca ? '…' : '+ Adicionar'}</button>
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Salve a marca primeiro para poder adicionar números de WhatsApp.</div>
+              )}
+            </div>
             <div className="linha-campos">
-              <div className="campo"><label>WhatsApp</label><input value={formMarca.whatsapp} onChange={(e) => setFormMarca({ ...formMarca, whatsapp: e.target.value })} placeholder="5562999999999" /></div>
               <div className="campo"><label>Telegram</label><input value={formMarca.telegram} onChange={(e) => setFormMarca({ ...formMarca, telegram: e.target.value })} /></div>
             </div>
             <div className="linha-campos">

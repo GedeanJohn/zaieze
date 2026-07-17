@@ -32,13 +32,15 @@ const LIMITES_GALERIA: Record<'BASICO' | 'AVANCADO', { fotos: number; videos: nu
 }
 
 const midiaSelect = { id: true, tipo: true, url: true, ordem: true } as const
+const whatsappMarcaSelect = { id: true, numero: true, rotulo: true } as const
 
 const marcaSelect = {
   id: true, redeId: true, nome: true, logoUrl: true, bannerUrl: true,
   midias: { select: midiaSelect, orderBy: { ordem: 'asc' } },
   descricao: true, formasPagamento: true, modoEnvio: true, condicoesCompra: true,
   tamanhos: true, valores: true, endereco: true, cnpj: true,
-  instagram: true, facebook: true, whatsapp: true, telegram: true, tiktok: true, site: true, linkCatalogo: true,
+  instagram: true, facebook: true, telegram: true, tiktok: true, site: true, linkCatalogo: true,
+  whatsapps: { select: whatsappMarcaSelect, orderBy: { ordem: 'asc' } },
   percentualComissaoSugerido: true, ordem: true, ativo: true, autorizadoEm: true, recusadoEm: true,
 } as const
 
@@ -260,7 +262,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
       orderBy: [{ assessorMarca: { percentualComissaoSugerido: 'desc' } }, { createdAt: 'desc' }],
       select: {
         id: true, nome: true, fotoUrl: true, preco: true, descricao: true,
-        assessorMarca: { select: { id: true, nome: true, linkCatalogo: true, whatsapp: true } },
+        assessorMarca: { select: { id: true, nome: true, linkCatalogo: true, whatsapps: { select: whatsappMarcaSelect, orderBy: { ordem: 'asc' } } } },
       },
     })
     return lancamentos.map((l) => ({ ...l, preco: l.preco != null ? num(l.preco) : null }))
@@ -556,7 +558,6 @@ export async function assessoresRoutes(app: FastifyInstance) {
     cnpj: z.string().trim().max(30).nullable().optional(),
     instagram: linkSeguro(200),
     facebook: linkSeguro(200),
-    whatsapp: z.string().trim().max(30).nullable().optional(),
     telegram: linkSeguro(200),
     tiktok: linkSeguro(200),
     site: linkSeguro(200),
@@ -731,6 +732,37 @@ export async function assessoresRoutes(app: FastifyInstance) {
       fs.unlink(path.join(dir, path.basename(midia.url))).catch(() => {})
     }
     await prisma.assessorMarcaMidia.delete({ where: { id: midiaId } })
+    return { ok: true }
+  })
+
+  // Números de WhatsApp de uma marca representada — mais de um permitido (ex.: "Atendimento",
+  // "Vendas"), cada um vira uma linha própria na janela de links da vitrine.
+  const whatsappMarcaSchema = z.object({
+    numero: z.string().trim().min(1).max(30),
+    rotulo: z.string().trim().max(60).nullable().optional(),
+  })
+  app.post('/minha/marcas/:id/whatsapps', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { id } = request.params as { id: string }
+    const marca = await prisma.assessorMarca.findFirst({ where: { id, assessorId: assessor.id } })
+    if (!marca) return reply.code(404).send({ erro: 'Marca não encontrada' })
+    const b = whatsappMarcaSchema.parse(request.body)
+    const maiorOrdem = await prisma.assessorMarcaWhatsapp.aggregate({ where: { assessorMarcaId: id }, _max: { ordem: true } })
+    const numero = await prisma.assessorMarcaWhatsapp.create({
+      data: { assessorMarcaId: id, numero: b.numero, rotulo: b.rotulo || null, ordem: (maiorOrdem._max.ordem ?? -1) + 1 },
+      select: whatsappMarcaSelect,
+    })
+    return reply.code(201).send(numero)
+  })
+
+  app.delete('/minha/marcas/:id/whatsapps/:whatsappId', protegido, async (request, reply) => {
+    const assessor = await assessorDoUsuario(request.user.sub)
+    const { id, whatsappId } = request.params as { id: string; whatsappId: string }
+    const marca = await prisma.assessorMarca.findFirst({ where: { id, assessorId: assessor.id } })
+    if (!marca) return reply.code(404).send({ erro: 'Marca não encontrada' })
+    const numero = await prisma.assessorMarcaWhatsapp.findFirst({ where: { id: whatsappId, assessorMarcaId: id } })
+    if (!numero) return reply.code(404).send({ erro: 'Número não encontrado' })
+    await prisma.assessorMarcaWhatsapp.delete({ where: { id: whatsappId } })
     return { ok: true }
   })
 

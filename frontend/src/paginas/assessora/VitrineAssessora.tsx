@@ -18,16 +18,17 @@ function IconeMarca({ icone, size = 20 }: { icone: { path: string; title: string
 }
 
 interface Midia { id: string; tipo: 'FOTO' | 'VIDEO'; url: string; ordem: number }
+interface WhatsappMarca { id: string; numero: string; rotulo: string | null }
 interface Marca {
   id: string; redeId: string | null; nome: string; logoUrl: string | null; bannerUrl: string | null
   midias: Midia[]
-  instagram: string | null; facebook: string | null; whatsapp: string | null; telegram: string | null; tiktok: string | null; site: string | null
+  instagram: string | null; facebook: string | null; whatsapps: WhatsappMarca[]; telegram: string | null; tiktok: string | null; site: string | null
   linkCatalogo: string | null; endereco: string | null
 }
 interface Depoimento { nota: number; comentario: string | null; nomeCliente: string | null; createdAt: string }
 interface Lancamento {
   id: string; nome: string; fotoUrl: string | null; preco: number | null; descricao: string | null
-  assessorMarca: { id: string; nome: string; linkCatalogo: string | null; whatsapp: string | null }
+  assessorMarca: { id: string; nome: string; linkCatalogo: string | null; whatsapps: WhatsappMarca[] }
 }
 interface Vitrine {
   nome: string; fotoUrl: string | null; bio: string | null; tagline: string | null; disponivel: boolean
@@ -283,7 +284,10 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
   const [midiaAberta, setMidiaAberta] = useState<{ tipo: 'imagem' | 'video'; url: string } | null>(null)
 
   const links: { rotulo: string; href: string; Icone: (p: { size?: number }) => JSX.Element }[] = []
-  if (marca.whatsapp) links.push({ rotulo: 'WhatsApp', href: linkWhatsapp(marca.whatsapp), Icone: (p) => <IconeMarca icone={siWhatsapp} {...p} /> })
+  marca.whatsapps.forEach((w, i) => {
+    const rotulo = w.rotulo ? `WhatsApp — ${w.rotulo}` : (marca.whatsapps.length > 1 ? `WhatsApp ${i + 1}` : 'WhatsApp')
+    links.push({ rotulo, href: linkWhatsapp(w.numero), Icone: (p) => <IconeMarca icone={siWhatsapp} {...p} /> })
+  })
   const instagramHref = linkPublicoSeguro(marca.instagram)
   if (instagramHref) links.push({ rotulo: 'Instagram', href: instagramHref, Icone: (p) => <IconeMarca icone={siInstagram} {...p} /> })
   const facebookHref = linkPublicoSeguro(marca.facebook)
@@ -329,7 +333,7 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
         {links.length > 0 && (
           <div className="vit-modal-links">
             {links.map((l) => (
-              <a key={l.rotulo} className="vit-modal-link" href={l.href} target="_blank" rel="noreferrer">
+              <a key={`${l.rotulo}-${l.href}`} className="vit-modal-link" href={l.href} target="_blank" rel="noreferrer">
                 <l.Icone size={20} /> {l.rotulo}
               </a>
             ))}
@@ -476,11 +480,12 @@ function PaginaLancamentos({ lancamentos, onClose }: { lancamentos: Lancamento[]
             {itemAberto.preco != null && <div className="vit-lancamentoCard-preco" style={{ fontSize: 22, marginBottom: 10 }}>{formataReal(itemAberto.preco)}</div>}
             {itemAberto.descricao && <p style={{ color: '#d8d3ca', fontSize: 14, lineHeight: 1.5 }}>{itemAberto.descricao}</p>}
             <div className="vit-modal-links">
-              {itemAberto.assessorMarca.whatsapp && (
-                <a className="vit-modal-link" href={linkWhatsapp(itemAberto.assessorMarca.whatsapp)} target="_blank" rel="noreferrer">
-                  <IconeMarca icone={siWhatsapp} /> Perguntar no WhatsApp
+              {itemAberto.assessorMarca.whatsapps.map((w, i) => (
+                <a key={w.id} className="vit-modal-link" href={linkWhatsapp(w.numero)} target="_blank" rel="noreferrer">
+                  <IconeMarca icone={siWhatsapp} />
+                  Perguntar no WhatsApp{w.rotulo ? ` — ${w.rotulo}` : itemAberto.assessorMarca.whatsapps.length > 1 ? ` ${i + 1}` : ''}
                 </a>
-              )}
+              ))}
               {linkPublicoSeguro(itemAberto.assessorMarca.linkCatalogo) && (
                 <a className="vit-modal-link" href={linkPublicoSeguro(itemAberto.assessorMarca.linkCatalogo)!} target="_blank" rel="noreferrer">
                   <ShoppingBag size={20} /> Ver no catálogo da marca

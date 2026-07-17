@@ -1550,7 +1550,6 @@ model AssessorMarca {
   cnpj            String?
   instagram String?
   facebook  String?
-  whatsapp  String?
   telegram  String?
   tiktok    String?
   site      String?
@@ -1572,9 +1571,27 @@ model AssessorMarca {
   vendas   VendaAssessora[]
   midias   AssessorMarcaMidia[]
   lancamentos AssessorLancamento[]
+  whatsapps AssessorMarcaWhatsapp[]
 
   @@index([assessorId, ordem])
   @@map("assessor_marcas")
+}
+
+/// Números de WhatsApp de contato de uma marca representada — mais de um permitido (ex.:
+/// "Atendimento", "Vendas"), exibidos como linhas próprias na janela de links da vitrine
+/// (não é mais um campo único AssessorMarca.whatsapp).
+model AssessorMarcaWhatsapp {
+  id              String   @id @default(cuid())
+  assessorMarcaId String
+  numero          String
+  rotulo          String?
+  ordem           Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  assessorMarca AssessorMarca @relation(fields: [assessorMarcaId], references: [id], onDelete: Cascade)
+
+  @@index([assessorMarcaId, ordem])
+  @@map("assessor_marca_whatsapps")
 }
 
 enum TipoMidiaAssessorMarca {

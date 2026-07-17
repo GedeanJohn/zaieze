@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Search, Share2, Menu, X, Tag, Shirt, Users, Star, Gift, Megaphone, Truck,
-  Headphones, Home, ShoppingBag, UserRound, FileText, MoreHorizontal, Globe, Phone, Play, Sparkles, ArrowLeft,
+  Headphones, Home, ShoppingBag, UserRound, FileText, MoreHorizontal, Globe, Phone, Play, Sparkles, ArrowLeft, MapPin,
 } from 'lucide-react'
 import { siInstagram, siFacebook, siTiktok, siTelegram, siWhatsapp } from 'simple-icons'
 import { api, formataReal } from '../../api'
@@ -22,7 +22,7 @@ interface Marca {
   id: string; redeId: string | null; nome: string; logoUrl: string | null; bannerUrl: string | null
   midias: Midia[]
   instagram: string | null; facebook: string | null; whatsapp: string | null; telegram: string | null; tiktok: string | null; site: string | null
-  linkCatalogo: string | null
+  linkCatalogo: string | null; endereco: string | null
 }
 interface Depoimento { nota: number; comentario: string | null; nomeCliente: string | null; createdAt: string }
 interface Lancamento {
@@ -333,6 +333,25 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
                 <l.Icone size={20} /> {l.rotulo}
               </a>
             ))}
+          </div>
+        )}
+        {marca.endereco && (
+          <div className="vit-modal-endereco">
+            <div className="vit-modal-endereco-texto"><MapPin size={16} /> {marca.endereco}</div>
+            <iframe
+              className="vit-modal-mapa"
+              title={`Mapa de ${marca.nome}`}
+              src={`https://maps.google.com/maps?q=${encodeURIComponent(marca.endereco)}&output=embed`}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+            <a
+              className="vit-modal-link" style={{ justifyContent: 'center' }}
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(marca.endereco)}`}
+              target="_blank" rel="noreferrer"
+            >
+              <MapPin size={18} /> Abrir no Google Maps
+            </a>
           </div>
         )}
       </div>
@@ -652,6 +671,14 @@ export function VitrineEstilos() {
         background: rgba(255,255,255,0.05); color: #f2efe9; text-decoration: none; font-size: 14px; font-weight: 600;
       }
       .vit-modal-link:hover { background: rgba(255,255,255,0.1); }
+      .vit-modal-endereco { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; text-align: left; }
+      .vit-modal-endereco-texto {
+        display: flex; align-items: flex-start; gap: 8px; color: #ccc; font-size: 13px; line-height: 1.4;
+      }
+      .vit-modal-endereco-texto svg { flex-shrink: 0; margin-top: 1px; color: #c9a25f; }
+      .vit-modal-mapa {
+        width: 100%; aspect-ratio: 16/9; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; filter: grayscale(0.2) invert(0.92) contrast(0.9);
+      }
 
       @media (max-width: 860px) {
         .vit-hero { padding: 20px 16px 8px; }

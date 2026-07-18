@@ -1553,6 +1553,7 @@ model AssessorMarca {
   telegram  String?
   tiktok    String?
   site      String?
+  googleEmpresas String? // link da ficha/avaliação da marca no Google Empresas (Google Meu Negócio)
   linkCatalogo String? // link do catálogo público de verdade da marca (quando ela é cliente ZAIEZE) — preenchido manualmente, sem vínculo automático com nenhuma vendedora
   percentualComissaoSugerido Decimal? @db.Decimal(5, 2) // pré-preenche o % ao lançar uma venda desta marca
   ordem     Int      @default(0) // ordem manual de exibição na vitrine

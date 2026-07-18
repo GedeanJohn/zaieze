@@ -162,6 +162,11 @@ function CrmApp() {
   )
 }
 
+// Registra o service worker (sem cache — só existe pra habilitar o prompt de instalação do PWA).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}) })
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <IdiomaProvider>

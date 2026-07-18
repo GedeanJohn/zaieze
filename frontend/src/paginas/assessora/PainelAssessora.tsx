@@ -33,6 +33,7 @@ interface Marca {
   descricao: string | null; formasPagamento: string | null; modoEnvio: string | null; condicoesCompra: string | null
   tamanhos: string | null; valores: string | null; endereco: string | null; cnpj: string | null
   instagram: string | null; facebook: string | null; whatsapps: WhatsappMarca[]; telegram: string | null; tiktok: string | null; site: string | null
+  googleEmpresas: string | null
   linkCatalogo: string | null
   percentualComissaoSugerido: number | null; ordem: number; ativo: boolean
   autorizadoEm: string | null; recusadoEm: string | null
@@ -48,7 +49,7 @@ interface Indicacao { slug: string; percentual: number; cliques: number; redesIn
 
 const marcaVazia = {
   nome: '', descricao: '', formasPagamento: '', modoEnvio: '', condicoesCompra: '',
-  tamanhos: '', valores: '', endereco: '', cnpj: '', instagram: '', facebook: '', telegram: '', tiktok: '', site: '', linkCatalogo: '',
+  tamanhos: '', valores: '', endereco: '', cnpj: '', instagram: '', facebook: '', telegram: '', tiktok: '', site: '', googleEmpresas: '', linkCatalogo: '',
   percentualComissaoSugerido: '', ativo: true,
 }
 
@@ -323,7 +324,7 @@ export default function PainelAssessora() {
       nome: m.nome, descricao: m.descricao ?? '', formasPagamento: m.formasPagamento ?? '',
       modoEnvio: m.modoEnvio ?? '', condicoesCompra: m.condicoesCompra ?? '', tamanhos: m.tamanhos ?? '', valores: m.valores ?? '',
       endereco: m.endereco ?? '', cnpj: m.cnpj ?? '', instagram: m.instagram ?? '', facebook: m.facebook ?? '',
-      telegram: m.telegram ?? '', tiktok: m.tiktok ?? '', site: m.site ?? '', linkCatalogo: m.linkCatalogo ?? '',
+      telegram: m.telegram ?? '', tiktok: m.tiktok ?? '', site: m.site ?? '', googleEmpresas: m.googleEmpresas ?? '', linkCatalogo: m.linkCatalogo ?? '',
       percentualComissaoSugerido: m.percentualComissaoSugerido != null ? String(m.percentualComissaoSugerido) : '', ativo: m.ativo,
     })
   }
@@ -1113,6 +1114,9 @@ export default function PainelAssessora() {
             <div className="linha-campos">
               <div className="campo"><label>TikTok</label><input value={formMarca.tiktok} onChange={(e) => setFormMarca({ ...formMarca, tiktok: e.target.value })} /></div>
               <div className="campo"><label>Site</label><input value={formMarca.site} onChange={(e) => setFormMarca({ ...formMarca, site: e.target.value })} /></div>
+            </div>
+            <div className="linha-campos">
+              <div className="campo"><label>Avaliação no Google Empresas</label><input value={formMarca.googleEmpresas} onChange={(e) => setFormMarca({ ...formMarca, googleEmpresas: e.target.value })} placeholder="https://g.page/r/..." /></div>
             </div>
             <div className="linha-campos">
               <div className="campo"><label>% comissão sugerido</label><input type="number" min={0} max={100} step="0.5" value={formMarca.percentualComissaoSugerido} onChange={(e) => setFormMarca({ ...formMarca, percentualComissaoSugerido: e.target.value })} /></div>

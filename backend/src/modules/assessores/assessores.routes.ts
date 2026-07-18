@@ -39,7 +39,7 @@ const marcaSelect = {
   midias: { select: midiaSelect, orderBy: { ordem: 'asc' } },
   descricao: true, formasPagamento: true, modoEnvio: true, condicoesCompra: true,
   tamanhos: true, valores: true, endereco: true, cnpj: true,
-  instagram: true, facebook: true, telegram: true, tiktok: true, site: true, linkCatalogo: true,
+  instagram: true, facebook: true, telegram: true, tiktok: true, site: true, googleEmpresas: true, linkCatalogo: true,
   whatsapps: { select: whatsappMarcaSelect, orderBy: { ordem: 'asc' } },
   percentualComissaoSugerido: true, ordem: true, ativo: true, autorizadoEm: true, recusadoEm: true,
 } as const
@@ -561,6 +561,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
     telegram: linkSeguro(200),
     tiktok: linkSeguro(200),
     site: linkSeguro(200),
+    googleEmpresas: linkSeguro(300),
     linkCatalogo: linkSeguro(300),
     percentualComissaoSugerido: z.coerce.number().positive().max(100).nullable().optional(),
     ativo: z.boolean().optional(),

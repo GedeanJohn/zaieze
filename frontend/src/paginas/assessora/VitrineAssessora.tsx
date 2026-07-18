@@ -3,9 +3,10 @@ import {
   Search, Share2, Menu, X, Tag, Shirt, Users, Star, Gift, Megaphone, Truck,
   Headphones, Home, ShoppingBag, UserRound, FileText, MoreHorizontal, Globe, Phone, Play, Sparkles, ArrowLeft, MapPin,
 } from 'lucide-react'
-import { siInstagram, siFacebook, siTiktok, siTelegram, siWhatsapp } from 'simple-icons'
+import { siInstagram, siFacebook, siTiktok, siTelegram, siWhatsapp, siGoogle } from 'simple-icons'
 import { api, formataReal } from '../../api'
 import { useToast } from '../../componentes/Toast'
+import BotaoInstalarApp from '../../componentes/BotaoInstalarApp'
 
 /** Logo real da rede social (simple-icons, SVG vetorial) — sempre na cor atual do texto
  *  (currentColor), pra combinar com o resto do visual dourado/monocromático da vitrine. */
@@ -23,6 +24,7 @@ interface Marca {
   id: string; redeId: string | null; nome: string; logoUrl: string | null; bannerUrl: string | null
   midias: Midia[]
   instagram: string | null; facebook: string | null; whatsapps: WhatsappMarca[]; telegram: string | null; tiktok: string | null; site: string | null
+  googleEmpresas: string | null
   linkCatalogo: string | null; endereco: string | null
 }
 interface Depoimento { nota: number; comentario: string | null; nomeCliente: string | null; createdAt: string }
@@ -144,6 +146,7 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
         </div>
         <div className="vit-topo-acoes">
           <button type="button" className="vit-icone-botao" aria-label="Buscar marca" onClick={() => setBuscaAberta((a) => !a)}><Search size={18} /></button>
+          <BotaoInstalarApp />
           <button type="button" className="vit-icone-botao" aria-label="Compartilhar" onClick={compartilhar}><Share2 size={18} /></button>
           {v.whatsapp && (
             <a className="vit-icone-botao" aria-label="Falar no WhatsApp" href={linkWhatsapp(v.whatsapp)} target="_blank" rel="noreferrer"><IconeMarca icone={siWhatsapp} size={18} /></a>
@@ -282,6 +285,19 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
 
 function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void }) {
   const [midiaAberta, setMidiaAberta] = useState<{ tipo: 'imagem' | 'video'; url: string } | null>(null)
+  const [localizacao, setLocalizacao] = useState<{ lat: number; lng: number } | null>(null)
+  const [localizacaoNegada, setLocalizacaoNegada] = useState(false)
+
+  // Pede a localização do visitante (permissão nativa do navegador) só quando a marca tem
+  // endereço — usada pra traçar a rota dele até a marca no mapa, em vez de só o pino da marca.
+  useEffect(() => {
+    if (!marca.endereco || !('geolocation' in navigator)) return
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setLocalizacao({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => setLocalizacaoNegada(true),
+      { timeout: 8000, maximumAge: 5 * 60 * 1000 },
+    )
+  }, [marca.endereco])
 
   const links: { rotulo: string; href: string; Icone: (p: { size?: number }) => JSX.Element }[] = []
   marca.whatsapps.forEach((w, i) => {
@@ -298,6 +314,8 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
   if (telegramHref) links.push({ rotulo: 'Telegram', href: telegramHref, Icone: (p) => <IconeMarca icone={siTelegram} {...p} /> })
   const siteHref = linkPublicoSeguro(marca.site)
   if (siteHref) links.push({ rotulo: 'Site', href: siteHref, Icone: (p) => <Globe {...p} /> })
+  const googleEmpresasHref = linkPublicoSeguro(marca.googleEmpresas)
+  if (googleEmpresasHref) links.push({ rotulo: 'Avaliações no Google', href: googleEmpresasHref, Icone: (p) => <IconeMarca icone={siGoogle} {...p} /> })
   const linkCatalogoHref = linkPublicoSeguro(marca.linkCatalogo)
 
   const midias = marca.midias.map((m) => ({ tipo: m.tipo === 'FOTO' ? ('imagem' as const) : ('video' as const), url: m.url }))
@@ -345,13 +363,26 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
             <iframe
               className="vit-modal-mapa"
               title={`Mapa de ${marca.nome}`}
-              src={`https://maps.google.com/maps?q=${encodeURIComponent(marca.endereco)}&output=embed`}
+              src={
+                localizacao
+                  ? `https://maps.google.com/maps?saddr=${localizacao.lat},${localizacao.lng}&daddr=${encodeURIComponent(marca.endereco)}&output=embed`
+                  : `https://maps.google.com/maps?q=${encodeURIComponent(marca.endereco)}&z=17&output=embed`
+              }
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
             />
+            {localizacao ? (
+              <div className="vit-modal-endereco-texto" style={{ fontSize: 12 }}>Rota da sua localização até a marca.</div>
+            ) : localizacaoNegada ? (
+              <div className="vit-modal-endereco-texto" style={{ fontSize: 12 }}>Ative a localização no navegador pra ver a rota até você.</div>
+            ) : null}
             <a
               className="vit-modal-link" style={{ justifyContent: 'center' }}
-              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(marca.endereco)}`}
+              href={
+                localizacao
+                  ? `https://www.google.com/maps/dir/?api=1&origin=${localizacao.lat},${localizacao.lng}&destination=${encodeURIComponent(marca.endereco)}`
+                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(marca.endereco)}`
+              }
               target="_blank" rel="noreferrer"
             >
               <MapPin size={18} /> Abrir no Google Maps

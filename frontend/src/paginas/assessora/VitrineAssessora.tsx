@@ -782,12 +782,15 @@ export function VitrineEstilos() {
         .vit-stats { gap: 10px 18px; margin-top: 12px; }
         .vit-stat strong { font-size: 15px; }
         .vit-stat span { font-size: 8.5px; }
-        .vit-acoes { margin-top: 12px; gap: 8px; }
-        .vit-btn-primario, .vit-btn-secundario { padding: 10px 10px; font-size: 12px; justify-content: center; }
-        /* Botão do WhatsApp alinhado com a largura da foto (mesma fração da coluna no
-           .vit-hero-topo); Ligar/Lançamentos dividem o espaço restante. */
-        .vit-btn-primario { flex: 0 0 34%; }
-        .vit-btn-secundario { flex: 1; }
+        /* Os 3 botões ficam lado a lado com largura do próprio conteúdo (como no desktop, só
+           menores) — NÃO usar flex:1 (base 0%) dividindo em partes iguais: o min-width:auto
+           padrão do flexbox não deixa o texto de "Lançamentos" (o mais longo) encolher abaixo
+           do próprio conteúdo, e isso é o que forçava a quebra de linha (sobrando espaço vazio
+           nas linhas). Com largura natural + fonte/padding/gap reduzidos, os 3 cabem numa linha
+           só em telas de ~360-390px. */
+        .vit-acoes { gap: 6px; margin-top: 12px; }
+        .vit-btn-primario, .vit-btn-secundario { padding: 10px 8px; font-size: 11px; gap: 5px; }
+        .vit-btn-primario svg, .vit-btn-secundario svg { width: 15px; height: 15px; flex-shrink: 0; }
         .vit-grid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
         .vit-lancamentos-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 16px 16px 32px; }
         .vit-cardMarca-nome { padding: 5px 6px; font-size: 9px; line-height: 1.2; }

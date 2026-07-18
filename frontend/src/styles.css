@@ -365,6 +365,9 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   --leitura: 'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif;
   /* Fonte script: frases de efeito em destaque (ex.: tagline da vitrine do Brand Partner). */
   --fonte-script: 'Allura', cursive;
+  /* Fonte editorial: nome das marcas nos cards da vitrine (mesma serifada pra todas — é uma
+     vitrine curada, não a identidade visual de cada marca). */
+  --fonte-editorial: 'Playfair Display', Georgia, 'Times New Roman', serif;
 }
 
 .site {

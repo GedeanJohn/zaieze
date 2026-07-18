@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Download, Share, X, PlusSquare, Compass } from 'lucide-react'
+import { Download, Share, X, PlusSquare, Copy, Check } from 'lucide-react'
+import { useToast } from './Toast'
 
 interface EventoInstalacao extends Event {
   prompt: () => Promise<void>
@@ -14,14 +15,6 @@ function ehIos(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent)
 }
 
-/** "Adicionar à Tela de Início" só existe no Safari de verdade — dentro do navegador embutido de
- *  outros apps (WhatsApp, Instagram etc., que abrem o link numa SFSafariViewController) essa opção
- *  nem aparece no compartilhar. O esquema x-safari-https:// é reconhecido pelo iOS pra tirar a
- *  página desse navegador embutido e abrir na Safari de verdade (mesma página, mesma URL). */
-function urlForcaSafari(url: string): string {
-  return url.replace(/^https?:\/\//, (m) => (m === 'https://' ? 'x-safari-https://' : 'x-safari-http://'))
-}
-
 /** Botão "Instalar app" — no Android/Chrome dispara o prompt nativo de instalação (PWA);
  *  no iPhone/Safari (sem esse evento) mostra o passo a passo do "Adicionar à Tela de Início".
  *  Some sozinho se o app já estiver instalado (aberto em modo standalone). */
@@ -29,6 +22,8 @@ export default function BotaoInstalarApp({ className = 'vit-icone-botao' }: { cl
   const [promptEvento, setPromptEvento] = useState<EventoInstalacao | null>(null)
   const [instrucoesIosAbertas, setInstrucoesIosAbertas] = useState(false)
   const [instalado, setInstalado] = useState(estaStandalone())
+  const [linkCopiado, setLinkCopiado] = useState(false)
+  const avisar = useToast()
 
   useEffect(() => {
     if (instalado) return
@@ -59,6 +54,18 @@ export default function BotaoInstalarApp({ className = 'vit-icone-botao' }: { cl
     setInstrucoesIosAbertas(true)
   }
 
+  async function copiarLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+    } catch {
+      avisar('Não deu pra copiar automaticamente. Toque e segure o endereço na barra do navegador pra copiar.')
+      return
+    }
+    setLinkCopiado(true)
+    avisar('Link copiado.')
+    setTimeout(() => setLinkCopiado(false), 3000)
+  }
+
   return (
     <>
       <button type="button" className={className} aria-label="Instalar app" onClick={clicar}><Download size={18} /></button>
@@ -69,20 +76,15 @@ export default function BotaoInstalarApp({ className = 'vit-icone-botao' }: { cl
             <h3 className="vit-modal-nome">Instalar na tela de início</h3>
             <p style={{ margin: '16px 0 6px', lineHeight: 1.6, fontSize: 13, color: '#b8b3ac' }}>
               Abriu esse link pelo WhatsApp, Instagram ou outro app? "Adicionar à Tela de Início" só
-              funciona no Safari de verdade — toque no botão abaixo primeiro.
+              funciona no Safari de verdade — copie o link abaixo e cole no Safari.
             </p>
-            <a
-              className="vit-modal-catalogo" style={{ marginTop: 10 }}
-              href={urlForcaSafari(window.location.href)}
-            >
-              <Compass size={18} /> Abrir no Safari
-            </a>
-            <p style={{ margin: '6px 0 0', fontSize: 11.5, color: '#8a8a8a' }}>
-              O iPhone vai perguntar se pode abrir no Safari — toque em <strong>"Abrir"</strong> na confirmação.
-            </p>
+            <button type="button" className="vit-modal-catalogo" style={{ marginTop: 10, width: '100%', border: 'none' }} onClick={copiarLink}>
+              {linkCopiado ? <Check size={18} /> : <Copy size={18} />} {linkCopiado ? 'Link copiado' : 'Copiar link'}
+            </button>
             <p style={{ margin: '18px 0 0', lineHeight: 1.6 }}>
-              1. Toque no ícone <Share size={16} style={{ verticalAlign: 'middle' }} /> <strong>Compartilhar</strong> na barra do Safari.<br />
-              2. Escolha <strong>Adicionar à Tela de Início</strong> <PlusSquare size={16} style={{ verticalAlign: 'middle' }} />.
+              1. Abra o Safari e cole o link.<br />
+              2. Toque no ícone <Share size={16} style={{ verticalAlign: 'middle' }} /> <strong>Compartilhar</strong> na barra do Safari.<br />
+              3. Escolha <strong>Adicionar à Tela de Início</strong> <PlusSquare size={16} style={{ verticalAlign: 'middle' }} />.
             </p>
           </div>
         </div>

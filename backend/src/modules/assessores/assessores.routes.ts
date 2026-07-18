@@ -48,6 +48,23 @@ const marcaSelect = {
 // que nascem autorizadas — ver POST /minha/marcas e o provisionamento no checkout de Redes).
 const marcaPublicaWhere = { ativo: true, autorizadoEm: { not: null } } as const
 
+/** Fundo do card de marca na vitrine: a primeira foto de produto cadastrada na loja (Rede) que a
+ *  marca representa — só existe pra marcas que já são clientes ZAIEZE (redeId preenchido); marcas
+ *  externas (cadastradas manualmente pela assessora) não têm loja/catálogo, então caem na arte
+ *  abstrata de fallback do frontend. "Primeira" = produto ativo mais antigo que já tem alguma
+ *  foto (pula produtos sem foto ainda) — um produto por loja (distinct). */
+async function primeiraFotoProdutoPorRede(redeIds: (string | null)[]): Promise<Map<string, string>> {
+  const idsUnicos = [...new Set(redeIds.filter((id): id is string => !!id))]
+  if (idsUnicos.length === 0) return new Map()
+  const produtos = await prisma.produto.findMany({
+    where: { redeId: { in: idsUnicos }, ativo: true, fotos: { isEmpty: false } },
+    orderBy: { createdAt: 'asc' },
+    distinct: ['redeId'],
+    select: { redeId: true, fotos: true },
+  })
+  return new Map(produtos.map((p) => [p.redeId, p.fotos[0]]))
+}
+
 /** Painel da assessora de moda (perfil, marcas representadas, lançamento manual de vendas)
  *  + vitrine pública no subdomínio próprio dela. */
 export async function assessoresRoutes(app: FastifyInstance) {
@@ -202,6 +219,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
     })
     if (!assessor || !assessor.usuario.ativo) return reply.code(404).send({ erro: 'Página não encontrada' })
     const { statAvaliacao, totalAvaliacoes, depoimentos } = await resumoAvaliacoes(assessor.id)
+    const fotoPorRede = await primeiraFotoProdutoPorRede(assessor.marcas.map((m) => m.redeId))
     return {
       nome: assessor.usuario.nome,
       fotoUrl: assessor.usuario.fotoUrl,
@@ -216,7 +234,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
       statProdutos: assessor.statProdutos,
       statClientes: assessor._count.clientes,
       statAvaliacao, totalAvaliacoes, depoimentos,
-      marcas: assessor.marcas.map(serializarMarca),
+      marcas: assessor.marcas.map((m) => ({ ...serializarMarca(m), fotoProdutoUrl: (m.redeId && fotoPorRede.get(m.redeId)) || null })),
     }
   })
 

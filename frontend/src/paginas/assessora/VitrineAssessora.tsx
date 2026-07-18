@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Search, Share2, Menu, X, Tag, Shirt, Users, Star, Gift, Megaphone, Truck,
-  Headphones, Home, ShoppingBag, UserRound, FileText, MoreHorizontal, Globe, Phone, Play, Sparkles, ArrowLeft, MapPin,
+  Headphones, Home, ShoppingBag, UserRound, User, FileText, MoreHorizontal, Globe, Phone, Play, Sparkles, ArrowLeft, MapPin,
 } from 'lucide-react'
 import { siInstagram, siFacebook, siTiktok, siTelegram, siWhatsapp, siGoogle } from 'simple-icons'
 import { api, formataReal } from '../../api'
@@ -22,6 +22,7 @@ interface Midia { id: string; tipo: 'FOTO' | 'VIDEO'; url: string; ordem: number
 interface WhatsappMarca { id: string; numero: string; rotulo: string | null }
 interface Marca {
   id: string; redeId: string | null; nome: string; logoUrl: string | null; bannerUrl: string | null
+  fotoProdutoUrl: string | null
   midias: Midia[]
   instagram: string | null; facebook: string | null; whatsapps: WhatsappMarca[]; telegram: string | null; tiktok: string | null; site: string | null
   googleEmpresas: string | null
@@ -92,6 +93,23 @@ function usePwaPersonalizado(v: Vitrine | null) {
 
 function linkWhatsapp(numero: string): string {
   return `https://wa.me/${numero.replace(/\D/g, '')}`
+}
+
+/** Arte abstrata de moda pra card de marca sem nenhuma imagem própria (nem foto de produto, nem
+ *  banner/logo cadastrado) — determinística (mesma marca sempre cai na mesma arte), evocando
+ *  texturas do universo da moda (lã, seda, veludo, linho, pedra) em vez de um cinza plano. */
+const ARTE_ABSTRATA_MARCA = [
+  'linear-gradient(135deg, #2a2a2a 0%, #161616 45%, #2f2a26 100%)', // lã escura
+  'linear-gradient(120deg, #d8cdb8 0%, #efe8d8 35%, #cabb9d 70%, #e4dac4 100%)', // seda clara
+  'linear-gradient(125deg, #2b2b2f 0%, #1a1a1d 30%, #3a3a40 55%, #17171a 100%)', // seda escura
+  'linear-gradient(160deg, #4a4a4a 0%, #2e2e2e 50%, #55534f 100%)', // pedra/concreto
+  'radial-gradient(120% 120% at 30% 20%, #5a2430 0%, #2c1116 60%, #1a0a0d 100%)', // veludo vinho
+  'linear-gradient(135deg, #d9cdb8 0%, #c3b394 50%, #ddd2bc 100%)', // linho claro
+]
+function arteAbstrataMarca(nome: string): string {
+  let hash = 0
+  for (let i = 0; i < nome.length; i++) hash = (hash * 31 + nome.charCodeAt(i)) >>> 0
+  return ARTE_ABSTRATA_MARCA[hash % ARTE_ABSTRATA_MARCA.length]
 }
 
 /** Botão "Ligar" usa o MESMO número do WhatsApp (não um campo separado) — só muda a ação
@@ -264,16 +282,21 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
         </div>
         {marcasFiltradas.length === 0 && <div className="vit-vazio-secao">{v.marcas.length === 0 ? 'Nenhuma marca cadastrada ainda.' : 'Nenhuma marca encontrada.'}</div>}
         <div className="vit-grid">
-          {marcasFiltradas.map((m) => (
-            <button key={m.id} type="button" className="vit-cardMarca" onClick={() => setMarcaModal(m)}>
-              {m.bannerUrl
-                ? <img src={m.bannerUrl} alt={m.nome} />
-                : m.logoUrl
-                  ? <div className="vit-cardMarca-logoFundo"><img src={m.logoUrl} alt={m.nome} /></div>
-                  : <div className="vit-cardMarca-semImagem">{m.nome}</div>}
-              <span className="vit-cardMarca-nome">{m.nome}</span>
-            </button>
-          ))}
+          {marcasFiltradas.map((m) => {
+            // Prioridade do fundo do card: 1) primeira foto de produto da loja (mais autêntico,
+            // já é do catálogo real) 2) banner/logo que a assessora cadastrou manualmente
+            // 3) arte abstrata de moda (nem foto de produto nem banner/logo cadastrado).
+            const imagemFundo = m.fotoProdutoUrl || m.bannerUrl || m.logoUrl
+            return (
+              <button
+                key={m.id} type="button" className="vit-cardMarca" onClick={() => setMarcaModal(m)}
+                style={imagemFundo ? undefined : { background: arteAbstrataMarca(m.nome) }}
+              >
+                {imagemFundo && <img src={imagemFundo} alt={m.nome} />}
+                <span className="vit-cardMarca-nome">{m.nome}</span>
+              </button>
+            )
+          })}
         </div>
       </section>
 
@@ -322,7 +345,10 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
       <nav className="vit-bottom-nav">
         {NAV_ITENS.map(({ id, rotulo, Icone }) => (
           <button key={id} type="button" className={`vit-nav-item${id === 'perfil' ? ' ativo' : ''}`} onClick={() => irPara(id)}>
-            <span className="vit-nav-icone"><Icone size={20} /></span>
+            {/* "Perfil" (sempre ativo) usa User preenchido — silhueta sólida, como no mockup —
+                em vez do UserRound de contorno fino (que tem um anel externo; preenchido viraria
+                só um disco sólido sem detalhe) usado nas outras referências desse ícone. */}
+            <span className="vit-nav-icone">{id === 'perfil' ? <User size={22} fill="#fff" /> : <Icone size={20} />}</span>
             {rotulo}
           </button>
         ))}
@@ -679,17 +705,24 @@ export function VitrineEstilos() {
       }
 
       .vit-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+      /* Vitrine curada: todo card de marca leva o MESMO tratamento — imagem (ou cor determinística
+         de fallback) cobrindo o card + gradiente escurecendo pra legibilidade + nome centralizado
+         numa serifada editorial única (não a identidade visual de cada marca; é a "grade" da
+         vitrine que fica consistente, com ou sem banner/logo cadastrado). */
       .vit-cardMarca {
-        position: relative; aspect-ratio: 4/3.1; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08);
-        background: #141414; cursor: pointer; padding: 0; display: block;
+        position: relative; aspect-ratio: 4/3.1; border-radius: 3px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08);
+        cursor: pointer; padding: 0; display: block;
       }
-      .vit-cardMarca img { width: 100%; height: 100%; object-fit: cover; display: block; }
-      .vit-cardMarca-logoFundo { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #1a1a1a; padding: 20%; }
-      .vit-cardMarca-logoFundo img { width: 100%; height: 100%; object-fit: contain; }
-      .vit-cardMarca-semImagem { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #ccc; font-weight: 700; font-size: 14px; text-align: center; padding: 12px; }
+      .vit-cardMarca img { width: 100%; height: 100%; object-fit: cover; display: block; filter: brightness(0.72); }
+      .vit-cardMarca::after {
+        content: ''; position: absolute; inset: 0; z-index: 1;
+        background: linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.28) 55%, rgba(0,0,0,0.6) 100%);
+      }
       .vit-cardMarca-nome {
-        position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 10px;
-        background: linear-gradient(to top, rgba(0,0,0,0.75), transparent); font-size: 12px; font-weight: 700; text-align: left; color: #fff;
+        position: absolute; z-index: 2; inset: 0; padding: 10px;
+        display: flex; align-items: center; justify-content: center; text-align: center;
+        font-family: var(--fonte-editorial); font-size: 15px; font-weight: 600; letter-spacing: 0.09em;
+        text-transform: uppercase; color: #f5f1e8; line-height: 1.3;
       }
 
       .vit-pagina-fundo { position: fixed; inset: 0; background: #0a0a0a; z-index: 90; overflow-y: auto; }
@@ -720,8 +753,15 @@ export function VitrineEstilos() {
         flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none;
         color: #8a8a8a; font-size: 11px; padding: 6px 2px; cursor: pointer;
       }
-      .vit-nav-item.ativo { color: #c9a25f; }
+      .vit-nav-item.ativo { color: #c9a25f; font-weight: 700; }
       .vit-nav-icone { display: flex; }
+      /* Aba ativa ("Perfil") ganha um botão circular elevado, dourado — igual ao mockup —
+         em vez de só mudar a cor do ícone como as outras abas. */
+      .vit-nav-item.ativo .vit-nav-icone {
+        width: 56px; height: 56px; margin-top: -30px; border-radius: 50%; align-items: center; justify-content: center;
+        background: #c9963f; color: #fff;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 0 4px #0d0d0d;
+      }
 
       .vit-modal-fundo { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; z-index: 70; padding: 16px; }
       .vit-modal {
@@ -782,19 +822,19 @@ export function VitrineEstilos() {
         .vit-stats { gap: 10px 18px; margin-top: 12px; }
         .vit-stat strong { font-size: 15px; }
         .vit-stat span { font-size: 8.5px; }
-        /* Os 3 botões ficam lado a lado com largura do próprio conteúdo (como no desktop, só
-           menores) — NÃO usar flex:1 (base 0%) dividindo em partes iguais: o min-width:auto
-           padrão do flexbox não deixa o texto de "Lançamentos" (o mais longo) encolher abaixo
-           do próprio conteúdo, e isso é o que forçava a quebra de linha (sobrando espaço vazio
-           nas linhas). Com largura natural + fonte/padding/gap reduzidos, os 3 cabem numa linha
-           só em telas de ~360-390px. */
+        /* Os 3 botões crescem pra preencher a linha toda (flex-grow), mas com base "auto" (não
+           "0%" — evitar o atalho "flex: 1"): o navegador calcula a largura de cada um pelo
+           próprio conteúdo primeiro, e só distribui o espaço QUE SOBRAR depois. Com "flex: 1"
+           (base 0%) o cálculo começa do zero pra cada botão, e o min-width:auto padrão do
+           flexbox não deixa o texto de "Lançamentos" (o mais longo) encolher abaixo do próprio
+           conteúdo — isso forçava a quebra de linha em telas estreitas. Com base "auto" nunca
+           precisa encolher abaixo do conteúdo (só distribui sobra), e ainda preenche telas largas. */
         .vit-acoes { gap: 6px; margin-top: 12px; }
-        .vit-btn-primario, .vit-btn-secundario { padding: 10px 8px; font-size: 11px; gap: 5px; }
+        .vit-btn-primario, .vit-btn-secundario { flex: 1 1 auto; padding: 10px 8px; font-size: 11px; gap: 5px; white-space: nowrap; }
         .vit-btn-primario svg, .vit-btn-secundario svg { width: 15px; height: 15px; flex-shrink: 0; }
         .vit-grid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
         .vit-lancamentos-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 16px 16px 32px; }
-        .vit-cardMarca-nome { padding: 5px 6px; font-size: 9px; line-height: 1.2; }
-        .vit-cardMarca-semImagem { font-size: 10px; padding: 6px; }
+        .vit-cardMarca-nome { padding: 6px; font-size: 10px; letter-spacing: 0.06em; line-height: 1.25; }
         .vit-faixa { grid-template-columns: repeat(2, 1fr); }
         .vit-marcas-secao { margin-top: 28px; padding: 0 16px; }
         .vit-topo { padding: 12px 16px; }

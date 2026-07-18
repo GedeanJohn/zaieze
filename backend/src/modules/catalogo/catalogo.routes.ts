@@ -111,13 +111,22 @@ export async function catalogoRoutes(app: FastifyInstance) {
 
   // ─────────── Endpoints PÚBLICOS (sem auth) ───────────
 
-  // Verifica se a loja/marca (slug) existe e está ativa — usado na tela "Acessar meu painel"
-  // para avisar antes de redirecionar a um endereço inexistente.
+  // Verifica se o slug existe e está ativo — usado na tela "Acessar meu painel" para avisar antes
+  // de redirecionar a um endereço inexistente. Slug pode ser de uma Rede (loja) OU de um Assessor
+  // (Brand Partner tem subdomínio próprio, fora da tabela Rede — ver auth.routes.ts).
   app.get('/rede-existe/:slug', async (request, reply) => {
-    const { slug } = request.params as { slug: string }
-    const rede = await prisma.rede.findUnique({ where: { slug: slug.toLowerCase() }, select: { nome: true, ativo: true } })
-    if (!rede || !rede.ativo) return reply.code(404).send({ existe: false })
-    return { existe: true, nome: rede.nome }
+    const s = (request.params as { slug: string }).slug.toLowerCase()
+    const rede = await prisma.rede.findUnique({ where: { slug: s }, select: { nome: true, ativo: true } })
+    if (rede) {
+      if (!rede.ativo) return reply.code(404).send({ existe: false })
+      return { existe: true, nome: rede.nome }
+    }
+    const assessor = await prisma.assessor.findUnique({
+      where: { slug: s },
+      select: { usuario: { select: { nome: true, ativo: true } } },
+    })
+    if (!assessor || !assessor.usuario.ativo) return reply.code(404).send({ existe: false })
+    return { existe: true, nome: assessor.usuario.nome }
   })
 
   // Dados do catálogo da vendedora (coleções liberadas + branding da marca).

@@ -193,7 +193,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
       where: { slug },
       select: {
         id: true, slug: true, bio: true, tagline: true, disponivel: true, seguirAgenda: true, whatsapp: true, instagram: true, site: true,
-        statProdutos: true,
+        statProdutos: true, plano: true,
         usuario: { select: { nome: true, fotoUrl: true, ativo: true } },
         marcas: { where: marcaPublicaWhere, orderBy: { ordem: 'asc' }, select: marcaSelect },
         horarios: { select: { diaSemana: true, inicio: true, fim: true } },
@@ -207,6 +207,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
       fotoUrl: assessor.usuario.fotoUrl,
       bio: assessor.bio,
       tagline: assessor.tagline,
+      plano: assessor.plano,
       disponivel: assessor.seguirAgenda ? calcularDisponivelPorAgenda(assessor.horarios) : assessor.disponivel,
       whatsapp: assessor.whatsapp,
       instagram: assessor.instagram,

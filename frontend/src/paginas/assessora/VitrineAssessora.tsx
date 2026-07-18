@@ -34,10 +34,60 @@ interface Lancamento {
 }
 interface Vitrine {
   nome: string; fotoUrl: string | null; bio: string | null; tagline: string | null; disponivel: boolean
+  plano: 'BASICO' | 'AVANCADO'
   whatsapp: string | null; instagram: string | null; site: string | null
   statMarcas: number; statProdutos: number | null; statClientes: number; statAvaliacao: number | null
   totalAvaliacoes: number; depoimentos: Depoimento[]
   marcas: Marca[]
+}
+
+/** Plano AVANCADO: o PWA instalado a partir da vitrine usa a foto e o nome dela em vez do
+ *  ícone/nome padrão do ZAIEZE — reforça a marca pessoal da Brand Partner pros clientes dela.
+ *  Troca o <link rel="manifest"> por um gerado em memória (Blob URL, sem rota nova no backend)
+ *  e o ícone/título usados pelo "Adicionar à Tela de Início" do iOS. Restaura tudo ao sair da
+ *  tela, já que é uma SPA e outras rotas (login, painel) não podem herdar essa personalização. */
+function usePwaPersonalizado(v: Vitrine | null) {
+  useEffect(() => {
+    if (!v || v.plano !== 'AVANCADO' || !v.fotoUrl) return
+
+    const linkManifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')
+    const linkAppleIcon = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]')
+    const metaAppleTitle = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]')
+    const original = {
+      manifest: linkManifest?.href ?? null,
+      appleIcon: linkAppleIcon?.href ?? null,
+      appleTitle: metaAppleTitle?.content ?? null,
+      titulo: document.title,
+    }
+
+    const manifest = {
+      name: v.nome,
+      short_name: v.nome.split(' ')[0],
+      start_url: `${window.location.pathname}?pwa=1`,
+      scope: window.location.pathname,
+      display: 'standalone',
+      background_color: '#0a0a0a',
+      theme_color: '#0a0a0a',
+      icons: [
+        { src: v.fotoUrl, sizes: '192x192', purpose: 'any' },
+        { src: v.fotoUrl, sizes: '512x512', purpose: 'any' },
+      ],
+    }
+    const blobUrl = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }))
+
+    if (linkManifest) linkManifest.href = blobUrl
+    if (linkAppleIcon) linkAppleIcon.href = v.fotoUrl
+    if (metaAppleTitle) metaAppleTitle.content = v.nome
+    document.title = v.nome
+
+    return () => {
+      URL.revokeObjectURL(blobUrl)
+      if (linkManifest && original.manifest) linkManifest.href = original.manifest
+      if (linkAppleIcon && original.appleIcon) linkAppleIcon.href = original.appleIcon
+      if (metaAppleTitle && original.appleTitle) metaAppleTitle.content = original.appleTitle
+      document.title = original.titulo
+    }
+  }, [v])
 }
 
 function linkWhatsapp(numero: string): string {
@@ -84,6 +134,8 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
   useEffect(() => {
     api.get(`/assessores/publico/${slug}`).then(({ data }) => setV(data)).catch(() => setErro('Página não encontrada.'))
   }, [slug])
+
+  usePwaPersonalizado(v)
 
   useEffect(() => {
     if (lancamentosAberto && lancamentos === null) {

@@ -22,6 +22,7 @@ export default function AssessorDeModa() {
   const funcionalidades = [
     t('assessorPlano.func1'), t('assessorPlano.func2'), t('assessorPlano.func3'),
     t('assessorPlano.func4'), t('assessorPlano.func5'), t('assessorPlano.func6'),
+    t('assessorPlano.func7'),
   ]
 
   return (

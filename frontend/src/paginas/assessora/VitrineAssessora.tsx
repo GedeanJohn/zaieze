@@ -710,13 +710,13 @@ export function VitrineEstilos() {
         color: #f2efe9; padding: 10px 12px; font-size: 14px; font-family: inherit; margin-bottom: 10px; resize: vertical;
       }
 
-      .vit-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+      .vit-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
       /* Vitrine curada: todo card de marca leva o MESMO tratamento — imagem (ou cor determinística
          de fallback) cobrindo o card + gradiente escurecendo pra legibilidade + nome centralizado
          numa serifada editorial única (não a identidade visual de cada marca; é a "grade" da
          vitrine que fica consistente, com ou sem banner/logo cadastrado). */
       .vit-cardMarca {
-        position: relative; aspect-ratio: 4/3.1; border-radius: 3px; overflow: hidden;
+        position: relative; aspect-ratio: 4/2.7; border-radius: 3px; overflow: hidden;
         background: #141414; cursor: pointer; padding: 0; display: block;
         border: none; -webkit-appearance: none; appearance: none; box-shadow: none;
       }
@@ -844,7 +844,7 @@ export function VitrineEstilos() {
         .vit-acoes { gap: 6px; margin-top: 12px; }
         .vit-btn-primario, .vit-btn-secundario { flex: 1 1 auto; padding: 10px 8px; font-size: 11px; gap: 5px; white-space: nowrap; }
         .vit-btn-primario svg, .vit-btn-secundario svg { width: 15px; height: 15px; flex-shrink: 0; }
-        .vit-grid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .vit-grid { grid-template-columns: repeat(4, 1fr); gap: 7px; }
         .vit-lancamentos-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 16px 16px 32px; }
         .vit-cardMarca-nome { padding: 6px; font-size: 10px; letter-spacing: 0.06em; line-height: 1.25; }
         .vit-faixa { grid-template-columns: repeat(2, 1fr); }

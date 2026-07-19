@@ -29,6 +29,7 @@ interface Midia { id: string; tipo: 'FOTO' | 'VIDEO'; url: string; ordem: number
 interface WhatsappMarca { id: string; numero: string; rotulo: string | null }
 interface Marca {
   id: string; redeId: string | null; nome: string; logoUrl: string | null; bannerUrl: string | null
+  exibirLogo: boolean
   midias: Midia[]
   descricao: string | null; formasPagamento: string | null; modoEnvio: string | null; condicoesCompra: string | null
   tamanhos: string | null; valores: string | null; endereco: string | null; cnpj: string | null
@@ -50,7 +51,7 @@ interface Indicacao { slug: string; percentual: number; cliques: number; redesIn
 const marcaVazia = {
   nome: '', descricao: '', formasPagamento: '', modoEnvio: '', condicoesCompra: '',
   tamanhos: '', valores: '', endereco: '', cnpj: '', instagram: '', facebook: '', telegram: '', tiktok: '', site: '', googleEmpresas: '', linkCatalogo: '',
-  percentualComissaoSugerido: '', ativo: true,
+  percentualComissaoSugerido: '', ativo: true, exibirLogo: false,
 }
 
 // timeZone: 'UTC' — `data` é um campo só-de-dia (guardado como meia-noite UTC); sem isso, em
@@ -326,6 +327,7 @@ export default function PainelAssessora() {
       endereco: m.endereco ?? '', cnpj: m.cnpj ?? '', instagram: m.instagram ?? '', facebook: m.facebook ?? '',
       telegram: m.telegram ?? '', tiktok: m.tiktok ?? '', site: m.site ?? '', googleEmpresas: m.googleEmpresas ?? '', linkCatalogo: m.linkCatalogo ?? '',
       percentualComissaoSugerido: m.percentualComissaoSugerido != null ? String(m.percentualComissaoSugerido) : '', ativo: m.ativo,
+      exibirLogo: m.exibirLogo,
     })
   }
   async function adicionarWhatsappMarca() {
@@ -988,6 +990,10 @@ export default function PainelAssessora() {
               ) : (
                 <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Salve a marca primeiro para poder enviar a logo.</div>
               )}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontWeight: 400 }}>
+                <input type="checkbox" checked={formMarca.exibirLogo} onChange={(e) => setFormMarca({ ...formMarca, exibirLogo: e.target.checked })} />
+                Mostrar a logo no card da vitrine, em vez do nome + foto de fundo
+              </label>
             </div>
             <div className="campo">
               <label>Banner (imagem grande do card na vitrine)</label>

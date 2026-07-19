@@ -1540,6 +1540,9 @@ model AssessorMarca {
   nome       String
   logoUrl    String?
   bannerUrl  String? // imagem grande do card na grade "Marcas que represento" (distinta da logoUrl pequena)
+  // Card da vitrine mostra a logo centralizada (contida, sem cortar) no lugar do nome + foto de
+  // fundo — pra quem prefere a identidade visual da marca a uma foto de produto/arte abstrata.
+  exibirLogo Boolean @default(false)
   descricao       String? // bullets, 1 por linha (ex.: "Fabricação própria")
   formasPagamento String? // bullets, 1 por linha (ex.: "PIX", "Cartão em até 4x")
   modoEnvio       String? // bullets, 1 por linha

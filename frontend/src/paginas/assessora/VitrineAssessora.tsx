@@ -22,7 +22,7 @@ interface Midia { id: string; tipo: 'FOTO' | 'VIDEO'; url: string; ordem: number
 interface WhatsappMarca { id: string; numero: string; rotulo: string | null }
 interface Marca {
   id: string; redeId: string | null; nome: string; logoUrl: string | null; bannerUrl: string | null
-  fotoProdutoUrl: string | null
+  fotoProdutoUrl: string | null; exibirLogo: boolean
   midias: Midia[]
   instagram: string | null; facebook: string | null; whatsapps: WhatsappMarca[]; telegram: string | null; tiktok: string | null; site: string | null
   googleEmpresas: string | null
@@ -283,17 +283,23 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
         {marcasFiltradas.length === 0 && <div className="vit-vazio-secao">{v.marcas.length === 0 ? 'Nenhuma marca cadastrada ainda.' : 'Nenhuma marca encontrada.'}</div>}
         <div className="vit-grid">
           {marcasFiltradas.map((m) => {
-            // Prioridade do fundo do card: 1) primeira foto de produto da loja (mais autêntico,
-            // já é do catálogo real) 2) banner/logo que a assessora cadastrou manualmente
-            // 3) arte abstrata de moda (nem foto de produto nem banner/logo cadastrado).
-            const imagemFundo = m.fotoProdutoUrl || m.bannerUrl || m.logoUrl
+            // Se a assessora optou por mostrar a logo (exibirLogo), o card exibe a logo contida
+            // e centralizada no lugar do nome + foto de fundo — nesse modo NÃO usa a primeira foto
+            // de produto da loja. Senão, prioridade do fundo: 1) primeira foto de produto da loja
+            // (mais autêntico, já é do catálogo real) 2) banner cadastrado manualmente 3) arte
+            // abstrata de moda (nem foto de produto nem banner). logoUrl nunca vira fundo "cover" —
+            // é um recorte pequeno (geralmente com fundo branco), esticado vira uma mancha branca.
+            const usaLogo = m.exibirLogo && m.logoUrl
+            const imagemFundo = !usaLogo ? (m.fotoProdutoUrl || m.bannerUrl) : null
             return (
               <button
-                key={m.id} type="button" className="vit-cardMarca" onClick={() => setMarcaModal(m)}
-                style={imagemFundo ? undefined : { background: arteAbstrataMarca(m.nome) }}
+                key={m.id} type="button" className={`vit-cardMarca${usaLogo ? ' vit-cardMarca--logo' : ''}`} onClick={() => setMarcaModal(m)}
+                style={imagemFundo || usaLogo ? undefined : { background: arteAbstrataMarca(m.nome) }}
               >
                 {imagemFundo && <img src={imagemFundo} alt={m.nome} />}
-                <span className="vit-cardMarca-nome">{m.nome}</span>
+                {usaLogo
+                  ? <span className="vit-cardMarca-logo"><img src={m.logoUrl!} alt={m.nome} /></span>
+                  : <span className="vit-cardMarca-nome">{m.nome}</span>}
               </button>
             )
           })}
@@ -710,8 +716,8 @@ export function VitrineEstilos() {
          numa serifada editorial única (não a identidade visual de cada marca; é a "grade" da
          vitrine que fica consistente, com ou sem banner/logo cadastrado). */
       .vit-cardMarca {
-        position: relative; aspect-ratio: 4/3.1; border-radius: 3px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08);
-        cursor: pointer; padding: 0; display: block;
+        position: relative; aspect-ratio: 4/3.1; border-radius: 3px; overflow: hidden;
+        background: #141414; cursor: pointer; padding: 0; display: block;
       }
       .vit-cardMarca img { width: 100%; height: 100%; object-fit: cover; display: block; filter: brightness(0.72); }
       .vit-cardMarca::after {
@@ -724,6 +730,11 @@ export function VitrineEstilos() {
         font-family: var(--fonte-editorial); font-size: 15px; font-weight: 600; letter-spacing: 0.09em;
         text-transform: uppercase; color: #f5f1e8; line-height: 1.3;
       }
+      /* Modo "mostrar logo" (Marca.exibirLogo): sem foto de fundo, então sem o véu escurecedor —
+         a logo fica contida (sem cortar), com uma margem de respiro dentro do card. */
+      .vit-cardMarca--logo::after { content: none; }
+      .vit-cardMarca-logo { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; padding: 16%; }
+      .vit-cardMarca-logo img { width: 100%; height: 100%; object-fit: contain; }
 
       .vit-pagina-fundo { position: fixed; inset: 0; background: #0a0a0a; z-index: 90; overflow-y: auto; }
       .vit-lancamentos-grid { max-width: 1100px; margin: 0 auto; padding: 20px 24px 40px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }

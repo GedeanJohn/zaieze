@@ -35,7 +35,7 @@ const midiaSelect = { id: true, tipo: true, url: true, ordem: true } as const
 const whatsappMarcaSelect = { id: true, numero: true, rotulo: true } as const
 
 const marcaSelect = {
-  id: true, redeId: true, nome: true, logoUrl: true, bannerUrl: true,
+  id: true, redeId: true, nome: true, logoUrl: true, bannerUrl: true, exibirLogo: true,
   midias: { select: midiaSelect, orderBy: { ordem: 'asc' } },
   descricao: true, formasPagamento: true, modoEnvio: true, condicoesCompra: true,
   tamanhos: true, valores: true, endereco: true, cnpj: true,
@@ -584,6 +584,7 @@ export async function assessoresRoutes(app: FastifyInstance) {
     linkCatalogo: linkSeguro(300),
     percentualComissaoSugerido: z.coerce.number().positive().max(100).nullable().optional(),
     ativo: z.boolean().optional(),
+    exibirLogo: z.boolean().optional(),
   })
 
   app.post('/minha/marcas', protegido, async (request) => {

@@ -145,6 +145,18 @@ tr:hover td { background: #fdfaf6; }
 /* Tabelas largas (colunas com nowrap) rolam na horizontal dentro do próprio card em vez de
    estourar o layout — sem isso o overflow-x: clip do body (linha 21) corta o conteúdo à direita. */
 .conteudo table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
+/* Mesma ideia da regra acima, mas como wrapper explícito — pra usar em páginas que não têm o
+   ancestral .conteudo (ex.: painel do Brand Partner, fora do shell do CRM). */
+.tabela-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tabela-scroll table { white-space: nowrap; }
+
+.filtro-vendas-acao { margin-left: auto; }
+@media (max-width: 600px) {
+  /* Em telas estreitas os campos (De/Até/Marca) quebram linha antes do botão — com
+     margin-left:auto ele ficava sozinho, empurrado pro canto direito, com folga vazia
+     à esquerda. Largura total fica mais previsível/alinhado nesse cenário. */
+  .filtro-vendas-acao { margin-left: 0; width: 100%; }
+}
 
 .btn {
   background: #0a0a0b; color: #fff; border: none; border-radius: 8px;

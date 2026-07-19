@@ -518,6 +518,7 @@ export default function PainelAssessora() {
 
   const linkPublico = perfil ? `https://${perfil.slug}.zaieze.com` : ''
   const totalComissaoFiltro = vendas.reduce((s, v) => s + v.totalComissao, 0)
+  const totalVendaFiltro = vendas.reduce((s, v) => s + v.valorVenda, 0)
 
   if (!perfil) return <div style={{ padding: 24, color: 'var(--ink-soft)' }}>Carregando…</div>
 
@@ -788,7 +789,7 @@ export default function PainelAssessora() {
 
       {aba === 'vendas' && (
         <>
-          <div className="cartao" style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div className="cartao filtro-vendas" style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div className="campo"><label>De</label><input type="date" value={filtroDe} onChange={(e) => setFiltroDe(e.target.value)} /></div>
             <div className="campo"><label>Até</label><input type="date" value={filtroAte} onChange={(e) => setFiltroAte(e.target.value)} /></div>
             <div className="campo">
@@ -798,7 +799,7 @@ export default function PainelAssessora() {
                 {marcas.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
               </select>
             </div>
-            <button className="btn" style={{ marginLeft: 'auto' }} onClick={() => abrirNovaVenda()} disabled={marcas.length === 0}>+ Lançar venda</button>
+            <button className="btn filtro-vendas-acao" onClick={() => abrirNovaVenda()} disabled={marcas.length === 0}>+ Lançar venda</button>
           </div>
 
           <div className="cartao">
@@ -811,25 +812,35 @@ export default function PainelAssessora() {
                 <button type="button" className="btn secundario" onClick={() => exportar('pdf')}>PDF</button>
               </div>
             </div>
-            <table>
-              <thead><tr><th>Data</th><th>Marca</th><th>Valor da venda</th><th>% comissão</th><th>Total comissão</th><th></th></tr></thead>
-              <tbody>
-                {vendas.map((v) => (
-                  <tr key={v.id}>
-                    <td>{fmtData(v.data)}</td>
-                    <td>{v.marca}</td>
-                    <td>{formataReal(v.valorVenda)}</td>
-                    <td>{v.percentualComissao}%</td>
-                    <td><strong>{formataReal(v.totalComissao)}</strong></td>
-                    <td><button type="button" className="btn-link" onClick={() => excluirVenda(v.id)}>excluir</button></td>
-                  </tr>
-                ))}
-                {vendas.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--ink-soft)' }}>Nenhuma venda lançada no período.</td></tr>}
-              </tbody>
-              {vendas.length > 0 && (
-                <tfoot><tr><td colSpan={4} style={{ textAlign: 'right', fontWeight: 700 }}>Total do período</td><td style={{ fontWeight: 700 }}>{formataReal(totalComissaoFiltro)}</td><td /></tr></tfoot>
-              )}
-            </table>
+            <div className="tabela-scroll">
+              <table>
+                <thead><tr><th>Data</th><th>Marca</th><th>Valor da venda</th><th>% comissão</th><th>Total comissão</th><th></th></tr></thead>
+                <tbody>
+                  {vendas.map((v) => (
+                    <tr key={v.id}>
+                      <td>{fmtData(v.data)}</td>
+                      <td>{v.marca}</td>
+                      <td>{formataReal(v.valorVenda)}</td>
+                      <td>{v.percentualComissao}%</td>
+                      <td><strong>{formataReal(v.totalComissao)}</strong></td>
+                      <td><button type="button" className="btn-link" onClick={() => excluirVenda(v.id)}>excluir</button></td>
+                    </tr>
+                  ))}
+                  {vendas.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--ink-soft)' }}>Nenhuma venda lançada no período.</td></tr>}
+                </tbody>
+                {vendas.length > 0 && (
+                  <tfoot>
+                    <tr>
+                      <td colSpan={2} style={{ textAlign: 'right', fontWeight: 700 }}>Total do período</td>
+                      <td style={{ fontWeight: 700 }}>{formataReal(totalVendaFiltro)}</td>
+                      <td />
+                      <td style={{ fontWeight: 700 }}>{formataReal(totalComissaoFiltro)}</td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
           </div>
         </>
       )}

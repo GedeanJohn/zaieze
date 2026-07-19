@@ -35,7 +35,7 @@ const midiaSelect = { id: true, tipo: true, url: true, ordem: true } as const
 const whatsappMarcaSelect = { id: true, numero: true, rotulo: true } as const
 
 const marcaSelect = {
-  id: true, redeId: true, nome: true, logoUrl: true, bannerUrl: true, exibirLogo: true,
+  id: true, redeId: true, nome: true, logoUrl: true, bannerUrl: true, exibirLogo: true, cliques: true,
   midias: { select: midiaSelect, orderBy: { ordem: 'asc' } },
   descricao: true, formasPagamento: true, modoEnvio: true, condicoesCompra: true,
   tamanhos: true, valores: true, endereco: true, cnpj: true,
@@ -285,6 +285,18 @@ export async function assessoresRoutes(app: FastifyInstance) {
       },
     })
     return lancamentos.map((l) => ({ ...l, preco: l.preco != null ? num(l.preco) : null }))
+  })
+
+  // Clique num link de contato (WhatsApp, catálogo etc.) de uma marca representada — público,
+  // sem login. Métrica pra Brand Partner acompanhar quantos clientes ela mandou pra cada loja
+  // (não confirma atendimento/venda do lado do lojista). Rate-limit generoso: um visitante
+  // navegando pode abrir vários links da mesma marca em sequência.
+  app.post('/publico/marcas/:id/clique', { config: { rateLimit: { max: 60, timeWindow: '10 minutes' } } }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const marca = await prisma.assessorMarca.findFirst({ where: { id, ...marcaPublicaWhere }, select: { id: true } })
+    if (!marca) return reply.code(404).send({ erro: 'Marca não encontrada' })
+    await prisma.assessorMarca.update({ where: { id }, data: { cliques: { increment: 1 } } })
+    return reply.code(204).send()
   })
 
   // preHandler por rota (não addHook): este módulo mistura a vitrine pública acima com o

@@ -29,7 +29,7 @@ interface Midia { id: string; tipo: 'FOTO' | 'VIDEO'; url: string; ordem: number
 interface WhatsappMarca { id: string; numero: string; rotulo: string | null }
 interface Marca {
   id: string; redeId: string | null; nome: string; logoUrl: string | null; bannerUrl: string | null
-  exibirLogo: boolean
+  exibirLogo: boolean; cliques: number
   midias: Midia[]
   descricao: string | null; formasPagamento: string | null; modoEnvio: string | null; condicoesCompra: string | null
   tamanhos: string | null; valores: string | null; endereco: string | null; cnpj: string | null
@@ -776,6 +776,9 @@ export default function PainelAssessora() {
                   <div style={{ fontSize: 12, color: '#dc2626', marginTop: 4 }}>Solicitação recusada pela marca</div>
                 )}
                 {m.valores && <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{m.valores}</div>}
+                <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 4 }}>
+                  {m.cliques} {m.cliques === 1 ? 'clique' : 'cliques'} nos links de contato
+                </div>
                 <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
                   <button type="button" className="btn-link" onClick={() => abrirEditarMarca(m)}>editar</button>
                   <button type="button" className="btn-link" onClick={() => abrirNovaVenda(m.id)}>lançar venda</button>

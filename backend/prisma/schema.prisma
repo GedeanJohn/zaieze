@@ -1539,6 +1539,11 @@ model AssessorMarca {
   redeId     String? // preenchido quando a marca já é cliente ZAIEZE — hoje é só referência/selo, sem crédito automático de venda
   nome       String
   logoUrl    String?
+  // Quantas vezes um visitante da vitrine clicou em algum link de contato desta marca
+  // (WhatsApp, catálogo, site etc.) — métrica PRA ASSESSORA de quantos clientes ela mandou
+  // pra loja, não uma confirmação de venda/atendimento do lado do lojista (que pode nem ser
+  // cliente ZAIEZE — não temos como saber o que acontece depois do clique).
+  cliques    Int     @default(0)
   bannerUrl  String? // imagem grande do card na grade "Marcas que represento" (distinta da logoUrl pequena)
   // Card da vitrine mostra a logo centralizada (contida, sem cortar) no lugar do nome + foto de
   // fundo — pra quem prefere a identidade visual da marca a uma foto de produto/arte abstrata.

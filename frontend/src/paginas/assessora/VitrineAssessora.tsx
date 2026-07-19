@@ -91,8 +91,24 @@ function usePwaPersonalizado(v: Vitrine | null) {
   }, [v])
 }
 
-function linkWhatsapp(numero: string): string {
-  return `https://wa.me/${numero.replace(/\D/g, '')}`
+function linkWhatsapp(numero: string, texto?: string): string {
+  const base = `https://wa.me/${numero.replace(/\D/g, '')}`
+  return texto ? `${base}?text=${encodeURIComponent(texto)}` : base
+}
+
+/** Mensagem pré-preenchida no WhatsApp da marca — é como o LOJISTA (de dentro ou de fora da
+ *  ZAIEZE, tanto faz) sabe que o cliente veio pela indicação desta Brand Partner especificamente,
+ *  sem precisar de nenhuma integração do lado dele. */
+function mensagemIndicacao(nomeAssessora: string): string {
+  return `Olá, sou cliente da ${nomeAssessora}.`
+}
+
+/** Contagem de cliques nos links de contato de uma marca — métrica pra Brand Partner acompanhar
+ *  quantos clientes ela mandou pra cada loja (não confirma se o lojista realmente atendeu/vendeu,
+ *  isso foge do nosso controle quando a loja não é cliente ZAIEZE). Fire-and-forget: nunca atrasa
+ *  nem quebra a navegação do visitante. */
+function registrarClique(marcaId: string) {
+  api.post(`/assessores/publico/marcas/${marcaId}/clique`).catch(() => {})
 }
 
 /** Arte abstrata de moda pra card de marca sem nenhuma imagem própria (nem foto de produto, nem
@@ -360,14 +376,14 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
         ))}
       </nav>
 
-      {marcaModal && <ModalLinksMarca marca={marcaModal} onClose={() => setMarcaModal(null)} />}
+      {marcaModal && <ModalLinksMarca marca={marcaModal} assessoraNome={v.nome} onClose={() => setMarcaModal(null)} />}
       {avaliacaoAberta && <ModalAvaliacao slug={slug} onClose={() => setAvaliacaoAberta(false)} />}
-      {lancamentosAberto && <PaginaLancamentos lancamentos={lancamentos} onClose={() => setLancamentosAberto(false)} />}
+      {lancamentosAberto && <PaginaLancamentos lancamentos={lancamentos} assessoraNome={v.nome} onClose={() => setLancamentosAberto(false)} />}
     </div>
   )
 }
 
-function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void }) {
+function ModalLinksMarca({ marca, assessoraNome, onClose }: { marca: Marca; assessoraNome: string; onClose: () => void }) {
   const [midiaAberta, setMidiaAberta] = useState<{ tipo: 'imagem' | 'video'; url: string } | null>(null)
   const [localizacao, setLocalizacao] = useState<{ lat: number; lng: number } | null>(null)
   const [localizacaoNegada, setLocalizacaoNegada] = useState(false)
@@ -386,7 +402,7 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
   const links: { rotulo: string; href: string; Icone: (p: { size?: number }) => JSX.Element }[] = []
   marca.whatsapps.forEach((w, i) => {
     const rotulo = w.rotulo ? `WhatsApp — ${w.rotulo}` : (marca.whatsapps.length > 1 ? `WhatsApp ${i + 1}` : 'WhatsApp')
-    links.push({ rotulo, href: linkWhatsapp(w.numero), Icone: (p) => <IconeMarca icone={siWhatsapp} {...p} /> })
+    links.push({ rotulo, href: linkWhatsapp(w.numero, mensagemIndicacao(assessoraNome)), Icone: (p) => <IconeMarca icone={siWhatsapp} {...p} /> })
   })
   const instagramHref = linkPublicoSeguro(marca.instagram)
   if (instagramHref) links.push({ rotulo: 'Instagram', href: instagramHref, Icone: (p) => <IconeMarca icone={siInstagram} {...p} /> })
@@ -411,7 +427,7 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
         {marca.logoUrl && <img className="vit-modal-logo" src={marca.logoUrl} alt={marca.nome} />}
         <h3 className="vit-modal-nome">{marca.nome}</h3>
         {linkCatalogoHref && (
-          <a className="vit-modal-catalogo" href={linkCatalogoHref} target="_blank" rel="noreferrer">
+          <a className="vit-modal-catalogo" href={linkCatalogoHref} target="_blank" rel="noreferrer" onClick={() => registrarClique(marca.id)}>
             <ShoppingBag size={18} /> Ver catálogo
           </a>
         )}
@@ -435,7 +451,7 @@ function ModalLinksMarca({ marca, onClose }: { marca: Marca; onClose: () => void
         {links.length > 0 && (
           <div className="vit-modal-links">
             {links.map((l) => (
-              <a key={`${l.rotulo}-${l.href}`} className="vit-modal-link" href={l.href} target="_blank" rel="noreferrer">
+              <a key={`${l.rotulo}-${l.href}`} className="vit-modal-link" href={l.href} target="_blank" rel="noreferrer" onClick={() => registrarClique(marca.id)}>
                 <l.Icone size={20} /> {l.rotulo}
               </a>
             ))}
@@ -557,7 +573,7 @@ function ModalAvaliacao({ slug, onClose }: { slug: string; onClose: () => void }
 /** Tela cheia (não é uma rota própria — a vitrine é um app de página única) com os modelos que
  *  o Brand Partner escolheu destacar. Vem ordenada pelo backend (comissão da marca, depois mais
  *  recente) — não reordena no cliente. */
-function PaginaLancamentos({ lancamentos, onClose }: { lancamentos: Lancamento[] | null; onClose: () => void }) {
+function PaginaLancamentos({ lancamentos, assessoraNome, onClose }: { lancamentos: Lancamento[] | null; assessoraNome: string; onClose: () => void }) {
   const [itemAberto, setItemAberto] = useState<Lancamento | null>(null)
 
   return (
@@ -596,13 +612,13 @@ function PaginaLancamentos({ lancamentos, onClose }: { lancamentos: Lancamento[]
             {itemAberto.descricao && <p style={{ color: '#d8d3ca', fontSize: 14, lineHeight: 1.5 }}>{itemAberto.descricao}</p>}
             <div className="vit-modal-links">
               {itemAberto.assessorMarca.whatsapps.map((w, i) => (
-                <a key={w.id} className="vit-modal-link" href={linkWhatsapp(w.numero)} target="_blank" rel="noreferrer">
+                <a key={w.id} className="vit-modal-link" href={linkWhatsapp(w.numero, mensagemIndicacao(assessoraNome))} target="_blank" rel="noreferrer" onClick={() => registrarClique(itemAberto.assessorMarca.id)}>
                   <IconeMarca icone={siWhatsapp} />
                   Perguntar no WhatsApp{w.rotulo ? ` — ${w.rotulo}` : itemAberto.assessorMarca.whatsapps.length > 1 ? ` ${i + 1}` : ''}
                 </a>
               ))}
               {linkPublicoSeguro(itemAberto.assessorMarca.linkCatalogo) && (
-                <a className="vit-modal-link" href={linkPublicoSeguro(itemAberto.assessorMarca.linkCatalogo)!} target="_blank" rel="noreferrer">
+                <a className="vit-modal-link" href={linkPublicoSeguro(itemAberto.assessorMarca.linkCatalogo)!} target="_blank" rel="noreferrer" onClick={() => registrarClique(itemAberto.assessorMarca.id)}>
                   <ShoppingBag size={20} /> Ver no catálogo da marca
                 </a>
               )}

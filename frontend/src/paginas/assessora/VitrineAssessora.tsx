@@ -718,6 +718,7 @@ export function VitrineEstilos() {
       .vit-cardMarca {
         position: relative; aspect-ratio: 4/3.1; border-radius: 3px; overflow: hidden;
         background: #141414; cursor: pointer; padding: 0; display: block;
+        border: none; -webkit-appearance: none; appearance: none; box-shadow: none;
       }
       .vit-cardMarca img { width: 100%; height: 100%; object-fit: cover; display: block; filter: brightness(0.72); }
       .vit-cardMarca::after {

@@ -663,8 +663,8 @@ export default function PainelAssessora() {
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, marginBottom: 2 }}>Foto de perfil</div>
               <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 8 }}>
-                É a foto grande da capa da sua vitrine. Use uma foto vertical (retrato), numa proporção
-                próxima de 3:3,5 — evita cortes estranhos no quadro.
+                É a foto grande da capa da sua vitrine. Use uma foto na proporção de tela de celular
+                em pé (9:16) — ex.: <strong>1080×1920px</strong> — evita cortes estranhos no quadro.
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button type="button" className="btn" disabled={enviandoFoto} onClick={() => fotoRef.current?.click()}>{enviandoFoto ? 'Enviando…' : '📷 Trocar foto'}</button>

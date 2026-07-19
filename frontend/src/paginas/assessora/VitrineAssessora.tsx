@@ -657,8 +657,8 @@ export function VitrineEstilos() {
       .vit-hero { max-width: 1100px; margin: 0 auto; padding: 32px 24px 8px; }
       .vit-hero-topo { display: grid; grid-template-columns: 340px 1fr; gap: 40px; }
       .vit-hero-foto {
-        position: relative; border-radius: 16px; overflow: hidden; aspect-ratio: 3/3.5; background: #1a1a1a;
-        border: 1px solid rgba(255,255,255,0.14);
+        position: relative; border-radius: 16px; overflow: hidden; aspect-ratio: 9/16; background: #1a1a1a;
+        border: 2px solid #9a9a9a;
       }
       .vit-hero-foto img { width: 100%; height: 100%; object-fit: cover; object-position: center 25%; display: block; }
       .vit-hero-fotoVazia { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 64px; font-weight: 800; color: #555; }
@@ -826,7 +826,7 @@ export function VitrineEstilos() {
       @media (max-width: 860px) {
         .vit-hero { padding: 20px 16px 8px; }
         .vit-hero-topo { grid-template-columns: 34% 1fr; gap: 14px; align-items: start; }
-        .vit-hero-foto { aspect-ratio: 3/3.5; border-radius: 12px; }
+        .vit-hero-foto { aspect-ratio: 9/16; border-radius: 12px; }
         .vit-hero-fotoVazia { font-size: 36px; }
         .vit-disponivel { left: 6px; bottom: 6px; padding: 4px 8px; gap: 4px; font-size: 10px; }
         .vit-disponivel-bolha { width: 6px; height: 6px; }

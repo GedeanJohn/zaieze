@@ -658,7 +658,7 @@ export function VitrineEstilos() {
       .vit-hero-topo { display: grid; grid-template-columns: 340px 1fr; gap: 40px; }
       .vit-hero-foto {
         position: relative; border-radius: 16px; overflow: hidden; aspect-ratio: 9/16; background: #1a1a1a;
-        border: 2px solid #9a9a9a;
+        border: 1px solid rgba(255,255,255,0.14);
       }
       .vit-hero-foto img { width: 100%; height: 100%; object-fit: cover; object-position: center 25%; display: block; }
       .vit-hero-fotoVazia { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 64px; font-weight: 800; color: #555; }

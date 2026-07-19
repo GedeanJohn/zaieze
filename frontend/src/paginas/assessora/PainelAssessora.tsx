@@ -662,7 +662,10 @@ export default function PainelAssessora() {
               : <span style={{ width: 72, height: 72, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 24, color: '#fff', background: 'linear-gradient(135deg, #c9a25f, #8a6a35)' }}>{(usuario?.nome ?? '?').slice(0, 1).toUpperCase()}</span>}
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, marginBottom: 2 }}>Foto de perfil</div>
-              <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 8 }}>É a foto grande da capa da sua vitrine.</div>
+              <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 8 }}>
+                É a foto grande da capa da sua vitrine. Use uma foto vertical (retrato), numa proporção
+                próxima de 3:3,5 — evita cortes estranhos no quadro.
+              </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button type="button" className="btn" disabled={enviandoFoto} onClick={() => fotoRef.current?.click()}>{enviandoFoto ? 'Enviando…' : '📷 Trocar foto'}</button>
                 {fotoUrl && <button type="button" className="btn secundario" disabled={enviandoFoto} onClick={removerFoto}>Remover</button>}

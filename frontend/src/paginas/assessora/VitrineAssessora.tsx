@@ -684,7 +684,7 @@ export function VitrineEstilos() {
 
       .vit-acoes { display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
       .vit-btn-primario, .vit-btn-secundario {
-        display: inline-flex; align-items: center; gap: 8px; padding: 13px 22px; border-radius: 10px;
+        display: inline-flex; align-items: center; gap: 8px; padding: 13px 22px; border-radius: 6px;
         font-size: 14px; font-weight: 700; letter-spacing: 0.03em; text-decoration: none; cursor: pointer; border: none;
       }
       .vit-btn-primario { background: linear-gradient(135deg, #d6b06f, #b8863f); color: #14100a; }

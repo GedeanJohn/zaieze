@@ -3,6 +3,7 @@ import { ExternalLink, Eye } from 'lucide-react'
 import { api, formataReal, mensagemDeErro, usuarioLogado, atualizarUsuarioLocal } from '../../api'
 import { useToast } from '../../componentes/Toast'
 import PreviewVitrine from '../../componentes/PreviewVitrine'
+import CampoSenha from '../../componentes/CampoSenha'
 import { HOST } from '../../host'
 
 type PlanoAssessor = 'BASICO' | 'AVANCADO'
@@ -75,6 +76,13 @@ export default function PainelAssessora() {
   const [indicacao, setIndicacao] = useState<Indicacao | null>(null)
 
   const [perfil, setPerfil] = useState<Perfil | null>(null)
+  // Nome/e-mail/senha (conta de login) — antes só dava pra editar em /conta, uma rota do shell
+  // do CRM que a Assessora nunca alcança de verdade (Raiz() não renderiza Outlet pro papel dela,
+  // então a navegação pra lá só reexibia este mesmo painel). Trazido pra cá, no único painel dela.
+  const [nomeConta, setNomeConta] = useState(usuario?.nome ?? '')
+  const [emailConta, setEmailConta] = useState(usuario?.email ?? '')
+  const [senhaConta, setSenhaConta] = useState('')
+  const [salvandoConta, setSalvandoConta] = useState(false)
   const [bio, setBio] = useState(''); const [whatsapp, setWhatsapp] = useState('')
   const [instagram, setInstagram] = useState(''); const [site, setSite] = useState('')
   const [tagline, setTagline] = useState(''); const [disponivel, setDisponivel] = useState(true)
@@ -271,6 +279,22 @@ export default function PainelAssessora() {
       avisar('Perfil salvo.')
       carregarPerfil()
     } catch (e2) { avisar(mensagemDeErro(e2), 'erro') } finally { setSalvandoPerfil(false) }
+  }
+
+  async function salvarConta(e: React.FormEvent) {
+    e.preventDefault()
+    setSalvandoConta(true)
+    try {
+      const corpo: Record<string, unknown> = {}
+      if (nomeConta && nomeConta !== usuario?.nome) corpo.nome = nomeConta
+      if (emailConta && emailConta !== usuario?.email) corpo.email = emailConta
+      if (senhaConta) corpo.senha = senhaConta
+      if (Object.keys(corpo).length === 0) { avisar('Nada para alterar.'); return }
+      const { data } = await api.patch('/usuarios/me', corpo)
+      atualizarUsuarioLocal({ nome: data.nome, email: data.email })
+      setSenhaConta('')
+      avisar('Dados de acesso atualizados.' + (corpo.email ? ' Use o novo e-mail no próximo login.' : ''))
+    } catch (e2) { avisar(mensagemDeErro(e2), 'erro') } finally { setSalvandoConta(false) }
   }
 
   function adicionarPeriodo(diaSemana: number) {
@@ -657,6 +681,17 @@ export default function PainelAssessora() {
 
       {aba === 'perfil' && (
         <>
+          <form className="cartao" onSubmit={salvarConta} style={{ maxWidth: 520 }}>
+            <h2 style={{ marginTop: 0 }}>Dados de acesso</h2>
+            <div className="campo"><label>Nome</label><input value={nomeConta} onChange={(e) => setNomeConta(e.target.value)} required /></div>
+            <div className="campo"><label>E-mail (seu login)</label><input type="email" value={emailConta} onChange={(e) => setEmailConta(e.target.value)} required /></div>
+            <div className="campo">
+              <label>Nova senha (deixe vazio para manter)</label>
+              <CampoSenha value={senhaConta} onChange={(e) => setSenhaConta(e.target.value)} minLength={6} placeholder="mínimo 6 caracteres" />
+            </div>
+            <div className="acoes"><button className="btn" disabled={salvandoConta}>{salvandoConta ? 'Salvando…' : 'Salvar'}</button></div>
+          </form>
+
           <div className="cartao" style={{ display: 'flex', alignItems: 'center', gap: 16, maxWidth: 520 }}>
             {fotoUrl
               ? <img src={fotoUrl} alt="" style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover' }} />

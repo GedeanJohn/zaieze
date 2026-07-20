@@ -226,10 +226,10 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
       <VitrineEstilos />
 
       <header className="vit-topo">
-        <div className="vit-marca-wrap">
+        <a className="vit-marca-wrap" href="https://zaieze.com" target="_blank" rel="noreferrer">
           <div className="vit-marca-nome">zaieze</div>
           <div className="vit-marca-sub">SISTEMAS PARA MODA</div>
-        </div>
+        </a>
         <div className="vit-topo-acoes">
           <button type="button" className="vit-icone-botao" aria-label="Buscar marca" onClick={() => setBuscaAberta((a) => !a)}><Search size={18} /></button>
           <BotaoInstalarApp />
@@ -646,6 +646,7 @@ export function VitrineEstilos() {
         padding: 16px 24px; border-bottom: 1px solid rgba(255,255,255,0.08);
         position: sticky; top: 0; background: #0a0a0ae6; backdrop-filter: blur(6px); z-index: 20;
       }
+      .vit-marca-wrap { text-decoration: none; display: block; }
       .vit-marca-nome { font-family: var(--marca); font-size: 22px; letter-spacing: 0.06em; color: #fff; line-height: 1; }
       .vit-marca-sub { font-size: 10px; letter-spacing: 0.12em; color: #8a8a8a; margin-top: 2px; }
       .vit-topo-acoes { display: flex; gap: 8px; }

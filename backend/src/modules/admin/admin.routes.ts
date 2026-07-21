@@ -61,7 +61,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
   const precoAddonSchema = z.object({ preco: z.coerce.number().nonnegative() })
   app.put('/addons/:tipo/preco', async (request) => {
-    const { tipo } = z.object({ tipo: z.enum(['PROVADOR', 'VENDEDORA_ZAIEZE']) }).parse(request.params)
+    const { tipo } = z.object({ tipo: z.enum(['PROVADOR', 'VENDEDORA_ZAIEZE', 'ESTOQUE_INTELIGENTE']) }).parse(request.params)
     const { preco } = precoAddonSchema.parse(request.body)
     await definirPrecoAddon(tipo, preco)
     return { ok: true, addons: await listarAddons() }
@@ -122,12 +122,14 @@ export async function adminRoutes(app: FastifyInstance) {
       include: {
         assinatura: { select: { plano: true, status: true, valor: true, cicloFimEm: true, cancelamentoSolicitadoEm: true, simulada: true } },
         _count: { select: { lojas: true, usuarios: true } },
+        usuarios: { where: { role: 'GESTOR' }, select: { id: true, nome: true, email: true }, take: 1 },
       },
     })
     return {
       redes: redes.map((r) => ({
         id: r.id, nome: r.nome, slug: r.slug, plano: r.plano, ativo: r.ativo, criadoEm: r.createdAt,
         lojas: r._count.lojas, usuarios: r._count.usuarios,
+        gestor: r.usuarios[0] ?? null,
         assinatura: r.assinatura
           ? {
               plano: r.assinatura.plano, status: r.assinatura.status, valor: num(r.assinatura.valor),
@@ -136,6 +138,68 @@ export async function adminRoutes(app: FastifyInstance) {
             }
           : null,
       })),
+    }
+  })
+
+  // Reset PROATIVO da senha do gestor de uma rede — não depende dele ter aberto um pedido de
+  // "esqueci minha senha" primeiro (ver /solicitacoes-senha acima, que só atende pedidos já
+  // registrados). Útil quando o gestor perdeu acesso a tudo (e-mail e WhatsApp) e não consegue
+  // nem abrir o pedido sozinho.
+  app.post('/redes/:id/gestor/resetar-senha', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const gestor = await prisma.usuario.findFirst({ where: { redeId: id, role: 'GESTOR' }, select: { id: true, nome: true } })
+    if (!gestor) return reply.code(404).send({ erro: 'Gestor não encontrado' })
+    const senha = gerarSenhaProvisoria()
+    await prisma.usuario.update({ where: { id: gestor.id }, data: { senhaHash: await bcrypt.hash(senha, 10) } })
+    return { nome: gestor.nome, senha }
+  })
+
+  // "Entrar como": o SUPER_ADMIN assume a sessão de outro usuário (qualquer papel/marca) pra
+  // suporte/investigação — mesmo formato de token do /auth/login, mas sem checar senha nem os
+  // gates de assinatura/rede ativa (o objetivo às vezes é justamente investigar uma conta travada).
+  // Fica registrado em ImpersonacaoLog. Não permite virar outro SUPER_ADMIN (evita esconder ações
+  // atrás da sessão de outro operador da plataforma).
+  app.post('/usuarios/:id/entrar-como', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const alvo = await prisma.usuario.findUnique({
+      where: { id },
+      include: {
+        loja: { select: { id: true, nome: true, slug: true, rede: { select: { id: true, nome: true, slug: true, plano: true } } } },
+        rede: { select: { id: true, nome: true, slug: true, plano: true } },
+      },
+    })
+    if (!alvo) return reply.code(404).send({ erro: 'Usuário não encontrado' })
+    if (alvo.role === 'SUPER_ADMIN') return reply.code(403).send({ erro: 'Não é possível entrar como outro super admin' })
+
+    const redeId = alvo.redeId ?? alvo.loja?.rede.id ?? null
+    const rede = alvo.rede ?? alvo.loja?.rede ?? null
+    const assessor = alvo.role === 'ASSESSORA'
+      ? await prisma.assessor.findUnique({ where: { usuarioId: alvo.id }, select: { slug: true } })
+      : null
+
+    await prisma.impersonacaoLog.create({
+      data: {
+        operadorId: request.user.sub, operadorNome: request.user.nome, operadorRole: request.user.role,
+        usuarioAlvoId: alvo.id, usuarioAlvoNome: alvo.nome, usuarioAlvoRole: alvo.role,
+      },
+    })
+
+    // Expira mais rápido que um login normal (12h) — sessão de suporte, não de trabalho do dia.
+    const token = app.jwt.sign(
+      { sub: alvo.id, redeId, lojaId: alvo.lojaId, role: alvo.role, nome: alvo.nome, plano: rede?.plano ?? null },
+      { expiresIn: '2h' },
+    )
+    return {
+      token,
+      // slug pra montar a URL de destino (subdomínio) no front — não faz parte do formato
+      // padrão de `usuario` salvo no localStorage, só usado no momento do redirect.
+      redeSlug: rede?.slug ?? null,
+      usuario: {
+        id: alvo.id, nome: alvo.nome, email: alvo.email, role: alvo.role, fotoUrl: alvo.fotoUrl, idioma: alvo.idioma,
+        rede: rede ? { id: rede.id, nome: rede.nome, plano: rede.plano } : null,
+        loja: alvo.loja ? { id: alvo.loja.id, nome: alvo.loja.nome, slug: alvo.loja.slug } : null,
+        assessor: assessor?.slug ? { slug: assessor.slug } : null,
+      },
     }
   })
 

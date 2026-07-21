@@ -1,11 +1,14 @@
 import type { TipoAddon } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 
-const PADRAO: Record<TipoAddon, number> = { PROVADOR: 59.99, VENDEDORA_ZAIEZE: 297 }
-const NOMES: Record<TipoAddon, string> = { PROVADOR: 'Provador Virtual', VENDEDORA_ZAIEZE: 'Vendedora ZAIEZE' }
+// Preço do Estoque Inteligente é placeholder (não validado com o usuário) — ajustável no painel
+// do super admin (definirPrecoAddon), mesmo mecanismo dos outros add-ons.
+const PADRAO: Record<TipoAddon, number> = { PROVADOR: 59.99, VENDEDORA_ZAIEZE: 297, ESTOQUE_INTELIGENTE: 49.9 }
+const NOMES: Record<TipoAddon, string> = { PROVADOR: 'Provador Virtual', VENDEDORA_ZAIEZE: 'Vendedora ZAIEZE', ESTOQUE_INTELIGENTE: 'Estoque Inteligente' }
 const RESUMOS: Record<TipoAddon, string> = {
   PROVADOR: 'Prova virtual com IA (foto e vídeo) — disponível para qualquer plano, cobrada à parte.',
   VENDEDORA_ZAIEZE: 'Loja 100% automatizada por IA: atende WhatsApp/Instagram, recomenda produtos e fecha vendas sozinha — disponível para qualquer plano, cobrada à parte.',
+  ESTOQUE_INTELIGENTE: 'Campeões de venda e risco de ruptura por produto — disponível para qualquer plano, cobrada à parte.',
 }
 
 /** Preço vigente de um add-on (banco; cai no padrão se ainda não houver registro). */
@@ -36,6 +39,21 @@ export async function confirmarCicloAddon(redeId: string, tipo: TipoAddon): Prom
     where: { redeId_tipo: { redeId, tipo } },
     data: { status: 'ATIVA', cicloFimEm: proximoCicloFimAddon(), cancelamentoSolicitadoEm: null, cancelamentoOrigem: null },
   })
+  if (tipo === 'VENDEDORA_ZAIEZE') await autoConfigurarLojaPadraoVendedoraIa(redeId)
+}
+
+/**
+ * Ativação automática da "loja padrão" da Vendedora ZAIEZE quando o pagamento do add-on é
+ * confirmado — só quando não há ambiguidade (rede com exatamente 1 loja). Com 0 ou 2+ lojas não
+ * dá pra adivinhar; o gestor continua configurando manualmente em /vendedora-zaieze (a tela já
+ * pré-seleciona a loja quando só existe uma). Não sobrescreve uma escolha manual já feita.
+ */
+async function autoConfigurarLojaPadraoVendedoraIa(redeId: string): Promise<void> {
+  const rede = await prisma.rede.findUnique({ where: { id: redeId }, select: { lojaVendedoraIaId: true } })
+  if (rede?.lojaVendedoraIaId) return
+  const lojas = await prisma.loja.findMany({ where: { redeId }, select: { id: true } })
+  if (lojas.length !== 1) return
+  await prisma.rede.update({ where: { id: redeId }, data: { lojaVendedoraIaId: lojas[0].id } })
 }
 
 /**
@@ -66,7 +84,13 @@ export async function aplicarFimDeCicloAddon(redeId: string, tipo: TipoAddon): P
   const a = await prisma.assinaturaAddon.findUnique({ where: { redeId_tipo: { redeId, tipo } } })
   if (!a || a.status === 'CANCELADA') return
   const vencido = a.cancelamentoSolicitadoEm && a.cicloFimEm && a.cicloFimEm.getTime() <= Date.now()
-  if (vencido) await prisma.assinaturaAddon.update({ where: { id: a.id }, data: { status: 'CANCELADA' } })
+  if (vencido) {
+    await prisma.assinaturaAddon.update({ where: { id: a.id }, data: { status: 'CANCELADA' } })
+    // A rota `contextoVendedoraIa` já checa addonAtivo() e para de responder sozinha assim que
+    // cancelado — limpar aqui é higiene (evita reativar um dia com a loja antiga "fantasma"
+    // configurada) e obriga reconfirmar a loja padrão se a assinatura for retomada depois.
+    if (tipo === 'VENDEDORA_ZAIEZE') await prisma.rede.update({ where: { id: redeId }, data: { lojaVendedoraIaId: null } })
+  }
 }
 
 /** Varredura (cron/admin): encerra todos os add-ons com ciclo vencido. Retorna quantos cortou. */

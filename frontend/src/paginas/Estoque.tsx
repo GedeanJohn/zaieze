@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api, formataReal, mensagemDeErro } from '../api'
 import { useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
@@ -65,6 +66,7 @@ export default function Estoque() {
   const [movimentos, setMovimentos] = useState<Movimento[]>([])
   const [dash, setDash] = useState<DashEstoque | null>(null)
   const [intel, setIntel] = useState<Inteligencia | null>(null)
+  const [semAcessoIntel, setSemAcessoIntel] = useState(false)
   const [demanda, setDemanda] = useState<DemandaReserva[]>([])
   const [tipo, setTipo] = useState('')
   const [produtos, setProdutos] = useState<ProdutoP[]>([])
@@ -85,8 +87,14 @@ export default function Estoque() {
     if (!escopo.pronto) return
     const { data } = await api.get('/estoque/dashboard', { params: escopo.params })
     setDash(data)
-    const { data: i } = await api.get('/estoque/inteligencia', { params: escopo.params })
-    setIntel(i)
+    // Estoque Inteligente é add-on à parte (não vem mais garantido pelo plano Elite) — 403 aqui é
+    // esperado pra quem não assinou, não um erro real.
+    try {
+      const { data: i } = await api.get('/estoque/inteligencia', { params: escopo.params })
+      setIntel(i)
+    } catch (e) {
+      if ((e as { response?: { status?: number } }).response?.status === 403) setSemAcessoIntel(true)
+    }
   }, [escopo.pronto, escopo.params])
 
   const carregarDemanda = useCallback(async () => {
@@ -282,6 +290,16 @@ export default function Estoque() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {semAcessoIntel && (
+        <div className="cartao" style={{ marginTop: 16 }}>
+          <h2 className="painel-titulo">Estoque Inteligente</h2>
+          <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+            Campeões de venda e risco de ruptura por produto — add-on de assinatura à parte, disponível para qualquer plano.
+          </p>
+          <Link className="btn" to="/planos">Assinar add-on</Link>
         </div>
       )}
 

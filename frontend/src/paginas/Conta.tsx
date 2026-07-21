@@ -22,6 +22,11 @@ export default function Conta() {
   const { idioma, setIdioma } = useIdioma()
   const [salvandoIdioma, setSalvandoIdioma] = useState(false)
 
+  // Telefone/WhatsApp — não vem no login (só em /usuarios/me), e é o que faz o "esqueci minha
+  // senha" mandar a senha na hora em vez de cair numa fila de pedido manual. Sem número
+  // cadastrado, o SUPER_ADMIN em particular fica sem ninguém "acima" pra atender o pedido.
+  const [telefone, setTelefone] = useState('')
+
   async function salvarIdioma(novo: Idioma) {
     setSalvandoIdioma(true)
     try {
@@ -32,13 +37,16 @@ export default function Conta() {
     } catch (err) { avisar(mensagemDeErro(err), 'erro') } finally { setSalvandoIdioma(false) }
   }
 
-  // Bio do catálogo (só a vendedora tem loja pública). Carrega o valor atual do servidor.
+  // Bio do catálogo (só a vendedora tem loja pública). Carrega junto com o telefone (mesma rota).
   const ehVendedora = u.role === 'VENDEDORA'
   const [bio, setBio] = useState('')
   const [bioOrig, setBioOrig] = useState('')
+  const [telefoneOrig, setTelefoneOrig] = useState('')
   useEffect(() => {
-    if (!ehVendedora) return
-    api.get('/usuarios/me').then(({ data }) => { setBio(data.bioCatalogo ?? ''); setBioOrig(data.bioCatalogo ?? '') }).catch(() => {})
+    api.get('/usuarios/me').then(({ data }) => {
+      setTelefone(data.telefone ?? ''); setTelefoneOrig(data.telefone ?? '')
+      if (ehVendedora) { setBio(data.bioCatalogo ?? ''); setBioOrig(data.bioCatalogo ?? '') }
+    }).catch(() => {})
   }, [ehVendedora])
 
   // Foto de perfil (exibida no topo do app e no Chat)
@@ -75,9 +83,11 @@ export default function Conta() {
       if (nome && nome !== u.nome) corpo.nome = nome
       if (email && email !== u.email) corpo.email = email
       if (senha) corpo.senha = senha
+      if (telefone !== telefoneOrig) corpo.telefone = telefone || null
       if (ehVendedora && bio !== bioOrig) corpo.bioCatalogo = bio
       if (Object.keys(corpo).length === 0) { avisar('Nada para alterar.'); return }
       const { data } = await api.patch('/usuarios/me', corpo)
+      if ('telefone' in corpo) setTelefoneOrig(telefone)
       if ('bioCatalogo' in corpo) setBioOrig(bio)
       const atual = usuarioLogado()
       if (atual) localStorage.setItem('modacrm_usuario', JSON.stringify({ ...atual, nome: data.nome, email: data.email }))
@@ -123,6 +133,11 @@ export default function Conta() {
       <form className="cartao" onSubmit={salvar} style={{ maxWidth: 520 }}>
         <div className="campo"><label>Nome</label><input value={nome} onChange={(e) => setNome(e.target.value)} required /></div>
         <div className="campo"><label>E-mail (seu login)</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
+        <div className="campo">
+          <label>Telefone / WhatsApp</label>
+          <input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="Ex.: 5562999999999" />
+          <small style={{ color: 'var(--ink-soft)' }}>Usado pra mandar uma senha nova na hora se você esquecer — sem isso, o pedido depende de alguém atender manualmente.</small>
+        </div>
         <div className="campo"><label>Nova senha (deixe vazio para manter)</label><CampoSenha value={senha} onChange={(e) => setSenha(e.target.value)} minLength={6} placeholder="mínimo 6 caracteres" /></div>
         {ehVendedora && (
           <div className="campo">

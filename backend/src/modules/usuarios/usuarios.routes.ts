@@ -95,6 +95,10 @@ export async function usuariosRoutes(app: FastifyInstance) {
     const meId = request.user.sub
     const body = z.object({
       nome: z.string().min(2).optional(), email: z.string().email().optional(), senha: z.string().min(6).optional(),
+      // Telefone/WhatsApp — usado pelo "esqueci minha senha" pra mandar a senha provisória na
+      // hora; sem ele, o pedido cai numa fila que ninguém enxerga pro papel SUPER_ADMIN (não tem
+      // GESTOR "acima" pra atender). nullish: permite apagar mandando string vazia/null.
+      telefone: z.string().trim().transform(normalizarTelefone).nullish(),
       bioCatalogo: z.string().max(280).nullish(),
       idioma: z.enum(['pt', 'en', 'en-gb', 'es']).optional(),
     }).parse(request.body)
@@ -109,11 +113,12 @@ export async function usuariosRoutes(app: FastifyInstance) {
       data: {
         ...(body.nome ? { nome: body.nome } : {}),
         ...(body.email ? { email: body.email.toLowerCase() } : {}),
+        ...(body.telefone !== undefined ? { telefone: body.telefone || null } : {}),
         ...(body.senha ? { senhaHash: await bcrypt.hash(body.senha, 10) } : {}),
         ...(body.bioCatalogo !== undefined ? { bioCatalogo: body.bioCatalogo?.trim() || null } : {}),
         ...(body.idioma ? { idioma: body.idioma } : {}),
       },
-      select: { id: true, nome: true, email: true, role: true, bioCatalogo: true, idioma: true },
+      select: { id: true, nome: true, email: true, role: true, telefone: true, bioCatalogo: true, idioma: true },
     })
   })
 
@@ -203,6 +208,45 @@ export async function usuariosRoutes(app: FastifyInstance) {
       },
       select: selecaoPublica,
     })
+  })
+
+  // "Entrar como": o GESTOR assume a sessão de um membro da PRÓPRIA equipe (Gerente, Gestor de
+  // Estoque, Vendedora — nunca outro GESTOR) pra ver exatamente o que ele vê. Mesmo mecanismo do
+  // "entrar como" do SUPER_ADMIN (ver /admin/usuarios/:id/entrar-como), mas restrito à própria
+  // rede. Como sempre fica no mesmo subdomínio do gestor, não precisa de redeSlug pro front trocar
+  // de origem — só devolve token+usuario, como um login normal.
+  app.post('/:id/entrar-como', { preHandler: [app.authorize('GESTOR')] }, async (request, reply) => {
+    const redeId = await redeIdDeQualquer(request)
+    const { id } = request.params as { id: string }
+    const alvo = await prisma.usuario.findFirst({
+      where: { id, role: { in: ['GERENTE', 'VENDEDORA', 'ESTOQUISTA'] }, OR: [{ redeId }, { loja: { redeId } }] },
+      include: { loja: { select: { id: true, nome: true, slug: true } } },
+    })
+    if (!alvo) return reply.code(404).send({ erro: 'Usuário não encontrado na sua equipe' })
+
+    const rede = await prisma.rede.findUnique({ where: { id: redeId }, select: { id: true, nome: true, plano: true } })
+
+    await prisma.impersonacaoLog.create({
+      data: {
+        operadorId: request.user.sub, operadorNome: request.user.nome, operadorRole: request.user.role,
+        usuarioAlvoId: alvo.id, usuarioAlvoNome: alvo.nome, usuarioAlvoRole: alvo.role,
+      },
+    })
+
+    // Expira mais rápido que um login normal (12h) — sessão de suporte, não de trabalho do dia.
+    const token = app.jwt.sign(
+      { sub: alvo.id, redeId: alvo.redeId ?? redeId, lojaId: alvo.lojaId, role: alvo.role, nome: alvo.nome, plano: rede?.plano ?? null },
+      { expiresIn: '2h' },
+    )
+    return {
+      token,
+      usuario: {
+        id: alvo.id, nome: alvo.nome, email: alvo.email, role: alvo.role, fotoUrl: alvo.fotoUrl, idioma: alvo.idioma,
+        rede: rede ? { id: rede.id, nome: rede.nome, plano: rede.plano } : null,
+        loja: alvo.loja ? { id: alvo.loja.id, nome: alvo.loja.nome, slug: alvo.loja.slug } : null,
+        assessor: null,
+      },
+    }
   })
 
   // CENÁRIO 1 — Substituir a pessoa MANTENDO a carteira: reusa o mesmo registro

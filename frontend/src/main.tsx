@@ -53,6 +53,8 @@ import AssessorDeModa from './paginas/site/AssessorDeModa'
 import CadastroAssessor from './paginas/site/CadastroAssessor'
 import Lgpd from './paginas/site/Lgpd'
 import PoliticaPrivacidade from './paginas/site/PoliticaPrivacidade'
+import { aplicarImpersonacaoDaUrl } from './lib/impersonar'
+import BannerImpersonar from './componentes/BannerImpersonar'
 
 function Protegida({ children }: { children: React.ReactElement }) {
   return usuarioLogado() ? children : <Navigate to="/login" replace />
@@ -162,6 +164,10 @@ function CrmApp() {
   )
 }
 
+// Aplica um pacote de "entrar como" vindo na URL (ver lib/impersonar.ts) ANTES de qualquer coisa
+// renderizar — troca o localStorage síncrono, então usuarioLogado() já vem certo no 1º render.
+aplicarImpersonacaoDaUrl()
+
 // Registra o service worker (sem cache — só existe pra habilitar o prompt de instalação do PWA).
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}) })
@@ -171,6 +177,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <IdiomaProvider>
       <ToastProvider>
+        <BannerImpersonar />
         <BrowserRouter>{HOST.tipo === 'landing' ? <SiteApp /> : <CrmApp />}</BrowserRouter>
       </ToastProvider>
     </IdiomaProvider>

@@ -30,6 +30,7 @@ enum StatusAssinatura {
 enum TipoAddon {
   PROVADOR // Provador Virtual (FASHN AI — try-on de foto e vídeo)
   VENDEDORA_ZAIEZE // Vendedora ZAIEZE — loja 100% automatizada por IA (WhatsApp/Instagram → fecha venda)
+  ESTOQUE_INTELIGENTE // Análise de campeões de venda e risco de ruptura (saiu do plano Elite, assinatura à parte)
 }
 
 enum StatusAddon {
@@ -1006,6 +1007,23 @@ model ItemOrcamento {
 
   @@index([orcamentoId])
   @@map("itens_orcamento")
+}
+
+// Registro de "entrar como": SUPER_ADMIN opera a sessão de qualquer usuário (suporte/investigação),
+// ou GESTOR opera a sessão de um membro da própria equipe (Gerente/Gestor de Estoque/Vendedora).
+// Sem relations (auditoria — não deve cascatear se o usuário for excluído).
+model ImpersonacaoLog {
+  id              String   @id @default(cuid())
+  operadorId      String
+  operadorNome    String
+  operadorRole    Role
+  usuarioAlvoId   String
+  usuarioAlvoNome String
+  usuarioAlvoRole Role
+  createdAt       DateTime @default(now())
+
+  @@index([usuarioAlvoId, createdAt])
+  @@map("impersonacao_log")
 }
 
 // Histórico de auditoria de descontos aplicados no PDV (quem, quando, %, valor, quem autorizou).

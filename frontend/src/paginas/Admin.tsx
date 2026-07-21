@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { api, formataReal, mensagemDeErro, type Plano } from '../api'
 import { useToast } from '../componentes/Toast'
+import { entrarComoUsuario } from '../lib/impersonar'
 
 interface PlanoAdmin { plano: Plano; nome: string; limite: string; resumo: string; preco: number }
 interface AddonAdmin { tipo: string; nome: string; resumo: string; preco: number }
 interface RedeAdmin {
   id: string; nome: string; slug: string; plano: Plano; ativo: boolean; criadoEm: string; lojas: number; usuarios: number
+  gestor: { id: string; nome: string; email: string } | null
   assinatura: { plano: Plano; status: string; valor: number; cicloFimEm: string | null; cancelamentoAgendado: boolean; simulada: boolean } | null
 }
 interface Promo { id: string; codigo: string; tipo: 'DIAS_GRATIS' | 'PERCENTUAL'; aplicaA: 'REDE' | 'ASSESSOR'; plano: string | null; dias: number | null; percentual: string | null; descricao: string | null; validadeAte: string | null; maxUsos: number | null; usos: number; ativo: boolean }
@@ -21,6 +23,7 @@ export default function Admin() {
   const [redes, setRedes] = useState<RedeAdmin[]>([])
   const [promos, setPromos] = useState<Promo[]>([])
   const [ocupado, setOcupado] = useState(false)
+  const [senhaGestorGerada, setSenhaGestorGerada] = useState<{ rede: string; nome: string; senha: string } | null>(null)
   const avisar = useToast()
 
   function carregar() {
@@ -60,6 +63,22 @@ export default function Admin() {
       await api.delete(`/admin/redes/${r.id}`, { data: { confirmarNome: digitado.trim() } })
       avisar(`${r.nome} excluída permanentemente.`)
       carregar()
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
+  }
+
+  async function entrarComoGestor(r: RedeAdmin) {
+    if (!r.gestor) return
+    if (!window.confirm(`Entrar como ${r.gestor.nome} (${r.nome})? Fica registrado. Um banner aparece pra você voltar quando quiser.`)) return
+    try { await entrarComoUsuario(r.gestor.id) } catch (e) { avisar(mensagemDeErro(e), 'erro') }
+  }
+
+  async function resetarSenhaGestor(r: RedeAdmin) {
+    if (!r.gestor) return
+    if (!window.confirm(`Gerar uma senha provisória nova para ${r.gestor.nome} (${r.nome})? A senha atual dele deixa de funcionar.`)) return
+    setOcupado(true)
+    try {
+      const { data } = await api.post(`/admin/redes/${r.id}/gestor/resetar-senha`)
+      setSenhaGestorGerada({ rede: r.nome, nome: data.nome, senha: data.senha })
     } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
   }
 
@@ -163,13 +182,20 @@ export default function Admin() {
       {/* ── Redes (clientes) ── */}
       <div className="cartao">
         <h2 style={{ marginTop: 0 }}>🏢 Redes (clientes) · {redes.length}</h2>
+        {senhaGestorGerada && (
+          <div className="sucesso" style={{ marginBottom: 10 }}>
+            Senha provisória de <strong>{senhaGestorGerada.nome}</strong> ({senhaGestorGerada.rede}): <strong>{senhaGestorGerada.senha}</strong> — copie e envie manualmente.
+            <button type="button" className="btn-link" style={{ marginLeft: 10 }} onClick={() => setSenhaGestorGerada(null)}>fechar</button>
+          </div>
+        )}
         <table>
-          <thead><tr><th>Marca</th><th>Endereço</th><th>Plano</th><th>Assinatura</th><th>Lojas</th><th>Usuários</th><th>Desde</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Marca</th><th>Endereço</th><th>Gestor</th><th>Plano</th><th>Assinatura</th><th>Lojas</th><th>Usuários</th><th>Desde</th><th>Ações</th></tr></thead>
           <tbody>
             {redes.map((r) => (
               <tr key={r.id} style={{ opacity: r.ativo ? 1 : 0.5 }}>
                 <td>{r.nome}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{r.slug}.zaieze.com</td>
+                <td>{r.gestor ? <span title={r.gestor.email}>{r.gestor.nome}</span> : '—'}</td>
                 <td>{r.plano}</td>
                 <td>
                   {r.assinatura
@@ -184,11 +210,19 @@ export default function Admin() {
                     <a href="#" onClick={(e) => { e.preventDefault(); ativarCortesia(r) }} style={{ color: '#16a34a', fontWeight: 600 }}>Ativar (cortesia)</a>
                   )}
                   {(!r.ativo || r.assinatura?.status === 'PENDENTE') && ' · '}
+                  {r.gestor && (
+                    <a href="#" onClick={(e) => { e.preventDefault(); entrarComoGestor(r) }} style={{ fontWeight: 600 }}>Entrar como</a>
+                  )}
+                  {r.gestor && ' · '}
+                  {r.gestor && (
+                    <a href="#" onClick={(e) => { e.preventDefault(); resetarSenhaGestor(r) }} style={{ fontWeight: 600 }}>Resetar senha</a>
+                  )}
+                  {r.gestor && ' · '}
                   <a href="#" onClick={(e) => { e.preventDefault(); excluirRede(r) }} style={{ color: 'var(--danger)', fontWeight: 600 }}>Excluir loja</a>
                 </td>
               </tr>
             ))}
-            {redes.length === 0 && <tr><td colSpan={8} style={{ color: 'var(--ink-soft)' }}>Nenhuma rede ainda.</td></tr>}
+            {redes.length === 0 && <tr><td colSpan={9} style={{ color: 'var(--ink-soft)' }}>Nenhuma rede ainda.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -760,6 +794,11 @@ function AssessoresSection() {
     window.alert(`Link de indicação copiado:\n${url}`)
   }
 
+  async function entrarComoAssessora(a: AssessorAdmin) {
+    if (!window.confirm(`Entrar como ${a.usuario.nome} (${a.slug}.zaieze.com)? Fica registrado.`)) return
+    try { await entrarComoUsuario(a.usuario.id) } catch { window.alert('Não foi possível entrar como este usuário.') }
+  }
+
   return (
     <div className="cartao">
       <h2 style={{ marginTop: 0 }}>👗 Brand Partners</h2>
@@ -839,7 +878,8 @@ function AssessoresSection() {
               <td>{formataReal(a.pendente)}</td>
               <td>{formataReal(a.paga)}</td>
               <td style={{ whiteSpace: 'nowrap' }}>
-                <a href="#" onClick={(e) => { e.preventDefault(); copiarLinkIndicacao(a) }}>copiar link</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); entrarComoAssessora(a) }}>entrar como</a>
+                {' · '}<a href="#" onClick={(e) => { e.preventDefault(); copiarLinkIndicacao(a) }}>copiar link</a>
                 {' · '}<a href="#" onClick={(e) => { e.preventDefault(); alternarAtivo(a) }}>{a.usuario.ativo ? 'desativar' : 'ativar'}</a>
               </td>
             </tr>

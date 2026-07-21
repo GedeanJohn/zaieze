@@ -4,6 +4,7 @@ import ConvidarModal from '../componentes/ConvidarModal'
 import { useToast } from '../componentes/Toast'
 import CampoSenha from '../componentes/CampoSenha'
 import { useIdioma } from '../lib/i18n'
+import { entrarComoDaEquipe } from '../lib/impersonar'
 
 interface Membro {
   id: string
@@ -157,6 +158,11 @@ export default function Equipe() {
   async function alternarAtivo(m: Membro) {
     await api.patch(`/usuarios/${m.id}`, { ativo: !m.ativo }, { params: teamParams })
     carregarEquipe()
+  }
+
+  async function entrarComo(id: string, nome: string) {
+    if (!window.confirm(`Entrar como ${nome}? Fica registrado. Um banner aparece pra você voltar quando quiser.`)) return
+    try { await entrarComoDaEquipe(id) } catch (e) { window.alert(mensagemDeErro(e)) }
   }
 
   function abrirGerenciar(m: Membro) {
@@ -333,6 +339,12 @@ export default function Equipe() {
                       <td><span className={`selo ${m.ativo ? 'ok' : 'baixo'}`}>{m.ativo ? t('equipe.ativa') : t('equipe.inativa')}</span></td>
                       <td style={{ whiteSpace: 'nowrap' }}>
                         <a href="#" onClick={(e) => { e.preventDefault(); setForm({ ...m, comissaoPadrao: m.comissaoPadrao ?? '', senha: '' } as FormMembro) }}>{t('equipe.editar')}</a>
+                        {usuario.role === 'GESTOR' && (
+                          <>
+                            {' · '}
+                            <a href="#" onClick={(e) => { e.preventDefault(); entrarComo(m.id, m.nome) }}>entrar como</a>
+                          </>
+                        )}
                         {m.role === 'VENDEDORA' && (
                           <>
                             {' · '}
@@ -405,6 +417,12 @@ export default function Equipe() {
                     <a href="#" onClick={(e) => { e.preventDefault(); setFormE({ id: es.id, nome: es.nome, email: es.email, telefone: es.telefone ?? '' }) }}>{t('equipe.editar')}</a>
                     {' · '}
                     <a href="#" onClick={(e) => { e.preventDefault(); alternarEstoquista(es) }}>{es.ativo ? t('equipe.desativar') : t('equipe.ativarLink')}</a>
+                    {usuario.role === 'GESTOR' && (
+                      <>
+                        {' · '}
+                        <a href="#" onClick={(e) => { e.preventDefault(); entrarComo(es.id, es.nome) }}>entrar como</a>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}

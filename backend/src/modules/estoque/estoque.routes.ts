@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { redeIdDeQualquer } from '../../plugins/auth'
-import { requireFeature } from '../../plugins/planos'
+import { requireAddon } from '../../plugins/planos'
 import { flagPedidosDisponiveis } from '../reservas/reservas.service'
 
 const itemEntradaSchema = z.object({
@@ -170,8 +170,9 @@ export async function estoqueRoutes(app: FastifyInstance) {
     return { papel: 'REDE', rede, ...(await kpiEstoqueRede(redeId, true)) }
   })
 
-  // Estoque inteligente: campeões de venda (30d) e previsão de ruptura (estoque central)
-  app.get('/inteligencia', { preHandler: [requireFeature('estoque_inteligente'), app.authorize(...GESTAO)] }, async (request) => {
+  // Estoque inteligente: campeões de venda (30d) e previsão de ruptura (estoque central).
+  // Saiu do plano Elite — agora é add-on de assinatura à parte (qualquer plano).
+  app.get('/inteligencia', { preHandler: [requireAddon('ESTOQUE_INTELIGENTE'), app.authorize(...GESTAO)] }, async (request) => {
     const redeId = await redeIdDeQualquer(request)
     const desde = new Date(Date.now() - 30 * 86_400_000)
     const [variacoes, saidas] = await Promise.all([

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, formataReal, mensagemDeErro, rotuloFeature, type Plano } from '../api'
+import { api, atualizarUsuarioLocal, formataReal, mensagemDeErro, rotuloFeature, usuarioLogado, type Plano } from '../api'
 import { useIdioma } from '../lib/i18n'
 
 interface PlanoCatalogo {
@@ -64,7 +64,14 @@ export default function Planos() {
     api.get('/assinaturas/minha').then(({ data }) => { setAssinatura(data.assinatura); setMpConfiguradoNoServidor(Boolean(data.mpConfigurado)) }).catch(() => setAssinatura(null))
     api.get('/contrato/status').then(({ data }) => setContratoAceito(Boolean(data.aceito))).catch(() => {})
     api.get('/addons').then(({ data }) => setAddonsCatalogo(data.addons)).catch(() => {})
-    api.get('/addons/minha').then(({ data }) => setAddonsMinha(data.addons)).catch(() => {})
+    api.get('/addons/minha').then(({ data }) => {
+      setAddonsMinha(data.addons)
+      // Espelha os add-ons contratados no localStorage pra o menu (Força IA) refletir na hora,
+      // sem precisar relogar, quando o usuário assina/cancela um add-on nesta tela.
+      const ativos = (data.addons as AssinaturaAddon[]).filter((a) => a.status === 'ATIVA').map((a) => a.tipo)
+      const usuario = usuarioLogado()
+      if (usuario?.rede) atualizarUsuarioLocal({ rede: { ...usuario.rede, addonsAtivos: ativos } })
+    }).catch(() => {})
   }
   useEffect(() => { carregar() }, [])
 

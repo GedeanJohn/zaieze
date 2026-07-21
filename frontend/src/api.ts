@@ -29,7 +29,7 @@ export interface Usuario {
   role: Papel
   fotoUrl?: string | null
   idioma?: string
-  rede: { id: string; nome: string; plano: string } | null
+  rede: { id: string; nome: string; plano: string; addonsAtivos?: string[] } | null
   loja: { id: string; nome: string; slug: string } | null
   assessor?: { slug: string } | null
 }
@@ -120,6 +120,14 @@ export function temFeature(feature: string): boolean {
   if (u?.role === 'SUPER_ADMIN') return true
   const plano = (u?.rede?.plano as Plano) ?? 'START'
   return ORDEM_PLANO[plano] >= ORDEM_PLANO[FEATURE_MIN[feature] ?? 'START']
+}
+
+// ── Add-ons de IA (Força IA): contratados à parte de qualquer plano, ver backend/addons ──
+export type TipoAddon = 'PROVADOR' | 'VENDEDORA_ZAIEZE' | 'ESTOQUE_INTELIGENTE'
+export function temAddon(tipo: TipoAddon): boolean {
+  const u = usuarioLogado()
+  if (u?.role === 'SUPER_ADMIN') return true
+  return u?.rede?.addonsAtivos?.includes(tipo) ?? false
 }
 
 export function mensagemDeErro(e: unknown): string {

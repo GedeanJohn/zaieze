@@ -101,10 +101,24 @@ a { color: var(--accent); text-decoration: none; }
   .sidebar.recolhida .rodape { text-align: center; }
   .sidebar.recolhida .rodape .rodape-nome { display: none; }
   .sidebar.recolhida .rodape button { width: auto; padding: 8px; }
+  /* Ícone-only: seções viram uma coluna só de ícones, sem cabeçalho nem accordion. */
+  .sidebar.recolhida .sidebar-secao-header { display: none; }
+  .sidebar.recolhida .sidebar-secao-corpo { display: flex !important; }
 }
 /* Marca ZAIEZE no topo do menu (fonte NUSAR) — só no drawer mobile (no desktop já está na barra de topo) */
 .sidebar-marca { display: block; font-family: var(--marca); font-weight: 600; font-size: 26px; letter-spacing: 0.12em; color: #fff; margin: 2px 8px 18px; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
+.sidebar-secao { display: flex; flex-direction: column; margin-top: 10px; }
+.sidebar-secao-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  background: none; border: none; cursor: pointer; width: 100%;
+  padding: 6px 13px; margin-bottom: 2px;
+  color: #7a7a7a; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  transition: color 0.15s ease;
+}
+.sidebar-secao-header:hover { color: #ccc; }
+.sidebar-secao-header svg { flex-shrink: 0; opacity: 0.8; }
+.sidebar-secao-corpo { display: flex; flex-direction: column; gap: 2px; }
 .sidebar a {
   display: flex; align-items: center; gap: 11px;
   color: #b3b3b3; padding: 10px 13px; border-radius: 10px; font-size: 14px; letter-spacing: 0.01em;

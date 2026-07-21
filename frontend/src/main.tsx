@@ -11,6 +11,7 @@ import Layout from './paginas/Layout'
 import Dashboard from './paginas/Dashboard'
 import Vendas from './paginas/Vendas'
 import Estoque from './paginas/Estoque'
+import EstoqueInteligente from './paginas/EstoqueInteligente'
 import Separacao from './paginas/Separacao'
 import Clientes from './paginas/Clientes'
 import Campanhas from './paginas/Campanhas'
@@ -134,6 +135,7 @@ function CrmApp() {
         <Route path="vendas" element={<Vendas />} />
         <Route path="orcamentos" element={<Orcamentos />} />
         <Route path="estoque" element={<Estoque />} />
+        <Route path="estoque-inteligente" element={<EstoqueInteligente />} />
         <Route path="separacao" element={<Separacao />} />
         <Route path="clientes" element={<Clientes />} />
         <Route path="campanhas" element={<Campanhas />} />

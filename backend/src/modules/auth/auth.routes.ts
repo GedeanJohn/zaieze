@@ -95,6 +95,12 @@ export async function authRoutes(app: FastifyInstance) {
       { expiresIn: '12h' },
     )
 
+    // Add-ons de IA contratados (Provador, Vendedora ZAIEZE, Estoque Inteligente) — o menu do
+    // frontend usa isso pra só mostrar cada item de "Força IA" quando a rede realmente pagou por ele.
+    const addonsAtivos = redeId
+      ? (await prisma.assinaturaAddon.findMany({ where: { redeId, status: 'ATIVA' }, select: { tipo: true } })).map((a) => a.tipo)
+      : []
+
     return {
       token,
       usuario: {
@@ -104,7 +110,7 @@ export async function authRoutes(app: FastifyInstance) {
         role: usuario.role,
         fotoUrl: usuario.fotoUrl,
         idioma: usuario.idioma,
-        rede: rede ? { id: rede.id, nome: rede.nome, plano: rede.plano } : null,
+        rede: rede ? { id: rede.id, nome: rede.nome, plano: rede.plano, addonsAtivos } : null,
         loja: usuario.loja ? { id: usuario.loja.id, nome: usuario.loja.nome, slug: usuario.loja.slug } : null,
         assessor: assessorSlug ? { slug: assessorSlug } : null,
       },
@@ -138,7 +144,7 @@ export async function authRoutes(app: FastifyInstance) {
   })
 
   app.get('/me', { preHandler: [app.authenticate] }, async (request) => {
-    return prisma.usuario.findUniqueOrThrow({
+    const usuario = await prisma.usuario.findUniqueOrThrow({
       where: { id: request.user.sub },
       select: {
         id: true, nome: true, email: true, role: true, telefone: true, fotoUrl: true, idioma: true,
@@ -148,5 +154,16 @@ export async function authRoutes(app: FastifyInstance) {
         loja: { select: { id: true, nome: true, slug: true, rede: { select: { id: true, nome: true, plano: true } } } },
       },
     })
+
+    const redeId = usuario.rede?.id ?? usuario.loja?.rede.id ?? null
+    const addonsAtivos = redeId
+      ? (await prisma.assinaturaAddon.findMany({ where: { redeId, status: 'ATIVA' }, select: { tipo: true } })).map((a) => a.tipo)
+      : []
+
+    return {
+      ...usuario,
+      rede: usuario.rede ? { ...usuario.rede, addonsAtivos } : null,
+      loja: usuario.loja ? { ...usuario.loja, rede: { ...usuario.loja.rede, addonsAtivos } } : null,
+    }
   })
 }

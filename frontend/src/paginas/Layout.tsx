@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate, useLocation, Link } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
   Megaphone, Package, Tag, Layers, Boxes, UsersRound, Eye, Receipt,
   Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Wrench, Smartphone, Camera, Store, Shirt,
-  ChevronLeft, ChevronRight, Bot, Landmark,
+  ChevronLeft, ChevronRight, ChevronDown, Bot, Landmark, Sparkles,
+  type LucideIcon,
 } from 'lucide-react'
-import { api, rotuloPapel, temFeature, usuarioLogado } from '../api'
+import { api, rotuloPapel, temFeature, temAddon, usuarioLogado } from '../api'
 import { useIdioma } from '../lib/i18n'
 
 const ICON = { size: 18, strokeWidth: 1.75 } as const
@@ -17,6 +18,38 @@ function iniciais(nome: string): string {
   return ((p[0]?.[0] ?? '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase() || '?'
 }
 
+interface ItemMenu {
+  to: string
+  label: string
+  Icone: LucideIcon
+  mostrar: boolean
+}
+
+/** Um grupo de itens do menu com header colapsável (accordion, estado salvo por navegador).
+ * Não renderiza nada se não sobrar item visível pro papel atual. Se a rota ativa está dentro do
+ * grupo, ele abre sozinho mesmo que o usuário tenha colapsado — sem sobrescrever a preferência salva. */
+function SecaoMenu({ titulo, itens, fechada, onToggle }: { titulo: string; itens: ItemMenu[]; fechada: boolean; onToggle: () => void }) {
+  const location = useLocation()
+  if (itens.length === 0) return null
+  const contemAtiva = itens.some((i) => i.to === location.pathname)
+  const aberta = contemAtiva || !fechada
+  return (
+    <div className="sidebar-secao">
+      <button type="button" className="sidebar-secao-header" onClick={onToggle} aria-expanded={aberta}>
+        <span>{titulo}</span>
+        <ChevronDown size={14} strokeWidth={2} style={{ transform: aberta ? undefined : 'rotate(-90deg)', transition: 'transform 0.15s ease' }} />
+      </button>
+      <div className="sidebar-secao-corpo" style={{ display: aberta ? 'flex' : 'none' }}>
+        {itens.map(({ to, label, Icone }) => (
+          <NavLink key={to} to={to} className={({ isActive }) => (isActive ? 'ativo' : '')} title={label}>
+            <Icone {...ICON} /><span>{label}</span>
+          </NavLink>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function Layout() {
   const usuario = usuarioLogado()!
   const navigate = useNavigate()
@@ -24,6 +57,14 @@ export default function Layout() {
   // Sidebar recolhida (só ícones) no desktop — vale para qualquer perfil, preferência salva por navegador
   const [menuRecolhido, setMenuRecolhido] = useState(() => localStorage.getItem('zaieze_menu_recolhido') === '1')
   useEffect(() => { localStorage.setItem('zaieze_menu_recolhido', menuRecolhido ? '1' : '0') }, [menuRecolhido])
+  // Seções do menu colapsadas (accordion) — preferência salva por navegador, mesmo espírito do recolhido acima.
+  const [secoesFechadas, setSecoesFechadas] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('zaieze_menu_secoes_fechadas') ?? '{}') } catch { return {} }
+  })
+  useEffect(() => { localStorage.setItem('zaieze_menu_secoes_fechadas', JSON.stringify(secoesFechadas)) }, [secoesFechadas])
+  function alternarSecao(chave: string) {
+    setSecoesFechadas((s) => ({ ...s, [chave]: !s[chave] }))
+  }
   const { t } = useIdioma()
 
   // Aviso global de encerramento de acesso (cancelamento agendado) — todos os papéis, todas as telas
@@ -57,6 +98,9 @@ export default function Layout() {
   const podeSeparacao = role === 'ESTOQUISTA' || role === 'GERENTE' || role === 'GESTOR' || role === 'SUPER_ADMIN'
   // Supervisão do atendimento (espelho somente leitura das conversas das vendedoras): gerente/gestor/admin.
   const podeSupervisionar = role === 'GERENTE' || role === 'GESTOR' || role === 'SUPER_ADMIN'
+  // Estoque Inteligente (add-on de IA): dono da rede contrata, mas quem opera no dia a dia é o
+  // Gestor de Estoque — mesmo grupo de papéis já usado no gate do backend (GET /estoque/inteligencia).
+  const podeEstoqueInteligente = role === 'SUPER_ADMIN' || role === 'GESTOR' || role === 'ESTOQUISTA'
   const cls = ({ isActive }: { isActive: boolean }) => (isActive ? 'ativo' : '')
 
   function sair() {
@@ -64,6 +108,57 @@ export default function Layout() {
     localStorage.removeItem('modacrm_usuario')
     navigate('/login')
   }
+
+  const itensVendas: ItemMenu[] = [
+    { to: '/vendas', label: t('layout.vendas'), Icone: ShoppingBag, mostrar: podeVendasClientes },
+    { to: '/orcamentos', label: t('layout.orcamentos'), Icone: Receipt, mostrar: podeVendasClientes },
+    { to: '/clientes', label: t('layout.clientes'), Icone: Users, mostrar: podeVendasClientes },
+    { to: '/funil', label: t('layout.funil'), Icone: Filter, mostrar: podeVendasClientes && temFeature('funil') },
+    { to: '/radar', label: t('layout.radar'), Icone: Radar, mostrar: podeVendasClientes && temFeature('radar') },
+    { to: '/atacado', label: t('layout.atacado'), Icone: Package, mostrar: podeVendasClientes && temFeature('atacado') },
+  ].filter((i) => i.mostrar)
+
+  const itensForcaIa: ItemMenu[] = [
+    { to: '/vendedora-zaieze', label: t('layout.vendedoraZaieze'), Icone: Bot, mostrar: ehDonoRede && temAddon('VENDEDORA_ZAIEZE') },
+    { to: '/provador', label: t('layout.provador'), Icone: Shirt, mostrar: podeVendasClientes && temAddon('PROVADOR') },
+    { to: '/estoque-inteligente', label: t('layout.estoqueInteligente'), Icone: Sparkles, mostrar: podeEstoqueInteligente && temAddon('ESTOQUE_INTELIGENTE') },
+  ].filter((i) => i.mostrar)
+
+  const itensComunicacao: ItemMenu[] = [
+    { to: '/caixa', label: t('layout.chatZaieze'), Icone: Inbox, mostrar: podeVendasClientes && temFeature('whatsapp') },
+    { to: '/supervisao', label: t('layout.supervisao'), Icone: Eye, mostrar: podeSupervisionar && temFeature('whatsapp') },
+    { to: '/campanhas', label: t('layout.campanhas'), Icone: MessageCircle, mostrar: podeVendasClientes && temFeature('whatsapp') },
+  ].filter((i) => i.mostrar)
+
+  const itensProdutoEstoque: ItemMenu[] = [
+    { to: '/colecoes', label: t('layout.colecoes'), Icone: Layers, mostrar: podeEstoque },
+    { to: '/produtos', label: t('layout.produtos'), Icone: Tag, mostrar: true },
+    { to: '/estoque', label: t('layout.estoque'), Icone: Boxes, mostrar: podeEstoque },
+    { to: '/separacao', label: t('layout.separacao'), Icone: ClipboardCheck, mostrar: podeSeparacao },
+  ].filter((i) => i.mostrar)
+
+  const itensEquipe: ItemMenu[] = [
+    { to: '/equipe', label: t('layout.equipe'), Icone: UsersRound, mostrar: podeEquipe },
+    { to: '/ranking', label: t('layout.ranking'), Icone: Trophy, mostrar: podeVendasClientes && temFeature('gamificacao') },
+    { to: '/mural', label: t('layout.mural'), Icone: Megaphone, mostrar: podeVendasClientes && temFeature('gamificacao') },
+  ].filter((i) => i.mostrar)
+
+  const itensCanais: ItemMenu[] = [
+    { to: '/whatsapp-config', label: t('layout.whatsappOficial'), Icone: Smartphone, mostrar: ehDonoRede && temFeature('whatsapp') },
+    { to: '/instagram-config', label: t('layout.instagramOficial'), Icone: Camera, mostrar: ehDonoRede && temFeature('whatsapp') },
+    { to: '/mercadolivre-config', label: t('layout.mercadoLivre'), Icone: Store, mostrar: ehDonoRede && temFeature('marketplace') },
+  ].filter((i) => i.mostrar)
+
+  const itensFinanceiro: ItemMenu[] = [
+    { to: '/recebimento-vendas', label: t('layout.recebimentoVendas'), Icone: Landmark, mostrar: ehDonoRede },
+    { to: '/planos', label: t('layout.planos'), Icone: CreditCard, mostrar: ehDonoRede },
+    { to: '/contrato', label: t('layout.contrato'), Icone: FileText, mostrar: ehDonoRede },
+  ].filter((i) => i.mostrar)
+
+  const itensInstitucional: ItemMenu[] = [
+    { to: '/marca', label: t('layout.minhaLoja'), Icone: Palette, mostrar: ehDonoRede && temFeature('portal_cliente') },
+    { to: '/manual', label: t('layout.manual'), Icone: BookOpen, mostrar: ehDonoRede },
+  ].filter((i) => i.mostrar)
 
   return (
     <div className="app-shell">
@@ -96,32 +191,16 @@ export default function Layout() {
         <div className="sidebar-marca">{menuRecolhido ? 'Z' : 'ZAIEZE'}</div>
         <nav className="sidebar-nav">
         <NavLink to="/" end className={cls} title={t('layout.dashboard')}><LayoutDashboard {...ICON} /><span>{t('layout.dashboard')}</span></NavLink>
-        {podeVendasClientes && <NavLink to="/vendas" className={cls} title={t('layout.vendas')}><ShoppingBag {...ICON} /><span>{t('layout.vendas')}</span></NavLink>}
-        {podeVendasClientes && <NavLink to="/orcamentos" className={cls} title={t('layout.orcamentos')}><Receipt {...ICON} /><span>{t('layout.orcamentos')}</span></NavLink>}
-        {podeVendasClientes && <NavLink to="/clientes" className={cls} title={t('layout.clientes')}><Users {...ICON} /><span>{t('layout.clientes')}</span></NavLink>}
-        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/caixa" className={cls} title={t('layout.chatZaieze')}><Inbox {...ICON} /><span>{t('layout.chatZaieze')}</span></NavLink>}
-        {podeSupervisionar && temFeature('whatsapp') && <NavLink to="/supervisao" className={cls} title={t('layout.supervisao')}><Eye {...ICON} /><span>{t('layout.supervisao')}</span></NavLink>}
-        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/campanhas" className={cls} title={t('layout.campanhas')}><MessageCircle {...ICON} /><span>{t('layout.campanhas')}</span></NavLink>}
-        {podeVendasClientes && temFeature('funil') && <NavLink to="/funil" className={cls} title={t('layout.funil')}><Filter {...ICON} /><span>{t('layout.funil')}</span></NavLink>}
-        {podeVendasClientes && temFeature('radar') && <NavLink to="/radar" className={cls} title={t('layout.radar')}><Radar {...ICON} /><span>{t('layout.radar')}</span></NavLink>}
-        {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/ranking" className={cls} title={t('layout.ranking')}><Trophy {...ICON} /><span>{t('layout.ranking')}</span></NavLink>}
-        {podeVendasClientes && temFeature('gamificacao') && <NavLink to="/mural" className={cls} title={t('layout.mural')}><Megaphone {...ICON} /><span>{t('layout.mural')}</span></NavLink>}
-        {podeVendasClientes && temFeature('atacado') && <NavLink to="/atacado" className={cls} title={t('layout.atacado')}><Package {...ICON} /><span>{t('layout.atacado')}</span></NavLink>}
-        {podeVendasClientes && <NavLink to="/provador" className={cls} title={t('layout.provador')}><Shirt {...ICON} /><span>{t('layout.provador')}</span></NavLink>}
-        {podeEstoque && <NavLink to="/colecoes" className={cls} title={t('layout.colecoes')}><Layers {...ICON} /><span>{t('layout.colecoes')}</span></NavLink>}
-        <NavLink to="/produtos" className={cls} title={t('layout.produtos')}><Tag {...ICON} /><span>{t('layout.produtos')}</span></NavLink>
-        {podeEstoque && <NavLink to="/estoque" className={cls} title={t('layout.estoque')}><Boxes {...ICON} /><span>{t('layout.estoque')}</span></NavLink>}
-        {podeSeparacao && <NavLink to="/separacao" className={cls} title={t('layout.separacao')}><ClipboardCheck {...ICON} /><span>{t('layout.separacao')}</span></NavLink>}
-        {podeEquipe && <NavLink to="/equipe" className={cls} title={t('layout.equipe')}><UsersRound {...ICON} /><span>{t('layout.equipe')}</span></NavLink>}
-        {ehDonoRede && temFeature('whatsapp') && <NavLink to="/whatsapp-config" className={cls} title={t('layout.whatsappOficial')}><Smartphone {...ICON} /><span>{t('layout.whatsappOficial')}</span></NavLink>}
-        {ehDonoRede && temFeature('whatsapp') && <NavLink to="/instagram-config" className={cls} title={t('layout.instagramOficial')}><Camera {...ICON} /><span>{t('layout.instagramOficial')}</span></NavLink>}
-        {ehDonoRede && <NavLink to="/vendedora-zaieze" className={cls} title={t('layout.vendedoraZaieze')}><Bot {...ICON} /><span>{t('layout.vendedoraZaieze')}</span></NavLink>}
-        {ehDonoRede && <NavLink to="/recebimento-vendas" className={cls} title={t('layout.recebimentoVendas')}><Landmark {...ICON} /><span>{t('layout.recebimentoVendas')}</span></NavLink>}
-        {ehDonoRede && temFeature('marketplace') && <NavLink to="/mercadolivre-config" className={cls} title={t('layout.mercadoLivre')}><Store {...ICON} /><span>{t('layout.mercadoLivre')}</span></NavLink>}
-        {ehDonoRede && temFeature('portal_cliente') && <NavLink to="/marca" className={cls} title={t('layout.minhaLoja')}><Palette {...ICON} /><span>{t('layout.minhaLoja')}</span></NavLink>}
-        {ehDonoRede && <NavLink to="/manual" className={cls} title={t('layout.manual')}><BookOpen {...ICON} /><span>{t('layout.manual')}</span></NavLink>}
-        {ehDonoRede && <NavLink to="/planos" className={cls} title={t('layout.planos')}><CreditCard {...ICON} /><span>{t('layout.planos')}</span></NavLink>}
-        {ehDonoRede && <NavLink to="/contrato" className={cls} title={t('layout.contrato')}><FileText {...ICON} /><span>{t('layout.contrato')}</span></NavLink>}
+
+        <SecaoMenu titulo={t('layout.secao.vendas')} itens={itensVendas} fechada={!!secoesFechadas.vendas} onToggle={() => alternarSecao('vendas')} />
+        <SecaoMenu titulo={t('layout.secao.forcaIa')} itens={itensForcaIa} fechada={!!secoesFechadas.forcaIa} onToggle={() => alternarSecao('forcaIa')} />
+        <SecaoMenu titulo={t('layout.secao.comunicacao')} itens={itensComunicacao} fechada={!!secoesFechadas.comunicacao} onToggle={() => alternarSecao('comunicacao')} />
+        <SecaoMenu titulo={t('layout.secao.produtoEstoque')} itens={itensProdutoEstoque} fechada={!!secoesFechadas.produtoEstoque} onToggle={() => alternarSecao('produtoEstoque')} />
+        <SecaoMenu titulo={t('layout.secao.equipe')} itens={itensEquipe} fechada={!!secoesFechadas.equipe} onToggle={() => alternarSecao('equipe')} />
+        <SecaoMenu titulo={t('layout.secao.canais')} itens={itensCanais} fechada={!!secoesFechadas.canais} onToggle={() => alternarSecao('canais')} />
+        <SecaoMenu titulo={t('layout.secao.financeiro')} itens={itensFinanceiro} fechada={!!secoesFechadas.financeiro} onToggle={() => alternarSecao('financeiro')} />
+        <SecaoMenu titulo={t('layout.secao.institucional')} itens={itensInstitucional} fechada={!!secoesFechadas.institucional} onToggle={() => alternarSecao('institucional')} />
+
         {ehAdmin && <NavLink to="/admin" className={cls} title={t('layout.admin')}><Wrench {...ICON} /><span>{t('layout.admin')}</span></NavLink>}
         <NavLink to="/conta" className={cls} title={t('layout.minhaConta')}><UserCog {...ICON} /><span>{t('layout.minhaConta')}</span></NavLink>
         </nav>

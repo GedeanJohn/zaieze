@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { api, formataReal, mensagemDeErro } from '../api'
 import { useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
@@ -12,10 +11,6 @@ interface DashEstoque {
   criticosCount: number; paradosCount: number
   criticos: { produto: string; referencia: string | null; cor: string; tamanho: string; estoque: number; estoqueMinimo: number }[]
   parados: { produto: string; referencia: string | null; cor: string; tamanho: string; estoque: number; valorCusto: number }[]
-}
-interface Inteligencia {
-  campeoes: { produto: string; referencia: string | null; qtd: number }[]
-  ruptura: { produto: string; referencia: string | null; cor: string; tamanho: string; estoque: number; vendidos30: number; diasEstimados: number }[]
 }
 interface DemandaReserva {
   variacaoId: string; produto: string; referencia: string | null; cor: string; tamanho: string
@@ -65,8 +60,6 @@ export default function Estoque() {
   const { t } = useIdioma()
   const [movimentos, setMovimentos] = useState<Movimento[]>([])
   const [dash, setDash] = useState<DashEstoque | null>(null)
-  const [intel, setIntel] = useState<Inteligencia | null>(null)
-  const [semAcessoIntel, setSemAcessoIntel] = useState(false)
   const [demanda, setDemanda] = useState<DemandaReserva[]>([])
   const [tipo, setTipo] = useState('')
   const [produtos, setProdutos] = useState<ProdutoP[]>([])
@@ -87,14 +80,6 @@ export default function Estoque() {
     if (!escopo.pronto) return
     const { data } = await api.get('/estoque/dashboard', { params: escopo.params })
     setDash(data)
-    // Estoque Inteligente é add-on à parte (não vem mais garantido pelo plano Elite) — 403 aqui é
-    // esperado pra quem não assinou, não um erro real.
-    try {
-      const { data: i } = await api.get('/estoque/inteligencia', { params: escopo.params })
-      setIntel(i)
-    } catch (e) {
-      if ((e as { response?: { status?: number } }).response?.status === 403) setSemAcessoIntel(true)
-    }
   }, [escopo.pronto, escopo.params])
 
   const carregarDemanda = useCallback(async () => {
@@ -290,45 +275,6 @@ export default function Estoque() {
               ))}
             </tbody>
           </table>
-        </div>
-      )}
-
-      {semAcessoIntel && (
-        <div className="cartao" style={{ marginTop: 16 }}>
-          <h2 className="painel-titulo">Estoque Inteligente</h2>
-          <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-            Campeões de venda e risco de ruptura por produto — add-on de assinatura à parte, disponível para qualquer plano.
-          </p>
-          <Link className="btn" to="/planos">Assinar add-on</Link>
-        </div>
-      )}
-
-      {intel && (intel.campeoes.length > 0 || intel.ruptura.length > 0) && (
-        <div className="grade-paineis" style={{ marginTop: 16 }}>
-          <div className="cartao">
-            <h2 className="painel-titulo">{t('estq.campeoesTitulo')}</h2>
-            <table>
-              <thead><tr><th>{t('estq.colProduto')}</th><th>{t('estq.colRef')}</th><th>{t('estq.colVendidos')}</th></tr></thead>
-              <tbody>
-                {intel.campeoes.map((c, i) => (
-                  <tr key={i}><td>{c.produto}</td><td style={{ fontFamily: 'Consolas, monospace', fontSize: 12 }}>{c.referencia ?? '—'}</td><td><strong>{c.qtd}</strong></td></tr>
-                ))}
-                {intel.campeoes.length === 0 && <tr><td colSpan={3} style={{ color: 'var(--ink-soft)' }}>{t('estq.semVendasPeriodo')}</td></tr>}
-              </tbody>
-            </table>
-          </div>
-          <div className="cartao">
-            <h2 className="painel-titulo">{t('estq.rupturaTitulo')}</h2>
-            <table>
-              <thead><tr><th>{t('estq.colProduto')}</th><th>{t('estq.colGrade')}</th><th>{t('estq.colEstoque')}</th><th>{t('estq.colAcabaEm')}</th></tr></thead>
-              <tbody>
-                {intel.ruptura.map((r, i) => (
-                  <tr key={i}><td>{r.produto}</td><td style={{ color: 'var(--ink-soft)' }}>{r.cor}/{r.tamanho}</td><td>{r.estoque}</td><td><span className="selo baixo">{t('estq.diaSufixo', { n: r.diasEstimados })}</span></td></tr>
-                ))}
-                {intel.ruptura.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--ok)' }}>{t('estq.nenhumRisco')}</td></tr>}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
 

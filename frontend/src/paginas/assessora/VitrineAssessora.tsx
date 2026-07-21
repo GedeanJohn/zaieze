@@ -369,9 +369,19 @@ export default function VitrineAssessora({ slug }: { slug: string }) {
           <button key={id} type="button" className={`vit-nav-item${id === 'perfil' ? ' ativo' : ''}`} onClick={() => irPara(id)}>
             {/* "Perfil" (sempre ativo) usa User preenchido — silhueta sólida, como no mockup —
                 em vez do UserRound de contorno fino (que tem um anel externo; preenchido viraria
-                só um disco sólido sem detalhe) usado nas outras referências desse ícone. */}
-            <span className="vit-nav-icone">{id === 'perfil' ? <User size={22} fill="#fff" /> : <Icone size={20} />}</span>
-            {rotulo}
+                só um disco sólido sem detalhe) usado nas outras referências desse ícone. O rótulo
+                "Perfil" fica dentro da esfera, abaixo do ícone — as outras abas mantêm o rótulo fora. */}
+            <span className="vit-nav-icone">
+              {id === 'perfil' ? (
+                <>
+                  <User size={18} fill="#fff" />
+                  <span className="vit-nav-icone-rotulo">{rotulo}</span>
+                </>
+              ) : (
+                <Icone size={20} />
+              )}
+            </span>
+            {id !== 'perfil' && rotulo}
           </button>
         ))}
       </nav>
@@ -788,13 +798,16 @@ export function VitrineEstilos() {
       .vit-nav-item.ativo { color: #c9a25f; font-weight: 700; }
       .vit-nav-icone { display: flex; }
       /* Aba ativa ("Perfil") ganha um botão circular elevado, dourado, com halo de brilho —
-         igual ao mockup — em vez de só mudar a cor do ícone como as outras abas. */
+         igual ao mockup — em vez de só mudar a cor do ícone como as outras abas. Rótulo "Perfil"
+         fica dentro da esfera, abaixo do ícone, em preto. */
       .vit-nav-item.ativo .vit-nav-icone {
-        width: 56px; height: 56px; margin-top: -30px; border-radius: 50%; align-items: center; justify-content: center;
+        width: 50px; height: 50px; margin-top: -27px; border-radius: 50%; flex-direction: column; gap: 1px;
+        align-items: center; justify-content: center;
         background: radial-gradient(circle at 35% 30%, #f0c481 0%, #d7a34f 55%, #b3812f 100%);
         color: #fff; border: 1px solid rgba(255, 224, 168, 0.65);
-        box-shadow: 0 0 0 4px #0d0d0d, 0 0 26px 8px rgba(217, 168, 84, 0.55), 0 6px 16px rgba(0,0,0,0.4);
+        box-shadow: 0 0 26px 8px rgba(217, 168, 84, 0.55), 0 6px 16px rgba(0,0,0,0.4);
       }
+      .vit-nav-icone-rotulo { color: #000; font-size: 8px; font-weight: 700; line-height: 1; }
 
       .vit-modal-fundo { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; z-index: 70; padding: 16px; }
       .vit-modal {

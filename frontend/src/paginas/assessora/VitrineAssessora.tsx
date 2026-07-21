@@ -787,12 +787,13 @@ export function VitrineEstilos() {
       }
       .vit-nav-item.ativo { color: #c9a25f; font-weight: 700; }
       .vit-nav-icone { display: flex; }
-      /* Aba ativa ("Perfil") ganha um botão circular elevado, dourado — igual ao mockup —
-         em vez de só mudar a cor do ícone como as outras abas. */
+      /* Aba ativa ("Perfil") ganha um botão circular elevado, dourado, com halo de brilho —
+         igual ao mockup — em vez de só mudar a cor do ícone como as outras abas. */
       .vit-nav-item.ativo .vit-nav-icone {
         width: 56px; height: 56px; margin-top: -30px; border-radius: 50%; align-items: center; justify-content: center;
-        background: #c9963f; color: #fff;
-        box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 0 4px #0d0d0d;
+        background: radial-gradient(circle at 35% 30%, #f0c481 0%, #d7a34f 55%, #b3812f 100%);
+        color: #fff; border: 1px solid rgba(255, 224, 168, 0.65);
+        box-shadow: 0 0 0 4px #0d0d0d, 0 0 26px 8px rgba(217, 168, 84, 0.55), 0 6px 16px rgba(0,0,0,0.4);
       }
 
       .vit-modal-fundo { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; z-index: 70; padding: 16px; }

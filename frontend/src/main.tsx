@@ -55,6 +55,7 @@ import Lgpd from './paginas/site/Lgpd'
 import PoliticaPrivacidade from './paginas/site/PoliticaPrivacidade'
 import { aplicarImpersonacaoDaUrl } from './lib/impersonar'
 import BannerImpersonar from './componentes/BannerImpersonar'
+import { useProtegerConteudo } from './lib/protegerConteudo'
 
 function Protegida({ children }: { children: React.ReactElement }) {
   return usuarioLogado() ? children : <Navigate to="/login" replace />
@@ -98,6 +99,7 @@ function RaizProtegida() {
 
 // Site público (www.zaieze.com / zaieze.com): landing comercial + checkout
 function SiteApp() {
+  useProtegerConteudo()
   return (
     <Routes>
       <Route path="/" element={<Landing />} />

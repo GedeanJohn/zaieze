@@ -405,6 +405,9 @@ details.mais-detalhes[open] > summary::before { content: '▾ '; }
   padding: 26px 8vw; max-width: 1240px; margin: 0 auto;
 }
 .site-logo-img { height: 34px; display: block; }
+
+/* Dificulta o "arrastar/salvar imagem" casual nas páginas comerciais (site público) — ver useProtegerConteudo. */
+body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-touch-callout: none; }
 .site-top nav { display: flex; gap: 30px; align-items: center; }
 .site-top nav a { color: #fff; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.85; }
 .site-top nav a:hover { opacity: 1; }

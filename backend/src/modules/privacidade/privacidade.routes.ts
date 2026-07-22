@@ -11,6 +11,11 @@ import {
 /**
  * Política de Privacidade — leitura, status de aceite e aceite eletrônico.
  *
+ * Só diz respeito ao GESTOR/SUPER_ADMIN: é o GESTOR quem representa o Contratante (a pessoa
+ * jurídica da marca) perante a ZAIEZE; os demais papéis (GERENTE/VENDEDORA/ESTOQUISTA) são
+ * colaboradores/empregados do Contratante, não parte no contrato — por isso nem o status nem o
+ * documento aparecem pra eles.
+ *
  * Diferente do Contrato SaaS (aceite por clique explícito em /contrato), aqui o aceite
  * de uma nova versão é registrado automaticamente no primeiro uso autenticado do
  * GESTOR/SUPER_ADMIN após a publicação (ver POST /aceitar, chamado pelo próprio Layout
@@ -23,16 +28,15 @@ export async function privacidadeRoutes(app: FastifyInstance) {
     return { privacidade: montarPrivacidade({ idioma }) }
   })
 
-  // Status do aceite — QUALQUER usuário logado da rede (alimenta o banner do painel)
-  app.get('/status', { preHandler: [app.authenticate] }, async (request) => {
+  // Status do aceite — só GESTOR/SUPER_ADMIN (alimenta o banner do painel)
+  app.get('/status', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request) => {
     const redeId = request.user.redeId
     if (!redeId) return { aceito: true, pendente: false, prazo: null, diasRestantes: null, versao: '' }
     return statusReaceitePrivacidade(redeId)
   })
 
-  // Documento + histórico de mudanças + status do aceite — qualquer usuário logado da rede
-  // (a política vale para todos; só o registro do aceite em si é do GESTOR/SUPER_ADMIN)
-  app.get('/meu', { preHandler: [app.authenticate] }, async (request) => {
+  // Documento + histórico de mudanças + status do aceite — só GESTOR/SUPER_ADMIN
+  app.get('/meu', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request) => {
     const redeId = redeIdDe(request)
     const { idioma } = request.query as { idioma?: string }
     const [privacidade, status] = await Promise.all([montarPrivacidadeDaRede(redeId, idioma), statusReaceitePrivacidade(redeId)])

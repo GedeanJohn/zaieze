@@ -73,23 +73,27 @@ export default function Layout() {
   const [cobrancaComecaEm, setCobrancaComecaEm] = useState<string | null>(null)
   // Pendência de aceite dos termos (banner) — qualquer usuário da rede vê; o aceite é do gestor
   const [reaceite, setReaceite] = useState<{ pendente: boolean; diasRestantes: number | null } | null>(null)
-  // Política de Privacidade e Termos de Uso: diferente do Contrato (aceite por clique em
-  // /contrato), aqui o aceite de uma versão nova é automático no 1º uso do painel pelo
-  // GESTOR/SUPER_ADMIN — o banner só avisa e linka o changelog ("ver o que mudou").
+  // Política de Privacidade e Termos de Uso: só dizem respeito ao GESTOR (é quem representa o
+  // Contratante/pessoa jurídica da marca) — os demais papéis são colaboradores/empregados do
+  // Contratante, não parte no contrato, então nem buscam status nem veem o banner. Diferente do
+  // Contrato (aceite por clique em /contrato), aqui o aceite de uma versão nova é automático no
+  // 1º uso do painel pelo GESTOR/SUPER_ADMIN — o banner só avisa e linka o changelog.
   const [statusPrivacidade, setStatusPrivacidade] = useState<{ pendente: boolean; diasRestantes: number | null } | null>(null)
   const [statusTermosUso, setStatusTermosUso] = useState<{ pendente: boolean; diasRestantes: number | null } | null>(null)
   const podeAceitarAutomaticamente = usuario.role === 'GESTOR' || usuario.role === 'SUPER_ADMIN'
   useEffect(() => {
     api.get('/assinaturas/aviso').then(({ data }) => { setEncerraEm(data.encerraEm); setCobrancaComecaEm(data.cobrancaComecaEm ?? null) }).catch(() => {})
     api.get('/contrato/status').then(({ data }) => setReaceite(data)).catch(() => {})
-    api.get('/privacidade/status').then(({ data }) => {
-      setStatusPrivacidade(data)
-      if (data.pendente && podeAceitarAutomaticamente) api.post('/privacidade/aceitar').catch(() => {})
-    }).catch(() => {})
-    api.get('/termos-uso/status').then(({ data }) => {
-      setStatusTermosUso(data)
-      if (data.pendente && podeAceitarAutomaticamente) api.post('/termos-uso/aceitar').catch(() => {})
-    }).catch(() => {})
+    if (podeAceitarAutomaticamente) {
+      api.get('/privacidade/status').then(({ data }) => {
+        setStatusPrivacidade(data)
+        if (data.pendente) api.post('/privacidade/aceitar').catch(() => {})
+      }).catch(() => {})
+      api.get('/termos-uso/status').then(({ data }) => {
+        setStatusTermosUso(data)
+        if (data.pendente) api.post('/termos-uso/aceitar').catch(() => {})
+      }).catch(() => {})
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -173,8 +177,8 @@ export default function Layout() {
   const itensInstitucional: ItemMenu[] = [
     { to: '/marca', label: t('layout.minhaLoja'), Icone: Palette, mostrar: ehDonoRede && temFeature('portal_cliente') },
     { to: '/manual', label: t('layout.manual'), Icone: BookOpen, mostrar: ehDonoRede },
-    { to: '/privacidade', label: t('layout.privacidade'), Icone: FileText, mostrar: true },
-    { to: '/termos-uso', label: t('layout.termosDeUso'), Icone: FileText, mostrar: true },
+    { to: '/privacidade', label: t('layout.privacidade'), Icone: FileText, mostrar: ehDonoRede },
+    { to: '/termos-uso', label: t('layout.termosDeUso'), Icone: FileText, mostrar: ehDonoRede },
   ].filter((i) => i.mostrar)
 
   return (
@@ -243,14 +247,14 @@ export default function Layout() {
         {statusPrivacidade?.pendente && (
           <div className="aviso-encerramento" style={{ background: '#122a1e', color: '#9fe0bd' }}>
             🔒 <strong>{t('layout.privacidadeAtualizadaBanner')}</strong>{' '}
-            {podeAceitarAutomaticamente ? t('layout.aceiteAutomaticoRegistrado') : t('layout.aceiteAutomaticoAoGestor')}{' '}
+            {t('layout.aceiteAutomaticoRegistrado')}{' '}
             <Link to="/privacidade" style={{ color: '#c8f7dd', fontWeight: 700 }}>{t('layout.verOQueMudou')}</Link>
           </div>
         )}
         {statusTermosUso?.pendente && (
           <div className="aviso-encerramento" style={{ background: '#122a1e', color: '#9fe0bd' }}>
             📃 <strong>{t('layout.termosUsoAtualizadoBanner')}</strong>{' '}
-            {podeAceitarAutomaticamente ? t('layout.aceiteAutomaticoRegistrado') : t('layout.aceiteAutomaticoAoGestor')}{' '}
+            {t('layout.aceiteAutomaticoRegistrado')}{' '}
             <Link to="/termos-uso" style={{ color: '#c8f7dd', fontWeight: 700 }}>{t('layout.verOQueMudou')}</Link>
           </div>
         )}

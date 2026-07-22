@@ -11,6 +11,11 @@ import {
 /**
  * Termos de Uso e Responsabilidade — leitura, status de aceite e aceite eletrônico.
  *
+ * Só diz respeito ao GESTOR/SUPER_ADMIN: é o GESTOR quem representa o Contratante (a pessoa
+ * jurídica da marca) perante a ZAIEZE; os demais papéis (GERENTE/VENDEDORA/ESTOQUISTA) são
+ * colaboradores/empregados do Contratante, não parte no contrato — por isso nem o status nem o
+ * documento aparecem pra eles.
+ *
  * Mesmo espírito do módulo `privacidade`: o aceite de uma nova versão é registrado
  * automaticamente no primeiro uso autenticado do GESTOR/SUPER_ADMIN após a publicação
  * (ver POST /aceitar), com aviso por banner e link para o changelog (`historico`).
@@ -21,15 +26,15 @@ export async function termosUsoRoutes(app: FastifyInstance) {
     return { termosUso: montarTermosUso({ idioma }) }
   })
 
-  app.get('/status', { preHandler: [app.authenticate] }, async (request) => {
+  // Status do aceite — só GESTOR/SUPER_ADMIN (alimenta o banner do painel)
+  app.get('/status', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request) => {
     const redeId = request.user.redeId
     if (!redeId) return { aceito: true, pendente: false, prazo: null, diasRestantes: null, versao: '' }
     return statusReaceiteTermosUso(redeId)
   })
 
-  // Documento + histórico de mudanças + status do aceite — qualquer usuário logado da rede
-  // (os termos valem para todos; só o registro do aceite em si é do GESTOR/SUPER_ADMIN)
-  app.get('/meu', { preHandler: [app.authenticate] }, async (request) => {
+  // Documento + histórico de mudanças + status do aceite — só GESTOR/SUPER_ADMIN
+  app.get('/meu', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request) => {
     const redeId = redeIdDe(request)
     const { idioma } = request.query as { idioma?: string }
     const [termosUso, status] = await Promise.all([montarTermosUsoDaRede(redeId, idioma), statusReaceiteTermosUso(redeId)])

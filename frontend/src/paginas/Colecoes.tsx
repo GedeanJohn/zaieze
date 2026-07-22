@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, mensagemDeErro, usuarioLogado } from '../api'
 import { useLojaAtiva } from '../componentes/SeletorLoja'
+import Switch from '../componentes/Switch'
 import { useIdioma } from '../lib/i18n'
 
 interface Colecao {
@@ -233,21 +234,30 @@ export default function Colecoes() {
                 </td>
                 <td>{c.liberadaEm ? new Date(c.liberadaEm).toLocaleDateString('pt-BR') : '—'}</td>
                 <td>
-                  {c.status === 'EM_PREPARACAO'
-                    ? <a href="#" onClick={(e) => { e.preventDefault(); liberar(c) }}>{t('col.liberar')}</a>
-                    : <a href="#" onClick={(e) => { e.preventDefault(); recolher(c) }}>{t('col.recolher')}</a>}
-                  {' · '}
-                  <a href="#" onClick={(e) => { e.preventDefault(); setForm({ id: c.id, nome: c.nome, descricao: c.descricao ?? '', validadeAte: c.validadeAte ? c.validadeAte.slice(0, 10) : '' }) }}>{t('col.editar')}</a>
-                  {' · '}
-                  <label title={t('col.outletTitle')} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={c.outlet} onChange={() => alternarOutlet(c)} style={{ width: 'auto' }} /> {t('col.outletCheckbox')}
-                  </label>
-                  {podeOutlet && c.outlet && <>
-                    {' · '}
-                    <a href="#" onClick={(e) => { e.preventDefault(); abrirOutlet(c) }}>{t('col.desconto')}</a>
-                  </>}
-                  {' · '}
-                  <a href="#" style={{ color: 'var(--danger)' }} onClick={(e) => { e.preventDefault(); excluir(c) }}>{t('col.excluir')}</a>
+                  <div className="linha-acoes">
+                    <Switch
+                      ligado={c.status === 'LIBERADA'}
+                      onChange={() => (c.status === 'EM_PREPARACAO' ? liberar(c) : recolher(c))}
+                      icone="🚀"
+                      rotuloLigado={t('col.liberada')}
+                      rotuloDesligado={t('col.liberar')}
+                    />
+                    <button type="button" className="acao-btn" onClick={() => setForm({ id: c.id, nome: c.nome, descricao: c.descricao ?? '', validadeAte: c.validadeAte ? c.validadeAte.slice(0, 10) : '' })}>
+                      ✏️ {t('col.editar')}
+                    </button>
+                    <Switch
+                      ligado={c.outlet}
+                      onChange={() => alternarOutlet(c)}
+                      icone="🏷️"
+                      rotuloLigado={t('col.outletCheckbox')}
+                      rotuloDesligado={t('col.outletCheckbox')}
+                      title={t('col.outletTitle')}
+                    />
+                    {podeOutlet && c.outlet && (
+                      <button type="button" className="acao-btn" onClick={() => abrirOutlet(c)}>💲 {t('col.desconto')}</button>
+                    )}
+                    <button type="button" className="acao-btn perigo" onClick={() => excluir(c)}>🗑️ {t('col.excluir')}</button>
+                  </div>
                 </td>
               </tr>
             ))}

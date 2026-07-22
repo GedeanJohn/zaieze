@@ -4,6 +4,23 @@ import { useLojaAtiva } from '../componentes/SeletorLoja'
 import EtiquetasModal, { type ProdutoEtq } from '../componentes/EtiquetasModal'
 import { useIdioma } from '../lib/i18n'
 
+/** Sanitiza um campo de valor monetário digitado à mão: aceita vírgula OU ponto como separador
+ *  decimal (só um), descarta o resto. Mantém o separador tal como o usuário digitou (não força
+ *  virar ponto na tela) — só a conversão para Number no envio troca vírgula por ponto. */
+function sanitizarMoeda(v: string): string {
+  let s = v.replace(/[^0-9,.]/g, '')
+  const i = s.search(/[,.]/)
+  if (i !== -1) s = s.slice(0, i + 1) + s.slice(i + 1).replace(/[,.]/g, '')
+  return s
+}
+
+/** Converte um valor monetário digitado (com vírgula ou ponto) para number. */
+function moedaParaNumero(v: string | null | undefined): number | undefined {
+  if (!v || !v.trim()) return undefined
+  const n = Number(v.replace(',', '.'))
+  return Number.isNaN(n) ? undefined : n
+}
+
 interface Variacao {
   id?: string
   cor: string
@@ -200,6 +217,8 @@ export default function Produtos() {
     e.preventDefault()
     if (!form) return
     setErro('')
+    const precoVarejo = moedaParaNumero(form.precoVarejo)
+    if (!precoVarejo || precoVarejo <= 0) { setErro(t('prod.precoVarejoObrigatorio')); return }
     const limpa = (s?: string) => (s && s.trim() ? s.trim() : undefined)
     const corpo = {
       referencia: limpa(form.referencia),
@@ -209,9 +228,9 @@ export default function Produtos() {
       categoria: limpa(form.categoria),
       marca: limpa(form.marca),
       colecao: limpa(form.colecao),
-      precoVarejo: Number(form.precoVarejo),
-      precoAtacado: form.precoAtacado ? Number(form.precoAtacado) : undefined,
-      custo: form.custo ? Number(form.custo) : undefined,
+      precoVarejo,
+      precoAtacado: moedaParaNumero(form.precoAtacado),
+      custo: moedaParaNumero(form.custo),
       composicao: limpa(form.composicao),
       modelagem: limpa(form.modelagem),
       ncm: limpa(form.ncm),
@@ -389,7 +408,7 @@ export default function Produtos() {
               </div>
               <div className="campo">
                 <label>{t('prod.precoVarejoLabel')}</label>
-                <input type="number" step="0.01" min="0.01" value={form.precoVarejo} onChange={(e) => setForm({ ...form, precoVarejo: e.target.value })} onFocus={(e) => e.target.select()} required />
+                <input type="text" inputMode="decimal" placeholder="0,00" value={form.precoVarejo} onChange={(e) => setForm({ ...form, precoVarejo: sanitizarMoeda(e.target.value) })} onFocus={(e) => e.target.select()} onMouseUp={(e) => e.preventDefault()} required />
               </div>
             </div>
 
@@ -501,15 +520,15 @@ export default function Produtos() {
                 </div>
                 <div className="gv-cell">
                   <span>{t('prod.colEstoque')}</span>
-                  <input type="number" min="0" value={v.estoque} onChange={(e) => mudarVariacao(i, 'estoque', e.target.value)} onFocus={(e) => e.target.select()} />
+                  <input type="number" min="0" value={v.estoque} onChange={(e) => mudarVariacao(i, 'estoque', e.target.value)} onFocus={(e) => e.target.select()} onMouseUp={(e) => e.preventDefault()} />
                 </div>
                 <div className="gv-cell">
                   <span title={t('prod.reservaVarejoTitle')}>{t('prod.varejoLabel')}</span>
-                  <input type="number" min="0" max={v.estoque} value={v.estoqueVarejo ?? 0} onChange={(e) => mudarVariacao(i, 'estoqueVarejo', e.target.value)} onFocus={(e) => e.target.select()} title={t('prod.reservaVarejoTitle2')} />
+                  <input type="number" min="0" max={v.estoque} value={v.estoqueVarejo ?? 0} onChange={(e) => mudarVariacao(i, 'estoqueVarejo', e.target.value)} onFocus={(e) => e.target.select()} onMouseUp={(e) => e.preventDefault()} title={t('prod.reservaVarejoTitle2')} />
                 </div>
                 <div className="gv-cell">
                   <span>{t('prod.minimoLabel')}</span>
-                  <input type="number" min="0" value={v.estoqueMinimo} onChange={(e) => mudarVariacao(i, 'estoqueMinimo', e.target.value)} onFocus={(e) => e.target.select()} />
+                  <input type="number" min="0" value={v.estoqueMinimo} onChange={(e) => mudarVariacao(i, 'estoqueMinimo', e.target.value)} onFocus={(e) => e.target.select()} onMouseUp={(e) => e.preventDefault()} />
                 </div>
                 <button
                   type="button" className="remover" title={t('prod.remover')}
@@ -544,11 +563,11 @@ export default function Produtos() {
               <div className="linha-campos">
                 <div className="campo">
                   <label>{t('prod.precoAtacadoLabel')}</label>
-                  <input type="number" step="0.01" min="0" value={form.precoAtacado ?? ''} onChange={(e) => setForm({ ...form, precoAtacado: e.target.value })} onFocus={(e) => e.target.select()} />
+                  <input type="text" inputMode="decimal" placeholder="0,00" value={form.precoAtacado ?? ''} onChange={(e) => setForm({ ...form, precoAtacado: sanitizarMoeda(e.target.value) })} onFocus={(e) => e.target.select()} onMouseUp={(e) => e.preventDefault()} />
                 </div>
                 <div className="campo">
                   <label>{t('prod.custoLabel')}</label>
-                  <input type="number" step="0.01" min="0" value={form.custo ?? ''} onChange={(e) => setForm({ ...form, custo: e.target.value })} onFocus={(e) => e.target.select()} />
+                  <input type="text" inputMode="decimal" placeholder="0,00" value={form.custo ?? ''} onChange={(e) => setForm({ ...form, custo: sanitizarMoeda(e.target.value) })} onFocus={(e) => e.target.select()} onMouseUp={(e) => e.preventDefault()} />
                 </div>
               </div>
               <div className="linha-campos">
@@ -564,7 +583,7 @@ export default function Produtos() {
               <div className="linha-campos">
                 <div className="campo">
                   <label>{t('prod.pesoLabel')}</label>
-                  <input type="number" min="0" value={form.pesoGramas ?? ''} onChange={(e) => setForm({ ...form, pesoGramas: e.target.value })} onFocus={(e) => e.target.select()} />
+                  <input type="number" min="0" value={form.pesoGramas ?? ''} onChange={(e) => setForm({ ...form, pesoGramas: e.target.value })} onFocus={(e) => e.target.select()} onMouseUp={(e) => e.preventDefault()} />
                 </div>
                 <div className="campo">
                   <label>{t('prod.faixaEtariaLabel')}</label>

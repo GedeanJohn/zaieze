@@ -5,6 +5,7 @@ import { useToast } from '../componentes/Toast'
 import CampoSenha from '../componentes/CampoSenha'
 import { useIdioma } from '../lib/i18n'
 import { entrarComoDaEquipe } from '../lib/impersonar'
+import { HOST, urlCatalogo } from '../host'
 
 interface Membro {
   id: string
@@ -343,6 +344,12 @@ export default function Equipe() {
                           <>
                             {' · '}
                             <a href="#" onClick={(e) => { e.preventDefault(); entrarComo(m.id, m.nome) }}>entrar como</a>
+                          </>
+                        )}
+                        {m.role === 'VENDEDORA' && m.slugCatalogo && (
+                          <>
+                            {' · '}
+                            <a href={urlCatalogo(HOST.slug!, `/${m.slugCatalogo}`)} target="_blank" rel="noopener noreferrer">{t('equipe.verVitrine')}</a>
                           </>
                         )}
                         {m.role === 'VENDEDORA' && (

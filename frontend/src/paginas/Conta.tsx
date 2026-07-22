@@ -3,6 +3,7 @@ import { api, mensagemDeErro, usuarioLogado, atualizarUsuarioLocal } from '../ap
 import { useToast } from '../componentes/Toast'
 import CampoSenha from '../componentes/CampoSenha'
 import { useIdioma, type Idioma } from '../lib/i18n'
+import { HOST, urlCatalogo } from '../host'
 
 /** Iniciais do nome para o avatar. */
 function iniciais(nome: string): string {
@@ -42,10 +43,11 @@ export default function Conta() {
   const [bio, setBio] = useState('')
   const [bioOrig, setBioOrig] = useState('')
   const [telefoneOrig, setTelefoneOrig] = useState('')
+  const [slugCatalogo, setSlugCatalogo] = useState<string | null>(null)
   useEffect(() => {
     api.get('/usuarios/me').then(({ data }) => {
       setTelefone(data.telefone ?? ''); setTelefoneOrig(data.telefone ?? '')
-      if (ehVendedora) { setBio(data.bioCatalogo ?? ''); setBioOrig(data.bioCatalogo ?? '') }
+      if (ehVendedora) { setBio(data.bioCatalogo ?? ''); setBioOrig(data.bioCatalogo ?? ''); setSlugCatalogo(data.slugCatalogo ?? null) }
     }).catch(() => {})
   }, [ehVendedora])
 
@@ -144,6 +146,11 @@ export default function Conta() {
             <label>Bio da sua loja (catálogo)</label>
             <textarea rows={3} value={bio} onChange={(e) => setBio(e.target.value.slice(0, 280))} placeholder="Ex.: ✨ Apaixonada por moda! Coleções exclusivas e atendimento personalizado 💖 Vem comigo!" />
             <small style={{ color: 'var(--ink-soft)' }}>{bio.length}/280 · aparece no cabeçalho da sua loja (o link do catálogo que você compartilha).</small>
+            <div style={{ marginTop: 8 }}>
+              {slugCatalogo
+                ? <a href={urlCatalogo(HOST.slug!, `/${slugCatalogo}`)} target="_blank" rel="noopener noreferrer" className="btn secundario" style={{ display: 'inline-block', textDecoration: 'none' }}>🔗 Pré-visualizar minha vitrine</a>
+                : <small style={{ color: 'var(--ink-soft)' }}>Peça pro seu gestor definir o link da sua vitrine em Equipe pra poder pré-visualizar.</small>}
+            </div>
           </div>
         )}
         <div className="acoes"><button className="btn" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar'}</button></div>

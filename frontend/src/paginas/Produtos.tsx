@@ -344,7 +344,7 @@ export default function Produtos() {
 
       {form && (
         <div className="modal-fundo" onClick={() => setForm(null)}>
-          <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvar}>
+          <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvar} style={{ width: 'min(960px, 96vw)' }}>
             <h2>{form.id ? t('prod.editarProduto') : t('prod.novoProdutoTitulo')}</h2>
             {erro && <div className="alerta">{erro}</div>}
 
@@ -389,7 +389,7 @@ export default function Produtos() {
               </div>
               <div className="campo">
                 <label>{t('prod.precoVarejoLabel')}</label>
-                <input type="number" step="0.01" min="0.01" value={form.precoVarejo} onChange={(e) => setForm({ ...form, precoVarejo: e.target.value })} required />
+                <input type="number" step="0.01" min="0.01" value={form.precoVarejo} onChange={(e) => setForm({ ...form, precoVarejo: e.target.value })} onFocus={(e) => e.target.select()} required />
               </div>
             </div>
 
@@ -501,15 +501,15 @@ export default function Produtos() {
                 </div>
                 <div className="gv-cell">
                   <span>{t('prod.colEstoque')}</span>
-                  <input type="number" min="0" value={v.estoque} onChange={(e) => mudarVariacao(i, 'estoque', e.target.value)} />
+                  <input type="number" min="0" value={v.estoque} onChange={(e) => mudarVariacao(i, 'estoque', e.target.value)} onFocus={(e) => e.target.select()} />
                 </div>
                 <div className="gv-cell">
                   <span title={t('prod.reservaVarejoTitle')}>{t('prod.varejoLabel')}</span>
-                  <input type="number" min="0" max={v.estoque} value={v.estoqueVarejo ?? 0} onChange={(e) => mudarVariacao(i, 'estoqueVarejo', e.target.value)} title={t('prod.reservaVarejoTitle2')} />
+                  <input type="number" min="0" max={v.estoque} value={v.estoqueVarejo ?? 0} onChange={(e) => mudarVariacao(i, 'estoqueVarejo', e.target.value)} onFocus={(e) => e.target.select()} title={t('prod.reservaVarejoTitle2')} />
                 </div>
                 <div className="gv-cell">
                   <span>{t('prod.minimoLabel')}</span>
-                  <input type="number" min="0" value={v.estoqueMinimo} onChange={(e) => mudarVariacao(i, 'estoqueMinimo', e.target.value)} />
+                  <input type="number" min="0" value={v.estoqueMinimo} onChange={(e) => mudarVariacao(i, 'estoqueMinimo', e.target.value)} onFocus={(e) => e.target.select()} />
                 </div>
                 <button
                   type="button" className="remover" title={t('prod.remover')}
@@ -544,11 +544,11 @@ export default function Produtos() {
               <div className="linha-campos">
                 <div className="campo">
                   <label>{t('prod.precoAtacadoLabel')}</label>
-                  <input type="number" step="0.01" min="0" value={form.precoAtacado ?? ''} onChange={(e) => setForm({ ...form, precoAtacado: e.target.value })} />
+                  <input type="number" step="0.01" min="0" value={form.precoAtacado ?? ''} onChange={(e) => setForm({ ...form, precoAtacado: e.target.value })} onFocus={(e) => e.target.select()} />
                 </div>
                 <div className="campo">
                   <label>{t('prod.custoLabel')}</label>
-                  <input type="number" step="0.01" min="0" value={form.custo ?? ''} onChange={(e) => setForm({ ...form, custo: e.target.value })} />
+                  <input type="number" step="0.01" min="0" value={form.custo ?? ''} onChange={(e) => setForm({ ...form, custo: e.target.value })} onFocus={(e) => e.target.select()} />
                 </div>
               </div>
               <div className="linha-campos">
@@ -564,7 +564,7 @@ export default function Produtos() {
               <div className="linha-campos">
                 <div className="campo">
                   <label>{t('prod.pesoLabel')}</label>
-                  <input type="number" min="0" value={form.pesoGramas ?? ''} onChange={(e) => setForm({ ...form, pesoGramas: e.target.value })} />
+                  <input type="number" min="0" value={form.pesoGramas ?? ''} onChange={(e) => setForm({ ...form, pesoGramas: e.target.value })} onFocus={(e) => e.target.select()} />
                 </div>
                 <div className="campo">
                   <label>{t('prod.faixaEtariaLabel')}</label>

@@ -17,6 +17,7 @@ interface Perfil {
   plano: PlanoAssessor; limites: { fotos: number; videos: number }
 }
 interface AssessorCliente { id: string; nome: string; telefone: string | null; createdAt: string }
+interface SecaoDocumento { n: number; titulo: string; itens: (string | string[])[] }
 const DIAS_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 interface Avaliacao {
   id: string; nota: number; comentario: string | null; nomeCliente: string | null
@@ -76,6 +77,12 @@ export default function PainelAssessora() {
   const [indicacao, setIndicacao] = useState<Indicacao | null>(null)
 
   const [perfil, setPerfil] = useState<Perfil | null>(null)
+  // Política de Privacidade e Termos de Uso: aceite de uma nova versão é automático no 1º
+  // acesso ao painel (mesmo espírito do Layout.tsx da Rede) — sem botão. Só avisa por banner
+  // com link para ler o documento completo (endpoint público, sem info de aceite por sessão).
+  const [statusPrivacidade, setStatusPrivacidade] = useState<{ pendente: boolean } | null>(null)
+  const [statusTermosUso, setStatusTermosUso] = useState<{ pendente: boolean } | null>(null)
+  const [docLeitura, setDocLeitura] = useState<{ titulo: string; secoes: SecaoDocumento[] } | null>(null)
   // Nome/e-mail/senha (conta de login) — antes só dava pra editar em /conta, uma rota do shell
   // do CRM que a Assessora nunca alcança de verdade (Raiz() não renderiza Outlet pro papel dela,
   // então a navegação pra lá só reexibia este mesmo painel). Trazido pra cá, no único painel dela.
@@ -231,6 +238,22 @@ export default function PainelAssessora() {
   }
   useEffect(() => { carregarPerfil(); carregarMarcas(); carregarAssinatura(); carregarIndicacao(); carregarAvaliacoes(); carregarLancamentos(); carregarClientes() }, [])
   useEffect(() => { api.get('/assessores/plano').then(({ data }) => setPrecosPlano(data)).catch(() => {}) }, [])
+  // Política de Privacidade / Termos de Uso: ao detectar pendência, registra o aceite
+  // automaticamente (uso do painel = aceite) e mantém o aviso nesta sessão.
+  useEffect(() => {
+    api.get('/privacidade/assessor/status').then(({ data }) => {
+      setStatusPrivacidade(data)
+      if (data.pendente) api.post('/privacidade/assessor/aceitar').catch(() => {})
+    }).catch(() => {})
+    api.get('/termos-uso/assessor/status').then(({ data }) => {
+      setStatusTermosUso(data)
+      if (data.pendente) api.post('/termos-uso/assessor/aceitar').catch(() => {})
+    }).catch(() => {})
+  }, [])
+  function abrirLeitura(caminho: 'privacidade' | 'termos-uso') {
+    const campo = caminho === 'privacidade' ? 'privacidade' : 'termosUso'
+    api.get(`/${caminho}/termos`).then(({ data }) => setDocLeitura(data[campo])).catch((e) => avisar(mensagemDeErro(e), 'erro'))
+  }
 
   async function trocarPlano(novoPlano: PlanoAssessor) {
     if (!window.confirm(`Trocar para o plano ${novoPlano === 'AVANCADO' ? 'Avançado' : 'Básico'}? O valor da sua assinatura muda a partir da próxima cobrança.`)) return
@@ -555,6 +578,21 @@ export default function PainelAssessora() {
         </div>
         <button className="btn secundario" onClick={sair}>Sair</button>
       </header>
+
+      {statusPrivacidade?.pendente && (
+        <div className="aviso-encerramento" style={{ background: '#122a1e', color: '#9fe0bd', marginBottom: 12 }}>
+          🔒 <strong>Atualizamos nossa Política de Privacidade.</strong>{' '}
+          Ao continuar usando o sistema, seu aceite da nova versão já foi registrado automaticamente.{' '}
+          <a href="#" onClick={(e) => { e.preventDefault(); abrirLeitura('privacidade') }} style={{ color: '#c8f7dd', fontWeight: 700 }}>Ver o que mudou</a>
+        </div>
+      )}
+      {statusTermosUso?.pendente && (
+        <div className="aviso-encerramento" style={{ background: '#122a1e', color: '#9fe0bd', marginBottom: 12 }}>
+          📃 <strong>Atualizamos nossos Termos de Uso e Responsabilidade.</strong>{' '}
+          Ao continuar usando o sistema, seu aceite da nova versão já foi registrado automaticamente.{' '}
+          <a href="#" onClick={(e) => { e.preventDefault(); abrirLeitura('termos-uso') }} style={{ color: '#c8f7dd', fontWeight: 700 }}>Ver o que mudou</a>
+        </div>
+      )}
 
       <div className="cartao" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Sua vitrine pública:</div>
@@ -1222,6 +1260,29 @@ export default function PainelAssessora() {
           totalMarcas={marcas.length} statProdutos={statProdutos} statClientes={perfil?.statClientes ? String(perfil.statClientes) : ''}
           onClose={() => setPreview(false)}
         />
+      )}
+
+      {docLeitura && (
+        <div className="modal-fundo" onClick={() => setDocLeitura(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 94vw)' }}>
+            <h2>{docLeitura.titulo}</h2>
+            <div style={{ maxHeight: '55vh', overflowY: 'auto', lineHeight: 1.65, fontSize: 14 }}>
+              {docLeitura.secoes.map((sec) => (
+                <div key={sec.n} style={{ marginTop: 14 }}>
+                  <h3 style={{ margin: '0 0 4px', fontSize: 15 }}>{sec.n}. {sec.titulo}</h3>
+                  {sec.itens.map((item, i) => (
+                    Array.isArray(item)
+                      ? <ul key={i} style={{ margin: '4px 0 8px 18px' }}>{item.map((li, j) => <li key={j} style={{ margin: '2px 0' }}>{li}</li>)}</ul>
+                      : <p key={i} style={{ textAlign: 'justify', margin: '4px 0' }}>{item}</p>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="acoes">
+              <button type="button" className="btn" onClick={() => setDocLeitura(null)}>Fechar</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

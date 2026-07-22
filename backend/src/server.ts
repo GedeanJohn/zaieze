@@ -8,6 +8,8 @@ import { encerrarAssinaturasVencidas } from './modules/assinaturas/assinatura.se
 import { encerrarAssessorasVencidas } from './modules/assessores/assinatura-assessor.service'
 import { aplicarReajustesIgpm } from './modules/assinaturas/igpm.service'
 import { aplicarDistratoTermos } from './modules/contrato/contrato.service'
+import { aplicarDistratoPrivacidade } from './modules/privacidade/privacidade.service'
+import { aplicarDistratoTermosUso } from './modules/termos-uso/termos-uso.service'
 import { atualizarCotacaoUsd } from './modules/cambio/cambio.service'
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000
@@ -49,11 +51,17 @@ async function main() {
     limparLooks()
     setInterval(limparLooks, UM_DIA_MS).unref()
 
-    // Termos/distrato + encerramento de assinaturas: roda no boot e a cada 24h.
-    // 1) distrata quem não aceitou os termos no prazo (cancela recorrência + fim de ciclo);
-    // 2) encerra as assinaturas cujo ciclo pago já venceu.
+    // Contrato/Privacidade/Termos de Uso + encerramento de assinaturas: roda no boot e a
+    // cada 24h. 1) distrata quem não (re)aceitou cada um dos 3 documentos no prazo (cancela
+    // recorrência + fim de ciclo) — Privacidade e Termos de Uso normalmente já são aceitos
+    // automaticamente no 1º uso do painel após a publicação (ver Layout.tsx), então este job
+    // só pega quem nunca mais fez login; 2) encerra as assinaturas cujo ciclo pago já venceu.
     const aplicarTermos = () => aplicarDistratoTermos()
-      .then((d) => { if (d > 0) app.log.info(`Distrato por não-aceite dos termos: ${d} rede(s)`) })
+      .then((d) => { if (d > 0) app.log.info(`Distrato por não-aceite do contrato: ${d} rede(s)`) })
+      .then(() => aplicarDistratoPrivacidade())
+      .then((d) => { if (d > 0) app.log.info(`Distrato por não-aceite da Política de Privacidade: ${d} rede(s)`) })
+      .then(() => aplicarDistratoTermosUso())
+      .then((d) => { if (d > 0) app.log.info(`Distrato por não-aceite dos Termos de Uso: ${d} rede(s)`) })
       .then(() => encerrarAssinaturasVencidas())
       .then((e) => { if (e > 0) app.log.info(`Assinaturas encerradas (ciclo vencido): ${e}`) })
       .then(() => encerrarAssessorasVencidas())

@@ -7,6 +7,8 @@ import { useIdioma } from '../../lib/i18n'
 
 interface ClausulaContrato { n: number; titulo: string; paragrafos: string[] }
 interface ContratoMontado { titulo: string; qualificacao: string[]; clausulas: ClausulaContrato[] }
+interface SecaoDocumento { n: number; titulo: string; itens: (string | string[])[] }
+interface DocumentoMontado { titulo: string; secoes: SecaoDocumento[] }
 interface PromoInfo { valido: boolean; beneficio?: string }
 
 export default function CadastroAssessor() {
@@ -23,6 +25,14 @@ export default function CadastroAssessor() {
   const [aceiteContrato, setAceiteContrato] = useState(false)
   const [contrato, setContrato] = useState<ContratoMontado | null>(null)
   const [contratoAberto, setContratoAberto] = useState(false)
+  // Política de Privacidade e Termos de Uso: aceite explícito e individual, cada um com seu
+  // próprio checkbox e modal — independente do aceite do Contrato de Credenciamento acima.
+  const [aceitePrivacidade, setAceitePrivacidade] = useState(false)
+  const [privacidade, setPrivacidade] = useState<DocumentoMontado | null>(null)
+  const [privacidadeAberta, setPrivacidadeAberta] = useState(false)
+  const [aceiteTermosUso, setAceiteTermosUso] = useState(false)
+  const [termosUso, setTermosUso] = useState<DocumentoMontado | null>(null)
+  const [termosUsoAberto, setTermosUsoAberto] = useState(false)
   // Pré-preenche o cupom pela URL (?cupom=) — permite compartilhar um link já com o cupom.
   const [cupom, setCupom] = useState((params.get('cupom') || '').toUpperCase())
   const [promo, setPromo] = useState<PromoInfo | null>(null)
@@ -30,6 +40,8 @@ export default function CadastroAssessor() {
   useEffect(() => {
     api.get('/assessores/plano').then(({ data }) => setPrecos(data)).catch(() => {})
     api.get('/assessores/contrato').then(({ data }) => setContrato(data)).catch(() => {})
+    api.get('/privacidade/termos').then(({ data }) => setPrivacidade(data.privacidade)).catch(() => {})
+    api.get('/termos-uso/termos').then(({ data }) => setTermosUso(data.termosUso)).catch(() => {})
   }, [])
 
   function onNome(v: string) {
@@ -64,8 +76,8 @@ export default function CadastroAssessor() {
   }, [cupom])
 
   const podeEnviar = useMemo(
-    () => form.nome && form.slug.length >= 2 && form.email && form.senha.length >= 6 && slugStatus !== 'indisponivel' && aceiteContrato,
-    [form, slugStatus, aceiteContrato],
+    () => form.nome && form.slug.length >= 2 && form.email && form.senha.length >= 6 && slugStatus !== 'indisponivel' && aceiteContrato && aceitePrivacidade && aceiteTermosUso,
+    [form, slugStatus, aceiteContrato, aceitePrivacidade, aceiteTermosUso],
   )
 
   async function cadastrar(e: React.FormEvent) {
@@ -74,7 +86,8 @@ export default function CadastroAssessor() {
     try {
       const { data } = await api.post('/assessores/cadastro', {
         nome: form.nome, slug: form.slug.toLowerCase(), telefone: form.telefone || undefined,
-        email: form.email, senha: form.senha, plano: form.plano, cupom: cupom.trim() || undefined, aceiteContrato: true,
+        email: form.email, senha: form.senha, plano: form.plano, cupom: cupom.trim() || undefined,
+        aceiteContrato: true, aceitePrivacidade: true, aceiteTermosUso: true,
       })
       if (data.simulado) window.location.href = `/sucesso?slug=${data.slug}&plano=${encodeURIComponent(t('assessorPlano.tituloPlano'))}&simulado=1`
       else if (data.initPoint) window.location.href = data.initPoint
@@ -186,6 +199,30 @@ export default function CadastroAssessor() {
             </label>
           </div>
 
+          <div className="campo">
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', fontWeight: 400 }}>
+              <input type="checkbox" checked={aceitePrivacidade} onChange={(e) => setAceitePrivacidade(e.target.checked)} style={{ width: 'auto', marginTop: 3 }} required />
+              <span>
+                Li e aceito a{' '}
+                <a href="#" onClick={(e) => { e.preventDefault(); setPrivacidadeAberta(true) }} style={{ color: '#fff', textDecoration: 'underline' }}>
+                  Política de Privacidade
+                </a>.
+              </span>
+            </label>
+          </div>
+
+          <div className="campo">
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', fontWeight: 400 }}>
+              <input type="checkbox" checked={aceiteTermosUso} onChange={(e) => setAceiteTermosUso(e.target.checked)} style={{ width: 'auto', marginTop: 3 }} required />
+              <span>
+                Li e aceito os{' '}
+                <a href="#" onClick={(e) => { e.preventDefault(); setTermosUsoAberto(true) }} style={{ color: '#fff', textDecoration: 'underline' }}>
+                  Termos de Uso e Responsabilidade
+                </a>.
+              </span>
+            </label>
+          </div>
+
           <button className="btn grande" style={{ width: '100%' }} disabled={!podeEnviar || enviando}>
             {enviando ? t('assessorCadastro.processando') : t('assessorCadastro.irPagamento')}
           </button>
@@ -214,6 +251,52 @@ export default function CadastroAssessor() {
             </div>
             <div className="acoes">
               <button type="button" className="btn" onClick={() => { setAceiteContrato(true); setContratoAberto(false) }}>{t('assessorCadastro.aceiteBtn')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {privacidadeAberta && privacidade && (
+        <div className="modal-fundo" onClick={() => setPrivacidadeAberta(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 94vw)' }}>
+            <h2>{privacidade.titulo}</h2>
+            <div style={{ maxHeight: '55vh', overflowY: 'auto', lineHeight: 1.65, fontSize: 14 }}>
+              {privacidade.secoes.map((sec) => (
+                <div key={sec.n} style={{ marginTop: 14 }}>
+                  <h3 style={{ margin: '0 0 4px', fontSize: 15 }}>{sec.n}. {sec.titulo}</h3>
+                  {sec.itens.map((item, i) => (
+                    Array.isArray(item)
+                      ? <ul key={i} style={{ margin: '4px 0 8px 18px' }}>{item.map((li, j) => <li key={j} style={{ margin: '2px 0' }}>{li}</li>)}</ul>
+                      : <p key={i} style={{ textAlign: 'justify', margin: '4px 0' }}>{item}</p>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="acoes">
+              <button type="button" className="btn" onClick={() => { setAceitePrivacidade(true); setPrivacidadeAberta(false) }}>Li e aceito</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {termosUsoAberto && termosUso && (
+        <div className="modal-fundo" onClick={() => setTermosUsoAberto(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 94vw)' }}>
+            <h2>{termosUso.titulo}</h2>
+            <div style={{ maxHeight: '55vh', overflowY: 'auto', lineHeight: 1.65, fontSize: 14 }}>
+              {termosUso.secoes.map((sec) => (
+                <div key={sec.n} style={{ marginTop: 14 }}>
+                  <h3 style={{ margin: '0 0 4px', fontSize: 15 }}>{sec.n}. {sec.titulo}</h3>
+                  {sec.itens.map((item, i) => (
+                    Array.isArray(item)
+                      ? <ul key={i} style={{ margin: '4px 0 8px 18px' }}>{item.map((li, j) => <li key={j} style={{ margin: '2px 0' }}>{li}</li>)}</ul>
+                      : <p key={i} style={{ textAlign: 'justify', margin: '4px 0' }}>{item}</p>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="acoes">
+              <button type="button" className="btn" onClick={() => { setAceiteTermosUso(true); setTermosUsoAberto(false) }}>Li e aceito</button>
             </div>
           </div>
         </div>

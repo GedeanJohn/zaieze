@@ -290,6 +290,8 @@ model Rede {
   marcas     Marca[]
   campanhasModelo CampanhaModelo[]
   aceitesContrato AceiteContrato[]
+  aceitesPrivacidade AceitePrivacidade[]
+  aceitesTermosUso   AceiteTermosUso[]
   afiliadoOrigem Afiliado? @relation(fields: [afiliadoId], references: [id], onDelete: SetNull)
   assessorOrigem Assessor? @relation(fields: [assessorOrigemId], references: [id], onDelete: SetNull)
   looksProvador   LookProvador[]
@@ -316,6 +318,46 @@ model AceiteContrato {
 
   @@index([redeId, aceitoEm])
   @@map("aceites_contrato")
+}
+
+/// Registro de aceite eletrônico da Política de Privacidade (assinado pelo GESTOR em
+/// nome da rede). Mesmo mecanismo de prova jurídica do AceiteContrato — documento
+/// independente, com versionamento e reaceite/distrato próprios (ver privacidade.template.ts).
+model AceitePrivacidade {
+  id             String   @id @default(cuid())
+  redeId         String
+  versao         String // versão da política aceita
+  idioma         String   @default("pt")
+  assinanteNome  String   @map("assinante_nome")
+  assinanteEmail String   @map("assinante_email")
+  ip             String?
+  userAgent      String?  @map("user_agent")
+  aceitoEm       DateTime @default(now()) @map("aceito_em")
+
+  rede Rede @relation(fields: [redeId], references: [id], onDelete: Cascade)
+
+  @@index([redeId, aceitoEm])
+  @@map("aceites_privacidade")
+}
+
+/// Registro de aceite eletrônico dos Termos de Uso e Responsabilidade (assinado pelo
+/// GESTOR em nome da rede). Documento independente do Contrato SaaS e da Política de
+/// Privacidade, com versionamento e reaceite/distrato próprios (ver termos-uso.template.ts).
+model AceiteTermosUso {
+  id             String   @id @default(cuid())
+  redeId         String
+  versao         String // versão dos termos aceita
+  idioma         String   @default("pt")
+  assinanteNome  String   @map("assinante_nome")
+  assinanteEmail String   @map("assinante_email")
+  ip             String?
+  userAgent      String?  @map("user_agent")
+  aceitoEm       DateTime @default(now()) @map("aceito_em")
+
+  rede Rede @relation(fields: [redeId], references: [id], onDelete: Cascade)
+
+  @@index([redeId, aceitoEm])
+  @@map("aceites_termos_uso")
 }
 
 // ─────────────────────────── Billing SaaS (assinatura por rede) ───────────────────────────
@@ -1450,6 +1492,8 @@ model Assessor {
   vendas  VendaAssessora[]
   assinatura      AssinaturaAssessor?
   aceitesContrato AceiteContratoAssessor[]
+  aceitesPrivacidadeAssessor AceitePrivacidadeAssessor[]
+  aceitesTermosUsoAssessor   AceiteTermosUsoAssessor[]
   redesIndicadas  Rede[]
   comissoesIndicacao ComissaoAssessor[]
   horarios        AssessorHorario[]
@@ -1712,6 +1756,46 @@ model AceiteContratoAssessor {
 
   @@index([assessorId])
   @@map("aceites_contrato_assessor")
+}
+
+/// Aceite eletrônico da Política de Privacidade pela Assessora (Brand Partner). Mesma
+/// mecânica do AceitePrivacidade (Rede), mas escopada por assessorId — sem o job de
+/// distrato/cancelamento automático (o Contrato de Credenciamento da assessora também não
+/// tem essa aplicação; o aceite de nova versão aqui é só automático-por-uso, ver painel).
+model AceitePrivacidadeAssessor {
+  id             String   @id @default(cuid())
+  assessorId     String
+  versao         String
+  idioma         String   @default("pt")
+  assinanteNome  String
+  assinanteEmail String
+  ip             String?
+  userAgent      String?
+  aceitoEm       DateTime @default(now())
+
+  assessor Assessor @relation(fields: [assessorId], references: [id], onDelete: Cascade)
+
+  @@index([assessorId])
+  @@map("aceites_privacidade_assessor")
+}
+
+/// Aceite eletrônico dos Termos de Uso e Responsabilidade pela Assessora (Brand Partner).
+/// Mesma mecânica do AceiteTermosUso (Rede), escopado por assessorId.
+model AceiteTermosUsoAssessor {
+  id             String   @id @default(cuid())
+  assessorId     String
+  versao         String
+  idioma         String   @default("pt")
+  assinanteNome  String
+  assinanteEmail String
+  ip             String?
+  userAgent      String?
+  aceitoEm       DateTime @default(now())
+
+  assessor Assessor @relation(fields: [assessorId], references: [id], onDelete: Cascade)
+
+  @@index([assessorId])
+  @@map("aceites_termos_uso_assessor")
 }
 
 // ─────────────────────────── Provador virtual (módulo 13 — Elite) ───────────────────────────

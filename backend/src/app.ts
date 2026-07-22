@@ -34,6 +34,8 @@ import { atacadoRoutes } from './modules/atacado/atacado.routes'
 import { planosRoutes } from './modules/planos/planos.routes'
 import { assinaturasRoutes } from './modules/assinaturas/assinaturas.routes'
 import { contratoRoutes } from './modules/contrato/contrato.routes'
+import { privacidadeRoutes } from './modules/privacidade/privacidade.routes'
+import { termosUsoRoutes } from './modules/termos-uso/termos-uso.routes'
 import { metasRoutes } from './modules/metas/metas.routes'
 import { adminRoutes } from './modules/admin/admin.routes'
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes'
@@ -115,6 +117,8 @@ export async function buildApp() {
   await app.register(planosRoutes, { prefix: '/api/planos' })
   await app.register(assinaturasRoutes, { prefix: '/api/assinaturas' })
   await app.register(contratoRoutes, { prefix: '/api/contrato' })
+  await app.register(privacidadeRoutes, { prefix: '/api/privacidade' })
+  await app.register(termosUsoRoutes, { prefix: '/api/termos-uso' })
   await app.register(metasRoutes, { prefix: '/api/metas' })
   await app.register(adminRoutes, { prefix: '/api/admin' })
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' })

@@ -1,7 +1,7 @@
 import { prisma } from '../../lib/prisma'
 import { limparMidiaDaRede } from '../midia/limpeza.service'
 
-export type OrigemCancelamento = 'LOJISTA' | 'ADMIN' | 'MERCADO_PAGO' | 'DISTRATO_TERMOS'
+export type OrigemCancelamento = 'LOJISTA' | 'ADMIN' | 'MERCADO_PAGO' | 'DISTRATO_TERMOS' | 'DISTRATO_PRIVACIDADE' | 'DISTRATO_TERMOS_USO'
 
 /** Fim do próximo ciclo a partir de uma data (default: agora) — 1 mês (MENSAL) ou 12 meses (ANUAL). */
 export function proximoCicloFim(base = new Date(), periodicidade: 'MENSAL' | 'ANUAL' = 'MENSAL'): Date {

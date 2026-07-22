@@ -29,6 +29,8 @@ import Marca from './paginas/Marca'
 import Pipeline from './paginas/Pipeline'
 import Manual from './paginas/Manual'
 import Contrato from './paginas/Contrato'
+import Privacidade from './paginas/Privacidade'
+import TermosUso from './paginas/TermosUso'
 import Admin from './paginas/Admin'
 import WhatsAppOficial from './paginas/WhatsApp'
 import InstagramOficial from './paginas/Instagram'
@@ -154,6 +156,8 @@ function CrmApp() {
         <Route path="manual" element={<Manual />} />
         <Route path="planos" element={<Planos />} />
         <Route path="contrato" element={<Contrato />} />
+        <Route path="privacidade" element={<Privacidade />} />
+        <Route path="termos-uso" element={<TermosUso />} />
         <Route path="admin" element={<Admin />} />
         <Route path="whatsapp-config" element={<WhatsAppOficial />} />
         <Route path="instagram-config" element={<InstagramOficial />} />

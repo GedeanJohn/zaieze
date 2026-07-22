@@ -10,6 +10,8 @@ import { listarPlanos, precoDoPlano, percentualDescontoAnual, valorAnual } from 
 import { consumirCodigo, descricaoBeneficio, validarCodigo } from '../promo/promo.service'
 import { CONTRATO_VERSAO } from '../contrato/contrato.template'
 import { temAceiteVigente } from '../contrato/contrato.service'
+import { PRIVACIDADE_VERSAO } from '../privacidade/privacidade.template'
+import { TERMOS_USO_VERSAO } from '../termos-uso/termos-uso.template'
 import { normalizarTelefone } from '../../lib/telefone'
 import { confirmarCicloEComissionar, gerarComissaoDoCiclo, normalizarCodigo as normalizarCodigoAfiliado } from '../afiliados/afiliado.service'
 import { obterCotacaoAtual } from '../cambio/cambio.service'
@@ -165,11 +167,35 @@ export async function assinaturasRoutes(app: FastifyInstance) {
           data: { assessorId: assessorIndicador.id, redeId: r.id, nome: body.redeNome, ordem: (maiorOrdem._max.ordem ?? -1) + 1 },
         })
       }
-      // Aceite eletrônico da versão vigente do contrato, firmado no ato da adesão.
+      // Aceite eletrônico da versão vigente do Contrato, da Política de Privacidade e dos
+      // Termos de Uso, firmado no ato da adesão — cada documento com seu próprio registro
+      // (aceite individual e independente, ver contrato/privacidade/termos-uso).
       await tx.aceiteContrato.create({
         data: {
           redeId: r.id,
           versao: CONTRATO_VERSAO,
+          idioma: body.idioma,
+          assinanteNome: body.gestorNome,
+          assinanteEmail: email,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'] ?? null,
+        },
+      })
+      await tx.aceitePrivacidade.create({
+        data: {
+          redeId: r.id,
+          versao: PRIVACIDADE_VERSAO,
+          idioma: body.idioma,
+          assinanteNome: body.gestorNome,
+          assinanteEmail: email,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'] ?? null,
+        },
+      })
+      await tx.aceiteTermosUso.create({
+        data: {
+          redeId: r.id,
+          versao: TERMOS_USO_VERSAO,
           idioma: body.idioma,
           assinanteNome: body.gestorNome,
           assinanteEmail: email,

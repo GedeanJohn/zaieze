@@ -13,6 +13,8 @@ import { validarCodigo, consumirCodigo, descricaoBeneficio } from '../promo/prom
 import { percentualEfetivoIndicacao } from './comissao-assessor.service'
 import { proximoCicloFimAssessor, solicitarCancelamentoAssessor, reativarAssinaturaAssessor } from './assinatura-assessor.service'
 import { montarContratoAssessor, CONTRATO_ASSESSOR_VERSAO } from './contrato-assessor.template'
+import { PRIVACIDADE_VERSAO } from '../privacidade/privacidade.template'
+import { TERMOS_USO_VERSAO } from '../termos-uso/termos-uso.template'
 import { calcularDisponivelPorAgenda, agruparPorDia } from './agenda-disponibilidade.service'
 
 const num = (v: unknown) => Number(v ?? 0)
@@ -106,6 +108,8 @@ export async function assessoresRoutes(app: FastifyInstance) {
     plano: z.enum(['BASICO', 'AVANCADO']).default('BASICO'),
     cupom: z.string().trim().optional(),
     aceiteContrato: z.literal(true, { errorMap: () => ({ message: 'É necessário aceitar o contrato para continuar.' }) }),
+    aceitePrivacidade: z.literal(true, { errorMap: () => ({ message: 'É necessário aceitar a Política de Privacidade para continuar.' }) }),
+    aceiteTermosUso: z.literal(true, { errorMap: () => ({ message: 'É necessário aceitar os Termos de Uso para continuar.' }) }),
   })
   app.post('/cadastro', async (request, reply) => {
     const b = cadastroSchema.parse(request.body)
@@ -145,6 +149,18 @@ export async function assessoresRoutes(app: FastifyInstance) {
       await tx.aceiteContratoAssessor.create({
         data: {
           assessorId: a.id, versao: CONTRATO_ASSESSOR_VERSAO, assinanteNome: b.nome, assinanteEmail: email,
+          ip: request.ip, userAgent: request.headers['user-agent'] ?? null,
+        },
+      })
+      await tx.aceitePrivacidadeAssessor.create({
+        data: {
+          assessorId: a.id, versao: PRIVACIDADE_VERSAO, assinanteNome: b.nome, assinanteEmail: email,
+          ip: request.ip, userAgent: request.headers['user-agent'] ?? null,
+        },
+      })
+      await tx.aceiteTermosUsoAssessor.create({
+        data: {
+          assessorId: a.id, versao: TERMOS_USO_VERSAO, assinanteNome: b.nome, assinanteEmail: email,
           ip: request.ip, userAgent: request.headers['user-agent'] ?? null,
         },
       })

@@ -254,6 +254,38 @@ export async function assessoresRoutes(app: FastifyInstance) {
     }
   })
 
+  // Manifesto PWA por assessora: "Adicionar à Tela de Início" (Android) mostra o nome dela e a
+  // foto de perfil (já quadrada 512x512, mesmo endpoint de /usuarios/me/foto) em vez do ícone/
+  // título genérico "ZAIEZE". Consumido pelo <link rel="manifest"> reescrito em pwaAssessora.ts
+  // no frontend (só quando o subdomínio é dela — pra Rede o manifesto padrão continua valendo).
+  app.get('/publico/:slug/manifest.webmanifest', async (request, reply) => {
+    const { slug } = request.params as { slug: string }
+    const assessor = await prisma.assessor.findUnique({
+      where: { slug },
+      select: { usuario: { select: { nome: true, fotoUrl: true, ativo: true } } },
+    })
+    if (!assessor || !assessor.usuario.ativo) return reply.code(404).send({ erro: 'Página não encontrada' })
+    const nome = assessor.usuario.nome
+    reply.type('application/manifest+json')
+    return {
+      name: nome,
+      short_name: nome,
+      description: `Vitrine e catálogo de moda — ${nome}`,
+      start_url: '/?pwa=1',
+      scope: '/',
+      display: 'standalone',
+      background_color: '#000000',
+      theme_color: '#000000',
+      icons: assessor.usuario.fotoUrl
+        ? [{ src: assessor.usuario.fotoUrl, sizes: '512x512', type: 'image/webp', purpose: 'any' }]
+        : [
+            { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+            { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          ],
+    }
+  })
+
   // Lista completa dos depoimentos aprovados (pro "ver mais" na vitrine — o resumo acima só
   // manda os 3 mais recentes).
   app.get('/publico/:slug/avaliacoes', async (request, reply) => {

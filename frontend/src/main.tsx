@@ -57,6 +57,7 @@ import CadastroAssessor from './paginas/site/CadastroAssessor'
 import Lgpd from './paginas/site/Lgpd'
 import PoliticaPrivacidade from './paginas/site/PoliticaPrivacidade'
 import { aplicarImpersonacaoDaUrl } from './lib/impersonar'
+import { aplicarIdentidadeAssessoraNoPWA } from './lib/pwaAssessora'
 import BannerImpersonar from './componentes/BannerImpersonar'
 import { useProtegerConteudo } from './lib/protegerConteudo'
 
@@ -175,6 +176,8 @@ function CrmApp() {
 // Aplica um pacote de "entrar como" vindo na URL (ver lib/impersonar.ts) ANTES de qualquer coisa
 // renderizar — troca o localStorage síncrono, então usuarioLogado() já vem certo no 1º render.
 aplicarImpersonacaoDaUrl()
+
+if (HOST.tipo === 'tenant' && HOST.slug) aplicarIdentidadeAssessoraNoPWA(HOST.slug)
 
 // Registra o service worker (sem cache — só existe pra habilitar o prompt de instalação do PWA).
 if ('serviceWorker' in navigator) {

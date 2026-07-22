@@ -184,7 +184,7 @@ export default function Colecoes() {
       </div>
 
       <div className="cartao">
-        <table>
+        <table className="tabela-colecoes">
           <thead>
             <tr><th>{t('col.colColecao')}</th><th>{t('col.colStatus')}</th><th>{t('col.colPecas')}</th><th>{t('col.colLojas')}</th><th>{t('col.colLiberadaEm')}</th><th></th></tr>
           </thead>
@@ -217,13 +217,13 @@ export default function Colecoes() {
                     </div>
                   )}
                 </td>
-                <td>
+                <td data-label={t('col.colStatus')}>
                   <span className={`selo ${c.status === 'LIBERADA' ? 'ok' : 'baixo'}`}>
                     {c.status === 'LIBERADA' ? t('col.liberada') : t('col.emPreparacao')}
                   </span>
                 </td>
-                <td>{c.pecas}</td>
-                <td>
+                <td data-label={t('col.colPecas')}>{c.pecas}</td>
+                <td data-label={t('col.colLojas')}>
                   {c.lojaIds.length === 0
                     ? <span style={{ color: 'var(--danger)', fontSize: 12 }}>{t('col.nenhuma')}</span>
                     : <span style={{ fontSize: 13 }}>{t('col.lojasCount', { n: c.lojaIds.length })}</span>}
@@ -232,8 +232,8 @@ export default function Colecoes() {
                     <a href="#" style={{ fontSize: 12 }} onClick={(e) => { e.preventDefault(); setDistrib({ colecao: c, lojaIds: new Set(c.lojaIds) }) }}>{t('col.distribuir')}</a>
                   </>}
                 </td>
-                <td>{c.liberadaEm ? new Date(c.liberadaEm).toLocaleDateString('pt-BR') : '—'}</td>
-                <td>
+                <td data-label={t('col.colLiberadaEm')}>{c.liberadaEm ? new Date(c.liberadaEm).toLocaleDateString('pt-BR') : '—'}</td>
+                <td className="td-acoes">
                   <div className="linha-acoes">
                     <Switch
                       ligado={c.status === 'LIBERADA'}

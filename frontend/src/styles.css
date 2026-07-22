@@ -164,6 +164,27 @@ tr:hover td { background: #fdfaf6; }
 .tabela-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .tabela-scroll table { white-space: nowrap; }
 
+/* Tabela de Coleções em telas estreitas: em vez de rolar na horizontal pra ver as outras
+   colunas (só "Coleção" cabia na tela, o resto ficava fora — dava a impressão de vão gigante
+   entre colunas), cada linha vira um cartão empilhado com rótulo em cima do valor. */
+@media (max-width: 720px) {
+  .conteudo .tabela-colecoes { white-space: normal; overflow-x: visible; }
+  .conteudo .tabela-colecoes, .conteudo .tabela-colecoes tbody,
+  .conteudo .tabela-colecoes tr, .conteudo .tabela-colecoes td { display: block; width: 100%; }
+  .conteudo .tabela-colecoes thead { display: none; }
+  .conteudo .tabela-colecoes tr {
+    margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+  }
+  .conteudo .tabela-colecoes tr:last-child { margin-bottom: 0; }
+  .conteudo .tabela-colecoes td { padding: 6px 0; border-bottom: 1px solid #00000010; }
+  .conteudo .tabela-colecoes tr:hover td { background: none; }
+  .conteudo .tabela-colecoes td:last-child { border-bottom: none; padding-bottom: 0; }
+  .conteudo .tabela-colecoes td[data-label]::before {
+    content: attr(data-label); display: block; font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-bottom: 2px;
+  }
+  .conteudo .tabela-colecoes td.td-acoes { padding-top: 8px; }
+}
+
 .filtro-vendas-acao { margin-left: auto; }
 @media (max-width: 600px) {
   /* Em telas estreitas os campos (De/Até/Marca) quebram linha antes do botão — com

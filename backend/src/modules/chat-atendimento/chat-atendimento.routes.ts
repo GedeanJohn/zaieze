@@ -22,8 +22,9 @@ function urlTenant(slug: string): string {
  * gestor pode comprar mais de uma, mas cada assinatura vale só para uma vendedora por vez.
  */
 export async function chatAtendimentoRoutes(app: FastifyInstance) {
-  // Preço vigente (exibido na tela de contratação do gestor).
-  app.get('/preco', { preHandler: [app.authenticate] }, async () => ({ preco: await precoChatAtendimento() }))
+  // Preço vigente — público (exibido na tela de contratação do gestor E na landing pública,
+  // mesmo padrão de GET /addons e GET /assinaturas/planos).
+  app.get('/preco', async () => ({ preco: await precoChatAtendimento() }))
 
   // Todas as assinaturas da rede logada + nome da vendedora atribuída (se houver).
   app.get('/minhas', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request) => {

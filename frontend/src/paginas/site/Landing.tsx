@@ -123,6 +123,9 @@ export default function Landing() {
       setCambio(data.cambio ?? { usdPorBrl: null })
     }).catch(() => {})
     api.get('/addons').then(({ data }) => setAddons(data.addons)).catch(() => {})
+    api.get('/chat-atendimento/preco').then(({ data }) => {
+      setAddons((atuais) => [...atuais, { tipo: 'CHAT_ATENDIMENTO', nome: 'Chat de Atendimento', preco: data.preco }])
+    }).catch(() => {})
   }, [])
 
   useEffect(() => { capturarRefAfiliado() }, [])

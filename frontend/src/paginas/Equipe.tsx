@@ -17,7 +17,6 @@ interface Membro {
   metaMensal?: string | null
   comissaoPadrao?: string | null
   ativo: boolean
-  waNumero?: string | null
   _count?: { carteira: number }
 }
 
@@ -332,7 +331,7 @@ export default function Equipe() {
                       <td>{m.email}</td>
                       <td>{m.role === 'GERENTE' ? t('equipe.gerenteDeLojaOpt') : t('equipe.vendedoraOpt')}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>
-                        <span style={{ color: 'var(--ink-soft)' }}>{m.waNumero ? formatarWhatsapp(m.waNumero) : '—'}</span>
+                        <span style={{ color: 'var(--ink-soft)' }}>{m.telefone ? formatarWhatsapp(m.telefone) : '—'}</span>
                       </td>
                       <td>{t('equipe.clientesSufixo', { n: m._count?.carteira ?? 0 })}</td>
                       <td>{m.role === 'VENDEDORA' && metaLojaData ? `R$ ${metaLojaData.metaVendedora.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}</td>

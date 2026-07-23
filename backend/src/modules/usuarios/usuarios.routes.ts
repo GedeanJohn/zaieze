@@ -36,7 +36,6 @@ const atualizarUsuarioSchema = criarUsuarioSchema.partial().extend({
 const selecaoPublica = {
   id: true, nome: true, email: true, role: true, telefone: true, fotoUrl: true,
   slugCatalogo: true, metaMensal: true, comissaoPadrao: true, ativo: true, createdAt: true,
-  waNumero: true,
   equipe: { select: { id: true, nome: true } },
 } as const
 

@@ -67,7 +67,7 @@ async function resolverVendedoraPublica(redeSlug: string, vendSlug: string) {
   if (!rede || !rede.ativo || !planoInclui(rede.plano, 'portal_cliente')) return null
   const vend = await prisma.usuario.findFirst({
     where: { slugCatalogo: vendSlug, role: 'VENDEDORA', ativo: true, loja: { redeId: rede.id, ativo: true } },
-    select: { id: true, nome: true, fotoUrl: true, bioCatalogo: true, waNumero: true, lojaId: true, loja: { select: { id: true, nome: true } } },
+    select: { id: true, nome: true, fotoUrl: true, bioCatalogo: true, telefone: true, lojaId: true, loja: { select: { id: true, nome: true } } },
   })
   if (!vend || !vend.loja) return null
   return { rede, vend }
@@ -98,11 +98,11 @@ export async function catalogoRoutes(app: FastifyInstance) {
   app.get('/meu-link', { preHandler: [requireFeature('portal_cliente'), app.authorize('VENDEDORA')] }, async (request, reply) => {
     const vend = await prisma.usuario.findUniqueOrThrow({
       where: { id: request.user.sub },
-      select: { id: true, nome: true, slugCatalogo: true, waNumero: true, loja: { select: { nome: true, rede: { select: { id: true, slug: true } } } } },
+      select: { id: true, nome: true, slugCatalogo: true, telefone: true, loja: { select: { nome: true, rede: { select: { id: true, slug: true } } } } },
     })
     if (!vend.loja?.rede) return reply.code(422).send({ erro: 'Vendedora sem marca vinculada' })
     const slug = await garantirSlugCatalogo(vend, vend.loja.rede.id)
-    return { slug, redeSlug: vend.loja.rede.slug, lojaNome: vend.loja.nome, path: `/${slug}`, temWhatsapp: !!vend.waNumero }
+    return { slug, redeSlug: vend.loja.rede.slug, lojaNome: vend.loja.nome, path: `/${slug}`, temWhatsapp: !!vend.telefone }
   })
 
   // Links de todas as vendedoras da loja (gestor/gerente distribuem/auditam).
@@ -111,13 +111,13 @@ export async function catalogoRoutes(app: FastifyInstance) {
     const loja = await prisma.loja.findUniqueOrThrow({ where: { id: lojaId }, select: { redeId: true, rede: { select: { slug: true } } } })
     const vendedoras = await prisma.usuario.findMany({
       where: { lojaId, role: 'VENDEDORA', ativo: true },
-      select: { id: true, nome: true, slugCatalogo: true, waNumero: true },
+      select: { id: true, nome: true, slugCatalogo: true, telefone: true },
       orderBy: { nome: 'asc' },
     })
     const out = []
     for (const v of vendedoras) {
       const slug = await garantirSlugCatalogo(v, loja.redeId)
-      out.push({ id: v.id, nome: v.nome, slug, redeSlug: loja.rede.slug, path: `/${slug}`, temWhatsapp: !!v.waNumero })
+      out.push({ id: v.id, nome: v.nome, slug, redeSlug: loja.rede.slug, path: `/${slug}`, temWhatsapp: !!v.telefone })
     }
     return out
   })
@@ -213,7 +213,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
     return {
       marca: { nome: rede.nome, logoUrl: rede.logoUrl, bannerUrl: rede.bannerUrl, descricaoPublica: rede.descricaoPublica, corPrimaria: rede.corPrimaria, corSecundaria: rede.corSecundaria },
       loja: { nome: vend.loja!.nome },
-      vendedora: { nome: vend.nome, primeiroNome: vend.nome.trim().split(/\s+/)[0], fotoUrl: vend.fotoUrl, bio: vend.bioCatalogo, temWhatsapp: !!vend.waNumero },
+      vendedora: { nome: vend.nome, primeiroNome: vend.nome.trim().split(/\s+/)[0], fotoUrl: vend.fotoUrl, bio: vend.bioCatalogo, temWhatsapp: !!vend.telefone },
       pedidoMinimoAtacado: rede.pedidoMinimoAtacado,
       pedidoMinimoInfantil: rede.pedidoMinimoInfantil,
       colecoes: colecoesOut,
@@ -235,7 +235,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
     // Marcador de atribuição: se a mensagem chegar ao número da marca sem casar por telefone,
     // o webhook usa o (ref:<slug>) para achar a vendedora dona do link.
     const texto = marcaConectada ? `${base}\n\n(ref: ${vendSlug})` : base
-    const url = whatsappUrl(marcaConectada ? rede.waNumeroExibicao : vend.waNumero, texto)
+    const url = whatsappUrl(marcaConectada ? rede.waNumeroExibicao : vend.telefone, texto)
 
     // Sem telefone não dá para materializar o cliente aqui; ainda assim devolve o WhatsApp
     // (ao mandar a mensagem, o webhook cria o lead — por telefone ou pelo marcador (ref:)).

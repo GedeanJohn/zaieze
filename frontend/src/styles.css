@@ -535,6 +535,19 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 @media (max-width: 640px) {
   .ia-banner-corpo { flex-direction: column; align-items: flex-start; padding: 22px; }
 }
+/* Add-ons com IA vendidos à parte de qualquer plano (Provador, Vendedora ZAIEZE, Estoque
+   Inteligente) — lista de produto+preço dentro do mesmo banner, abaixo do texto de intro. */
+.ia-banner-produtos {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1px;
+  background: var(--zz-line); border: 1px solid var(--zz-line); border-radius: 10px; overflow: hidden;
+  margin-top: 1px;
+}
+.ia-banner-produto {
+  background: var(--zz-surface); padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;
+}
+.ia-banner-produto .nome { font-size: 13px; color: var(--zz-mut); }
+.ia-banner-produto .preco { font-size: 20px; font-weight: 800; }
+.ia-banner-produto .preco small { font-size: 12px; font-weight: 400; color: var(--zz-mut); }
 
 .faixa {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1px;

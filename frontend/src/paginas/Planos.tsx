@@ -311,7 +311,7 @@ export default function Planos() {
 
       <div className="cartao" style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <strong>🤖 {t('iaAvancada.titulo')}</strong>
+          <strong>{t('iaAvancada.titulo')}</strong>
           <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 4, maxWidth: 480 }}>{t('iaAvancada.texto')}</div>
         </div>
         <span className="selo ok">{t('iaAvancada.selo')}</span>

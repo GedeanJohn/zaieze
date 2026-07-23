@@ -98,8 +98,11 @@ function featuresAte(plano: Plano, t: (chave: string) => string): string[] {
     .map(([f]) => t(`feature.${f}`) || rotuloFeature[f] || f)
 }
 
+interface AddonCatalogo { tipo: string; nome: string; preco: number }
+
 export default function Landing() {
   const [planos, setPlanos] = useState<PlanoCatalogo[]>([])
+  const [addons, setAddons] = useState<AddonCatalogo[]>([])
   const [descontoAnual, setDescontoAnual] = useState(0)
   const [cambio, setCambio] = useState<{ usdPorBrl: number | null }>({ usdPorBrl: null })
   const [periodicidade, setPeriodicidade] = useState<Periodicidade>('MENSAL')
@@ -119,6 +122,7 @@ export default function Landing() {
       setDescontoAnual(data.percentualDescontoAnual ?? 0)
       setCambio(data.cambio ?? { usdPorBrl: null })
     }).catch(() => {})
+    api.get('/addons').then(({ data }) => setAddons(data.addons)).catch(() => {})
   }, [])
 
   useEffect(() => { capturarRefAfiliado() }, [])
@@ -250,11 +254,25 @@ export default function Landing() {
         <div className="ia-banner">
           <div className="ia-banner-corpo">
             <div>
-              <strong>🤖 {t('iaAvancada.titulo')}</strong>
+              <strong>{t('iaAvancada.titulo')}</strong>
               <p>{t('iaAvancada.texto')}</p>
             </div>
             <span className="tag-elite">{t('iaAvancada.selo')}</span>
           </div>
+          {addons.length > 0 && (
+            <div className="ia-banner-produtos">
+              {addons.map((a) => {
+                const emUsd = idioma !== 'pt' && cambio.usdPorBrl != null
+                const preco = emUsd ? formataUsd(a.preco * cambio.usdPorBrl!) : formataReal(a.preco)
+                return (
+                  <div key={a.tipo} className="ia-banner-produto">
+                    <span className="nome">{a.nome}</span>
+                    <span className="preco">{preco}<small>/{t('unidade.mes')}</small></span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         <div className="fale-conosco">

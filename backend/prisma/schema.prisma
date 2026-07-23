@@ -779,10 +779,29 @@ model Lead {
   vendedora Usuario  @relation("LeadsVendedora", fields: [vendedoraId], references: [id], onDelete: Cascade)
   cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   venda     Venda?   @relation(fields: [vendaId], references: [id], onDelete: SetNull)
+  pedidosCatalogo PedidoCatalogo[]
 
   @@index([lojaId, status])
   @@index([vendedoraId, status])
   @@map("leads")
+}
+
+// Snapshot do carrinho que o cliente montou na vitrine (Portal do Cliente) ao clicar em
+// "Enviar pedido" — pra vendedora ver o pedido formatado (fotos/itens/qtd/preço) direto no card
+// do Funil, em vez de só o texto corrido que vai pro WhatsApp. `itens` é denormalizado (preço/foto
+// no momento da compra) — não deve refletir mudanças posteriores no produto.
+model PedidoCatalogo {
+  id        String   @id @default(cuid())
+  leadId    String
+  itens     Json
+  pecas     Int
+  subtotal  Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@map("pedidos_catalogo")
 }
 
 // ─────────────────────────── Catálogo ───────────────────────────

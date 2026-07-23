@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api'
+import type { ItemPedido } from './Catalogo'
 
 /**
  * Agente 2 — "Vendedora Online" (atende o comprador no catálogo da loja).
@@ -16,13 +17,14 @@ interface Props {
   produtoId?: string
   produtoNome?: string
   resumoInicial?: string // pedido já montado no carrinho — pula a qualificação e vai direto ao contato
+  itensCarrinho?: ItemPedido[] // snapshot do carrinho — vai junto no /lead pra vendedora ver formatado no Funil
   onClose: () => void
 }
 
 type Msg = { de: 'bot' | 'user'; texto: string }
 type R = Record<string, string>
 
-export default function AgenteLoja({ redeSlug, vendSlug, marcaNome, vendedora, pedidoMinimoAtacado, produtoId, produtoNome, resumoInicial, onClose }: Props) {
+export default function AgenteLoja({ redeSlug, vendSlug, marcaNome, vendedora, pedidoMinimoAtacado, produtoId, produtoNome, resumoInicial, itensCarrinho, onClose }: Props) {
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [passo, setPasso] = useState('boasvindas')
   const [resp, setResp] = useState<R>({})
@@ -84,6 +86,7 @@ export default function AgenteLoja({ redeSlug, vendSlug, marcaNome, vendedora, p
     try {
       const { data } = await api.post(`/catalogo/publico/${redeSlug}/${vendSlug}/lead`, {
         nome: r.nome || undefined, telefone: r.telefone || undefined, produtoId, resumo: montarResumo(r),
+        itens: itensCarrinho,
       })
       if (data.whatsappUrl) { window.location.href = data.whatsappUrl; return }
       setMsgs((m) => [...m, { de: 'bot', texto: 'Recebemos seu contato! A vendedora vai te chamar em breve. 💛' }])

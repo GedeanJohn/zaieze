@@ -78,6 +78,19 @@ const leadSchema = z.object({
   telefone: z.string().min(8).optional(),
   produtoId: z.string().optional(),
   resumo: z.string().max(1000).optional(), // 1ª mensagem montada pelo agente (qualificação)
+  // Carrinho montado no catálogo (Portal do Cliente) — snapshot denormalizado (preço/foto do
+  // momento da compra) pra vendedora ver o pedido formatado no card do Funil.
+  itens: z.array(z.object({
+    produtoId: z.string(),
+    nome: z.string(),
+    fotoUrl: z.string().nullable().optional(),
+    cor: z.string().optional(),
+    estampa: z.string().optional(),
+    tamanho: z.string().optional(),
+    modo: z.enum(['ATACADO', 'VAREJO']),
+    precoUnit: z.number().nonnegative(),
+    qtd: z.number().int().positive(),
+  })).max(50).optional(),
 })
 
 export async function catalogoRoutes(app: FastifyInstance) {
@@ -245,6 +258,12 @@ export async function catalogoRoutes(app: FastifyInstance) {
       lojaId: vend.lojaId!, vendedoraId: vend.id, redeId: rede.id, clienteId: cliente.id,
       telefone, nome: body.nome?.trim(), slugCatalogo: vendSlug, produtoId: body.produtoId,
     })
+
+    if (body.itens?.length) {
+      const pecas = body.itens.reduce((s, i) => s + i.qtd, 0)
+      const subtotal = body.itens.reduce((s, i) => s + i.precoUnit * i.qtd, 0)
+      await prisma.pedidoCatalogo.create({ data: { leadId, itens: body.itens, pecas, subtotal } })
+    }
 
     return { whatsappUrl: url, leadId }
   })

@@ -16,12 +16,21 @@ type SituacaoChave =
   | 'REDISTRIBUIDO' | 'CONVERTIDO' | 'PERDIDO'
 interface Situacao { chave: SituacaoChave; label: string; cor: string }
 
+// Item do carrinho enviado pelo cliente na vitrine — snapshot denormalizado (preço/foto do
+// momento da compra), guardado em PedidoCatalogo pra vendedora ver o pedido formatado no card.
+interface ItemPedido {
+  produtoId: string; nome: string; fotoUrl?: string | null
+  cor?: string; estampa?: string; tamanho?: string; modo: 'ATACADO' | 'VAREJO'; precoUnit: number; qtd: number
+}
+interface PedidoCatalogo { id: string; itens: ItemPedido[]; pecas: number; subtotal: string; createdAt: string }
+
 interface Card {
   id: string; nome?: string | null; telefone?: string | null; status: Etapa; atrasado: boolean
   situacao: Situacao
   redistribuicoes: number; etapaDesde: string; createdAt: string
   vendedora: { id: string; nome: string }
   cliente?: { id: string; nome: string; telefone: string; cidade?: string | null; uf?: string | null } | null
+  pedidosCatalogo?: PedidoCatalogo[]
 }
 interface Metricas { total: number; abertos: number; atrasados: number; convertidos: number; perdidos: number; taxaConversao: number; tempoMedioRespostaMin: number | null; porSituacao: Partial<Record<SituacaoChave, number>> }
 interface Pipeline { colunas: Record<Etapa, Card[]>; metricas: Metricas }
@@ -99,8 +108,9 @@ function ColunaDrop({ etapa, children }: { etapa: Etapa; children: ReactNode }) 
 
 // Card do cliente = item ARRASTÁVEL (alça ⠿). Mudança de etapa SÓ por arrastar (sem seletor).
 // Clicar no nome/telefone abre a conversa do cliente no Chat Zaieze.
-function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, t }: {
+function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, t }: {
   c: Card; redistribuir: (c: Card) => void; podeRedistribuir: boolean; abrirChat: (clienteId: string) => void
+  verPedido: (pedido: PedidoCatalogo) => void
   t: (chave: string, vars?: Record<string, string | number>) => string
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: c.id, data: { card: c } })
@@ -108,6 +118,7 @@ function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, t }: {
   const clienteId = c.cliente?.id ?? null
   const nome = c.cliente?.nome ?? c.nome ?? '—'
   const telefone = c.cliente?.telefone ?? c.telefone ?? ''
+  const pedido = c.pedidosCatalogo?.[0]
   return (
     <div ref={setNodeRef} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `4px solid ${ct ?? c.situacao.cor}`, background: ct ? `${ct}22` : undefined, opacity: isDragging ? 0.4 : 1, userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
@@ -121,6 +132,16 @@ function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, t }: {
         </button>
       </div>
       <div style={{ marginTop: 6 }}><BadgeSituacao s={c.situacao} /></div>
+      {pedido && (
+        <button type="button" onClick={() => verPedido(pedido)} title={t('pipe.verPedidoTitle')}
+          style={{
+            marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600,
+            padding: '3px 9px', borderRadius: 999, border: '1px solid var(--accent-soft)', background: 'var(--accent-soft)',
+            color: 'var(--accent)', cursor: 'pointer',
+          }}>
+          🛒 {t('pipe.pedidoResumo', { n: pedido.pecas, valor: Number(pedido.subtotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) })}
+        </button>
+      )}
       <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginTop: 4 }}>
         👤 {c.vendedora.nome}{c.redistribuicoes > 0 && ` · ${t('pipe.redistribuicoesSufixo', { n: c.redistribuicoes })}`}
       </div>
@@ -155,6 +176,7 @@ export default function Pipeline() {
   const [ufFiltro, setUfFiltro] = useState('')
   const [erro, setErro] = useState('')
   const [copiado, setCopiado] = useState('')
+  const [pedidoAberto, setPedidoAberto] = useState<PedidoCatalogo | null>(null)
 
   const filtroAtivo = !!(nomeFiltro || telefoneFiltro || cidadeFiltro || ufFiltro)
   function normalizar(v: string): string { return v.trim().toLowerCase() }
@@ -343,7 +365,7 @@ export default function Pipeline() {
                   <span style={{ color: 'var(--ink-soft)', fontSize: 12 }}>{cards.length}</span>
                 </div>
                 {cards.map((c) => (
-                  <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat} t={t} />
+                  <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat} verPedido={setPedidoAberto} t={t} />
                 ))}
                 {cards.length === 0 && <div style={{ color: 'var(--ink-soft)', fontSize: 12, padding: 6 }}>—</div>}
               </ColunaDrop>
@@ -359,7 +381,46 @@ export default function Pipeline() {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {pedidoAberto && <ModalPedido pedido={pedidoAberto} onFechar={() => setPedidoAberto(null)} t={t} />}
     </>
+  )
+}
+
+const real = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+
+// Pré-visualização do pedido que o cliente montou na vitrine — itens com foto/variação/qtd/preço,
+// pra vendedora conferir sem precisar reconstruir a partir do texto corrido do WhatsApp.
+function ModalPedido({ pedido, onFechar, t }: { pedido: PedidoCatalogo; onFechar: () => void; t: (chave: string, vars?: Record<string, string | number>) => string }) {
+  return (
+    <div className="modal-fundo" onClick={onFechar}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(520px, 92vw)' }}>
+        <h2>{t('pipe.pedidoModalTitulo')}</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: '55vh', overflowY: 'auto' }}>
+          {pedido.itens.map((it, i) => (
+            <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+              {it.fotoUrl
+                ? <img src={it.fotoUrl} alt="" style={{ width: 52, height: 68, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
+                : <div style={{ width: 52, height: 68, borderRadius: 6, background: 'var(--accent-soft)', flexShrink: 0 }} />}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{it.nome}</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
+                  {[it.cor, it.estampa, it.tamanho].filter(Boolean).join(' / ')} · {it.modo === 'ATACADO' ? t('pipe.modoAtacado') : t('pipe.modoVarejo')}
+                </div>
+                <div style={{ fontSize: 13, marginTop: 2 }}>{real(it.precoUnit)} × {it.qtd} = <strong>{real(it.precoUnit * it.qtd)}</strong></div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginTop: 12 }}>
+          <span>{t('pipe.pedidoPecas')}</span><strong>{pedido.pecas}</strong>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, marginTop: 4 }}>
+          <span>{t('pipe.pedidoTotal')}</span><strong>{real(Number(pedido.subtotal))}</strong>
+        </div>
+        <div className="acoes"><button type="button" className="btn secundario" onClick={onFechar}>{t('comum.fechar')}</button></div>
+      </div>
+    </div>
   )
 }
 

@@ -29,6 +29,11 @@ interface ItemCarrinho {
   modo: Modo; precoUnit: number; economiaUnit: number; qtd: number; loteMinimo: number
   pesoGramas: number; estoque: number; foto?: string
 }
+// Snapshot do carrinho enviado no /lead — pra vendedora ver o pedido formatado no card do Funil.
+export interface ItemPedido {
+  produtoId: string; nome: string; fotoUrl?: string | null
+  cor?: string; estampa?: string; tamanho?: string; modo: Modo; precoUnit: number; qtd: number
+}
 
 const real = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
 /** Iniciais (até 2) para o avatar da vendedora quando não há foto. */
@@ -44,7 +49,7 @@ export default function Catalogo() {
   const [detalhe, setDetalhe] = useState<Produto | null>(null)
   const [carrinho, setCarrinho] = useState<ItemCarrinho[]>([])
   const [verCarrinho, setVerCarrinho] = useState(false)
-  const [agente, setAgente] = useState<{ produtoId?: string; produtoNome?: string; resumo?: string } | null>(null)
+  const [agente, setAgente] = useState<{ produtoId?: string; produtoNome?: string; resumo?: string; itens?: ItemPedido[] } | null>(null)
   const produtosRef = useRef<HTMLDivElement>(null)
   const irProdutos = () => produtosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
@@ -117,8 +122,13 @@ export default function Catalogo() {
       totais.economia > 0 ? `Economia: ${real(totais.economia)}` : '',
       `Peso estimado: ${totais.pesoKg.toFixed(2)} kg`,
     ].filter(Boolean).join('\n')
+    const itens: ItemPedido[] = carrinho.map((x) => ({
+      produtoId: x.produtoId, nome: x.nome, fotoUrl: x.foto ?? null,
+      cor: x.cor || undefined, estampa: x.estampa || undefined, tamanho: x.tamanho || undefined,
+      modo: x.modo, precoUnit: x.precoUnit, qtd: x.qtd,
+    }))
     setVerCarrinho(false)
-    setAgente({ resumo })
+    setAgente({ resumo, itens })
   }
 
   if (erro) return <div className="cat-vazio">{erro}</div>
@@ -215,6 +225,7 @@ export default function Catalogo() {
           marcaNome={cat.marca.nome} vendedora={cat.vendedora.primeiroNome}
           pedidoMinimoAtacado={cat.pedidoMinimoAtacado}
           produtoId={agente.produtoId} produtoNome={agente.produtoNome} resumoInicial={agente.resumo}
+          itensCarrinho={agente.itens}
           onClose={() => setAgente(null)}
         />
       )}

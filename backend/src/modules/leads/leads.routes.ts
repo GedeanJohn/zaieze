@@ -19,6 +19,9 @@ const ETAPAS: StatusLead[] = ['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'CONVERTIDO', 
 const incluiLead = {
   vendedora: { select: { id: true, nome: true } },
   cliente: { select: { id: true, nome: true, telefone: true, cidade: true, uf: true } },
+  // Só o pedido mais recente do ciclo — pra mostrar o resumo formatado (fotos/itens/qtd/preço)
+  // direto no card do Funil (ver [[PedidoCatalogo]]).
+  pedidosCatalogo: { orderBy: { createdAt: 'desc' as const }, take: 1 },
 }
 
 function decorar<T extends { status: StatusLead; prazoEm: Date; etapaDesde: Date; redistribuidoEm: Date | null }>(l: T, agora: number, apertadoPct?: number) {

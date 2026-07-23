@@ -791,14 +791,19 @@ model Lead {
 // do Funil, em vez de só o texto corrido que vai pro WhatsApp. `itens` é denormalizado (preço/foto
 // no momento da compra) — não deve refletir mudanças posteriores no produto.
 model PedidoCatalogo {
-  id        String   @id @default(cuid())
-  leadId    String
-  itens     Json
-  pecas     Int
-  subtotal  Decimal  @db.Decimal(12, 2)
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  leadId      String
+  itens       Json
+  pecas       Int
+  subtotal    Decimal  @db.Decimal(12, 2)
+  // Preenchido quando a vendedora abre o pedido pra editar/fechar — vira um Orçamento de
+  // verdade (mesma janela flutuante, aprovação de desconto e envio por WhatsApp já existentes
+  // pros orçamentos). Evita criar mais de um Orçamento a partir do mesmo pedido da vitrine.
+  orcamentoId String?  @unique
+  createdAt   DateTime @default(now())
 
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead      Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  orcamento Orcamento? @relation(fields: [orcamentoId], references: [id], onDelete: SetNull)
 
   @@index([leadId])
   @@map("pedidos_catalogo")
@@ -970,6 +975,10 @@ model Venda {
   // Vendedora ZAIEZE (canal ONLINE, ninguém humano viu o pagamento até aqui).
   pagamentoConferido   Boolean      @default(false)
   pagamentoConferidoEm DateTime?
+  // Comprovante que o CLIENTE anexa na tela pública do pedido (foto/PDF do PIX) — evidência pra
+  // quem vai marcar `pagamentoConferido`, em vez de só confiar no extrato sem nada anexado.
+  comprovantePagamentoUrl String?
+  comprovanteEnviadoEm    DateTime?
   createdAt        DateTime         @default(now())
 
   loja             Loja        @relation(fields: [lojaId], references: [id], onDelete: Cascade)
@@ -1048,6 +1057,7 @@ model Orcamento {
   aprovadoDescontoPor Usuario?        @relation("OrcamentosDescontoAprovadoPor", fields: [aprovadoDescontoPorId], references: [id], onDelete: SetNull)
   venda               Venda?          @relation(fields: [vendaId], references: [id], onDelete: SetNull)
   itens               ItemOrcamento[]
+  pedidoCatalogo      PedidoCatalogo?
 
   @@index([lojaId, status])
   @@index([clienteId])

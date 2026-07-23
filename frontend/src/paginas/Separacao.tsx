@@ -14,6 +14,7 @@ interface PedidoSep {
   separadoEm: string | null
   pagamentoConferido: boolean
   pagamentoConferidoEm: string | null
+  comprovantePagamentoUrl?: string | null
   cliente: string
   vendedora: string
   pecas: number
@@ -110,6 +111,11 @@ export default function Separacao() {
                 {p.pagamentoConferido
                   ? <span className="selo ok" style={{ fontSize: 11 }}>{t('sep.pagamentoConferidoStatus')}</span>
                   : <span className="selo" style={{ fontSize: 11, background: '#e5484d22', color: '#c2352b' }}>{t('sep.pagamentoPendenteStatus')}</span>}
+                {p.comprovantePagamentoUrl && (
+                  <a href={p.comprovantePagamentoUrl} target="_blank" rel="noreferrer" className="selo" style={{ fontSize: 11, background: '#dbeafe', color: '#1d4ed8' }}>
+                    🧾 {t('sep.comprovantePagamentoAnexado')}
+                  </a>
+                )}
               </div>
               <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 4 }}>
                 {dataBR(p.createdAt)} · {p.cliente} · {t('sep.pecasSufixo', { n: p.pecas })} · {formataReal(p.total)}

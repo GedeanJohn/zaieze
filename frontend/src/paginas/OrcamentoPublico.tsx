@@ -131,7 +131,10 @@ export default function OrcamentoPublico() {
 
           {o.status !== 'ENVIADO' ? (
             <div className="orc-status-fechado">
-              {o.status === 'CONVERTIDO' ? `✅ ${t('orcPub.jaAprovado')}` : o.status === 'ALTERACAO_SOLICITADA' ? t('orcPub.aguardandoVendedora') : t('orcPub.indisponivel')}
+              {o.status === 'CONVERTIDO' ? `✅ ${t('orcPub.jaAprovado')}`
+                : o.status === 'ALTERACAO_SOLICITADA' ? t('orcPub.aguardandoVendedora')
+                : (o.status === 'RASCUNHO' || o.status === 'AGUARDANDO_APROVACAO_DESCONTO') ? `👁 ${t('orcPub.previaAindaNaoEnviado')}`
+                : t('orcPub.indisponivel')}
             </div>
           ) : resultado === 'aprovado' ? (
             <div className="orc-confirmado">

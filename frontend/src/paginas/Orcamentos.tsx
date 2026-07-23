@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api, formataReal, mensagemDeErro, usuarioLogado } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
@@ -70,6 +71,7 @@ export default function Orcamentos() {
   const podeCriar = usuario.role === 'VENDEDORA' || usuario.role === 'GERENTE'
   const podeAprovarDesconto = usuario.role === 'GERENTE' || usuario.role === 'GESTOR' || usuario.role === 'SUPER_ADMIN'
   const escopo = useLojaAtiva()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [orcamentos, setOrcamentos] = useState<Orcamento[]>([])
   const [produtos, setProdutos] = useState<ProdutoP[]>([])
@@ -124,6 +126,18 @@ export default function Orcamentos() {
       itens: o.itens.map((i) => ({ produtoId: i.variacao.produtoId, variacaoId: i.variacaoId, quantidade: i.quantidade, precoUnitario: i.precoUnitario })),
     })
   }, [carregarApoio])
+
+  // Veio de "Editar pedido" no card do Funil (ver Pipeline.tsx) — abre direto na janela de
+  // edição desse orçamento recém-criado a partir do carrinho da vitrine.
+  useEffect(() => {
+    const idParaAbrir = searchParams.get('abrir')
+    if (!idParaAbrir || !escopo.pronto) return
+    setSearchParams((p) => { p.delete('abrir'); return p }, { replace: true })
+    api.get(`/orcamentos/${idParaAbrir}`, { params: escopo.params })
+      .then(({ data }) => abrirEdicao(data))
+      .catch((err) => avisar(mensagemDeErro(err), 'erro'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [escopo.pronto, escopo.params])
 
   function fecharForm() { setForm(null); setErro('') }
 
@@ -352,6 +366,13 @@ export default function Orcamentos() {
             {detalhe.status === 'CONVERTIDO' && detalhe.venda && (
               <div style={{ fontSize: 13, marginTop: 8 }}>
                 <a href={`/pedido/${detalhe.venda.id}`} target="_blank" rel="noreferrer">🧾 {t('orc.verVendaGerada')}</a>
+              </div>
+            )}
+
+            {(detalhe.status === 'RASCUNHO' || detalhe.status === 'ALTERACAO_SOLICITADA') && (
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '10px 0 0' }}>
+                {t('orc.previewExplicacao')}{' '}
+                <a href={`/orcamento/publico/${detalhe.tokenPublico}`} target="_blank" rel="noreferrer">👁 {t('orc.previewLink')}</a>
               </div>
             )}
 

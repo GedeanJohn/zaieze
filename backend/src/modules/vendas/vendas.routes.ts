@@ -1,10 +1,15 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import sharp from 'sharp'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
 import { gerarPedidoPdf, type VendaPdf } from './pedido-pdf.service'
 import { criarVenda, VendaError } from './vendas.service'
+import { enviarParaR2 } from '../midia/r2.service'
+import { salvarUploadLocal } from '../midia/midia.routes'
+
+const TIPOS_COMPROVANTE = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/avif', 'application/pdf'])
 
 // Régua de desconto padrão (sugestão por total do pedido). Editável por rede em descontoRegua.
 const REGUA_PADRAO = [
@@ -101,7 +106,7 @@ export async function vendasRoutes(app: FastifyInstance) {
       include: {
         cliente: { select: { nome: true, telefone: true } },
         vendedora: { select: { nome: true } },
-        loja: { select: { nome: true, rede: { select: { nome: true, logoUrl: true } } } },
+        loja: { select: { nome: true, rede: { select: { nome: true, logoUrl: true, chavePixTipo: true, chavePix: true, linkPagamentoCartao: true } } } },
         itens: {
           include: {
             variacao: {
@@ -116,6 +121,34 @@ export async function vendasRoutes(app: FastifyInstance) {
     })
     if (!venda) return reply.code(404).send({ erro: 'Pedido não encontrado' })
     return venda
+  })
+
+  // Comprovante de PAGAMENTO (distinto do comprovante do pedido/PDF acima): o cliente anexa a
+  // foto/PDF do PIX na própria tela pública, depois de aprovar o orçamento e pagar por fora do
+  // app. Fica visível pra quem confere o recebimento em "Pedidos a separar" antes de marcar
+  // `pagamentoConferido` — hoje esse passo era só de confiança, sem nenhuma evidência anexada.
+  app.post('/publico/:token/comprovante', { config: { rateLimit: { max: 10, timeWindow: '10 minutes' } } }, async (request, reply) => {
+    const { token } = request.params as { token: string }
+    const venda = await prisma.venda.findUnique({ where: { tokenPublico: token }, select: { id: true, lojaId: true } })
+    if (!venda) return reply.code(404).send({ erro: 'Pedido não encontrado' })
+
+    const arquivo = await request.file()
+    if (!arquivo) return reply.code(422).send({ erro: 'Envie um arquivo no campo "file"' })
+    if (!TIPOS_COMPROVANTE.has(arquivo.mimetype)) return reply.code(422).send({ erro: 'Formato inválido. Use PNG, JPG, WEBP, AVIF ou PDF.' })
+
+    const original = await arquivo.toBuffer()
+    let buffer = original
+    let ext = 'pdf'
+    let contentType = 'application/pdf'
+    if (arquivo.mimetype !== 'application/pdf') {
+      buffer = await sharp(original).rotate().resize({ width: 1280, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer()
+      ext = 'webp'
+      contentType = 'image/webp'
+    }
+    const url = (await enviarParaR2({ buffer, contentType, ext, lojaId: venda.lojaId, pasta: 'comprovantes' })) ?? (await salvarUploadLocal(buffer, ext))
+
+    await prisma.venda.update({ where: { id: venda.id }, data: { comprovantePagamentoUrl: url, comprovanteEnviadoEm: new Date() } })
+    return { comprovantePagamentoUrl: url }
   })
 
   // PDF do comprovante (público, por token): gerado no backend, baixável/anexável.
@@ -152,6 +185,7 @@ export async function vendasRoutes(app: FastifyInstance) {
       select: {
         id: true, tokenPublico: true, createdAt: true, total: true, atacado: true, canal: true,
         separado: true, separadoEm: true, pagamentoConferido: true, pagamentoConferidoEm: true,
+        comprovantePagamentoUrl: true,
         cliente: { select: { nome: true } },
         vendedora: { select: { nome: true } },
         itens: { select: { quantidade: true } },
@@ -161,6 +195,7 @@ export async function vendasRoutes(app: FastifyInstance) {
       id: v.id, tokenPublico: v.tokenPublico, createdAt: v.createdAt, total: v.total,
       atacado: v.atacado, canal: v.canal, separado: v.separado, separadoEm: v.separadoEm,
       pagamentoConferido: v.pagamentoConferido, pagamentoConferidoEm: v.pagamentoConferidoEm,
+      comprovantePagamentoUrl: v.comprovantePagamentoUrl,
       cliente: v.cliente?.nome ?? 'Consumidor avulso',
       vendedora: v.vendedora.nome,
       pecas: v.itens.reduce((s, i) => s + i.quantidade, 0),

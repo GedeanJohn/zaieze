@@ -22,7 +22,7 @@ interface ItemPedido {
   produtoId: string; nome: string; fotoUrl?: string | null
   cor?: string; estampa?: string; tamanho?: string; modo: 'ATACADO' | 'VAREJO'; precoUnit: number; qtd: number
 }
-interface PedidoCatalogo { id: string; itens: ItemPedido[]; pecas: number; subtotal: string; createdAt: string }
+interface PedidoCatalogo { id: string; leadId: string; orcamentoId?: string | null; itens: ItemPedido[]; pecas: number; subtotal: string; createdAt: string }
 
 interface Card {
   id: string; nome?: string | null; telefone?: string | null; status: Etapa; atrasado: boolean
@@ -177,6 +177,7 @@ export default function Pipeline() {
   const [erro, setErro] = useState('')
   const [copiado, setCopiado] = useState('')
   const [pedidoAberto, setPedidoAberto] = useState<PedidoCatalogo | null>(null)
+  const [editandoPedido, setEditandoPedido] = useState(false)
 
   const filtroAtivo = !!(nomeFiltro || telefoneFiltro || cidadeFiltro || ufFiltro)
   function normalizar(v: string): string { return v.trim().toLowerCase() }
@@ -222,6 +223,16 @@ export default function Pipeline() {
     try { await api.post(`/leads/${card.id}/redistribuir`, {}, { params: escopo.params }); carregar() }
     catch (err) { alert(mensagemDeErro(err)) }
   }
+  // Converte o pedido montado na vitrine num Orçamento de verdade (ou reabre o já convertido) e
+  // navega pra Orçamentos já com a janela de edição aberta (ver useEffect de `abrir` lá).
+  async function editarPedido(pedido: PedidoCatalogo) {
+    setEditandoPedido(true)
+    try {
+      const { data } = await api.post(`/orcamentos/da-vitrine/${pedido.leadId}`, {}, { params: escopo.params })
+      navigate(`/orcamentos?abrir=${data.id}`)
+    } catch (err) { alert(mensagemDeErro(err)) } finally { setEditandoPedido(false) }
+  }
+
   async function redistribuirAtrasados() {
     try {
       const { data } = await api.post('/leads/redistribuir-atrasados', {}, { params: escopo.params })
@@ -382,7 +393,9 @@ export default function Pipeline() {
         </DragOverlay>
       </DndContext>
 
-      {pedidoAberto && <ModalPedido pedido={pedidoAberto} onFechar={() => setPedidoAberto(null)} t={t} />}
+      {pedidoAberto && (
+        <ModalPedido pedido={pedidoAberto} onFechar={() => setPedidoAberto(null)} onEditar={editarPedido} editando={editandoPedido} t={t} />
+      )}
     </>
   )
 }
@@ -391,7 +404,10 @@ const real = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDig
 
 // Pré-visualização do pedido que o cliente montou na vitrine — itens com foto/variação/qtd/preço,
 // pra vendedora conferir sem precisar reconstruir a partir do texto corrido do WhatsApp.
-function ModalPedido({ pedido, onFechar, t }: { pedido: PedidoCatalogo; onFechar: () => void; t: (chave: string, vars?: Record<string, string | number>) => string }) {
+function ModalPedido({ pedido, onFechar, onEditar, editando, t }: {
+  pedido: PedidoCatalogo; onFechar: () => void; onEditar: (pedido: PedidoCatalogo) => void; editando: boolean
+  t: (chave: string, vars?: Record<string, string | number>) => string
+}) {
   return (
     <div className="modal-fundo" onClick={onFechar}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(520px, 92vw)' }}>
@@ -418,7 +434,12 @@ function ModalPedido({ pedido, onFechar, t }: { pedido: PedidoCatalogo; onFechar
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, marginTop: 4 }}>
           <span>{t('pipe.pedidoTotal')}</span><strong>{real(Number(pedido.subtotal))}</strong>
         </div>
-        <div className="acoes"><button type="button" className="btn secundario" onClick={onFechar}>{t('comum.fechar')}</button></div>
+        <div className="acoes">
+          <button type="button" className="btn secundario" onClick={onFechar}>{t('comum.fechar')}</button>
+          <button type="button" className="btn" disabled={editando} onClick={() => onEditar(pedido)}>
+            {editando ? t('pipe.abrindoOrcamento') : pedido.orcamentoId ? t('pipe.abrirOrcamento') : t('pipe.editarFecharPedido')}
+          </button>
+        </div>
       </div>
     </div>
   )

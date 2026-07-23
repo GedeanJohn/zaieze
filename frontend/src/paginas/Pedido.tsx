@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import QRCode from 'qrcode'
-import { api, formataReal, type FormaRecebimento } from '../api'
+import { api, formataReal, mensagemDeErro, type FormaRecebimento } from '../api'
 import SeletorIdioma from '../componentes/SeletorIdioma'
 import { useIdioma } from '../lib/i18n'
 
@@ -20,9 +20,11 @@ interface Pedido {
   atacado: boolean
   formaRecebimento: FormaRecebimento
   observacao?: string | null
+  comprovantePagamentoUrl?: string | null
+  comprovanteEnviadoEm?: string | null
   cliente?: { nome: string; telefone: string } | null
   vendedora: { nome: string }
-  loja: { nome: string; rede: { nome: string; logoUrl: string | null } }
+  loja: { nome: string; rede: { nome: string; logoUrl: string | null; chavePixTipo?: string | null; chavePix?: string | null; linkPagamentoCartao?: string | null } }
   itens: ItemPedido[]
 }
 
@@ -35,12 +37,27 @@ export default function Pedido() {
   const [p, setP] = useState<Pedido | null>(null)
   const [erro, setErro] = useState('')
   const [qr, setQr] = useState('')
+  const [enviandoComprovante, setEnviandoComprovante] = useState(false)
+  const [erroComprovante, setErroComprovante] = useState('')
+  const comprovanteRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const url = token ? `/vendas/publico/${token}` : `/vendas/${id}`
     api.get(url).then(({ data }) => setP(data)).catch(() => setErro(t('ped.naoEncontrado')))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, token])
+
+  async function enviarComprovante(arquivo: File) {
+    if (!token) return
+    setEnviandoComprovante(true); setErroComprovante('')
+    try {
+      const fd = new FormData()
+      fd.append('file', arquivo)
+      const { data } = await api.post(`/vendas/publico/${token}/comprovante`, fd)
+      setP((atual) => atual && { ...atual, comprovantePagamentoUrl: data.comprovantePagamentoUrl, comprovanteEnviadoEm: new Date().toISOString() })
+    } catch (err) { setErroComprovante(mensagemDeErro(err)) }
+    finally { setEnviandoComprovante(false) }
+  }
 
   // Link público do comprovante (sem login) + link do PDF gerado no backend.
   // É o link público que vai no QR e no envio ao cliente.
@@ -145,6 +162,41 @@ export default function Pedido() {
           </div>
         </div>
 
+        {(p.comprovantePagamentoUrl || (token && (p.loja.rede.chavePix || p.loja.rede.linkPagamentoCartao))) && (
+          <div className="ped-pagamento">
+            <h3>{t('ped.pagamentoTitulo')}</h3>
+            {p.comprovantePagamentoUrl ? (
+              <div className="ped-comprovante-ok">
+                ✅ {t('ped.comprovanteEnviadoTexto')} <a href={p.comprovantePagamentoUrl} target="_blank" rel="noreferrer">{t('ped.verComprovante')}</a>
+              </div>
+            ) : token && (
+              <>
+                {p.loja.rede.chavePix && (
+                  <div className="ped-pix">
+                    <span className="ped-rot">{t('ped.chavePixLabel')} ({p.loja.rede.chavePixTipo})</span>
+                    <div className="ped-pix-linha">
+                      <code>{p.loja.rede.chavePix}</code>
+                      <button type="button" className="ped-btn cinza" onClick={() => navigator.clipboard?.writeText(p.loja!.rede.chavePix!)}>{t('ped.copiarChave')}</button>
+                    </div>
+                  </div>
+                )}
+                {p.loja.rede.linkPagamentoCartao && (
+                  <a className="ped-btn" style={{ marginTop: 10, display: 'inline-block' }} href={p.loja.rede.linkPagamentoCartao} target="_blank" rel="noreferrer">{t('ped.pagarComCartao')}</a>
+                )}
+                <div className="ped-upload">
+                  <div className="ped-rot" style={{ marginTop: 14 }}>{t('ped.enviarComprovanteLabel')}</div>
+                  {erroComprovante && <div className="ped-alerta">{erroComprovante}</div>}
+                  <button type="button" className="ped-btn alt" disabled={enviandoComprovante} onClick={() => comprovanteRef.current?.click()}>
+                    {enviandoComprovante ? t('ped.enviando') : `📎 ${t('ped.anexarComprovante')}`}
+                  </button>
+                  <input ref={comprovanteRef} type="file" accept="image/*,application/pdf" hidden
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarComprovante(f); e.target.value = '' }} />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {p.observacao && <div className="ped-obs"><strong>{t('ped.observacoesLabel')}</strong> {p.observacao}</div>}
         <footer className="ped-pe">{p.loja.rede.nome} · {t('ped.poweredBy')}</footer>
       </div>
@@ -187,6 +239,14 @@ function PedidoEstilos() {
       .ped-totais .t { font-size: 20px; font-weight: 800; border-top: 2px solid #111; margin-top: 6px; padding-top: 8px; }
       .ped-totais .pag { color: #666; font-size: 12px; margin-top: 4px; }
       .ped-obs { margin-top: 18px; font-size: 13px; background: #faf7f2; border-radius: 6px; padding: 10px 12px; }
+      .ped-pagamento { margin-top: 22px; padding: 16px 18px; background: #f7f7f7; border-radius: 8px; }
+      .ped-pagamento h3 { margin: 0 0 10px; font-size: 15px; }
+      .ped-comprovante-ok { color: #1f9d55; font-weight: 600; font-size: 14px; }
+      .ped-comprovante-ok a { color: inherit; margin-left: 8px; }
+      .ped-pix-linha { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+      .ped-pix-linha code { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 6px 10px; font-size: 13px; word-break: break-all; }
+      .ped-upload { margin-top: 4px; }
+      .ped-alerta { margin: 6px 0; background: #fdeaea; color: #b3261e; border-radius: 6px; padding: 8px 12px; font-size: 13px; }
       .ped-pe { text-align: center; color: #bbb; font-size: 11px; margin-top: 24px; }
       @media print {
         .ped-noprint { display: none !important; }

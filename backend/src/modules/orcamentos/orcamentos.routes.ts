@@ -99,6 +99,56 @@ export async function orcamentosRoutes(app: FastifyInstance) {
     return reply.code(201).send(orcamento)
   })
 
+  // Converte o pedido montado na vitrine (PedidoCatalogo, ligado ao Lead) num Orçamento de
+  // verdade — reaproveita 100% do fluxo já existente (janela de edição, aprovação de desconto,
+  // envio por WhatsApp). Idempotente: se o pedido já foi convertido antes, devolve o mesmo orçamento.
+  app.post('/da-vitrine/:leadId', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
+    const lojaId = await lojaIdDe(request)
+    const { leadId } = request.params as { leadId: string }
+    const where: Prisma.LeadWhereInput = { id: leadId, lojaId }
+    if (request.user.role === 'VENDEDORA') where.vendedoraId = request.user.sub
+    const lead = await prisma.lead.findFirst({ where, include: { pedidosCatalogo: { orderBy: { createdAt: 'desc' }, take: 1 } } })
+    if (!lead) return reply.code(404).send({ erro: 'Ciclo não encontrado' })
+    const pedido = lead.pedidosCatalogo[0]
+    if (!pedido) return reply.code(422).send({ erro: 'Este ciclo não tem pedido montado na vitrine' })
+    if (pedido.orcamentoId) {
+      const existente = await prisma.orcamento.findUnique({ where: { id: pedido.orcamentoId }, include: incluirDetalhe })
+      if (existente) return existente
+    }
+    if (!lead.clienteId) return reply.code(422).send({ erro: 'Pedido sem cliente vinculado (sem telefone identificado)' })
+
+    const ctx = await carregarContexto(lojaId)
+    const redeId = ctx?.rede?.id
+    if (!redeId) return reply.code(422).send({ erro: 'Loja sem marca vinculada' })
+
+    type ItemPedidoJson = { produtoId: string; nome: string; cor?: string; estampa?: string; tamanho?: string; modo: string; precoUnit: number; qtd: number }
+    const itensPedido = pedido.itens as unknown as ItemPedidoJson[]
+    const variacoes = await prisma.variacaoProduto.findMany({
+      where: { produtoId: { in: itensPedido.map((i) => i.produtoId) }, produto: { redeId } },
+    })
+    const avisos: string[] = []
+    const itensCalculados: { variacaoId: string; quantidade: number; precoUnitario: number }[] = []
+    for (const item of itensPedido) {
+      const v = variacoes.find((x) => x.produtoId === item.produtoId && x.cor === (item.cor ?? '') && x.estampa === (item.estampa ?? '') && x.tamanho === (item.tamanho ?? ''))
+      if (!v) { avisos.push(item.nome); continue }
+      itensCalculados.push({ variacaoId: v.id, quantidade: item.qtd, precoUnitario: item.precoUnit })
+    }
+    if (itensCalculados.length === 0) return reply.code(422).send({ erro: 'Nenhuma peça do pedido está disponível para virar orçamento' })
+
+    const bruto = itensCalculados.reduce((s, i) => s + i.precoUnitario * i.quantidade, 0)
+    const atacado = itensPedido.some((i) => i.modo === 'ATACADO')
+    const orcamento = await prisma.orcamento.create({
+      data: {
+        lojaId, clienteId: lead.clienteId, vendedoraId: lead.vendedoraId, atacado, total: bruto,
+        observacao: 'Pedido montado no catálogo (vitrine)',
+        itens: { create: itensCalculados },
+      },
+      include: incluirDetalhe,
+    })
+    await prisma.pedidoCatalogo.update({ where: { id: pedido.id }, data: { orcamentoId: orcamento.id } })
+    return reply.code(201).send({ ...orcamento, avisos })
+  })
+
   app.get('/', { preHandler: [app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     const where: Prisma.OrcamentoWhereInput = { lojaId }

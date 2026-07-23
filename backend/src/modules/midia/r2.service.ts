@@ -32,7 +32,7 @@ export async function enviarParaR2(opts: {
   contentType: string
   ext: string
   lojaId: string
-  pasta: 'fotos' | 'videos' | 'perfil' | 'audio'
+  pasta: 'fotos' | 'videos' | 'perfil' | 'audio' | 'comprovantes'
 }): Promise<string | null> {
   if (!r2Configurado()) return null
   const chave = `${opts.lojaId}/${opts.pasta}/${Date.now()}-${crypto.randomBytes(6).toString('hex')}.${opts.ext}`

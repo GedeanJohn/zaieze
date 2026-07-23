@@ -55,7 +55,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
   app.get('/me', { preHandler: [app.authenticate] }, async (request) => {
     return prisma.usuario.findUniqueOrThrow({
       where: { id: request.user.sub },
-      select: { id: true, nome: true, email: true, role: true, fotoUrl: true, bioCatalogo: true, slugCatalogo: true, idioma: true },
+      select: { id: true, nome: true, email: true, role: true, telefone: true, fotoUrl: true, bioCatalogo: true, slugCatalogo: true, idioma: true },
     })
   })
 

@@ -260,7 +260,7 @@ export default function Landing() {
               <strong>{t('iaAvancada.titulo')}</strong>
               <p>{t('iaAvancada.texto')}</p>
             </div>
-            <span className="tag-elite">{t('iaAvancada.selo')}</span>
+            <span className="tag-addon">{t('iaAvancada.selo')}</span>
           </div>
           {addons.length > 0 && (
             <div className="ia-banner-produtos">

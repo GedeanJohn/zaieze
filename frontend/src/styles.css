@@ -528,7 +528,7 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 }
 .ia-banner-corpo strong { display: block; font-size: 18px; margin-bottom: 6px; letter-spacing: 0.02em; }
 .ia-banner-corpo p { font-size: 14px; color: var(--zz-mut); line-height: 1.6; margin: 0; max-width: 520px; }
-.ia-banner-corpo .tag-elite {
+.ia-banner-corpo .tag-addon {
   display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   color: #000; background: #fff; padding: 3px 10px; border-radius: 999px; white-space: nowrap;
 }

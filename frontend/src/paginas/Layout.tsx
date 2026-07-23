@@ -141,6 +141,7 @@ export default function Layout() {
     { to: '/vendedora-zaieze', label: t('layout.vendedoraZaieze'), Icone: Bot, mostrar: ehDonoRede && temAddon('VENDEDORA_ZAIEZE') },
     { to: '/provador', label: t('layout.provador'), Icone: Shirt, mostrar: podeVendasClientes && temAddon('PROVADOR') },
     { to: '/estoque-inteligente', label: t('layout.estoqueInteligente'), Icone: Sparkles, mostrar: podeEstoqueInteligente && temAddon('ESTOQUE_INTELIGENTE') },
+    { to: '/chat-atendimento', label: t('layout.chatAtendimento'), Icone: Bot, mostrar: ehDonoRede },
   ].filter((i) => i.mostrar)
 
   const itensComunicacao: ItemMenu[] = [

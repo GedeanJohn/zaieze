@@ -19,6 +19,7 @@ export default function Admin() {
   const [precos, setPrecos] = useState<Record<string, string>>({})
   const [addons, setAddons] = useState<AddonAdmin[]>([])
   const [precosAddon, setPrecosAddon] = useState<Record<string, string>>({})
+  const [precoChatAtendimento, setPrecoChatAtendimento] = useState('')
   const [descontoAnual, setDescontoAnual] = useState('10')
   const [redes, setRedes] = useState<RedeAdmin[]>([])
   const [promos, setPromos] = useState<Promo[]>([])
@@ -35,6 +36,7 @@ export default function Admin() {
       setAddons(data.addons)
       setPrecosAddon(Object.fromEntries(data.addons.map((a: AddonAdmin) => [a.tipo, String(a.preco)])))
     }).catch((e) => avisar(mensagemDeErro(e), 'erro'))
+    api.get('/admin/chat-atendimento-preco').then(({ data }) => setPrecoChatAtendimento(String(data.preco))).catch(() => {})
     api.get('/admin/redes').then(({ data }) => setRedes(data.redes)).catch(() => {})
     api.get('/admin/promos').then(({ data }) => setPromos(data.promos)).catch(() => {})
     api.get('/admin/config-assinatura').then(({ data }) => setDescontoAnual(String(data.percentualDescontoAnual))).catch(() => {})
@@ -101,6 +103,14 @@ export default function Admin() {
     } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
   }
 
+  async function salvarPrecoChatAtendimento() {
+    setOcupado(true)
+    try {
+      await api.put('/admin/chat-atendimento-preco', { preco: Number(precoChatAtendimento) })
+      avisar('Preço do Chat de Atendimento salvo. Vale para novas assinaturas.')
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
+  }
+
   async function salvarDescontoAnual() {
     setOcupado(true)
     try {
@@ -163,6 +173,18 @@ export default function Admin() {
           </div>
         ))}
         {addons.length === 0 && <div style={{ color: 'var(--ink-soft)' }}>Nenhum add-on cadastrado.</div>}
+
+        <hr style={{ margin: '14px 0', border: 'none', borderTop: '1px solid var(--border)' }} />
+        <div className="linha-campos" style={{ alignItems: 'end' }}>
+          <div className="campo" style={{ maxWidth: 220 }}>
+            <label>Chat de Atendimento (R$/mês)</label>
+            <input type="number" step="0.01" min="0" value={precoChatAtendimento} onChange={(e) => setPrecoChatAtendimento(e.target.value)} />
+          </div>
+          <div><button className="btn" onClick={salvarPrecoChatAtendimento} disabled={ocupado}>Salvar</button></div>
+          <div style={{ fontSize: 12, color: 'var(--ink-soft)', maxWidth: 320 }}>
+            Pré-atendimento roteirizado (sem IA em tempo real) — assinado <strong>por vendedora</strong>, não pela rede.
+          </div>
+        </div>
       </div>
 
       {/* ── Reajuste anual por IGP-M (contratos existentes, por aniversário) ── */}

@@ -11,6 +11,8 @@ import { aplicarDistratoTermos } from './modules/contrato/contrato.service'
 import { aplicarDistratoPrivacidade } from './modules/privacidade/privacidade.service'
 import { aplicarDistratoTermosUso } from './modules/termos-uso/termos-uso.service'
 import { atualizarCotacaoUsd } from './modules/cambio/cambio.service'
+import { atualizarPerfisNegocioVencidos } from './modules/chat-atendimento/perfil-negocio.service'
+import { encerrarChatAtendimentoVencidos } from './modules/chat-atendimento/assinatura-chat-atendimento.service'
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000
 
@@ -85,6 +87,18 @@ async function main() {
       .catch((err) => app.log.error({ err }, 'Falha ao atualizar cotação BRL→USD — mantendo último valor em cache'))
     atualizarCambio()
     setInterval(atualizarCambio, UM_DIA_MS).unref()
+
+    // Chat de Atendimento: (1) reprocessa o perfil de negócio/roteiro das redes com ao menos
+    // uma vendedora com o add-on ativo e o cache vencido (>7 dias) — lê o Instagram já conectado
+    // + segmento e gera via IA (1x/semana por rede, nunca durante o atendimento); (2) encerra
+    // assinaturas por vendedora com ciclo vencido. Boot + 24h.
+    const atualizarChatAtendimento = () => atualizarPerfisNegocioVencidos()
+      .then((n) => { if (n > 0) app.log.info(`Chat de Atendimento: perfis de negócio atualizados: ${n}`) })
+      .then(() => encerrarChatAtendimentoVencidos())
+      .then((e) => { if (e > 0) app.log.info(`Chat de Atendimento: assinaturas encerradas (ciclo vencido): ${e}`) })
+      .catch((err) => app.log.error({ err }, 'Falha no job do Chat de Atendimento'))
+    atualizarChatAtendimento()
+    setInterval(atualizarChatAtendimento, UM_DIA_MS).unref()
 
     // Segmentação automática: em produção roda via agendamento diário (cron).
     // No boot só roda se SEGMENTAR_BOOT=true — assim, em dev/demo, o recálculo

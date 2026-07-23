@@ -50,6 +50,7 @@ import { provadorRoutes } from './modules/provador/provador.routes'
 import { addonsRoutes } from './modules/addons/addons.routes'
 import { assessoresRoutes } from './modules/assessores/assessores.routes'
 import { vendedoraZaiezeRoutes } from './modules/vendedora-zaieze/vendedora-zaieze.routes'
+import { chatAtendimentoRoutes } from './modules/chat-atendimento/chat-atendimento.routes'
 import { recebimentoRoutes } from './modules/recebimento/recebimento.routes'
 
 export async function buildApp() {
@@ -133,6 +134,7 @@ export async function buildApp() {
   await app.register(addonsRoutes, { prefix: '/api/addons' })
   await app.register(assessoresRoutes, { prefix: '/api/assessores' })
   await app.register(vendedoraZaiezeRoutes, { prefix: '/api/vendedora-zaieze' })
+  await app.register(chatAtendimentoRoutes, { prefix: '/api/chat-atendimento' })
   await app.register(recebimentoRoutes, { prefix: '/api/recebimento' })
 
   return app

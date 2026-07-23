@@ -17,6 +17,7 @@ import { confirmarCicloEComissionar, gerarComissaoDoCiclo, normalizarCodigo as n
 import { obterCotacaoAtual } from '../cambio/cambio.service'
 import { confirmarCicloAddon, solicitarCancelamentoAddon } from '../addons/addon.service'
 import { confirmarCicloAssessor, solicitarCancelamentoAssessor } from '../assessores/assinatura-assessor.service'
+import { confirmarCicloChatAtendimento, solicitarCancelamentoChatAtendimento } from '../chat-atendimento/assinatura-chat-atendimento.service'
 import { normalizarSlug as normalizarSlugAssessor } from '../assessores/assessor.service'
 
 const arred2 = (n: number) => Math.round(n * 100) / 100
@@ -300,6 +301,18 @@ export async function assinaturasRoutes(app: FastifyInstance) {
         await confirmarCicloAssessor(assinaturaAssessor.assessorId)
       } else if (status === 'cancelled' || status === 'paused') {
         await solicitarCancelamentoAssessor(assinaturaAssessor.assessorId, 'MERCADO_PAGO')
+      }
+      return reply.code(200).send({ ok: true })
+    }
+
+    // Nenhum dos anteriores — pode ser a assinatura do Chat de Atendimento (comprada pelo gestor).
+    const assinaturaChatAtendimento = await prisma.assinaturaChatAtendimento.findFirst({ where: { mpPreapprovalId: id } })
+    if (assinaturaChatAtendimento) {
+      const status = await consultarPreapproval(id)
+      if (status === 'authorized') {
+        await confirmarCicloChatAtendimento(assinaturaChatAtendimento.id)
+      } else if (status === 'cancelled' || status === 'paused') {
+        await solicitarCancelamentoChatAtendimento(assinaturaChatAtendimento.id, 'MERCADO_PAGO')
       }
     }
     return reply.code(200).send({ ok: true })

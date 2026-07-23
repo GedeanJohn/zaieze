@@ -11,6 +11,8 @@ import { marcarLeadAtendido, garantirCicloAberto } from '../leads/leads.service'
 import { transcodificarAudioOpus, salvarUploadLocal } from '../midia/midia.routes'
 import { enviarParaR2 } from '../midia/r2.service'
 import { contextoVendedoraIa, usuarioEhAgenteIa, responderVendedoraZaieze } from '../vendedora-zaieze/vendedora-zaieze.service'
+import { chatAtendimentoAtivo } from '../chat-atendimento/assinatura-chat-atendimento.service'
+import { responderChatAtendimento } from '../chat-atendimento/motor.service'
 
 const JANELA_MS = 24 * 60 * 60 * 1000
 
@@ -43,7 +45,7 @@ async function rotearMensagemRecebida(params: { numero: string; texto: string; r
   const numero = params.numero.replace(/\D/g, '')
   if (!numero) return { roteado: false }
 
-  const sel = { id: true, lojaId: true, vendedoraId: true, loja: { select: { redeId: true } } } as const
+  const sel = { id: true, lojaId: true, vendedoraId: true, chatAtendimentoStatus: true, loja: { select: { redeId: true } } } as const
   let cliente = await prisma.cliente.findFirst({
     where: { telefone: numero, ...(params.redeId ? { loja: { redeId: params.redeId } } : {}) },
     select: sel,
@@ -92,10 +94,14 @@ async function rotearMensagemRecebida(params: { numero: string; texto: string; r
   await prisma.cliente.update({ where: { id: cliente.id }, data: { waUltimaEntradaEm: new Date() } })
 
   const atendidoPelaIa = await usuarioEhAgenteIa(cliente.vendedoraId)
+  // Chat de Atendimento: vendedora HUMANA (não a IA), cliente ainda não passou pelo bot (1º
+  // contato) e ela tem o add-on ativo — pré-qualifica antes de cair como lead cru na carteira.
+  const chatAtendimentoVaiRodar = !atendidoPelaIa && cliente.chatAtendimentoStatus === null && (await chatAtendimentoAtivo(cliente.vendedoraId))
+
   const ciclo = await garantirCicloAberto({
     lojaId: cliente.lojaId, vendedoraId: cliente.vendedoraId, redeId: cliente.loja.redeId,
     clienteId: cliente.id, telefone: numero, nome: params.nome,
-    origem: atendidoPelaIa ? 'VENDEDORA_IA' : undefined,
+    origem: atendidoPelaIa ? 'VENDEDORA_IA' : chatAtendimentoVaiRodar ? 'CHAT_ATENDIMENTO' : undefined,
   })
   const msg = await prisma.mensagemWhatsapp.create({
     data: {
@@ -108,6 +114,8 @@ async function rotearMensagemRecebida(params: { numero: string; texto: string; r
   if (atendidoPelaIa) {
     const clienteId = cliente.id
     responderVendedoraZaieze({ clienteId, canal: 'WHATSAPP' }).catch((e) => console.error('[vendedora-zaieze]', e))
+  } else if (chatAtendimentoVaiRodar) {
+    responderChatAtendimento({ clienteId: cliente.id, texto: params.texto, canal: 'WHATSAPP' }).catch((e) => console.error('[chat-atendimento]', e))
   }
 
   return { roteado: true, mensagemId: msg.id, lojaId: cliente.lojaId, novoLead: ciclo.novo }
@@ -138,6 +146,31 @@ function textoMeta(m: Record<string, any>): string {
 
 const STATUS_META: Record<string, StatusMensagem> = {
   sent: 'ENVIADA', delivered: 'ENTREGUE', read: 'LIDA', failed: 'FALHA',
+}
+
+/** Processa UM `value` do payload do webhook oficial da Meta (mensagens recebidas + recibos de status). */
+async function processarValorWebhook(rede: { id: string; waPhoneNumberId: string | null; waTokenCifrado: string | null }, value: Record<string, any>) {
+  for (const m of (value.messages ?? []) as Record<string, any>[]) {
+    const numero = String(m.from ?? '').replace(/\D/g, '')
+    const nome = value.contacts?.[0]?.profile?.name as string | undefined
+    if (!numero) continue
+    const rot = await rotearMensagemRecebida({ numero, texto: textoMeta(m), redeId: rede.id, nome })
+
+    // Mídia recebida: baixa da Meta → guarda no R2 → anexa à mensagem já registrada.
+    const midia = midiaDaMensagem(m)
+    if (rot.roteado && rot.mensagemId && rot.lojaId && midia && metaConfigurado(rede)) {
+      const dl = await baixarMidia({ rede, mediaId: midia.id })
+      if (dl) {
+        const url = await enviarParaR2({ buffer: dl.buffer, contentType: dl.mime, ext: extDoMime(dl.mime), lojaId: rot.lojaId, pasta: midia.pasta })
+        if (url) await prisma.mensagemWhatsapp.update({ where: { id: rot.mensagemId }, data: { tipoMidia: midia.tipoMidia, midiaUrl: url } })
+      }
+    }
+  }
+  // recibos de status (sent/delivered/read/failed)
+  for (const s of (value.statuses ?? []) as Record<string, any>[]) {
+    const novo = STATUS_META[String(s.status)]
+    if (s.id && novo) await prisma.mensagemWhatsapp.updateMany({ where: { waMessageId: String(s.id) }, data: { status: novo } })
+  }
 }
 
 const configSchema = z.object({
@@ -475,29 +508,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
     const body = request.body as { entry?: { changes?: { value?: Record<string, any> }[] }[] }
     for (const entry of body.entry ?? []) {
       for (const change of entry.changes ?? []) {
-        const value = change.value ?? {}
-        // mensagens recebidas
-        for (const m of (value.messages ?? []) as Record<string, any>[]) {
-          const numero = String(m.from ?? '').replace(/\D/g, '')
-          const nome = value.contacts?.[0]?.profile?.name as string | undefined
-          if (!numero) continue
-          const rot = await rotearMensagemRecebida({ numero, texto: textoMeta(m), redeId: rede.id, nome })
-
-          // Mídia recebida: baixa da Meta → guarda no R2 → anexa à mensagem já registrada.
-          const midia = midiaDaMensagem(m)
-          if (rot.roteado && rot.mensagemId && rot.lojaId && midia && metaConfigurado(rede)) {
-            const dl = await baixarMidia({ rede, mediaId: midia.id })
-            if (dl) {
-              const url = await enviarParaR2({ buffer: dl.buffer, contentType: dl.mime, ext: extDoMime(dl.mime), lojaId: rot.lojaId, pasta: midia.pasta })
-              if (url) await prisma.mensagemWhatsapp.update({ where: { id: rot.mensagemId }, data: { tipoMidia: midia.tipoMidia, midiaUrl: url } })
-            }
-          }
-        }
-        // recibos de status (sent/delivered/read/failed)
-        for (const s of (value.statuses ?? []) as Record<string, any>[]) {
-          const novo = STATUS_META[String(s.status)]
-          if (s.id && novo) await prisma.mensagemWhatsapp.updateMany({ where: { waMessageId: String(s.id) }, data: { status: novo } })
-        }
+        await processarValorWebhook(rede, change.value ?? {})
       }
     }
     return reply.code(200).send({ ok: true })

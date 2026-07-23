@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { aplicarReajuste, definirPrecos, listarPlanos, listarReajustes, percentualDescontoAnual, definirDescontoAnual } from '../planos/planos.service'
 import { listarAddons, definirPrecoAddon } from '../addons/addon.service'
+import { precoChatAtendimento, definirPrecoChatAtendimento } from '../chat-atendimento/assinatura-chat-atendimento.service'
 import { normalizarCodigo } from '../promo/promo.service'
 import { cancelarPreapproval, mpConfigurado } from '../assinaturas/mercadopago.service'
 import { excluirDoR2 } from '../midia/r2.service'
@@ -65,6 +66,14 @@ export async function adminRoutes(app: FastifyInstance) {
     const { preco } = precoAddonSchema.parse(request.body)
     await definirPrecoAddon(tipo, preco)
     return { ok: true, addons: await listarAddons() }
+  })
+
+  // Chat de Atendimento: add-on assinado POR VENDEDORA (não por rede), preço próprio.
+  app.get('/chat-atendimento-preco', async () => ({ preco: await precoChatAtendimento() }))
+  app.put('/chat-atendimento-preco', async (request) => {
+    const { preco } = precoAddonSchema.parse(request.body)
+    await definirPrecoChatAtendimento(preco)
+    return { ok: true, preco: await precoChatAtendimento() }
   })
 
   // Desconto do plano ANUAL (a priori 10%) — vale para novas assinaturas/trocas de periodicidade.

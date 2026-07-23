@@ -138,6 +138,7 @@ enum OrigemMensagem {
   REGUA // régua de inatividade
   ENTRADA // recebida do cliente
   VENDEDORA_IA // resposta automática da Vendedora ZAIEZE
+  CHAT_ATENDIMENTO // resposta automática do Chat de Atendimento (roteirizado, por vendedora)
 }
 
 enum EscopoComissao {
@@ -176,6 +177,7 @@ enum StatusLead {
 enum OrigemLead {
   CATALOGO // entrou pelo link do catálogo da vendedora
   VENDEDORA_IA // entrou por WhatsApp/Instagram e foi atendido pela Vendedora ZAIEZE
+  CHAT_ATENDIMENTO // pré-qualificado pelo Chat de Atendimento antes de cair no funil da vendedora
 }
 
 // Provador virtual (módulo 13 — Elite). Ciclo de vida de um "look": a vendedora gera o
@@ -296,6 +298,8 @@ model Rede {
   assessorOrigem Assessor? @relation(fields: [assessorOrigemId], references: [id], onDelete: SetNull)
   looksProvador   LookProvador[]
   assessorMarcas  AssessorMarca[]
+  perfilNegocio   PerfilNegocioRede?
+  assinaturasChatAtendimento AssinaturaChatAtendimento[]
 
   @@map("redes")
 }
@@ -434,6 +438,64 @@ model ConfigAddon {
   updatedAt DateTime  @default(now()) @updatedAt
 
   @@map("config_addons")
+}
+
+/// Preço vigente do add-on "Chat de Atendimento" (editável pelo SUPER_ADMIN). Linha única
+/// (id=1), mesmo padrão de ConfigAssinatura/ConfigCambio — não usa TipoAddon porque este
+/// add-on é assinado por VENDEDORA, não por Rede (ver AssinaturaChatAtendimento).
+model ConfigChatAtendimento {
+  id        Int      @id @default(1)
+  preco     Decimal  @default(39) @db.Decimal(10, 2)
+  updatedAt DateTime @updatedAt
+
+  @@map("config_chat_atendimento")
+}
+
+/// Assinatura do add-on "Chat de Atendimento" — comprada PELO GESTOR (não pela vendedora), que
+/// escolhe qual vendedora ela atende. O gestor pode comprar mais de uma (uma por vendedora que
+/// quiser cobrir), mas cada assinatura vale só para UMA vendedora por vez (vendedoraId,
+/// reatribuível). Mesmo padrão de ciclo/cobrança de AssinaturaAssessor, mas dono = Rede.
+model AssinaturaChatAtendimento {
+  id                       String           @id @default(cuid())
+  redeId                   String
+  vendedoraId              String? // atribuída pelo gestor; null = comprada mas ainda sem vendedora selecionada
+  status                   StatusAssinatura @default(PENDENTE)
+  valor                    Decimal          @db.Decimal(10, 2)
+  mpPreapprovalId          String?          @unique
+  simulada                 Boolean          @default(false)
+  cicloFimEm               DateTime?
+  cancelamentoSolicitadoEm DateTime?
+  cancelamentoOrigem       String?
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+
+  rede      Rede     @relation(fields: [redeId], references: [id], onDelete: Cascade)
+  vendedora Usuario? @relation(fields: [vendedoraId], references: [id], onDelete: SetNull)
+
+  @@index([redeId])
+  @@index([vendedoraId])
+
+  @@map("assinaturas_chat_atendimento")
+}
+
+/// Perfil de negócio da MARCA (1:1 com Rede) — cache gerado por IA a partir do segmento
+/// cadastrado + do Instagram Business já conectado (reaproveita Rede.igTokenCifrado, sem novo
+/// OAuth). Compartilhado por todas as vendedoras da rede que tiverem o Chat de Atendimento
+/// ativo. Job periódico (boot + 24h, reprocessa só se `geradoEm` tiver mais de ~7 dias) — nunca
+/// gerado/lido durante uma conversa em andamento (ver chat-atendimento/perfil-negocio.service.ts).
+model PerfilNegocioRede {
+  redeId              String    @id
+  instagramStatus     String    @default("nao_conectado") // 'conectado' | 'nao_conectado' | 'indisponivel'
+  perfilNegocio       Json? // { tomDeVoz, tipoPecaPredominante, publicoAlvoAparente, ticketAparente, palavrasChaveRecorrentes }
+  roteiro             Json? // gerado por IA — { versao, saudacao, saudacaoFallback, perguntasQualificacao, palavrasChaveSegmento, gatilhosHandoffDireto, mensagemConclusao, mensagemHandoffHumano }
+  roteiroOverride     Json? // personalização manual do gestor (mesmo formato do `roteiro`) — quando presente, tem prioridade total sobre o gerado por IA; o job periódico nunca sobrescreve isto
+  fonteDados          Json? // { seguidores, postsAnalisados, periodoAnalisado } — só auditoria
+  geradoEm            DateTime?
+  proximaAtualizacaoEm DateTime?
+
+  rede Rede @relation(fields: [redeId], references: [id], onDelete: Cascade)
+
+  @@map("perfil_negocio_rede")
 }
 
 /// Percentual de desconto do plano ANUAL (editável pelo SUPER_ADMIN). Uma linha só (id=1),
@@ -644,6 +706,7 @@ model Usuario {
   solicitacoesSenha SolicitacaoSenha[]
   afiliado          Afiliado?
   assessor          Assessor?
+  assinaturasChatAtendimento AssinaturaChatAtendimento[]
 
   @@unique([lojaId, slugCatalogo])
   @@index([lojaId, role])
@@ -726,6 +789,11 @@ model Cliente {
   // Portal do Cliente (fase 7): acesso próprio do cliente + saldo de cashback acumulado
   senhaHash         String?
   saldoCashback     Decimal         @default(0) @db.Decimal(12, 2)
+  // Chat de Atendimento (add-on por vendedora): estado do pré-atendimento roteirizado deste
+  // cliente. null = ainda não passou pelo bot (ou a vendedora não tem o add-on); intercepta só
+  // no 1º contato — uma vez CONCLUIDO, nunca mais roda pra este cliente (ver chat-atendimento.service.ts).
+  chatAtendimentoStatus    String? // 'EM_ANDAMENTO' | 'CONCLUIDO'
+  chatAtendimentoRespostas Json? // { peca?, tamanho?, faixaPreco? } — o que já foi coletado
   ativo             Boolean         @default(true)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt

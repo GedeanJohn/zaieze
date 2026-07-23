@@ -8,6 +8,8 @@ import { requireFeature } from '../../plugins/planos'
 import { igConfigurado, cifrar, decifrar, podeCifrar, assinaturaValida, verificarContaIg, enviarTextoIg, type RedeIG } from './instagram.service'
 import { marcarLeadAtendido, garantirCicloAberto } from '../leads/leads.service'
 import { contextoVendedoraIa, usuarioEhAgenteIa, responderVendedoraZaieze } from '../vendedora-zaieze/vendedora-zaieze.service'
+import { chatAtendimentoAtivo } from '../chat-atendimento/assinatura-chat-atendimento.service'
+import { responderChatAtendimento } from '../chat-atendimento/motor.service'
 
 const JANELA_MS = 24 * 60 * 60 * 1000
 
@@ -29,7 +31,7 @@ function dentroDaJanela(ultimaEntradaEm: Date | null | undefined): boolean {
  * Sem cliente correspondente (nem por igScopedId, nem por ref do catálogo) → sem roteamento.
  */
 async function rotearMensagemInstagramRecebida(params: { igScopedId: string; texto: string; redeId: string; nome?: string | null }) {
-  const sel = { id: true, lojaId: true, vendedoraId: true, loja: { select: { redeId: true } } } as const
+  const sel = { id: true, lojaId: true, vendedoraId: true, chatAtendimentoStatus: true, loja: { select: { redeId: true } } } as const
   let cliente = await prisma.cliente.findFirst({
     where: { igScopedId: params.igScopedId, loja: { redeId: params.redeId } },
     select: sel,
@@ -77,10 +79,14 @@ async function rotearMensagemInstagramRecebida(params: { igScopedId: string; tex
   await prisma.cliente.update({ where: { id: cliente.id }, data: { igUltimaEntradaEm: new Date() } })
 
   const atendidoPelaIa = await usuarioEhAgenteIa(cliente.vendedoraId)
+  // Chat de Atendimento: vendedora HUMANA (não a IA), cliente ainda não passou pelo bot (1º
+  // contato) e ela tem o add-on ativo — pré-qualifica antes de cair como lead cru na carteira.
+  const chatAtendimentoVaiRodar = !atendidoPelaIa && cliente.chatAtendimentoStatus === null && (await chatAtendimentoAtivo(cliente.vendedoraId))
+
   const ciclo = await garantirCicloAberto({
     lojaId: cliente.lojaId, vendedoraId: cliente.vendedoraId, redeId: cliente.loja.redeId,
     clienteId: cliente.id, nome: params.nome,
-    origem: atendidoPelaIa ? 'VENDEDORA_IA' : undefined,
+    origem: atendidoPelaIa ? 'VENDEDORA_IA' : chatAtendimentoVaiRodar ? 'CHAT_ATENDIMENTO' : undefined,
   })
   const msg = await prisma.mensagemInstagram.create({
     data: {
@@ -92,9 +98,23 @@ async function rotearMensagemInstagramRecebida(params: { igScopedId: string; tex
   if (atendidoPelaIa) {
     const clienteId = cliente.id
     responderVendedoraZaieze({ clienteId, canal: 'INSTAGRAM' }).catch((e) => console.error('[vendedora-zaieze]', e))
+  } else if (chatAtendimentoVaiRodar) {
+    responderChatAtendimento({ clienteId: cliente.id, texto: params.texto, canal: 'INSTAGRAM' }).catch((e) => console.error('[chat-atendimento]', e))
   }
 
   return { roteado: true, mensagemId: msg.id, lojaId: cliente.lojaId, novoLead: ciclo.novo }
+}
+
+/** Processa as `entry[]` de um payload de webhook (mensagens recebidas). */
+async function processarEntradasWebhook(redeId: string, entradas: { messaging?: Record<string, any>[] }[]) {
+  for (const entry of entradas) {
+    for (const ev of entry.messaging ?? []) {
+      const igScopedId = String(ev.sender?.id ?? '')
+      const texto = ev.message?.text as string | undefined
+      if (!igScopedId || !texto || ev.message?.is_echo) continue // ignora eco de mensagens enviadas por nós
+      await rotearMensagemInstagramRecebida({ igScopedId, texto, redeId })
+    }
+  }
 }
 
 const configSchema = z.object({
@@ -290,14 +310,7 @@ export async function instagramRoutes(app: FastifyInstance) {
 
     // Formato Messenger/Instagram: entry[].messaging[] = [{ sender:{id}, message:{text} }]
     const body = request.body as { entry?: { messaging?: Record<string, any>[] }[] }
-    for (const entry of body.entry ?? []) {
-      for (const ev of entry.messaging ?? []) {
-        const igScopedId = String(ev.sender?.id ?? '')
-        const texto = ev.message?.text as string | undefined
-        if (!igScopedId || !texto || ev.message?.is_echo) continue // ignora eco de mensagens enviadas por nós
-        await rotearMensagemInstagramRecebida({ igScopedId, texto, redeId: rede.id })
-      }
-    }
+    await processarEntradasWebhook(rede.id, body.entry ?? [])
     return reply.code(200).send({ ok: true })
   })
 }

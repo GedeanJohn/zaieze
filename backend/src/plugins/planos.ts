@@ -34,7 +34,7 @@ export function planoInclui(plano: Plano, feature: Feature): boolean {
 export const PLANOS_META = [
   { plano: 'START' as Plano, nome: 'Start', limite: 'Lojas e vendedoras ilimitadas', resumo: 'Operação completa + WhatsApp + funil de vendas, atacado, operação em rede e Portal do Cliente (loja da vendedora)' },
   { plano: 'PRO' as Plano, nome: 'Pro', limite: 'Lojas e vendedoras ilimitadas', resumo: 'Tudo do Start + carteira inteligente e comissão/ranking' },
-  { plano: 'ELITE' as Plano, nome: 'Elite', limite: 'Lojas e vendedoras ilimitadas', resumo: 'Tudo do Pro + Radar e IA avançada' },
+  { plano: 'ELITE' as Plano, nome: 'Elite', limite: 'Lojas e vendedoras ilimitadas', resumo: 'Tudo do Pro + Radar de Oportunidades' },
 ]
 
 /**

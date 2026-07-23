@@ -89,9 +89,12 @@ function IconeCarteira({ size = 32 }: { size?: number }) {
   )
 }
 
+// IA avançada sai da lista de cada plano e vira um destaque à parte, logo abaixo dos cards
+// (ver seção "recursos de IA") — os bots de atendimento (add-ons independentes de plano) não
+// entram nessa lista de qualquer forma, então não precisam de tratamento especial aqui.
 function featuresAte(plano: Plano, t: (chave: string) => string): string[] {
   return Object.entries(FEATURE_MIN)
-    .filter(([, min]) => ORDEM[min] <= ORDEM[plano])
+    .filter(([f, min]) => f !== 'ia_avancada' && ORDEM[min] <= ORDEM[plano])
     .map(([f]) => t(`feature.${f}`) || rotuloFeature[f] || f)
 }
 
@@ -242,6 +245,16 @@ export default function Landing() {
               </button>
             </div>
           ))}
+        </div>
+
+        <div className="ia-banner">
+          <div className="ia-banner-corpo">
+            <div>
+              <strong>🤖 {t('iaAvancada.titulo')}</strong>
+              <p>{t('iaAvancada.texto')}</p>
+            </div>
+            <span className="tag-elite">{t('iaAvancada.selo')}</span>
+          </div>
         </div>
 
         <div className="fale-conosco">

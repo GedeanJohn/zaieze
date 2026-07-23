@@ -101,7 +101,7 @@ export const FEATURE_MIN: Record<string, Plano> = {
 
 // Rótulos amigáveis das funcionalidades (tela de Planos/Upgrade)
 export const rotuloFeature: Record<string, string> = {
-  vendas: 'PDV / Vendas', produtos: 'Catálogo de produtos', estoque: 'Controle de estoque',
+  vendas: 'PDV / Vendas', produtos: 'Loja online exclusiva para as vendedoras', estoque: 'Controle de estoque',
   clientes: 'Cadastro de clientes', dashboard: 'Dashboard de vendas', forma_recebimento: 'Forma de recebimento',
   whatsapp: 'WhatsApp (disparos, réguas, Chat Zaieze)',
   funil: 'Funil de vendas (Kanban)',

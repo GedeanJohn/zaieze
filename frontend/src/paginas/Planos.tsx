@@ -196,9 +196,11 @@ export default function Planos() {
   if (erro && !dados) return <div className="cartao alerta">{erro}</div>
   if (!dados) return <div className="cartao">{t('planosApp.carregando')}</div>
 
+  // IA avançada sai da lista de cada plano — vira o destaque à parte logo abaixo dos cards
+  // (mesmo critério do site comercial, ver Landing.tsx).
   const featuresPorPlano = (plano: Plano) =>
     Object.entries(dados.features)
-      .filter(([, min]) => min === plano)
+      .filter(([f, min]) => f !== 'ia_avancada' && min === plano)
       .map(([f]) => t(`feature.${f}`) || rotuloFeature[f] || f)
 
   return (
@@ -305,6 +307,14 @@ export default function Planos() {
             </div>
           )
         })}
+      </div>
+
+      <div className="cartao" style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <strong>🤖 {t('iaAvancada.titulo')}</strong>
+          <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 4, maxWidth: 480 }}>{t('iaAvancada.texto')}</div>
+        </div>
+        <span className="selo ok">{t('iaAvancada.selo')}</span>
       </div>
 
       {addonsCatalogo.length > 0 && (

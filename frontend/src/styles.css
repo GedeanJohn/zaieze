@@ -518,6 +518,24 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   .assessor-banner-corpo { flex-direction: column; align-items: flex-start; padding: 22px; }
 }
 
+/* Destaque de "Recursos de IA" — à parte da lista de cada plano (não é um item de checklist
+   por assinatura; é um recurso da plataforma, hoje concentrado no ELITE). Mesmo padrão visual
+   do .assessor-banner, dentro da seção de planos. */
+.ia-banner { max-width: 1100px; margin: 28px auto 0; }
+.ia-banner-corpo {
+  display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap;
+  background: var(--zz-surface); border: 1px solid var(--zz-line); border-radius: 10px; padding: 28px 32px;
+}
+.ia-banner-corpo strong { display: block; font-size: 18px; margin-bottom: 6px; letter-spacing: 0.02em; }
+.ia-banner-corpo p { font-size: 14px; color: var(--zz-mut); line-height: 1.6; margin: 0; max-width: 520px; }
+.ia-banner-corpo .tag-elite {
+  display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #000; background: #fff; padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .ia-banner-corpo { flex-direction: column; align-items: flex-start; padding: 22px; }
+}
+
 .faixa {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1px;
   max-width: 1100px; margin: 30px auto; padding: 0 8vw; background: transparent;

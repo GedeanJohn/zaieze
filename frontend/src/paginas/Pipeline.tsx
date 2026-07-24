@@ -109,11 +109,14 @@ function ColunaDrop({ etapa, children }: { etapa: Etapa; children: ReactNode }) 
   )
 }
 
-// Card do cliente = item ARRASTÁVEL (alça ⠿). Mudança de etapa SÓ por arrastar (sem seletor).
+// Card do cliente. No desktop é ARRASTÁVEL (alça ⠿) — mudança de etapa só por arrastar. No
+// celular (aoMover presente) a alça some e vira um botão "Mover etapa" que abre um menu (ver
+// SheetMoverEtapa) — arrastar entre colunas distantes não funciona bem numa tela estreita.
 // Clicar no nome/telefone abre a conversa do cliente no Chat Zaieze.
-function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, t }: {
+function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, aoMover, t }: {
   c: Card; redistribuir: (c: Card) => void; podeRedistribuir: boolean; abrirChat: (clienteId: string) => void
   verPedido: (pedido: PedidoCatalogo, etapa: Etapa) => void
+  aoMover?: (c: Card) => void
   t: (chave: string, vars?: Record<string, string | number>) => string
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: c.id, data: { card: c } })
@@ -124,10 +127,12 @@ function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, t }
   const pedido = c.pedidosCatalogo?.[0]
   const avaliacao = c.cliente?.avaliacoes?.[0]
   return (
-    <div ref={setNodeRef} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `4px solid ${ct ?? c.situacao.cor}`, background: ct ? `${ct}22` : undefined, opacity: isDragging ? 0.4 : 1, userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
+    <div ref={aoMover ? undefined : setNodeRef} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `4px solid ${ct ?? c.situacao.cor}`, background: ct ? `${ct}22` : undefined, opacity: isDragging ? 0.4 : 1, userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-        <button type="button" {...attributes} {...listeners} title={t('pipe.arrastarParaMudar')} aria-label={t('pipe.arrastarCard')}
-          style={{ cursor: 'grab', touchAction: 'none', border: 'none', background: 'none', color: 'var(--ink-soft)', fontSize: 24, padding: '2px 4px', lineHeight: 1, alignSelf: 'stretch' }}>⠿</button>
+        {!aoMover && (
+          <button type="button" {...attributes} {...listeners} title={t('pipe.arrastarParaMudar')} aria-label={t('pipe.arrastarCard')}
+            style={{ cursor: 'grab', touchAction: 'none', border: 'none', background: 'none', color: 'var(--ink-soft)', fontSize: 24, padding: '2px 4px', lineHeight: 1, alignSelf: 'stretch' }}>⠿</button>
+        )}
         <button type="button" onClick={() => clienteId && abrirChat(clienteId)} disabled={!clienteId}
           title={clienteId ? t('pipe.abrirConversa') : undefined}
           style={{ flex: 1, minWidth: 0, textAlign: 'left', border: 'none', background: 'none', padding: 0, cursor: clienteId ? 'pointer' : 'default', color: 'inherit', display: 'block' }}>
@@ -164,11 +169,51 @@ function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, t }
       <div style={{ fontSize: 11, marginTop: 2, color: c.atrasado ? '#ff6b6b' : 'var(--ink-soft)' }}>
         ⏱ {tempoNaEtapa(c.etapaDesde)} {t('pipe.nestaEtapa')}{c.atrasado && ` · ${t('pipe.atrasadoSufixo')}`}
       </div>
-      {podeRedistribuir && ['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'AGUARDANDO_PAGAMENTO'].includes(c.status) && (
-        <div style={{ marginTop: 8 }}>
-          <button className="btn secundario" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => redistribuir(c)} title={t('pipe.redistribuirTitle')}>↪ {t('pipe.redistribuirBtn')}</button>
+      {(aoMover || (podeRedistribuir && ['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'AGUARDANDO_PAGAMENTO'].includes(c.status))) && (
+        <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {aoMover && (
+            <button className="btn secundario" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => aoMover(c)}>↕ {t('pipe.moverEtapaBtn')}</button>
+          )}
+          {podeRedistribuir && ['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'AGUARDANDO_PAGAMENTO'].includes(c.status) && (
+            <button className="btn secundario" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => redistribuir(c)} title={t('pipe.redistribuirTitle')}>↪ {t('pipe.redistribuirBtn')}</button>
+          )}
         </div>
       )}
+    </div>
+  )
+}
+
+// Menu (bottom sheet) pra mudar de etapa no celular — no lugar de arrastar entre colunas fora da
+// tela. Reaproveita a mesma `mover()` do Kanban (mesmo prompt de motivo ao escolher "Perdido").
+function SheetMoverEtapa({ card, onFechar, onEscolher, t }: {
+  card: Card; onFechar: () => void; onEscolher: (etapa: Etapa) => void
+  t: (chave: string, vars?: Record<string, string | number>) => string
+}) {
+  const nome = card.cliente?.nome ?? card.nome ?? '—'
+  return (
+    <div className="modal-fundo" onClick={onFechar}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(420px, 92vw)' }}>
+        <h2 style={{ marginBottom: 2 }}>{t('pipe.moverEtapaTitulo')}</h2>
+        <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>{nome}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {ETAPAS.map((etapa) => (
+            <button key={etapa} type="button" disabled={etapa === card.status} onClick={() => onEscolher(etapa)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '11px 8px', borderRadius: 10,
+                border: 'none', background: 'none', textAlign: 'left', width: '100%',
+                cursor: etapa === card.status ? 'default' : 'pointer', fontSize: 14, fontWeight: 600,
+                color: etapa === card.status ? 'var(--ink-soft)' : 'var(--ink)',
+              }}>
+              <span style={{ width: 9, height: 9, borderRadius: '50%', background: corEtapa[etapa], flexShrink: 0 }} />
+              {rotuloEtapa(etapa, t)}
+              {etapa === card.status && <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink-soft)' }}>{t('pipe.etapaAtualTag')}</span>}
+            </button>
+          ))}
+        </div>
+        <div className="acoes">
+          <button type="button" className="btn secundario" onClick={onFechar}>{t('comum.cancelar')}</button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -195,6 +240,8 @@ export default function Pipeline() {
   const [pedidoAberto, setPedidoAberto] = useState<PedidoCatalogo | null>(null)
   const [pedidoAbertoEtapa, setPedidoAbertoEtapa] = useState<Etapa | null>(null)
   const [editandoPedido, setEditandoPedido] = useState(false)
+  const [abaMobile, setAbaMobile] = useState<Etapa>('ENTROU')
+  const [cardMoverMobile, setCardMoverMobile] = useState<Card | null>(null)
 
   const filtroAtivo = !!(nomeFiltro || telefoneFiltro || cidadeFiltro || ufFiltro)
   function normalizar(v: string): string { return v.trim().toLowerCase() }
@@ -378,41 +425,75 @@ export default function Pipeline() {
         </div>
       )}
 
-      {/* Kanban com arrastar-e-soltar (alça ⠿) — desktop e mobile. Mudança de etapa só por arrastar. */}
-      <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '0 0 6px' }}>
-        {t('pipe.dicaParte1')} <strong>⠿</strong> {t('pipe.dicaParte2')}
-      </div>
       <DndContext sensors={sensors} onDragStart={aoIniciarArrasto} onDragEnd={aoSoltar}>
-        <div className="funil-kanban" style={{ display: 'grid', gridTemplateColumns: `repeat(${ETAPAS.length}, minmax(180px, 1fr))`, gap: 10, overflowX: 'auto' }}>
-          {ETAPAS.map((etapa) => {
-            const cards = pipeFiltrado?.colunas[etapa] ?? []
-            return (
-              <ColunaDrop key={etapa} etapa={etapa}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px 8px', borderBottom: `2px solid ${corEtapa[etapa]}`, marginBottom: 8 }}>
-                  <strong style={{ color: corEtapa[etapa] }}>{rotuloEtapa(etapa, t)}</strong>
-                  <span style={{ color: 'var(--ink-soft)', fontSize: 12 }}>{cards.length}</span>
-                </div>
-                {cards.map((c) => (
-                  <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat}
-                    verPedido={(pedido, etapa) => { setPedidoAberto(pedido); setPedidoAbertoEtapa(etapa) }} t={t} />
-                ))}
-                {cards.length === 0 && <div style={{ color: 'var(--ink-soft)', fontSize: 12, padding: 6 }}>—</div>}
-              </ColunaDrop>
-            )
-          })}
+        {/* Kanban com arrastar-e-soltar (alça ⠿) — só desktop (≥861px). No celular, uma tela com 6
+            colunas de 180px não cabe — vira abas de etapa + lista vertical (funil-mobile abaixo). */}
+        <div className="funil-desktop-only">
+          <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '0 0 6px' }}>
+            {t('pipe.dicaParte1')} <strong>⠿</strong> {t('pipe.dicaParte2')}
+          </div>
+          <div className="funil-kanban" style={{ display: 'grid', gridTemplateColumns: `repeat(${ETAPAS.length}, minmax(180px, 1fr))`, gap: 10, overflowX: 'auto' }}>
+            {ETAPAS.map((etapa) => {
+              const cards = pipeFiltrado?.colunas[etapa] ?? []
+              return (
+                <ColunaDrop key={etapa} etapa={etapa}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px 8px', borderBottom: `2px solid ${corEtapa[etapa]}`, marginBottom: 8 }}>
+                    <strong style={{ color: corEtapa[etapa] }}>{rotuloEtapa(etapa, t)}</strong>
+                    <span style={{ color: 'var(--ink-soft)', fontSize: 12 }}>{cards.length}</span>
+                  </div>
+                  {cards.map((c) => (
+                    <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat}
+                      verPedido={(pedido, etapa) => { setPedidoAberto(pedido); setPedidoAbertoEtapa(etapa) }} t={t} />
+                  ))}
+                  {cards.length === 0 && <div style={{ color: 'var(--ink-soft)', fontSize: 12, padding: 6 }}>—</div>}
+                </ColunaDrop>
+              )
+            })}
+          </div>
+          <DragOverlay>
+            {arrastando ? (
+              <div className="cartao" style={{ padding: 10, borderLeft: `4px solid ${corTempoEspera(arrastando) ?? arrastando.situacao.cor}`, boxShadow: '0 8px 24px #0005' }}>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{arrastando.cliente?.nome ?? arrastando.nome ?? '—'}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-soft)' }}>{t('pipe.solteNumaEtapa')}</div>
+              </div>
+            ) : null}
+          </DragOverlay>
         </div>
-        <DragOverlay>
-          {arrastando ? (
-            <div className="cartao" style={{ padding: 10, borderLeft: `4px solid ${corTempoEspera(arrastando) ?? arrastando.situacao.cor}`, boxShadow: '0 8px 24px #0005' }}>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{arrastando.cliente?.nome ?? arrastando.nome ?? '—'}</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-soft)' }}>{t('pipe.solteNumaEtapa')}</div>
-            </div>
-          ) : null}
-        </DragOverlay>
+
+        {/* Celular: abas de etapa + lista vertical. Mudar de etapa é por "Mover etapa" (menu), não arrastar. */}
+        <div className="funil-mobile">
+          <div className="funil-abas">
+            {ETAPAS.map((etapa) => {
+              const cards = pipeFiltrado?.colunas[etapa] ?? []
+              const temAtraso = cards.some((c) => c.atrasado)
+              return (
+                <button key={etapa} type="button" className={`funil-aba ${etapa === abaMobile ? 'ativa' : ''}`} onClick={() => setAbaMobile(etapa)}>
+                  <span className="ponto" style={{ background: corEtapa[etapa] }} />
+                  {rotuloEtapa(etapa, t)}
+                  <span className={`contagem ${temAtraso ? 'atraso' : ''}`}>{cards.length}</span>
+                </button>
+              )
+            })}
+          </div>
+          <div className="funil-lista-mobile">
+            {(pipeFiltrado?.colunas[abaMobile] ?? []).map((c) => (
+              <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat}
+                verPedido={(pedido, etapa) => { setPedidoAberto(pedido); setPedidoAbertoEtapa(etapa) }}
+                aoMover={(card) => setCardMoverMobile(card)} t={t} />
+            ))}
+            {(pipeFiltrado?.colunas[abaMobile] ?? []).length === 0 && (
+              <div style={{ color: 'var(--ink-soft)', fontSize: 13, padding: '20px 6px', textAlign: 'center' }}>—</div>
+            )}
+          </div>
+        </div>
       </DndContext>
 
       {pedidoAberto && (
         <ModalPedido pedido={pedidoAberto} etapa={pedidoAbertoEtapa} onFechar={() => { setPedidoAberto(null); setPedidoAbertoEtapa(null) }} onEditar={editarPedido} editando={editandoPedido} t={t} />
+      )}
+      {cardMoverMobile && (
+        <SheetMoverEtapa card={cardMoverMobile} onFechar={() => setCardMoverMobile(null)}
+          onEscolher={async (etapa) => { await mover(cardMoverMobile, etapa); setCardMoverMobile(null) }} t={t} />
       )}
     </>
   )

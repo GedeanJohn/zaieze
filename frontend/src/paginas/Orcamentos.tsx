@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, formataReal, mensagemDeErro, usuarioLogado } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
@@ -72,6 +72,7 @@ export default function Orcamentos() {
   const podeAprovarDesconto = usuario.role === 'GERENTE' || usuario.role === 'GESTOR' || usuario.role === 'SUPER_ADMIN'
   const escopo = useLojaAtiva()
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
 
   const [orcamentos, setOrcamentos] = useState<Orcamento[]>([])
   const [produtos, setProdutos] = useState<ProdutoP[]>([])
@@ -82,6 +83,10 @@ export default function Orcamentos() {
   const [detalhe, setDetalhe] = useState<Orcamento | null>(null)
   const [erro, setErro] = useState('')
   const [processando, setProcessando] = useState(false)
+  // true quando o editor foi aberto a partir de "Editar/fechar pedido" no card do Funil (ver
+  // Pipeline.tsx) — nesse caso fecharForm() volta pro Funil em vez de deixar a vendedora "presa"
+  // na lista de Orçamentos (o Funil não está no menu de baixo do celular, só dentro de "Mais").
+  const [veioDoFunil, setVeioDoFunil] = useState(false)
 
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
@@ -111,6 +116,7 @@ export default function Orcamentos() {
 
   const abrirNovo = useCallback(async () => {
     setErro('')
+    setVeioDoFunil(false)
     await carregarApoio()
     setForm({ clienteId: '', vendedoraId: '', atacado: false, descontoPct: '', observacao: '', itens: [{ ...LINHA_VAZIA }] })
   }, [carregarApoio])
@@ -134,12 +140,15 @@ export default function Orcamentos() {
     if (!idParaAbrir || !escopo.pronto) return
     setSearchParams((p) => { p.delete('abrir'); return p }, { replace: true })
     api.get(`/orcamentos/${idParaAbrir}`, { params: escopo.params })
-      .then(({ data }) => abrirEdicao(data))
+      .then(({ data }) => { setVeioDoFunil(true); return abrirEdicao(data) })
       .catch((err) => avisar(mensagemDeErro(err), 'erro'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [escopo.pronto, escopo.params])
 
-  function fecharForm() { setForm(null); setErro('') }
+  function fecharForm() {
+    setForm(null); setErro('')
+    if (veioDoFunil) { setVeioDoFunil(false); navigate('/funil') }
+  }
 
   function precoSugerido(produtoId: string, atacado: boolean): string {
     const p = produtos.find((x) => x.id === produtoId)
@@ -378,7 +387,7 @@ export default function Orcamentos() {
 
             <div className="acoes" style={{ flexWrap: 'wrap' }}>
               {EDITAVEL.includes(detalhe.status) && (
-                <button type="button" className="btn secundario" onClick={() => abrirEdicao(detalhe)}>{t('orc.editar')}</button>
+                <button type="button" className="btn secundario" onClick={() => { setVeioDoFunil(false); abrirEdicao(detalhe) }}>{t('orc.editar')}</button>
               )}
               {detalhe.status === 'AGUARDANDO_APROVACAO_DESCONTO' && podeAprovarDesconto && (
                 <>
@@ -404,6 +413,11 @@ export default function Orcamentos() {
       {form && (
         <div className="modal-fundo" onClick={fecharForm}>
           <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={salvar}>
+            {veioDoFunil && (
+              <button type="button" className="btn secundario" style={{ marginBottom: 10 }} onClick={fecharForm}>
+                ← {t('orc.voltarFunil')}
+              </button>
+            )}
             <h2>{form.id ? t('orc.editarOrcamento') : t('orc.novoOrcamento')}</h2>
             {erro && <div className="alerta">{erro}</div>}
 

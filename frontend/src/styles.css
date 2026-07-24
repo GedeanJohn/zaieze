@@ -945,6 +945,33 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   -webkit-user-select: none; -moz-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
 
+/* Funil no celular: abas de etapa + lista vertical no lugar do Kanban arrastável (que não cabe
+   numa tela estreita — 6 colunas de 180px não cabem em ~360px). Desktop mantém o Kanban de sempre;
+   troca só abaixo de 860px (mesmo corte do menu/rodapé mobile). */
+.funil-mobile { display: none; }
+@media (max-width: 860px) {
+  .funil-desktop-only { display: none; }
+  .funil-mobile { display: flex; flex-direction: column; gap: 10px; }
+}
+.funil-abas {
+  display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch;
+}
+.funil-abas::-webkit-scrollbar { display: none; }
+.funil-aba {
+  flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 7px 12px 7px 10px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border); font-size: 12.5px; font-weight: 600;
+  color: var(--ink-soft); cursor: pointer; white-space: nowrap;
+}
+.funil-aba .ponto { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.funil-aba .contagem {
+  font-size: 10.5px; font-weight: 700; color: var(--ink-soft); background: var(--bg); border-radius: 999px;
+  padding: 1px 6px; min-width: 16px; text-align: center;
+}
+.funil-aba.ativa { background: var(--ink); color: #fff; border-color: var(--ink); }
+.funil-aba.ativa .contagem { background: rgba(255, 255, 255, 0.2); color: #fff; }
+.funil-aba .contagem.atraso, .funil-aba.ativa .contagem.atraso { background: #EF4444; color: #fff; }
+.funil-lista-mobile { display: flex; flex-direction: column; }
+
 /* A página inteira do Chat usa a cor da conversa (full-bleed sobre o padding do .conteudo). */
 .cz-pagina {
   background: #efe9e0; /* cor da conversa (creme) */

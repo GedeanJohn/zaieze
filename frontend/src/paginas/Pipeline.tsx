@@ -383,7 +383,7 @@ export default function Pipeline() {
         {t('pipe.dicaParte1')} <strong>⠿</strong> {t('pipe.dicaParte2')}
       </div>
       <DndContext sensors={sensors} onDragStart={aoIniciarArrasto} onDragEnd={aoSoltar}>
-        <div className="funil-kanban" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(180px, 1fr))', gap: 10, overflowX: 'auto' }}>
+        <div className="funil-kanban" style={{ display: 'grid', gridTemplateColumns: `repeat(${ETAPAS.length}, minmax(180px, 1fr))`, gap: 10, overflowX: 'auto' }}>
           {ETAPAS.map((etapa) => {
             const cards = pipeFiltrado?.colunas[etapa] ?? []
             return (

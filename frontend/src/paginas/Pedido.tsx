@@ -230,7 +230,9 @@ export default function Pedido() {
   )
 }
 
-function PedidoEstilos() {
+/** Exportado pra ser reaproveitado pelo PrePedido.tsx (mesmo visual de comprovante, carrinho
+ *  ainda não fechado — sem QR/pagamento). */
+export function PedidoEstilos() {
   return (
     <style>{`
       .ped-root { background: #f3f3f3; min-height: 100vh; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color: #1a1a1a; }
@@ -257,10 +259,10 @@ function PedidoEstilos() {
       .ped-tab .r { text-align: right; }
       .ped-mini { width: 40px; height: 52px; object-fit: cover; border-radius: 4px; }
       .ped-mini.vazio { background: #eee; }
-      .ped-rodape { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 22px; gap: 20px; }
-      .ped-qr { text-align: center; font-size: 10px; color: #999; }
-      .ped-qr img { width: 110px; height: 110px; display: block; }
-      .ped-totais { min-width: 260px; font-size: 14px; }
+      .ped-rodape { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 22px; gap: 20px; flex-wrap: wrap; }
+      .ped-qr { text-align: center; font-size: 10px; color: #999; flex-shrink: 0; }
+      .ped-qr img { width: 110px; height: 110px; display: block; flex-shrink: 0; }
+      .ped-totais { min-width: 260px; font-size: 14px; flex: 1 1 260px; }
       .ped-totais > div { display: flex; justify-content: space-between; padding: 3px 0; }
       .ped-totais .d { color: #c62828; }
       .ped-totais .t { font-size: 20px; font-weight: 800; border-top: 2px solid #111; margin-top: 6px; padding-top: 8px; }
@@ -279,6 +281,16 @@ function PedidoEstilos() {
         .ped-noprint { display: none !important; }
         .ped-root { background: #fff; padding: 0; }
         .ped-folha { box-shadow: none; max-width: 100%; padding: 12px; border-radius: 0; }
+      }
+      @media (max-width: 480px) {
+        .ped-root { padding: 8px; }
+        .ped-folha { padding: 16px; }
+        .ped-marca { font-size: 19px; }
+        .ped-num { font-size: 12px; }
+        /* Tabela rola só dentro da própria caixa — a página nunca fica mais larga que a tela. */
+        .ped-tab { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
+        .ped-tab td, .ped-tab th { white-space: nowrap; }
+        .ped-tab td:nth-child(2), .ped-tab th:nth-child(2) { white-space: normal; min-width: 110px; }
       }
     `}</style>
   )

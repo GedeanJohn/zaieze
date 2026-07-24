@@ -21,6 +21,11 @@ export function urlCatalogoPublica(redeSlug: string, vendSlug: string): string {
   return `${env.TENANT_SCHEME}://${redeSlug}.${env.DOMINIO_BASE}/${vendSlug}`
 }
 
+/** URL pública do pré-pedido (carrinho montado na vitrine, ainda não virou Orçamento/Venda). */
+function urlPrePedidoPublica(redeSlug: string, token: string): string {
+  return `${env.TENANT_SCHEME}://${redeSlug}.${env.DOMINIO_BASE}/pre-pedido/publico/${token}`
+}
+
 /**
  * Catálogo público (Portal do Cliente) + link por vendedora.
  * URL pública: <marca>.zaieze.com/<vendedora>  (marca = rede; engloba todas as lojas).
@@ -34,6 +39,7 @@ const RESERVADOS = new Set([
   'ranking', 'mural', 'provador', 'atacado', 'produtos', 'equipe', 'estoquistas', 'planos',
   'colecoes', 'marca', 'leads', 'catalogo', 'cat', 'api', 'assets', 'uploads', 'checkout', 'sucesso', 'entrar', 'convite',
   'look', // página pública do provador (link da selfie por token)
+  'pre-pedido', // página pública do pré-pedido (link por token)
 ])
 
 /** Gera um slug a partir do nome (sem acento, kebab-case). */
@@ -342,16 +348,15 @@ export async function catalogoRoutes(app: FastifyInstance) {
     // Handoff pelo número OFICIAL da marca (a conversa entra no CRM, roteada pela carteira).
     // Quando a marca ainda não conectou a WABA, cai no número pessoal da vendedora (fallback).
     const marcaConectada = !!(rede.waPhoneNumberId && rede.waNumeroExibicao)
-    const base = body.resumo?.trim() || `Olá ${vend.nome.split(/\s+/)[0]}! Vim pelo catálogo e quero saber mais. 😊`
-    // Marcador de atribuição: se a mensagem chegar ao número da marca sem casar por telefone,
-    // o webhook usa o (ref:<slug>) para achar a vendedora dona do link.
-    const texto = marcaConectada ? `${base}\n\n(ref: ${vendSlug})` : base
-    const url = whatsappUrl(marcaConectada ? rede.waNumeroExibicao : vend.telefone, texto)
+    const saudacaoPadrao = body.resumo?.trim() || `Olá ${vend.nome.split(/\s+/)[0]}! Vim pelo catálogo e quero saber mais. 😊`
 
     // Sem telefone não dá para materializar o cliente aqui; ainda assim devolve o WhatsApp
     // (ao mandar a mensagem, o webhook cria o lead — por telefone ou pelo marcador (ref:)).
     const telefone = body.telefone?.replace(/\D/g, '')
-    if (!telefone) return { whatsappUrl: url }
+    if (!telefone) {
+      const textoSemTelefone = marcaConectada ? `${saudacaoPadrao}\n\n(ref: ${vendSlug})` : saudacaoPadrao
+      return { whatsappUrl: whatsappUrl(marcaConectada ? rede.waNumeroExibicao : vend.telefone, textoSemTelefone) }
+    }
 
     // Cliente entra na carteira da vendedora dona do link (não rouba carteira existente).
     const cliente = await prisma.cliente.upsert({
@@ -370,13 +375,56 @@ export async function catalogoRoutes(app: FastifyInstance) {
       telefone, nome: body.nome?.trim(), slugCatalogo: vendSlug, produtoId: body.produtoId,
     })
 
+    // Com carrinho: a mensagem vira curta + um link pro pedido no mesmo formato visual do
+    // comprovante (sem QR/pagamento, que só fazem sentido depois de virar Orçamento/Venda de
+    // verdade) — em vez do resumo em texto corrido montado no catálogo (Catalogo.tsx).
+    let base = saudacaoPadrao
     if (body.itens?.length) {
       const pecas = body.itens.reduce((s, i) => s + i.qtd, 0)
       const subtotal = body.itens.reduce((s, i) => s + i.precoUnit * i.qtd, 0)
-      await prisma.pedidoCatalogo.create({ data: { leadId, itens: body.itens, pecas, subtotal } })
+      const pedidoCatalogo = await prisma.pedidoCatalogo.create({
+        data: { leadId, itens: body.itens, pecas, subtotal },
+        select: { tokenPublico: true },
+      })
+      const linkPedido = urlPrePedidoPublica(redeSlug, pedidoCatalogo.tokenPublico)
+      const valor = `R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      base = `Olá ${vend.nome.split(/\s+/)[0]}! Novo pedido pelo catálogo — ${pecas} peça(s), ${valor}.\nVeja os detalhes: ${linkPedido}`
     }
+    // Marcador de atribuição: se a mensagem chegar ao número da marca sem casar por telefone,
+    // o webhook usa o (ref:<slug>) para achar a vendedora dona do link.
+    const texto = marcaConectada ? `${base}\n\n(ref: ${vendSlug})` : base
+    const url = whatsappUrl(marcaConectada ? rede.waNumeroExibicao : vend.telefone, texto)
 
     return { whatsappUrl: url, leadId }
+  })
+
+  // Pré-pedido público (sem login): link enviado à vendedora no WhatsApp assim que o cliente
+  // monta o carrinho na vitrine — mesmo formato visual do comprovante (Pedido.tsx), sem QR nem
+  // seção de pagamento (ainda não virou Orçamento/Venda de verdade).
+  app.get('/publico/pre-pedido/:token', async (request, reply) => {
+    const { token } = request.params as { token: string }
+    const pedido = await prisma.pedidoCatalogo.findUnique({
+      where: { tokenPublico: token },
+      select: {
+        id: true, itens: true, pecas: true, subtotal: true, createdAt: true, orcamentoId: true,
+        lead: {
+          select: {
+            vendedora: { select: { nome: true } },
+            cliente: { select: { nome: true, telefone: true } },
+            loja: { select: { nome: true, rede: { select: { nome: true, logoUrl: true } } } },
+          },
+        },
+      },
+    })
+    if (!pedido) return reply.code(404).send({ erro: 'Pedido não encontrado' })
+    return {
+      id: pedido.id, itens: pedido.itens, pecas: pedido.pecas, subtotal: pedido.subtotal, createdAt: pedido.createdAt,
+      convertido: !!pedido.orcamentoId,
+      vendedora: { nome: pedido.lead.vendedora.nome },
+      cliente: pedido.lead.cliente ? { nome: pedido.lead.cliente.nome, telefone: pedido.lead.cliente.telefone } : null,
+      loja: { nome: pedido.lead.loja.nome },
+      marca: { nome: pedido.lead.loja.rede.nome, logoUrl: pedido.lead.loja.rede.logoUrl },
+    }
   })
 
   // ─────── Verificação por WhatsApp (código de 6 dígitos) pro "Meus pedidos" ───────

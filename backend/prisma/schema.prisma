@@ -903,16 +903,20 @@ model Lead {
 // do Funil, em vez de só o texto corrido que vai pro WhatsApp. `itens` é denormalizado (preço/foto
 // no momento da compra) — não deve refletir mudanças posteriores no produto.
 model PedidoCatalogo {
-  id          String   @id @default(cuid())
-  leadId      String
-  itens       Json
-  pecas       Int
-  subtotal    Decimal  @db.Decimal(12, 2)
+  id           String   @id @default(cuid())
+  leadId       String
+  itens        Json
+  pecas        Int
+  subtotal     Decimal  @db.Decimal(12, 2)
   // Preenchido quando a vendedora abre o pedido pra editar/fechar — vira um Orçamento de
   // verdade (mesma janela flutuante, aprovação de desconto e envio por WhatsApp já existentes
   // pros orçamentos). Evita criar mais de um Orçamento a partir do mesmo pedido da vitrine.
-  orcamentoId String?  @unique
-  createdAt   DateTime @default(now())
+  orcamentoId  String?  @unique
+  // Link público (sem login) que a vendedora recebe no WhatsApp assim que o cliente monta o
+  // carrinho — mostra o pedido no mesmo formato visual do comprovante (Pedido.tsx), mas sem QR
+  // code nem seção de pagamento, já que ainda não virou Orçamento/Venda de verdade.
+  tokenPublico String   @unique @default(cuid())
+  createdAt    DateTime @default(now())
 
   lead      Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
   orcamento Orcamento? @relation(fields: [orcamentoId], references: [id], onDelete: SetNull)

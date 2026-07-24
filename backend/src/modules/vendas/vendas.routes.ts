@@ -171,7 +171,8 @@ export async function vendasRoutes(app: FastifyInstance) {
   })
 
   // Pedidos a separar (gestor de estoque + gerente): pedidos fechados, pendentes por padrão.
-  // O gerente acompanha/cobra; o gestor de estoque marca como separado.
+  // O gerente acompanha/cobra a equipe inteira aqui — inclusive a etapa ENTREGUE, que só a
+  // vendedora confirma (ver /:id/status-entrega); esta tela é só leitura pra essa última etapa.
   app.get('/separacao', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'ESTOQUISTA')] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     const { status } = request.query as { status?: string } // 'todos' = inclui já separados
@@ -184,7 +185,8 @@ export async function vendasRoutes(app: FastifyInstance) {
       take: 200,
       select: {
         id: true, tokenPublico: true, createdAt: true, total: true, atacado: true, canal: true,
-        separado: true, separadoEm: true, pagamentoConferido: true, pagamentoConferidoEm: true,
+        separado: true, separadoEm: true, statusEntrega: true, statusEntregaEm: true,
+        pagamentoConferido: true, pagamentoConferidoEm: true,
         comprovantePagamentoUrl: true,
         cliente: { select: { nome: true } },
         vendedora: { select: { nome: true } },
@@ -194,6 +196,7 @@ export async function vendasRoutes(app: FastifyInstance) {
     return vendas.map((v) => ({
       id: v.id, tokenPublico: v.tokenPublico, createdAt: v.createdAt, total: v.total,
       atacado: v.atacado, canal: v.canal, separado: v.separado, separadoEm: v.separadoEm,
+      statusEntrega: v.statusEntrega, statusEntregaEm: v.statusEntregaEm,
       pagamentoConferido: v.pagamentoConferido, pagamentoConferidoEm: v.pagamentoConferidoEm,
       comprovantePagamentoUrl: v.comprovantePagamentoUrl,
       cliente: v.cliente?.nome ?? 'Consumidor avulso',
@@ -202,17 +205,35 @@ export async function vendasRoutes(app: FastifyInstance) {
     }))
   })
 
-  // Marca/desmarca o pedido como separado fisicamente.
-  app.patch('/:id/separado', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'ESTOQUISTA')] }, async (request, reply) => {
+  // Etapas de entrega: SEPARANDO → TRANSPORTADORA → EM_TRANSITO são do gestor de estoque/gerente
+  // (tela "Pedidos a separar"); ENTREGUE só a VENDEDORA dona do pedido confirma (em "Meu pedido").
+  // `separado` (booleano legado) continua em sincronia — vira true assim que sai de SEPARANDO.
+  const statusEntregaSchema = z.object({ statusEntrega: z.enum(['SEPARANDO', 'TRANSPORTADORA', 'EM_TRANSITO', 'ENTREGUE']) })
+  app.patch('/:id/status-entrega', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'ESTOQUISTA', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { id } = request.params as { id: string }
-    const { separado } = z.object({ separado: z.boolean() }).parse(request.body)
-    const venda = await prisma.venda.findFirst({ where: { id, lojaId }, select: { id: true } })
+    const { statusEntrega } = statusEntregaSchema.parse(request.body)
+    const role = request.user.role
+
+    if (statusEntrega === 'ENTREGUE') {
+      if (role !== 'VENDEDORA' && role !== 'SUPER_ADMIN') return reply.code(403).send({ erro: 'Só a vendedora do pedido confirma a entrega.' })
+    } else if (role === 'VENDEDORA') {
+      return reply.code(403).send({ erro: 'Essa etapa é do gestor de estoque.' })
+    }
+
+    const where: Prisma.VendaWhereInput = { id, lojaId }
+    if (role === 'VENDEDORA') where.vendedoraId = request.user.sub
+    const venda = await prisma.venda.findFirst({ where, select: { id: true } })
     if (!venda) return reply.code(404).send({ erro: 'Pedido não encontrado' })
+
     return prisma.venda.update({
       where: { id },
-      data: { separado, separadoEm: separado ? new Date() : null },
-      select: { id: true, separado: true, separadoEm: true },
+      data: {
+        statusEntrega, statusEntregaEm: new Date(),
+        separado: statusEntrega !== 'SEPARANDO',
+        separadoEm: statusEntrega !== 'SEPARANDO' ? new Date() : null,
+      },
+      select: { id: true, statusEntrega: true, statusEntregaEm: true, separado: true, separadoEm: true },
     })
   })
 

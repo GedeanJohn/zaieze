@@ -1,10 +1,20 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
 import { lojaIdDe } from '../../plugins/auth'
 import { requireFeature, planoInclui } from '../../plugins/planos'
 import { garantirCicloAberto } from '../leads/leads.service'
+import { enviarTemplatePlataforma } from '../whatsapp/meta.service'
+import { TERMO_CLIENTE_VERSAO, TERMO_CLIENTE_TEXTO } from './termo-cliente.template'
+import type { JwtUser } from '../../types/fastify'
+
+/** Token do cliente público verificado (perfil da vendedora) — formato bem diferente do JwtUser
+ *  de funcionário (sem role/redeId), reaproveitando só o mecanismo de assinatura do @fastify/jwt.
+ *  O cast via JwtUser é só pra satisfazer o tipo fixo de app.jwt.sign/verify — nunca passa por
+ *  requireFeature/authorize (que exigem role), então não há confusão com o JWT de equipe. */
+interface ClientePedidosPayload { tipo: 'cliente_pedidos'; lojaId: string; telefone: string }
 
 /** URL pública do catálogo da vendedora: <scheme>://<rede>.<dominio>/<slug>. */
 export function urlCatalogoPublica(redeSlug: string, vendSlug: string): string {
@@ -71,6 +81,24 @@ async function resolverVendedoraPublica(redeSlug: string, vendSlug: string) {
   })
   if (!vend || !vend.loja) return null
   return { rede, vend }
+}
+
+/** Média (1 casa decimal), total de avaliações APROVADAS e até 3 depoimentos mais recentes da
+ *  vendedora — mesmo padrão de resumoAvaliacoes (assessores.routes.ts). Sem nenhuma aprovada
+ *  ainda, statAvaliacao vem null (esconde o selo em vez de mostrar nota zerada). */
+async function resumoAvaliacoesVendedora(vendedoraId: string) {
+  const [agregado, amostras] = await Promise.all([
+    prisma.vendedoraAvaliacao.aggregate({ where: { vendedoraId, status: 'APROVADA' }, _avg: { nota: true }, _count: true }),
+    prisma.vendedoraAvaliacao.findMany({
+      where: { vendedoraId, status: 'APROVADA' }, orderBy: { moderadoEm: 'desc' }, take: 3,
+      select: { nota: true, comentario: true, nomeCliente: true, createdAt: true },
+    }),
+  ])
+  return {
+    statAvaliacao: agregado._avg.nota != null ? Math.round(agregado._avg.nota * 10) / 10 : null,
+    totalAvaliacoes: agregado._count,
+    depoimentos: amostras,
+  }
 }
 
 const leadSchema = z.object({
@@ -210,14 +238,97 @@ export async function catalogoRoutes(app: FastifyInstance) {
       }))
       .filter((c) => c.produtos.length > 0)
 
+    // Estatísticas reais do perfil público (nada fabricado): clientes ativos na carteira dela,
+    // vendas concluídas e coleções já liberadas pra sua loja (histórico, não só as vigentes).
+    const [clientesAtivos, pedidosEntregues, colecoesLancadas, avaliacaoResumo] = await Promise.all([
+      prisma.cliente.count({ where: { vendedoraId: vend.id, ativo: true, consumidorOutro: false } }),
+      prisma.venda.count({ where: { vendedoraId: vend.id, status: 'CONCLUIDA' } }),
+      prisma.colecao.count({ where: { lojas: { some: { lojaId: vend.lojaId! } }, status: 'LIBERADA' } }),
+      resumoAvaliacoesVendedora(vend.id),
+    ])
+
     return {
       marca: { nome: rede.nome, logoUrl: rede.logoUrl, bannerUrl: rede.bannerUrl, descricaoPublica: rede.descricaoPublica, corPrimaria: rede.corPrimaria, corSecundaria: rede.corSecundaria },
       loja: { nome: vend.loja!.nome },
-      vendedora: { nome: vend.nome, primeiroNome: vend.nome.trim().split(/\s+/)[0], fotoUrl: vend.fotoUrl, bio: vend.bioCatalogo, temWhatsapp: !!vend.telefone },
+      vendedora: {
+        nome: vend.nome, primeiroNome: vend.nome.trim().split(/\s+/)[0], fotoUrl: vend.fotoUrl, bio: vend.bioCatalogo, temWhatsapp: !!vend.telefone,
+        stats: { clientesAtivos, pedidosEntregues, colecoesLancadas },
+        ...avaliacaoResumo,
+      },
       pedidoMinimoAtacado: rede.pedidoMinimoAtacado,
       pedidoMinimoInfantil: rede.pedidoMinimoInfantil,
       colecoes: colecoesOut,
     }
+  })
+
+  // Lista completa dos depoimentos aprovados da vendedora (pro "ver mais" no perfil público).
+  app.get('/publico/:redeSlug/:vendSlug/avaliacoes', async (request, reply) => {
+    const { redeSlug, vendSlug } = request.params as { redeSlug: string; vendSlug: string }
+    const ctx = await resolverVendedoraPublica(redeSlug, vendSlug)
+    if (!ctx) return reply.code(404).send({ erro: 'Página não encontrada' })
+    return prisma.vendedoraAvaliacao.findMany({
+      where: { vendedoraId: ctx.vend.id, status: 'APROVADA' },
+      orderBy: { moderadoEm: 'desc' },
+      take: 50,
+      select: { nota: true, comentario: true, nomeCliente: true, createdAt: true },
+    })
+  })
+
+  // Envio de avaliação pelo cliente — público, sem login. Nasce PENDENTE (só entra na média/
+  // depoimentos depois que a vendedora aprova em "Minha conta"). Rate-limit contra spam/flood.
+  const avaliacaoSchema = z.object({
+    nota: z.number().int().min(1).max(5),
+    comentario: z.string().trim().max(400).nullable().optional(),
+    nomeCliente: z.string().trim().max(80).nullable().optional(),
+    // Opcional: se bater com um Cliente já cadastrado NESTA vendedora, a avaliação aparece
+    // também no card dele no Funil — nunca cria Cliente novo a partir disso.
+    telefone: z.string().trim().max(20).nullable().optional(),
+  })
+  app.post('/publico/:redeSlug/:vendSlug/avaliacao', { config: { rateLimit: { max: 5, timeWindow: '10 minutes' } } }, async (request, reply) => {
+    const { redeSlug, vendSlug } = request.params as { redeSlug: string; vendSlug: string }
+    const ctx = await resolverVendedoraPublica(redeSlug, vendSlug)
+    if (!ctx) return reply.code(404).send({ erro: 'Página não encontrada' })
+    const { vend } = ctx
+    const b = avaliacaoSchema.parse(request.body)
+
+    let clienteId: string | null = null
+    const telefoneLimpo = b.telefone?.replace(/\D/g, '')
+    if (telefoneLimpo) {
+      const cliente = await prisma.cliente.findUnique({
+        where: { lojaId_telefone: { lojaId: vend.lojaId!, telefone: telefoneLimpo } },
+        select: { id: true, vendedoraId: true },
+      })
+      if (cliente && cliente.vendedoraId === vend.id) clienteId = cliente.id
+    }
+
+    await prisma.vendedoraAvaliacao.create({
+      data: { vendedoraId: vend.id, nota: b.nota, comentario: b.comentario || null, nomeCliente: b.nomeCliente || null, clienteId },
+    })
+    return reply.code(201).send({ ok: true })
+  })
+
+  // ─────────── Avaliações de atendimento (moderação da própria vendedora) ───────────
+  app.get('/minhas-avaliacoes', { preHandler: [requireFeature('portal_cliente'), app.authorize('VENDEDORA')] }, async (request) => {
+    const { status } = request.query as { status?: string }
+    return prisma.vendedoraAvaliacao.findMany({
+      where: { vendedoraId: request.user.sub, ...(status ? { status: status as 'PENDENTE' | 'APROVADA' | 'RECUSADA' } : {}) },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, nota: true, comentario: true, nomeCliente: true, status: true, createdAt: true },
+    })
+  })
+
+  app.post('/minhas-avaliacoes/:id/aprovar', { preHandler: [requireFeature('portal_cliente'), app.authorize('VENDEDORA')] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const av = await prisma.vendedoraAvaliacao.findFirst({ where: { id, vendedoraId: request.user.sub } })
+    if (!av) return reply.code(404).send({ erro: 'Avaliação não encontrada' })
+    return prisma.vendedoraAvaliacao.update({ where: { id }, data: { status: 'APROVADA', moderadoEm: new Date() } })
+  })
+
+  app.post('/minhas-avaliacoes/:id/recusar', { preHandler: [requireFeature('portal_cliente'), app.authorize('VENDEDORA')] }, async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const av = await prisma.vendedoraAvaliacao.findFirst({ where: { id, vendedoraId: request.user.sub } })
+    if (!av) return reply.code(404).send({ erro: 'Avaliação não encontrada' })
+    return prisma.vendedoraAvaliacao.update({ where: { id }, data: { status: 'RECUSADA', moderadoEm: new Date() } })
   })
 
   // Cliente clica em "Falar com a vendedora": registra o lead e devolve a URL do WhatsApp.
@@ -266,5 +377,142 @@ export async function catalogoRoutes(app: FastifyInstance) {
     }
 
     return { whatsappUrl: url, leadId }
+  })
+
+  // ─────── Verificação por WhatsApp (código de 6 dígitos) pro "Meus pedidos" ───────
+  // Antes bastava digitar QUALQUER telefone pra ver os pedidos dele — agora precisa provar que é
+  // dono do número, recebendo um código pelo WhatsApp da própria ZAIEZE (mesmo canal do "esqueci
+  // minha senha" — enviarTemplatePlataforma —, não depende da marca ter WhatsApp oficial). Depois
+  // de confirmado, vira um token assinado (JWT) que o /meus-pedidos exige — quem só tem o
+  // telefone, sem o código, não passa mais.
+  function gerarCodigo(): string {
+    return String(Math.floor(100000 + Math.random() * 900000))
+  }
+
+  app.get('/publico/termo-cliente', async () => ({ versao: TERMO_CLIENTE_VERSAO, texto: TERMO_CLIENTE_TEXTO }))
+
+  const enviarCodigoSchema = z.object({ telefone: z.string().min(8) })
+  app.post('/publico/:redeSlug/:vendSlug/verificar-telefone/enviar', { config: { rateLimit: { max: 5, timeWindow: '10 minutes' } } }, async (request, reply) => {
+    const { redeSlug, vendSlug } = request.params as { redeSlug: string; vendSlug: string }
+    const ctx = await resolverVendedoraPublica(redeSlug, vendSlug)
+    if (!ctx) return reply.code(404).send({ erro: 'Página não encontrada' })
+    const { vend } = ctx
+    const { telefone } = enviarCodigoSchema.parse(request.body)
+    const telefoneLimpo = telefone.replace(/\D/g, '')
+    if (telefoneLimpo.length < 8) return reply.code(422).send({ erro: 'WhatsApp inválido' })
+
+    const codigo = gerarCodigo()
+    await prisma.verificacaoTelefonePublico.create({
+      data: {
+        lojaId: vend.lojaId!, telefone: telefoneLimpo, codigoHash: await bcrypt.hash(codigo, 10),
+        expiraEm: new Date(Date.now() + 10 * 60_000),
+      },
+    })
+    await enviarTemplatePlataforma({ telefone: telefoneLimpo, templateNome: env.ZAIEZE_WA_TEMPLATE_OTP, params: [{ texto: codigo }] })
+    return { ok: true }
+  })
+
+  const confirmarCodigoSchema = z.object({
+    telefone: z.string().min(8), codigo: z.string().length(6),
+    aceiteTermo: z.literal(true, { errorMap: () => ({ message: 'É preciso aceitar o termo pra continuar.' }) }),
+  })
+  app.post('/publico/:redeSlug/:vendSlug/verificar-telefone/confirmar', { config: { rateLimit: { max: 10, timeWindow: '10 minutes' } } }, async (request, reply) => {
+    const { redeSlug, vendSlug } = request.params as { redeSlug: string; vendSlug: string }
+    const ctx = await resolverVendedoraPublica(redeSlug, vendSlug)
+    if (!ctx) return reply.code(404).send({ erro: 'Página não encontrada' })
+    const { vend } = ctx
+    const body = confirmarCodigoSchema.parse(request.body)
+    const telefoneLimpo = body.telefone.replace(/\D/g, '')
+
+    const verificacao = await prisma.verificacaoTelefonePublico.findFirst({
+      where: { lojaId: vend.lojaId!, telefone: telefoneLimpo, usado: false, expiraEm: { gte: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (!verificacao) return reply.code(400).send({ erro: 'Código expirado ou não encontrado. Peça um novo.' })
+    if (verificacao.tentativas >= 5) return reply.code(429).send({ erro: 'Muitas tentativas. Peça um novo código.' })
+
+    const confere = await bcrypt.compare(body.codigo, verificacao.codigoHash)
+    if (!confere) {
+      await prisma.verificacaoTelefonePublico.update({ where: { id: verificacao.id }, data: { tentativas: { increment: 1 } } })
+      return reply.code(400).send({ erro: 'Código incorreto.' })
+    }
+
+    await prisma.$transaction([
+      prisma.verificacaoTelefonePublico.update({ where: { id: verificacao.id }, data: { usado: true } }),
+      prisma.aceiteTermoClientePublico.create({
+        data: {
+          lojaId: vend.lojaId!, telefone: telefoneLimpo, versao: TERMO_CLIENTE_VERSAO,
+          ip: request.ip, userAgent: request.headers['user-agent'] ?? null,
+        },
+      }),
+    ])
+
+    const payloadToken: ClientePedidosPayload = { tipo: 'cliente_pedidos', lojaId: vend.lojaId!, telefone: telefoneLimpo }
+    const token = app.jwt.sign(payloadToken as unknown as JwtUser, { expiresIn: '90d' })
+    return { ok: true, token }
+  })
+
+  // "Ver Carrinho" (abertos) / "Ver Pedidos" (fechados) do perfil público — exige o token emitido
+  // por /verificar-telefone/confirmar (mostra os pedidos do cliente NA LOJA inteira, não só os
+  // desta vendedora: do ponto de vista dele é "meu histórico aqui", não importa quem atendeu).
+  app.post('/publico/:redeSlug/:vendSlug/meus-pedidos', { config: { rateLimit: { max: 20, timeWindow: '10 minutes' } } }, async (request, reply) => {
+    const { redeSlug, vendSlug } = request.params as { redeSlug: string; vendSlug: string }
+    const ctx = await resolverVendedoraPublica(redeSlug, vendSlug)
+    if (!ctx) return reply.code(404).send({ erro: 'Página não encontrada' })
+    const { vend } = ctx
+    const { token } = z.object({ token: z.string() }).parse(request.body)
+
+    let payload: Partial<ClientePedidosPayload>
+    try {
+      payload = app.jwt.verify(token) as unknown as ClientePedidosPayload
+    } catch {
+      return reply.code(401).send({ erro: 'Verificação expirada. Confirme seu WhatsApp de novo.' })
+    }
+    if (payload.tipo !== 'cliente_pedidos' || payload.lojaId !== vend.lojaId || !payload.telefone) {
+      return reply.code(401).send({ erro: 'Verificação expirada. Confirme seu WhatsApp de novo.' })
+    }
+    const telefoneLimpo = payload.telefone
+
+    const cliente = await prisma.cliente.findUnique({
+      where: { lojaId_telefone: { lojaId: vend.lojaId!, telefone: telefoneLimpo } },
+      select: { id: true },
+    })
+    if (!cliente) return { abertos: [], fechados: [] }
+
+    const [leadsAbertos, vendas] = await Promise.all([
+      prisma.lead.findMany({
+        where: { clienteId: cliente.id, status: { in: ['ENTROU', 'ATENDIDO', 'NEGOCIANDO'] } },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, status: true, createdAt: true,
+          pedidosCatalogo: {
+            orderBy: { createdAt: 'desc' }, take: 1,
+            select: { pecas: true, subtotal: true, orcamento: { select: { status: true, tokenPublico: true } } },
+          },
+        },
+      }),
+      prisma.venda.findMany({
+        where: { clienteId: cliente.id, status: 'CONCLUIDA' },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+        select: { id: true, tokenPublico: true, createdAt: true, total: true, statusEntrega: true, itens: { select: { quantidade: true } } },
+      }),
+    ])
+
+    return {
+      abertos: leadsAbertos.map((l) => {
+        const pedido = l.pedidosCatalogo[0]
+        return {
+          id: l.id, status: l.status, createdAt: l.createdAt,
+          pecas: pedido?.pecas ?? null, subtotal: pedido?.subtotal ?? null,
+          statusOrcamento: pedido?.orcamento?.status ?? null,
+          tokenOrcamento: pedido?.orcamento?.tokenPublico ?? null,
+        }
+      }),
+      fechados: vendas.map((v) => ({
+        id: v.id, tokenPublico: v.tokenPublico, createdAt: v.createdAt, total: v.total,
+        statusEntrega: v.statusEntrega, pecas: v.itens.reduce((s, i) => s + i.quantidade, 0),
+      })),
+    }
   })
 }

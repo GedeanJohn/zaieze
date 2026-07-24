@@ -18,7 +18,14 @@ const ETAPAS: StatusLead[] = ['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'CONVERTIDO', 
 
 const incluiLead = {
   vendedora: { select: { id: true, nome: true } },
-  cliente: { select: { id: true, nome: true, telefone: true, cidade: true, uf: true } },
+  cliente: {
+    select: {
+      id: true, nome: true, telefone: true, cidade: true, uf: true,
+      // Avaliação mais recente APROVADA que esse cliente deixou no perfil público da vendedora
+      // (ver catalogo.routes.ts) — mostrada como badge no card do Funil.
+      avaliacoes: { where: { status: 'APROVADA' as const }, orderBy: { createdAt: 'desc' as const }, take: 1, select: { nota: true, comentario: true } },
+    },
+  },
   // Só o pedido mais recente do ciclo — pra mostrar o resumo formatado (fotos/itens/qtd/preço)
   // direto no card do Funil (ver [[PedidoCatalogo]]).
   pedidosCatalogo: { orderBy: { createdAt: 'desc' as const }, take: 1 },

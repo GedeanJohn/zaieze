@@ -73,6 +73,14 @@ enum StatusVenda {
   CANCELADA
 }
 
+/// Etapas de entrega de um pedido fechado (Venda) — ver Venda.statusEntrega.
+enum StatusEntrega {
+  SEPARANDO
+  TRANSPORTADORA
+  EM_TRANSITO
+  ENTREGUE
+}
+
 // Pedido de reserva: a peça esgotou (ou o estoque disponível no canal é insuficiente) mas o
 // cliente quer aquela variação mesmo assim — vira demanda programada para a fábrica produzir.
 enum StatusPedidoReserva {
@@ -197,40 +205,40 @@ enum StatusProvador {
 // ─────────────────────────── Rede (marca) — tenant raiz ───────────────────────────
 
 model Rede {
-  id                       String   @id @default(cuid())
+  id                       String    @id @default(cuid())
   nome                     String // nome da marca
-  slug                     String   @unique
-  plano                    Plano    @default(START)
-  ativo                    Boolean  @default(true)
+  slug                     String    @unique
+  plano                    Plano     @default(START)
+  ativo                    Boolean   @default(true)
   // Identidade visual da marca (usada no catálogo público / Portal do Cliente)
   logoUrl                  String? // caminho do arquivo enviado pelo gestor (servido em /uploads)
   bannerUrl                String? // banner do topo do catálogo público (faixa antes dos produtos)
   // Descrição da loja escrita pelo gestor: alimenta a meta description e o schema.org (JSON-LD)
   // do catálogo público — fonte de pesquisa para buscadores e IA (GEO).
   descricaoPublica         String?
-  corPrimaria              String   @default("#111111") // cor de destaque (botões/CTA)
-  corSecundaria            String   @default("#ffffff") // cor de fundo
+  corPrimaria              String    @default("#111111") // cor de destaque (botões/CTA)
+  corSecundaria            String    @default("#ffffff") // cor de fundo
   // SLA por etapa do funil (minutos): tempo máximo do ciclo em cada etapa antes de "atrasar".
-  slaEntrouMin             Int      @default(30) // 1ª resposta; estourou + auto = redistribui
-  slaAtendidoMin           Int      @default(1440) // avançar do "atendido" (1 dia)
-  slaNegociandoMin         Int      @default(4320) // fechar a negociação (3 dias)
-  slaAutoRedistribuir      Boolean  @default(false) // redistribui sozinho quando ENTROU estoura o prazo
+  slaEntrouMin             Int       @default(30) // 1ª resposta; estourou + auto = redistribui
+  slaAtendidoMin           Int       @default(1440) // avançar do "atendido" (1 dia)
+  slaNegociandoMin         Int       @default(4320) // fechar a negociação (3 dias)
+  slaAutoRedistribuir      Boolean   @default(false) // redistribui sozinho quando ENTROU estoura o prazo
   // Card do funil colorido por tempo de espera: VERMELHO quando passa do SLA (atrasado);
   // LARANJA quando falta <= slaApertadoPct% do prazo; VERDE no resto.
-  slaApertadoPct           Int      @default(20)
+  slaApertadoPct           Int       @default(20)
   // Canal varejo×atacado por QUANTIDADE de peças no pedido/carrinho: pedido com nº de peças
   // >= este mínimo é ATACADO (aplica preço de atacado); abaixo é VAREJO. Definido pelo gestor.
-  pedidoMinimoAtacado      Int      @default(6)
+  pedidoMinimoAtacado      Int       @default(6)
   // Lote mínimo de atacado para INFANTIL (costuma ser maior, ex.: 12). Demais gêneros usam pedidoMinimoAtacado.
-  pedidoMinimoInfantil     Int      @default(12)
+  pedidoMinimoInfantil     Int       @default(12)
   // Desconto no PDV: régua sugerida por total (JSON [{ate, pct}]) + limites de autorização.
   descontoRegua            Json? // null = usa a régua padrão do sistema
-  descontoAutoMaxPct       Int      @default(10) // até este % a vendedora aplica sozinha
-  descontoSenhaMaxPct      Int      @default(15) // acima de auto e até aqui pede senha da própria; acima pede gerente
+  descontoAutoMaxPct       Int       @default(10) // até este % a vendedora aplica sozinha
+  descontoSenhaMaxPct      Int       @default(15) // acima de auto e até aqui pede senha da própria; acima pede gerente
   // Texto padrão de disparo/campanha definido pelo GESTOR para as vendedoras.
   // disparoVendedoraEditavel = a vendedora pode personalizar o texto (true) ou fica travada (false).
   textoDisparoPadrao       String?
-  disparoVendedoraEditavel Boolean  @default(true)
+  disparoVendedoraEditavel Boolean   @default(true)
   // WhatsApp Cloud API (oficial da Meta) — UMA WABA/número por marca. Todas as vendedoras
   // atendem por este número; a identidade da vendedora vai no conteúdo. Config manual pelo gestor.
   // Ausência de waPhoneNumberId/token → módulo opera em modo SIMULADO (não envia de verdade).
@@ -240,7 +248,7 @@ model Rede {
   waTokenCifrado           String? // token permanente (System User), criptografado em repouso (AES-256-GCM)
   waVerifyToken            String? // token de verificação do webhook (GET hub.verify_token)
   waAppSecret              String? // segredo do app Meta p/ validar X-Hub-Signature-256 (opcional)
-  waConectado              Boolean  @default(false)
+  waConectado              Boolean   @default(false)
   waConectadoEm            DateTime?
   // Instagram Messaging (oficial da Meta) — mesma lógica do WhatsApp: 1 conta por marca,
   // config manual pelo gestor (Business Account ID + token). Ausência → modo SIMULADO.
@@ -252,13 +260,13 @@ model Rede {
   igTokenCifrado           String? // access token, cifrado em repouso (mesmo AES-256-GCM do WhatsApp)
   igVerifyToken            String? // token de verificação do webhook (GET hub.verify_token)
   igAppSecret              String? // segredo do app Meta p/ validar X-Hub-Signature-256 (opcional)
-  igConectado              Boolean  @default(false)
+  igConectado              Boolean   @default(false)
   igConectadoEm            DateTime?
   // Meta mensal da MARCA (valor total do mês). Distribuída às lojas conforme metaModo:
   // IGUAL = meta da marca ÷ nº de lojas; MANUAL = valor definido em cada Loja.metaMensal.
   // A meta da vendedora é derivada: meta da loja ÷ nº de vendedoras ativas da loja.
-  metaMensal               Decimal? @db.Decimal(12, 2)
-  metaModo                 String   @default("IGUAL") // IGUAL | MANUAL
+  metaMensal               Decimal?  @db.Decimal(12, 2)
+  metaModo                 String    @default("IGUAL") // IGUAL | MANUAL
   // Programa de Afiliados: qual afiliado indicou esta rede (se veio por um link ?ref=).
   // Base do cálculo de comissão vitalícia — gravado no ato do checkout, não muda depois.
   afiliadoId               String?
@@ -277,28 +285,28 @@ model Rede {
   chavePixTipo             String? // EMAIL | CPF | TELEFONE | ALEATORIA
   chavePix                 String?
   linkPagamentoCartao      String? // link de cobrança de um gateway externo (Mercado Pago, PagSeguro etc.)
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
-  lojas      Loja[]
-  usuarios   Usuario[] // gestores da rede
-  assinatura Assinatura?
-  addons     AssinaturaAddon[]
+  lojas                      Loja[]
+  usuarios                   Usuario[] // gestores da rede
+  assinatura                 Assinatura?
+  addons                     AssinaturaAddon[]
   // Estoque central da fábrica/marca: coleções, produtos e taxonomias vivem no nível da REDE
   // (não por loja). As lojas apenas recebem permissão de venda via ColecaoLoja (distribuição).
-  colecoes   Colecao[]
-  produtos   Produto[]
-  categorias Categoria[]
-  marcas     Marca[]
-  campanhasModelo CampanhaModelo[]
-  aceitesContrato AceiteContrato[]
-  aceitesPrivacidade AceitePrivacidade[]
-  aceitesTermosUso   AceiteTermosUso[]
-  afiliadoOrigem Afiliado? @relation(fields: [afiliadoId], references: [id], onDelete: SetNull)
-  assessorOrigem Assessor? @relation(fields: [assessorOrigemId], references: [id], onDelete: SetNull)
-  looksProvador   LookProvador[]
-  assessorMarcas  AssessorMarca[]
-  perfilNegocio   PerfilNegocioRede?
+  colecoes                   Colecao[]
+  produtos                   Produto[]
+  categorias                 Categoria[]
+  marcas                     Marca[]
+  campanhasModelo            CampanhaModelo[]
+  aceitesContrato            AceiteContrato[]
+  aceitesPrivacidade         AceitePrivacidade[]
+  aceitesTermosUso           AceiteTermosUso[]
+  afiliadoOrigem             Afiliado?                   @relation(fields: [afiliadoId], references: [id], onDelete: SetNull)
+  assessorOrigem             Assessor?                   @relation(fields: [assessorOrigemId], references: [id], onDelete: SetNull)
+  looksProvador              LookProvador[]
+  assessorMarcas             AssessorMarca[]
+  perfilNegocio              PerfilNegocioRede?
   assinaturasChatAtendimento AssinaturaChatAtendimento[]
 
   @@map("redes")
@@ -474,7 +482,6 @@ model AssinaturaChatAtendimento {
 
   @@index([redeId])
   @@index([vendedoraId])
-
   @@map("assinaturas_chat_atendimento")
 }
 
@@ -484,13 +491,13 @@ model AssinaturaChatAtendimento {
 /// ativo. Job periódico (boot + 24h, reprocessa só se `geradoEm` tiver mais de ~7 dias) — nunca
 /// gerado/lido durante uma conversa em andamento (ver chat-atendimento/perfil-negocio.service.ts).
 model PerfilNegocioRede {
-  redeId              String    @id
-  instagramStatus     String    @default("nao_conectado") // 'conectado' | 'nao_conectado' | 'indisponivel'
-  perfilNegocio       Json? // { tomDeVoz, tipoPecaPredominante, publicoAlvoAparente, ticketAparente, palavrasChaveRecorrentes }
-  roteiro             Json? // gerado por IA — { versao, saudacao, saudacaoFallback, perguntasQualificacao, palavrasChaveSegmento, gatilhosHandoffDireto, mensagemConclusao, mensagemHandoffHumano }
-  roteiroOverride     Json? // personalização manual do gestor (mesmo formato do `roteiro`) — quando presente, tem prioridade total sobre o gerado por IA; o job periódico nunca sobrescreve isto
-  fonteDados          Json? // { seguidores, postsAnalisados, periodoAnalisado } — só auditoria
-  geradoEm            DateTime?
+  redeId               String    @id
+  instagramStatus      String    @default("nao_conectado") // 'conectado' | 'nao_conectado' | 'indisponivel'
+  perfilNegocio        Json? // { tomDeVoz, tipoPecaPredominante, publicoAlvoAparente, ticketAparente, palavrasChaveRecorrentes }
+  roteiro              Json? // gerado por IA — { versao, saudacao, saudacaoFallback, perguntasQualificacao, palavrasChaveSegmento, gatilhosHandoffDireto, mensagemConclusao, mensagemHandoffHumano }
+  roteiroOverride      Json? // personalização manual do gestor (mesmo formato do `roteiro`) — quando presente, tem prioridade total sobre o gerado por IA; o job periódico nunca sobrescreve isto
+  fonteDados           Json? // { seguidores, postsAnalisados, periodoAnalisado } — só auditoria
+  geradoEm             DateTime?
   proximaAtualizacaoEm DateTime?
 
   rede Rede @relation(fields: [redeId], references: [id], onDelete: Cascade)
@@ -687,26 +694,27 @@ model Usuario {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  rede              Rede?              @relation(fields: [redeId], references: [id], onDelete: Cascade)
-  loja              Loja?              @relation(fields: [lojaId], references: [id], onDelete: Cascade)
-  equipe            Equipe?            @relation(fields: [equipeId], references: [id], onDelete: SetNull)
-  carteira          Cliente[]          @relation("CarteiraVendedora")
-  vendas            Venda[]
-  pedidosReserva    PedidoReserva[]
-  orcamentos        Orcamento[]        @relation("OrcamentosVendedora")
-  orcamentosDescontoAprovado Orcamento[] @relation("OrcamentosDescontoAprovadoPor")
-  mensagens         MensagemWhatsapp[] @relation("MensagensVendedora")
-  mensagensInstagram MensagemInstagram[] @relation("MensagensInstagramVendedora")
-  campanhas         Campanha[]
-  campanhasModelo   CampanhaModelo[]   @relation("ModelosCampanhaCriados")
-  postsMural        PostMural[]
-  leads             Lead[]             @relation("LeadsVendedora")
-  gruposTransmissao GrupoTransmissao[] @relation("GruposVendedora")
-  looksProvador     LookProvador[]     @relation("LooksProvadorCriados")
-  solicitacoesSenha SolicitacaoSenha[]
-  afiliado          Afiliado?
-  assessor          Assessor?
+  rede                       Rede?                       @relation(fields: [redeId], references: [id], onDelete: Cascade)
+  loja                       Loja?                       @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  equipe                     Equipe?                     @relation(fields: [equipeId], references: [id], onDelete: SetNull)
+  carteira                   Cliente[]                   @relation("CarteiraVendedora")
+  vendas                     Venda[]
+  pedidosReserva             PedidoReserva[]
+  orcamentos                 Orcamento[]                 @relation("OrcamentosVendedora")
+  orcamentosDescontoAprovado Orcamento[]                 @relation("OrcamentosDescontoAprovadoPor")
+  mensagens                  MensagemWhatsapp[]          @relation("MensagensVendedora")
+  mensagensInstagram         MensagemInstagram[]         @relation("MensagensInstagramVendedora")
+  campanhas                  Campanha[]
+  campanhasModelo            CampanhaModelo[]            @relation("ModelosCampanhaCriados")
+  postsMural                 PostMural[]
+  leads                      Lead[]                      @relation("LeadsVendedora")
+  gruposTransmissao          GrupoTransmissao[]          @relation("GruposVendedora")
+  looksProvador              LookProvador[]              @relation("LooksProvadorCriados")
+  solicitacoesSenha          SolicitacaoSenha[]
+  afiliado                   Afiliado?
+  assessor                   Assessor?
   assinaturasChatAtendimento AssinaturaChatAtendimento[]
+  avaliacoes                 VendedoraAvaliacao[]
 
   @@unique([lojaId, slugCatalogo])
   @@index([lojaId, role])
@@ -749,64 +757,100 @@ model Convite {
   @@map("convites")
 }
 
+/// Código de verificação por WhatsApp pro "Meus pedidos" do perfil público da vendedora (sem
+/// login de cliente) — confirma que quem está pedindo os pedidos de um telefone É o dono dele,
+/// antes só bastava digitar qualquer número. Código de 6 dígitos, hash (nunca em texto puro),
+/// curta duração, uso único, com limite de tentativas (força bruta).
+model VerificacaoTelefonePublico {
+  id         String   @id @default(cuid())
+  lojaId     String
+  telefone   String
+  codigoHash String
+  tentativas Int      @default(0)
+  usado      Boolean  @default(false)
+  expiraEm   DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([lojaId, telefone])
+  @@map("verificacoes_telefone_publico")
+}
+
+/// Aceite do termo de responsabilidade do cliente público (sem login) — registrado no momento em
+/// que ele confirma o código de verificação. Mesmo espírito do AceiteContrato/AceitePrivacidade
+/// (versão + ip + userAgent), só que sem identidade de usuário — a "assinatura" é o próprio
+/// telefone verificado.
+model AceiteTermoClientePublico {
+  id        String   @id @default(cuid())
+  lojaId    String
+  telefone  String
+  versao    String
+  ip        String?
+  userAgent String?
+  aceitoEm  DateTime @default(now())
+
+  @@index([lojaId, telefone])
+  @@map("aceites_termo_cliente_publico")
+}
+
 // ─────────────────────────── Clientes (CRM) ───────────────────────────
 
 model Cliente {
-  id                String          @id @default(cuid())
-  lojaId            String
-  vendedoraId       String? // dona da carteira; null = sem carteira definida
-  nome              String
+  id                       String          @id @default(cuid())
+  lojaId                   String
+  vendedoraId              String? // dona da carteira; null = sem carteira definida
+  nome                     String
   // WhatsApp — chave de roteamento de conversas. Opcional: cliente que chega só pelo
   // Instagram (ver igScopedId) pode não ter telefone.
-  telefone          String?
-  email             String?
-  cpf               String?
-  instagram         String?
+  telefone                 String?
+  email                    String?
+  cpf                      String?
+  instagram                String?
   // Endereço (para filtros de segmentação geográfica em campanhas/seleção — R1).
   // Preenchidos via CEP (ViaCEP) no cadastro; DDD é derivado do telefone.
-  cep               String?
-  cidade            String?
-  uf                String? // sigla do estado (ex.: GO); região é derivada da UF
-  segmento          SegmentoCliente @default(NOVO)
+  cep                      String?
+  cidade                   String?
+  uf                       String? // sigla do estado (ex.: GO); região é derivada da UF
+  segmento                 SegmentoCliente @default(NOVO)
   // "Consumidor Outro": cliente coringa, 1 por loja, criado sob demanda (getOrCreate) para
   // vendas presenciais de balcão sem cadastro completo. Excluído das listagens normais de
   // carteira/segmentação (ver filtroCarteira em clientes.routes.ts).
-  consumidorOutro   Boolean         @default(false)
+  consumidorOutro          Boolean         @default(false)
   // agregados mantidos pelo módulo de vendas e job de segmentação (fase 3)
-  totalGasto        Decimal         @default(0) @db.Decimal(12, 2)
-  ultimaCompraEm    DateTime?
+  totalGasto               Decimal         @default(0) @db.Decimal(12, 2)
+  ultimaCompraEm           DateTime?
   // Última mensagem RECEBIDA do cliente — base da janela de 24h da Cloud API
   // (texto/mídia livre só até 24h depois; fora disso, só template aprovado).
-  waUltimaEntradaEm DateTime?
+  waUltimaEntradaEm        DateTime?
   // Instagram oficial (Meta) — id da pessoa escopado à conta da marca (não é o @handle).
   // Chave de roteamento de conversas do Instagram, equivalente ao telefone no WhatsApp.
-  igScopedId        String?
+  igScopedId               String?
   // Última mensagem RECEBIDA do cliente pelo Instagram — base da janela de 24h da Graph API.
-  igUltimaEntradaEm DateTime?
+  igUltimaEntradaEm        DateTime?
   // LGPD: consentimento para campanhas (WhatsApp/Custom Audiences — módulos 4, 10, 16)
-  consentimentoLgpd Boolean         @default(false)
-  observacoes       String?
+  consentimentoLgpd        Boolean         @default(false)
+  observacoes              String?
   // Portal do Cliente (fase 7): acesso próprio do cliente + saldo de cashback acumulado
-  senhaHash         String?
-  saldoCashback     Decimal         @default(0) @db.Decimal(12, 2)
+  senhaHash                String?
+  saldoCashback            Decimal         @default(0) @db.Decimal(12, 2)
   // Chat de Atendimento (add-on por vendedora): estado do pré-atendimento roteirizado deste
   // cliente. null = ainda não passou pelo bot (ou a vendedora não tem o add-on); intercepta só
   // no 1º contato — uma vez CONCLUIDO, nunca mais roda pra este cliente (ver chat-atendimento.service.ts).
   chatAtendimentoStatus    String? // 'EM_ANDAMENTO' | 'CONCLUIDO'
   chatAtendimentoRespostas Json? // { peca?, tamanho?, faixaPreco? } — o que já foi coletado
-  ativo             Boolean         @default(true)
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  ativo                    Boolean         @default(true)
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
 
-  loja         Loja               @relation(fields: [lojaId], references: [id], onDelete: Cascade)
-  vendedora    Usuario?           @relation("CarteiraVendedora", fields: [vendedoraId], references: [id], onDelete: SetNull)
-  vendas       Venda[]
-  pedidosReserva PedidoReserva[]
-  orcamentos   Orcamento[]
-  mensagens    MensagemWhatsapp[]
+  loja               Loja                 @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  vendedora          Usuario?             @relation("CarteiraVendedora", fields: [vendedoraId], references: [id], onDelete: SetNull)
+  vendas             Venda[]
+  pedidosReserva     PedidoReserva[]
+  orcamentos         Orcamento[]
+  mensagens          MensagemWhatsapp[]
   mensagensInstagram MensagemInstagram[]
-  leads        Lead[]
-  gruposMembro GrupoMembro[]
+  leads              Lead[]
+  gruposMembro       GrupoMembro[]
+  avaliacoes         VendedoraAvaliacao[]
 
   @@unique([lojaId, telefone])
   @@unique([lojaId, igScopedId])
@@ -843,10 +887,10 @@ model Lead {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
-  loja      Loja     @relation(fields: [lojaId], references: [id], onDelete: Cascade)
-  vendedora Usuario  @relation("LeadsVendedora", fields: [vendedoraId], references: [id], onDelete: Cascade)
-  cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  venda     Venda?   @relation(fields: [vendaId], references: [id], onDelete: SetNull)
+  loja            Loja             @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  vendedora       Usuario          @relation("LeadsVendedora", fields: [vendedoraId], references: [id], onDelete: Cascade)
+  cliente         Cliente?         @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  venda           Venda?           @relation(fields: [vendaId], references: [id], onDelete: SetNull)
   pedidosCatalogo PedidoCatalogo[]
 
   @@index([lojaId, status])
@@ -977,11 +1021,11 @@ model Produto {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  rede      Rede              @relation(fields: [redeId], references: [id], onDelete: Cascade)
-  categoria Categoria?        @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
-  marca     Marca?            @relation(fields: [marcaId], references: [id], onDelete: SetNull)
-  colecao   Colecao?          @relation(fields: [colecaoId], references: [id], onDelete: SetNull)
-  variacoes VariacaoProduto[]
+  rede          Rede              @relation(fields: [redeId], references: [id], onDelete: Cascade)
+  categoria     Categoria?        @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  marca         Marca?            @relation(fields: [marcaId], references: [id], onDelete: SetNull)
+  colecao       Colecao?          @relation(fields: [colecaoId], references: [id], onDelete: SetNull)
+  variacoes     VariacaoProduto[]
   looksProvador LookProvador[]
 
   @@unique([redeId, referencia])
@@ -1005,9 +1049,9 @@ model VariacaoProduto {
   // ajustando este valor (0 ≤ estoqueVarejo ≤ estoque).
   estoqueVarejo Int     @default(0)
 
-  produto    Produto            @relation(fields: [produtoId], references: [id], onDelete: Cascade)
-  itensVenda ItemVenda[]
-  movimentos MovimentoEstoque[]
+  produto        Produto            @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  itensVenda     ItemVenda[]
+  movimentos     MovimentoEstoque[]
   pedidosReserva PedidoReserva[]
   itensOrcamento ItemOrcamento[]
 
@@ -1018,40 +1062,46 @@ model VariacaoProduto {
 // ─────────────────────────── Vendas + Estoque ───────────────────────────
 
 model Venda {
-  id               String           @id @default(cuid())
+  id                      String           @id @default(cuid())
   // token público do comprovante: link sem login para o cliente abrir/imprimir o pedido
-  tokenPublico     String           @unique @default(cuid())
-  lojaId           String
-  clienteId        String?
-  vendedoraId      String
-  status           StatusVenda      @default(CONCLUIDA)
-  canal            CanalVenda       @default(BALCAO)
-  formaRecebimento FormaRecebimento @default(DINHEIRO)
-  total            Decimal          @db.Decimal(12, 2)
-  desconto         Decimal          @default(0) @db.Decimal(12, 2)
-  descontoPct      Decimal          @default(0) @db.Decimal(5, 2)
-  atacado          Boolean          @default(false)
+  tokenPublico            String           @unique @default(cuid())
+  lojaId                  String
+  clienteId               String?
+  vendedoraId             String
+  status                  StatusVenda      @default(CONCLUIDA)
+  canal                   CanalVenda       @default(BALCAO)
+  formaRecebimento        FormaRecebimento @default(DINHEIRO)
+  total                   Decimal          @db.Decimal(12, 2)
+  desconto                Decimal          @default(0) @db.Decimal(12, 2)
+  descontoPct             Decimal          @default(0) @db.Decimal(5, 2)
+  atacado                 Boolean          @default(false)
   // cashback creditado ao cliente nesta venda (Portal do Cliente) — base do estorno no cancelamento
-  cashbackGerado   Decimal          @default(0) @db.Decimal(12, 2)
-  observacao       String?
+  cashbackGerado          Decimal          @default(0) @db.Decimal(12, 2)
+  observacao              String?
   // Separação física (gestor de estoque): pedido entra como pendente ao fechar a venda; o
   // gestor marca como separado. O gerente acompanha/cobra os pendentes na tela "Pedidos a separar".
-  separado         Boolean          @default(false)
-  separadoEm       DateTime?
+  // Mantido em sincronia com statusEntrega (true assim que sai de SEPARANDO) por compatibilidade.
+  separado                Boolean          @default(false)
+  separadoEm              DateTime?
+  // Etapas de entrega — SEPARANDO/TRANSPORTADORA/EM_TRANSITO são atualizadas pelo gestor de
+  // estoque/gerente (tela "Pedidos a separar"); ENTREGUE só a VENDEDORA confirma (dona do pedido),
+  // em "Meu pedido" (Pedido.tsx). Também exibido pro cliente na sua vitrine ("Ver Pedidos").
+  statusEntrega           StatusEntrega    @default(SEPARANDO)
+  statusEntregaEm         DateTime?
   // Conferência do recebimento (bater com o extrato bancário) — passo manual ANTES da separação
   // física. Hoje é opcional/informativo (não bloqueia "separado"); mais relevante para vendas da
   // Vendedora ZAIEZE (canal ONLINE, ninguém humano viu o pagamento até aqui).
-  pagamentoConferido   Boolean      @default(false)
-  pagamentoConferidoEm DateTime?
+  pagamentoConferido      Boolean          @default(false)
+  pagamentoConferidoEm    DateTime?
   // Comprovante que o CLIENTE anexa na tela pública do pedido (foto/PDF do PIX) — evidência pra
   // quem vai marcar `pagamentoConferido`, em vez de só confiar no extrato sem nada anexado.
   comprovantePagamentoUrl String?
   comprovanteEnviadoEm    DateTime?
-  createdAt        DateTime         @default(now())
+  createdAt               DateTime         @default(now())
 
-  loja             Loja        @relation(fields: [lojaId], references: [id], onDelete: Cascade)
-  cliente          Cliente?    @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  vendedora        Usuario     @relation(fields: [vendedoraId], references: [id])
+  loja             Loja           @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+  cliente          Cliente?       @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  vendedora        Usuario        @relation(fields: [vendedoraId], references: [id])
   itens            ItemVenda[]
   leadsConvertidos Lead[]
   pedidoReserva    PedidoReserva?
@@ -1296,25 +1346,25 @@ model TemplateWhatsapp {
 }
 
 model MensagemWhatsapp {
-  id          String          @id @default(cuid())
-  lojaId      String
-  clienteId   String?
-  vendedoraId String // dona do atendimento (roteamento por carteira)
-  campanhaId  String?
-  grupoId     String? // disparo originado de um grupo de transmissão (lista interna)
-  direcao     DirecaoMensagem
-  status      StatusMensagem
-  origem      OrigemMensagem  @default(MANUAL)
-  telefone    String
-  texto       String
+  id           String          @id @default(cuid())
+  lojaId       String
+  clienteId    String?
+  vendedoraId  String // dona do atendimento (roteamento por carteira)
+  campanhaId   String?
+  grupoId      String? // disparo originado de um grupo de transmissão (lista interna)
+  direcao      DirecaoMensagem
+  status       StatusMensagem
+  origem       OrigemMensagem  @default(MANUAL)
+  telefone     String
+  texto        String
   // Mídia (ex.: áudio/PTT). tipoMidia null = mensagem de texto pura.
-  tipoMidia   String? // 'AUDIO' (futuro: IMAGEM, VIDEO, DOC)
-  midiaUrl    String?
+  tipoMidia    String? // 'AUDIO' (futuro: IMAGEM, VIDEO, DOC)
+  midiaUrl     String?
   // Cloud API: id da mensagem na Meta (wamid) para correlacionar os recibos (status);
   // templateNome preenchido quando o envio foi por template HSM (fora da janela de 24h).
-  waMessageId String?
+  waMessageId  String?
   templateNome String?
-  createdAt   DateTime        @default(now())
+  createdAt    DateTime        @default(now())
 
   cliente   Cliente?          @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   vendedora Usuario           @relation("MensagensVendedora", fields: [vendedoraId], references: [id])
@@ -1444,20 +1494,20 @@ model PostMural {
 
 /// Perfil de Afiliado — 1:1 com Usuario(role=AFILIADO).
 model Afiliado {
-  id                 String    @id @default(cuid())
-  usuarioId          String    @unique
-  codigo             String    @unique // código de indicação, usado no link ?ref=<codigo>
-  percentualComissao Decimal?  @db.Decimal(5, 2) // null = usa ConfigAfiliados.percentualPadrao
-  chavePixTipo       String? // EMAIL | CPF | TELEFONE | ALEATORIA
-  chavePix           String?
-  cliques            Int       @default(0) // contador de cliques no link (não deduplicado por visitante)
-  aceiteTermosVersao String?
-  aceiteTermosEm     DateTime?
-  aceiteTermosIp     String?
+  id                       String    @id @default(cuid())
+  usuarioId                String    @unique
+  codigo                   String    @unique // código de indicação, usado no link ?ref=<codigo>
+  percentualComissao       Decimal?  @db.Decimal(5, 2) // null = usa ConfigAfiliados.percentualPadrao
+  chavePixTipo             String? // EMAIL | CPF | TELEFONE | ALEATORIA
+  chavePix                 String?
+  cliques                  Int       @default(0) // contador de cliques no link (não deduplicado por visitante)
+  aceiteTermosVersao       String?
+  aceiteTermosEm           DateTime?
+  aceiteTermosIp           String?
   // Enquadramento fiscal (autodeclarado pelo afiliado) — sinaliza a regra de retenção de IR/INSS
   // por tipo de parceiro; a regra em si (quanto/quando reter) precisa ser validada com contador
   // antes de virar automação — ver referências do Programa de Afiliados na memória do projeto.
-  taxStatus String? // PF | PJ | MEI
+  taxStatus                String? // PF | PJ | MEI
   // Saúde fiscal do afiliado p/ compliance da Reforma Tributária (LC 214/2025): a plataforma pode
   // ser corresponsabilizada pelo recolhimento de IBS/CBS se o parceiro não emitir nota ou estiver
   // irregular. Hoje é um status MANUAL (o admin verifica e marca) — não há integração de NFS-e
@@ -1556,47 +1606,47 @@ model ComissaoAssessor {
 // sociais/WhatsApp) — numa vitrine pública única. Toda venda é lançada manualmente por ela
 // (mesmo quando a marca é cliente ZAIEZE — v1 não integra automaticamente com o funil da marca).
 model Assessor {
-  id        String   @id @default(cuid())
-  usuarioId String   @unique
-  slug      String   @unique // subdomínio próprio: <slug>.zaieze.com — único também frente a Rede.slug (checado em código, tabelas diferentes)
-  plano     PlanoAssessor @default(BASICO)
-  bio       String? // apresentação exibida na capa da vitrine pública
-  tagline   String? // frase de efeito em destaque na vitrine (fonte script), ex.: "Conectando estilos, criando histórias."
+  id                          String        @id @default(cuid())
+  usuarioId                   String        @unique
+  slug                        String        @unique // subdomínio próprio: <slug>.zaieze.com — único também frente a Rede.slug (checado em código, tabelas diferentes)
+  plano                       PlanoAssessor @default(BASICO)
+  bio                         String? // apresentação exibida na capa da vitrine pública
+  tagline                     String? // frase de efeito em destaque na vitrine (fonte script), ex.: "Conectando estilos, criando histórias."
   // Badge "Disponível"/"Offline" na vitrine. Quando seguirAgenda=true (padrão), o valor exibido
   // é CALCULADO a partir de AssessorHorario (dia da semana + horário atual, fuso America/Sao_Paulo)
   // e este campo vira só o override manual — ela pode marcar Offline fora da agenda (ex.: imprevisto)
   // desligando seguirAgenda, ou voltar a seguir a agenda normalmente.
-  disponivel   Boolean @default(true)
-  seguirAgenda Boolean @default(true)
-  whatsapp  String? // contato pessoal dela (distinto do whatsapp de cada marca representada)
+  disponivel                  Boolean       @default(true)
+  seguirAgenda                Boolean       @default(true)
+  whatsapp                    String? // contato pessoal dela (distinto do whatsapp de cada marca representada)
   // Botão "Ligar" da vitrine usa o MESMO número do whatsapp (só troca a ação: tel: em vez de wa.me)
   // — não existe mais um campo de telefone separado pra isso.
-  instagram String?
-  site      String?
+  instagram                   String?
+  site                        String?
   // Estatística exibida na vitrine — autodeclarada, sem validação.
   // "Clientes" NÃO é mais autodeclarado: é a contagem de AssessorCliente (ela marca quem virou
   // cliente). "Avaliação" também não está aqui — calculada a partir de AssessorAvaliacao.
-  statProdutos   Int?
+  statProdutos                Int?
   // Indicação de lojistas (link próprio ?refAssessor=<slug>): % arbitrado pelo SUPER_ADMIN por
   // assessora — null = sem indicação habilitada (nenhuma comissão é gerada até ser definido).
-  percentualComissaoIndicacao Decimal? @db.Decimal(5, 2)
-  cliquesIndicacao            Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  percentualComissaoIndicacao Decimal?      @db.Decimal(5, 2)
+  cliquesIndicacao            Int           @default(0)
+  createdAt                   DateTime      @default(now())
+  updatedAt                   DateTime      @updatedAt
 
-  usuario Usuario              @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  marcas  AssessorMarca[]
-  vendas  VendaAssessora[]
-  assinatura      AssinaturaAssessor?
-  aceitesContrato AceiteContratoAssessor[]
+  usuario                    Usuario                     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  marcas                     AssessorMarca[]
+  vendas                     VendaAssessora[]
+  assinatura                 AssinaturaAssessor?
+  aceitesContrato            AceiteContratoAssessor[]
   aceitesPrivacidadeAssessor AceitePrivacidadeAssessor[]
   aceitesTermosUsoAssessor   AceiteTermosUsoAssessor[]
-  redesIndicadas  Rede[]
-  comissoesIndicacao ComissaoAssessor[]
-  horarios        AssessorHorario[]
-  avaliacoes      AssessorAvaliacao[]
-  lancamentos     AssessorLancamento[]
-  clientes        AssessorCliente[]
+  redesIndicadas             Rede[]
+  comissoesIndicacao         ComissaoAssessor[]
+  horarios                   AssessorHorario[]
+  avaliacoes                 AssessorAvaliacao[]
+  lancamentos                AssessorLancamento[]
+  clientes                   AssessorCliente[]
 
   @@map("assessores")
 }
@@ -1650,19 +1700,49 @@ enum StatusAvaliacaoAssessor {
 /// nota 1-5 + comentário curto. Nasce PENDENTE; só entra na média/depoimentos públicos depois
 /// que a própria Brand Partner aprova no painel (evita golpe/spam indo direto ao ar).
 model AssessorAvaliacao {
-  id          String                   @id @default(cuid())
+  id          String                  @id @default(cuid())
   assessorId  String
   nota        Int // 1 a 5
-  comentario  String?                  @db.VarChar(400)
+  comentario  String?                 @db.VarChar(400)
   nomeCliente String? // opcional, texto livre (não é um Cliente cadastrado — não há login)
-  status      StatusAvaliacaoAssessor  @default(PENDENTE)
-  createdAt   DateTime                 @default(now())
+  status      StatusAvaliacaoAssessor @default(PENDENTE)
+  createdAt   DateTime                @default(now())
   moderadoEm  DateTime?
 
   assessor Assessor @relation(fields: [assessorId], references: [id], onDelete: Cascade)
 
   @@index([assessorId, status])
   @@map("assessor_avaliacoes")
+}
+
+enum StatusAvaliacaoVendedora {
+  PENDENTE
+  APROVADA
+  RECUSADA
+}
+
+/// Avaliação de atendimento enviada pelo CLIENTE no perfil público da VENDEDORA (sem login) —
+/// mesmo padrão do AssessorAvaliacao. Nasce PENDENTE; só entra na média/depoimentos públicos
+/// depois que a própria vendedora aprova em "Minha conta". Se o cliente informar o WhatsApp,
+/// tentamos casar com um Cliente já cadastrado NESTA vendedora (mesma loja) — só liga, nunca cria
+/// Cliente novo a partir disso — permite mostrar a avaliação no card dele no Funil.
+model VendedoraAvaliacao {
+  id          String                   @id @default(cuid())
+  vendedoraId String
+  nota        Int // 1 a 5
+  comentario  String?                  @db.VarChar(400)
+  nomeCliente String? // opcional, texto livre
+  clienteId   String? // preenchido automaticamente quando o telefone informado bate com um Cliente já da carteira dela
+  status      StatusAvaliacaoVendedora @default(PENDENTE)
+  createdAt   DateTime                 @default(now())
+  moderadoEm  DateTime?
+
+  vendedora Usuario  @relation(fields: [vendedoraId], references: [id], onDelete: Cascade)
+  cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+
+  @@index([vendedoraId, status])
+  @@index([clienteId, status])
+  @@map("vendedora_avaliacoes")
 }
 
 /// Agenda semanal recorrente do Brand Partner — cada linha é UM período de atendimento dentro
@@ -1693,53 +1773,53 @@ enum PlanoAssessor {
 /// Um "cartão de fornecedor" representado pela assessora — campos padronizados no modelo do
 /// catálogo de referência (descrição/pagamento/envio/condições em bullets, 1 item por linha).
 model AssessorMarca {
-  id         String  @id @default(cuid())
-  assessorId String
-  redeId     String? // preenchido quando a marca já é cliente ZAIEZE — hoje é só referência/selo, sem crédito automático de venda
-  nome       String
-  logoUrl    String?
+  id                         String    @id @default(cuid())
+  assessorId                 String
+  redeId                     String? // preenchido quando a marca já é cliente ZAIEZE — hoje é só referência/selo, sem crédito automático de venda
+  nome                       String
+  logoUrl                    String?
   // Quantas vezes um visitante da vitrine clicou em algum link de contato desta marca
   // (WhatsApp, catálogo, site etc.) — métrica PRA ASSESSORA de quantos clientes ela mandou
   // pra loja, não uma confirmação de venda/atendimento do lado do lojista (que pode nem ser
   // cliente ZAIEZE — não temos como saber o que acontece depois do clique).
-  cliques    Int     @default(0)
-  bannerUrl  String? // imagem grande do card na grade "Marcas que represento" (distinta da logoUrl pequena)
+  cliques                    Int       @default(0)
+  bannerUrl                  String? // imagem grande do card na grade "Marcas que represento" (distinta da logoUrl pequena)
   // Card da vitrine mostra a logo centralizada (contida, sem cortar) no lugar do nome + foto de
   // fundo — pra quem prefere a identidade visual da marca a uma foto de produto/arte abstrata.
-  exibirLogo Boolean @default(false)
-  descricao       String? // bullets, 1 por linha (ex.: "Fabricação própria")
-  formasPagamento String? // bullets, 1 por linha (ex.: "PIX", "Cartão em até 4x")
-  modoEnvio       String? // bullets, 1 por linha
-  condicoesCompra String? // bullets, 1 por linha (ex.: "Mínimo 12 peças", "Não precisa CNPJ")
-  tamanhos        String?
-  valores         String? // texto livre (ex.: "De R$ 59,90 a R$ 299,90")
-  endereco        String?
-  cnpj            String?
-  instagram String?
-  facebook  String?
-  telegram  String?
-  tiktok    String?
-  site      String?
-  googleEmpresas String? // link da ficha/avaliação da marca no Google Empresas (Google Meu Negócio)
-  linkCatalogo String? // link do catálogo público de verdade da marca (quando ela é cliente ZAIEZE) — preenchido manualmente, sem vínculo automático com nenhuma vendedora
-  percentualComissaoSugerido Decimal? @db.Decimal(5, 2) // pré-preenche o % ao lançar uma venda desta marca
-  ordem     Int      @default(0) // ordem manual de exibição na vitrine
-  ativo     Boolean  @default(true)
+  exibirLogo                 Boolean   @default(false)
+  descricao                  String? // bullets, 1 por linha (ex.: "Fabricação própria")
+  formasPagamento            String? // bullets, 1 por linha (ex.: "PIX", "Cartão em até 4x")
+  modoEnvio                  String? // bullets, 1 por linha
+  condicoesCompra            String? // bullets, 1 por linha (ex.: "Mínimo 12 peças", "Não precisa CNPJ")
+  tamanhos                   String?
+  valores                    String? // texto livre (ex.: "De R$ 59,90 a R$ 299,90")
+  endereco                   String?
+  cnpj                       String?
+  instagram                  String?
+  facebook                   String?
+  telegram                   String?
+  tiktok                     String?
+  site                       String?
+  googleEmpresas             String? // link da ficha/avaliação da marca no Google Empresas (Google Meu Negócio)
+  linkCatalogo               String? // link do catálogo público de verdade da marca (quando ela é cliente ZAIEZE) — preenchido manualmente, sem vínculo automático com nenhuma vendedora
+  percentualComissaoSugerido Decimal?  @db.Decimal(5, 2) // pré-preenche o % ao lançar uma venda desta marca
+  ordem                      Int       @default(0) // ordem manual de exibição na vitrine
+  ativo                      Boolean   @default(true)
   // Autorização do gestor da marca — obrigatória quando redeId != null (marca já é cliente ZAIEZE).
   // Criada automaticamente (pendente) quando a rede se cadastra pelo link ?refAssessor=<slug> do
   // assessora; só entra na vitrine/catálogo depois que o gestor aceita. Marcas externas (redeId
   // null, cadastradas manualmente pela assessora) nascem já autorizadas — não há gestor para aceitar.
-  autorizadoEm DateTime?
-  recusadoEm   DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  autorizadoEm               DateTime?
+  recusadoEm                 DateTime?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
 
-  assessor Assessor              @relation(fields: [assessorId], references: [id], onDelete: Cascade)
-  rede     Rede?                 @relation(fields: [redeId], references: [id], onDelete: SetNull)
-  vendas   VendaAssessora[]
-  midias   AssessorMarcaMidia[]
+  assessor    Assessor                @relation(fields: [assessorId], references: [id], onDelete: Cascade)
+  rede        Rede?                   @relation(fields: [redeId], references: [id], onDelete: SetNull)
+  vendas      VendaAssessora[]
+  midias      AssessorMarcaMidia[]
   lancamentos AssessorLancamento[]
-  whatsapps AssessorMarcaWhatsapp[]
+  whatsapps   AssessorMarcaWhatsapp[]
 
   @@index([assessorId, ordem])
   @@map("assessor_marcas")
@@ -1770,12 +1850,12 @@ enum TipoMidiaAssessorMarca {
 /// Fotos/vídeo de destaque dos produtos de uma marca representada — mostrados na janela de
 /// links da vitrine. Quantidade permitida por tipo depende do PlanoAssessor (ver LIMITES_GALERIA).
 model AssessorMarcaMidia {
-  id              String                  @id @default(cuid())
+  id              String                 @id @default(cuid())
   assessorMarcaId String
   tipo            TipoMidiaAssessorMarca
   url             String
-  ordem           Int                     @default(0)
-  createdAt       DateTime                @default(now())
+  ordem           Int                    @default(0)
+  createdAt       DateTime               @default(now())
 
   assessorMarca AssessorMarca @relation(fields: [assessorMarcaId], references: [id], onDelete: Cascade)
 
@@ -1806,10 +1886,10 @@ model VendaAssessora {
 /// Preço da assinatura mensal do plano "Assessor(a) de Moda" (página comercial) — editável
 /// pelo SUPER_ADMIN no Admin. Linha única (id fixo = 1), mesmo padrão de ConfigAfiliados.
 model ConfigAssessores {
-  id                   Int      @id @default(1)
-  precoMensalBasico    Decimal  @default(89.99) @db.Decimal(10, 2)
-  precoMensalAvancado  Decimal  @default(149.99) @db.Decimal(10, 2)
-  updatedAt            DateTime @updatedAt
+  id                  Int      @id @default(1)
+  precoMensalBasico   Decimal  @default(89.99) @db.Decimal(10, 2)
+  precoMensalAvancado Decimal  @default(149.99) @db.Decimal(10, 2)
+  updatedAt           DateTime @updatedAt
 
   @@map("config_assessores")
 }
@@ -1916,8 +1996,8 @@ model LookProvador {
   fotoClienteUrl         String?
   fotoClienteExpurgadaEm DateTime?
   // Consentimento LGPD do cliente (prova: quando + IP)
-  consentLgpdEm DateTime?
-  consentIp     String?
+  consentLgpdEm          DateTime?
+  consentIp              String?
 
   // Resultados gerados
   fotoUrl  String?

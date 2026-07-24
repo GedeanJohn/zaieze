@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, mensagemDeErro, usuarioLogado, atualizarUsuarioLocal } from '../api'
+import { AvaliacoesVendedora } from '../componentes/AvaliacoesVendedora'
 import { useToast } from '../componentes/Toast'
 import CampoSenha from '../componentes/CampoSenha'
 import { useIdioma, type Idioma } from '../lib/i18n'
@@ -155,6 +156,8 @@ export default function Conta() {
         )}
         <div className="acoes"><button className="btn" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar'}</button></div>
       </form>
+
+      {ehVendedora && <AvaliacoesVendedora />}
     </>
   )
 }

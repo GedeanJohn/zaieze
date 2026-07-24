@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, formataReal, mensagemDeErro } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 import { useIdioma } from '../lib/i18n'
+import { EtapasEntrega, type StatusEntrega } from '../componentes/EtapasEntrega'
 
 interface PedidoSep {
   id: string
@@ -12,6 +13,8 @@ interface PedidoSep {
   canal: 'BALCAO' | 'ONLINE' | 'MERCADO_LIVRE'
   separado: boolean
   separadoEm: string | null
+  statusEntrega: StatusEntrega
+  statusEntregaEm: string | null
   pagamentoConferido: boolean
   pagamentoConferidoEm: string | null
   comprovantePagamentoUrl?: string | null
@@ -51,10 +54,10 @@ export default function Separacao() {
 
   useEffect(() => { carregar() }, [carregar])
 
-  async function alternar(p: PedidoSep) {
+  async function avancarEtapa(p: PedidoSep, statusEntrega: StatusEntrega) {
     setSalvando(p.id); setErro('')
     try {
-      await api.patch(`/vendas/${p.id}/separado`, { separado: !p.separado }, { params: escopo.params })
+      await api.patch(`/vendas/${p.id}/status-entrega`, { statusEntrega }, { params: escopo.params })
       carregar()
     } catch (err) { setErro(mensagemDeErro(err)) } finally { setSalvando('') }
   }
@@ -90,6 +93,7 @@ export default function Separacao() {
         {t('sep.explicacao1')} <strong>{t('sep.pendenteDestaque')}</strong>{t('sep.explicacao2')}
         <strong> {t('sep.separadoDestaque')}</strong>{t('sep.explicacao3')}
       </p>
+      <p style={{ color: 'var(--ink-soft)', marginTop: -4 }}>{t('sep.explicacaoEntrega')}</p>
 
       {erro && <div className="alerta">{erro}</div>}
 
@@ -105,9 +109,12 @@ export default function Separacao() {
                 <strong>{t('sep.pedidoLabel')} {p.id.slice(-6).toUpperCase()}</strong>
                 <span className={`selo ${p.atacado ? 'baixo' : ''}`} style={{ fontSize: 11 }}>{p.atacado ? 'ATACADO' : 'VAREJO'}</span>
                 {p.canal === 'ONLINE' && <span className="selo" style={{ fontSize: 11 }}>{t('sep.canalOnline')}</span>}
-                {p.separado
-                  ? <span className="selo ok" style={{ fontSize: 11 }}>{t('sep.separadoStatus')}</span>
-                  : <span className="selo" style={{ fontSize: 11, background: '#e8a87c33', color: '#a85a2b' }}>{t('sep.pendenteHa')} {tempoDecorrido(p.createdAt, t)}</span>}
+                {p.statusEntrega === 'SEPARANDO' && (
+                  <span className="selo" style={{ fontSize: 11, background: '#e8a87c33', color: '#a85a2b' }}>{t('sep.pendenteHa')} {tempoDecorrido(p.createdAt, t)}</span>
+                )}
+                {p.statusEntrega === 'EM_TRANSITO' && (
+                  <span className="selo" style={{ fontSize: 11, background: '#dbeafe', color: '#1d4ed8' }}>{t('sep.aguardandoEntregaSufixo', { vendedora: p.vendedora })}</span>
+                )}
                 {p.pagamentoConferido
                   ? <span className="selo ok" style={{ fontSize: 11 }}>{t('sep.pagamentoConferidoStatus')}</span>
                   : <span className="selo" style={{ fontSize: 11, background: '#e5484d22', color: '#c2352b' }}>{t('sep.pagamentoPendenteStatus')}</span>}
@@ -121,17 +128,31 @@ export default function Separacao() {
                 {dataBR(p.createdAt)} · {p.cliente} · {t('sep.pecasSufixo', { n: p.pecas })} · {formataReal(p.total)}
               </div>
               <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>
-                {t('sep.vendedoraLabel')} {p.vendedora}{p.separado && p.separadoEm ? ` · ${t('sep.separadoEmSufixo')} ${dataBR(p.separadoEm)}` : ''}
+                {t('sep.vendedoraLabel')} {p.vendedora}{p.statusEntregaEm ? ` · ${t('sep.statusEntregaEmSufixo')} ${dataBR(p.statusEntregaEm)}` : ''}
               </div>
+              <div style={{ marginTop: 10, maxWidth: 360 }}><EtapasEntrega atual={p.statusEntrega} /></div>
             </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignSelf: 'flex-start' }}>
               <button className="btn secundario" onClick={() => abrirComprovante(p.tokenPublico)}>{t('sep.comprovante')}</button>
               <button className={`btn ${p.pagamentoConferido ? 'secundario' : ''}`} disabled={salvando === `pg-${p.id}`} onClick={() => alternarPagamento(p)}>
                 {salvando === `pg-${p.id}` ? '…' : p.pagamentoConferido ? t('sep.desmarcarConferido') : t('sep.marcarConferido')}
               </button>
-              <button className={`btn ${p.separado ? 'secundario' : ''}`} disabled={salvando === p.id} onClick={() => alternar(p)}>
-                {salvando === p.id ? '…' : p.separado ? t('sep.reabrir') : t('sep.marcarSeparado')}
-              </button>
+              {p.statusEntrega === 'SEPARANDO' && (
+                <button className="btn" disabled={salvando === p.id} onClick={() => avancarEtapa(p, 'TRANSPORTADORA')}>
+                  {salvando === p.id ? '…' : t('sep.marcarSeparado')}
+                </button>
+              )}
+              {p.statusEntrega === 'TRANSPORTADORA' && (
+                <>
+                  <button className="btn secundario" disabled={salvando === p.id} onClick={() => avancarEtapa(p, 'SEPARANDO')}>{t('comum.voltar')}</button>
+                  <button className="btn" disabled={salvando === p.id} onClick={() => avancarEtapa(p, 'EM_TRANSITO')}>
+                    {salvando === p.id ? '…' : t('sep.marcarEmTransito')}
+                  </button>
+                </>
+              )}
+              {p.statusEntrega === 'EM_TRANSITO' && (
+                <button className="btn secundario" disabled={salvando === p.id} onClick={() => avancarEtapa(p, 'TRANSPORTADORA')}>{t('comum.voltar')}</button>
+              )}
             </div>
           </div>
         ))}

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import QRCode from 'qrcode'
-import { api, formataReal, mensagemDeErro, type FormaRecebimento } from '../api'
+import { api, formataReal, mensagemDeErro, usuarioLogado, type FormaRecebimento } from '../api'
 import SeletorIdioma from '../componentes/SeletorIdioma'
 import { useIdioma } from '../lib/i18n'
+import { EtapasEntrega, type StatusEntrega } from '../componentes/EtapasEntrega'
 
 interface ItemPedido {
   quantidade: number
@@ -20,6 +21,7 @@ interface Pedido {
   atacado: boolean
   formaRecebimento: FormaRecebimento
   observacao?: string | null
+  statusEntrega: StatusEntrega
   comprovantePagamentoUrl?: string | null
   comprovanteEnviadoEm?: string | null
   cliente?: { nome: string; telefone: string } | null
@@ -57,6 +59,18 @@ export default function Pedido() {
       setP((atual) => atual && { ...atual, comprovantePagamentoUrl: data.comprovantePagamentoUrl, comprovanteEnviadoEm: new Date().toISOString() })
     } catch (err) { setErroComprovante(mensagemDeErro(err)) }
     finally { setEnviandoComprovante(false) }
+  }
+
+  const [marcandoEntregue, setMarcandoEntregue] = useState(false)
+  const [erroEntrega, setErroEntrega] = useState('')
+  async function marcarEntregue() {
+    if (!id) return
+    setMarcandoEntregue(true); setErroEntrega('')
+    try {
+      await api.patch(`/vendas/${id}/status-entrega`, { statusEntrega: 'ENTREGUE' })
+      setP((atual) => atual && { ...atual, statusEntrega: 'ENTREGUE' })
+    } catch (err) { setErroEntrega(mensagemDeErro(err)) }
+    finally { setMarcandoEntregue(false) }
   }
 
   // Link público do comprovante (sem login) + link do PDF gerado no backend.
@@ -128,6 +142,18 @@ export default function Pedido() {
             <div className="ped-rot">{t('ped.vendedoraLabel')}</div>
             <div>{p.vendedora.nome}</div>
           </div>
+        </section>
+
+        <section className="ped-entrega">
+          <EtapasEntrega atual={p.statusEntrega} cor="#111" />
+          {id && usuarioLogado()?.role === 'VENDEDORA' && p.statusEntrega !== 'ENTREGUE' && (
+            <div className="ped-noprint" style={{ marginTop: 10 }}>
+              {erroEntrega && <div className="ped-alerta">{erroEntrega}</div>}
+              <button type="button" className="ped-btn" disabled={marcandoEntregue} onClick={marcarEntregue}>
+                {marcandoEntregue ? t('ped.marcandoEntregue') : `✓ ${t('ped.marcarEntregue')}`}
+              </button>
+            </div>
+          )}
         </section>
 
         <table className="ped-tab">
@@ -222,6 +248,7 @@ function PedidoEstilos() {
       .ped-tag { font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 99px; background: #eee; color: #555; }
       .ped-tag.ata { background: #111; color: #fff; }
       .ped-partes { display: flex; gap: 40px; margin: 18px 0; font-size: 14px; }
+      .ped-entrega { margin: 18px 0; padding: 14px 16px; background: #faf7f2; border-radius: 8px; }
       .ped-rot { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #999; margin-bottom: 2px; }
       .ped-sub { font-size: 12px; color: #888; }
       .ped-tab { width: 100%; border-collapse: collapse; font-size: 13px; }

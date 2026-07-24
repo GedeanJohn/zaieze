@@ -29,7 +29,10 @@ interface Card {
   situacao: Situacao
   redistribuicoes: number; etapaDesde: string; createdAt: string
   vendedora: { id: string; nome: string }
-  cliente?: { id: string; nome: string; telefone: string; cidade?: string | null; uf?: string | null } | null
+  cliente?: {
+    id: string; nome: string; telefone: string; cidade?: string | null; uf?: string | null
+    avaliacoes?: { nota: number; comentario: string | null }[]
+  } | null
   pedidosCatalogo?: PedidoCatalogo[]
 }
 interface Metricas { total: number; abertos: number; atrasados: number; convertidos: number; perdidos: number; taxaConversao: number; tempoMedioRespostaMin: number | null; porSituacao: Partial<Record<SituacaoChave, number>> }
@@ -119,6 +122,7 @@ function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, t }
   const nome = c.cliente?.nome ?? c.nome ?? '—'
   const telefone = c.cliente?.telefone ?? c.telefone ?? ''
   const pedido = c.pedidosCatalogo?.[0]
+  const avaliacao = c.cliente?.avaliacoes?.[0]
   return (
     <div ref={setNodeRef} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `4px solid ${ct ?? c.situacao.cor}`, background: ct ? `${ct}22` : undefined, opacity: isDragging ? 0.4 : 1, userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
@@ -131,7 +135,18 @@ function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, t }
           <div style={{ fontSize: 12, color: 'var(--ink-soft)', lineHeight: 1.25, overflowWrap: 'anywhere' }}>{telefone}</div>
         </button>
       </div>
-      <div style={{ marginTop: 6 }}><BadgeSituacao s={c.situacao} /></div>
+      <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <BadgeSituacao s={c.situacao} />
+        {avaliacao && (
+          <span title={avaliacao.comentario ?? undefined} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600,
+            padding: '2px 8px', borderRadius: 12, color: '#c9a25f', lineHeight: 1.25,
+            background: '#c9a25f22', border: '1px solid #c9a25f55', maxWidth: '100%',
+          }}>
+            {'★'.repeat(avaliacao.nota)}{'☆'.repeat(5 - avaliacao.nota)}
+          </span>
+        )}
+      </div>
       {pedido && (
         <button type="button" onClick={() => verPedido(pedido)} title={t('pipe.verPedidoTitle')}
           style={{

@@ -52,6 +52,7 @@ import Checkout from './paginas/site/Checkout'
 import Sucesso from './paginas/site/Sucesso'
 import Entrar from './paginas/site/Entrar'
 import Catalogo from './paginas/site/Catalogo'
+import PerfilVendedora from './paginas/site/PerfilVendedora'
 import QuemSomos from './paginas/site/QuemSomos'
 import AssessorDeModa from './paginas/site/AssessorDeModa'
 import CadastroAssessor from './paginas/site/CadastroAssessor'
@@ -168,8 +169,10 @@ function CrmApp() {
         <Route path="recebimento-vendas" element={<RecebimentoVendas />} />
         <Route path="conta" element={<Conta />} />
       </Route>
-      {/* Catálogo público da vendedora: <marca>.zaieze.com/<vendedora> (sem login) */}
-      <Route path="/:vendSlug" element={<Catalogo />} />
+      {/* Perfil público da vendedora: <marca>.zaieze.com/<vendedora> (sem login) — a "Vitrine
+          Virtual" (catálogo de compras) fica num sub-caminho, aberta por um botão do perfil. */}
+      <Route path="/:vendSlug" element={<PerfilVendedora />} />
+      <Route path="/:vendSlug/catalogo" element={<Catalogo />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

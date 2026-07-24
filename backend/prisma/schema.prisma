@@ -178,7 +178,8 @@ enum StatusLead {
   ENTROU // entrou pelo catálogo; aguardando a 1ª resposta (SLA de entrada correndo)
   ATENDIDO // a vendedora respondeu (fechou o SLA de entrada)
   NEGOCIANDO // atendimento ativo / negociação em andamento
-  CONVERTIDO // virou venda (automático pela venda ou manual)
+  AGUARDANDO_PAGAMENTO // negociação fechada, aguardando o pagamento do cliente
+  CONVERTIDO // virou venda (automático pela venda ou manual) — exibido como "Venda Realizada"
   PERDIDO // ciclo encerrado sem compra (cliente pode reentrar = novo ciclo)
 }
 

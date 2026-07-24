@@ -9,7 +9,7 @@ import { urlCatalogo } from '../host'
 import { useLojaAtiva, SeletorLoja } from '../componentes/SeletorLoja'
 import { useIdioma } from '../lib/i18n'
 
-type Etapa = 'ENTROU' | 'ATENDIDO' | 'NEGOCIANDO' | 'CONVERTIDO' | 'PERDIDO'
+type Etapa = 'ENTROU' | 'ATENDIDO' | 'NEGOCIANDO' | 'AGUARDANDO_PAGAMENTO' | 'CONVERTIDO' | 'PERDIDO'
 type SituacaoChave =
   | 'ESPERA_NO_PRAZO' | 'ESPERA_APERTADO' | 'ESPERA_ATRASADO'
   | 'ATENDIMENTO_NO_PRAZO' | 'ATENDIMENTO_ATRASADO'
@@ -39,10 +39,10 @@ interface Metricas { total: number; abertos: number; atrasados: number; converti
 interface Pipeline { colunas: Record<Etapa, Card[]>; metricas: Metricas }
 interface LinkVend { id: string; nome: string; slug: string; redeSlug: string; path: string; temWhatsapp: boolean }
 
-const ETAPAS: Etapa[] = ['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'CONVERTIDO', 'PERDIDO']
-const CHAVE_ETAPA: Record<Etapa, string> = { ENTROU: 'entrou', ATENDIDO: 'atendido', NEGOCIANDO: 'negociando', CONVERTIDO: 'convertido', PERDIDO: 'perdido' }
+const ETAPAS: Etapa[] = ['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'AGUARDANDO_PAGAMENTO', 'CONVERTIDO', 'PERDIDO']
+const CHAVE_ETAPA: Record<Etapa, string> = { ENTROU: 'entrou', ATENDIDO: 'atendido', NEGOCIANDO: 'negociando', AGUARDANDO_PAGAMENTO: 'aguardandoPagamento', CONVERTIDO: 'convertido', PERDIDO: 'perdido' }
 const rotuloEtapa = (etapa: Etapa, t: (chave: string) => string): string => t(`pipe.etapa.${CHAVE_ETAPA[etapa]}`)
-const corEtapa: Record<Etapa, string> = { ENTROU: '#e8a87c', ATENDIDO: '#7cc4e8', NEGOCIANDO: '#c9a0ff', CONVERTIDO: '#7ce8a0', PERDIDO: '#888' }
+const corEtapa: Record<Etapa, string> = { ENTROU: '#e8a87c', ATENDIDO: '#7cc4e8', NEGOCIANDO: '#c9a0ff', AGUARDANDO_PAGAMENTO: '#f0c419', CONVERTIDO: '#7ce8a0', PERDIDO: '#888' }
 
 // Escala de cores da SITUAÇÃO (cor + ícone vêm do back; ícone só no front p/ acessibilidade).
 const ordemSituacao: SituacaoChave[] = [
@@ -113,7 +113,7 @@ function ColunaDrop({ etapa, children }: { etapa: Etapa; children: ReactNode }) 
 // Clicar no nome/telefone abre a conversa do cliente no Chat Zaieze.
 function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, t }: {
   c: Card; redistribuir: (c: Card) => void; podeRedistribuir: boolean; abrirChat: (clienteId: string) => void
-  verPedido: (pedido: PedidoCatalogo) => void
+  verPedido: (pedido: PedidoCatalogo, etapa: Etapa) => void
   t: (chave: string, vars?: Record<string, string | number>) => string
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: c.id, data: { card: c } })
@@ -148,13 +148,14 @@ function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, t }
         )}
       </div>
       {pedido && (
-        <button type="button" onClick={() => verPedido(pedido)} title={t('pipe.verPedidoTitle')}
+        <button type="button" onClick={() => verPedido(pedido, c.status)} title={t('pipe.verPedidoTitle')}
           style={{
-            marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600,
-            padding: '3px 9px', borderRadius: 999, border: '1px solid var(--accent-soft)', background: 'var(--accent-soft)',
-            color: 'var(--accent)', cursor: 'pointer',
+            marginTop: 6, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, fontSize: 11,
+            padding: '4px 9px', borderRadius: 10, border: '1px solid var(--accent-soft)', background: 'var(--accent-soft)',
+            color: 'var(--accent)', cursor: 'pointer', textAlign: 'left',
           }}>
-          🛒 {t('pipe.pedidoResumo', { n: pedido.pecas, valor: Number(pedido.subtotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) })}
+          <strong style={{ fontWeight: 700 }}>🛒 {pedido.orcamentoId ? t('pipe.orcamentoEmAndamento') : t('pipe.pedidoEmAndamento')}</strong>
+          <span>{t('pipe.pedidoResumo', { n: pedido.pecas, valor: Number(pedido.subtotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) })}</span>
         </button>
       )}
       <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginTop: 4 }}>
@@ -163,7 +164,7 @@ function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, t }
       <div style={{ fontSize: 11, marginTop: 2, color: c.atrasado ? '#ff6b6b' : 'var(--ink-soft)' }}>
         ⏱ {tempoNaEtapa(c.etapaDesde)} {t('pipe.nestaEtapa')}{c.atrasado && ` · ${t('pipe.atrasadoSufixo')}`}
       </div>
-      {podeRedistribuir && ['ENTROU', 'ATENDIDO', 'NEGOCIANDO'].includes(c.status) && (
+      {podeRedistribuir && ['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'AGUARDANDO_PAGAMENTO'].includes(c.status) && (
         <div style={{ marginTop: 8 }}>
           <button className="btn secundario" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => redistribuir(c)} title={t('pipe.redistribuirTitle')}>↪ {t('pipe.redistribuirBtn')}</button>
         </div>
@@ -192,6 +193,7 @@ export default function Pipeline() {
   const [erro, setErro] = useState('')
   const [copiado, setCopiado] = useState('')
   const [pedidoAberto, setPedidoAberto] = useState<PedidoCatalogo | null>(null)
+  const [pedidoAbertoEtapa, setPedidoAbertoEtapa] = useState<Etapa | null>(null)
   const [editandoPedido, setEditandoPedido] = useState(false)
 
   const filtroAtivo = !!(nomeFiltro || telefoneFiltro || cidadeFiltro || ufFiltro)
@@ -391,7 +393,8 @@ export default function Pipeline() {
                   <span style={{ color: 'var(--ink-soft)', fontSize: 12 }}>{cards.length}</span>
                 </div>
                 {cards.map((c) => (
-                  <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat} verPedido={setPedidoAberto} t={t} />
+                  <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat}
+                    verPedido={(pedido, etapa) => { setPedidoAberto(pedido); setPedidoAbertoEtapa(etapa) }} t={t} />
                 ))}
                 {cards.length === 0 && <div style={{ color: 'var(--ink-soft)', fontSize: 12, padding: 6 }}>—</div>}
               </ColunaDrop>
@@ -409,7 +412,7 @@ export default function Pipeline() {
       </DndContext>
 
       {pedidoAberto && (
-        <ModalPedido pedido={pedidoAberto} onFechar={() => setPedidoAberto(null)} onEditar={editarPedido} editando={editandoPedido} t={t} />
+        <ModalPedido pedido={pedidoAberto} etapa={pedidoAbertoEtapa} onFechar={() => { setPedidoAberto(null); setPedidoAbertoEtapa(null) }} onEditar={editarPedido} editando={editandoPedido} t={t} />
       )}
     </>
   )
@@ -419,10 +422,18 @@ const real = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDig
 
 // Pré-visualização do pedido que o cliente montou na vitrine — itens com foto/variação/qtd/preço,
 // pra vendedora conferir sem precisar reconstruir a partir do texto corrido do WhatsApp.
-function ModalPedido({ pedido, onFechar, onEditar, editando, t }: {
-  pedido: PedidoCatalogo; onFechar: () => void; onEditar: (pedido: PedidoCatalogo) => void; editando: boolean
+function ModalPedido({ pedido, etapa, onFechar, onEditar, editando, t }: {
+  pedido: PedidoCatalogo; etapa: Etapa | null; onFechar: () => void; onEditar: (pedido: PedidoCatalogo) => void; editando: boolean
   t: (chave: string, vars?: Record<string, string | number>) => string
 }) {
+  // A conversão em Orçamento só libera a partir de "Em Atendimento" — enquanto o ciclo ainda está
+  // "Entrou", a vendedora precisa atender antes de editar/fechar. Reabrir um orçamento JÁ criado
+  // continua liberado (não é mais "editar o pedido", é só ver o que já existe) — exceto depois de
+  // "Venda Realizada", que trava o pedido de novo mesmo com orçamento já aberto.
+  const bloqueadoAindaNaoAtendido = etapa === 'ENTROU' && !pedido.orcamentoId
+  const bloqueadoVendaConcluida = etapa === 'CONVERTIDO'
+  const bloqueado = bloqueadoAindaNaoAtendido || bloqueadoVendaConcluida
+  const mensagemBloqueio = bloqueadoVendaConcluida ? t('pipe.bloqueadoVendaConcluida') : t('pipe.bloqueadoAteAtendido')
   return (
     <div className="modal-fundo" onClick={onFechar}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(520px, 92vw)' }}>
@@ -449,9 +460,10 @@ function ModalPedido({ pedido, onFechar, onEditar, editando, t }: {
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, marginTop: 4 }}>
           <span>{t('pipe.pedidoTotal')}</span><strong>{real(Number(pedido.subtotal))}</strong>
         </div>
+        {bloqueado && <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 10 }}>{mensagemBloqueio}</p>}
         <div className="acoes">
           <button type="button" className="btn secundario" onClick={onFechar}>{t('comum.fechar')}</button>
-          <button type="button" className="btn" disabled={editando} onClick={() => onEditar(pedido)}>
+          <button type="button" className="btn" disabled={editando || bloqueado} title={bloqueado ? mensagemBloqueio : undefined} onClick={() => onEditar(pedido)}>
             {editando ? t('pipe.abrindoOrcamento') : pedido.orcamentoId ? t('pipe.abrirOrcamento') : t('pipe.editarFecharPedido')}
           </button>
         </div>

@@ -2,7 +2,7 @@ import type { OrigemLead, Prisma, StatusLead } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 
 // Etapas "abertas" do funil (em andamento) × "fechadas" (encerradas).
-export const ETAPAS_ABERTAS: StatusLead[] = ['ENTROU', 'ATENDIDO', 'NEGOCIANDO']
+export const ETAPAS_ABERTAS: StatusLead[] = ['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'AGUARDANDO_PAGAMENTO']
 export const ETAPAS_FECHADAS: StatusLead[] = ['CONVERTIDO', 'PERDIDO']
 
 // ── Escala de cores do funil (situação derivada de status + SLA, sem campo novo) ──
@@ -29,7 +29,7 @@ export function situacaoLead(
   agora: number = Date.now(),
   apertadoPct: number = APERTADO_PCT, // fração (0–1) do prazo restante p/ "apertado" (laranja)
 ): Situacao {
-  if (l.status === 'CONVERTIDO') return { chave: 'CONVERTIDO', label: 'Convertido', cor: '#059669' }
+  if (l.status === 'CONVERTIDO') return { chave: 'CONVERTIDO', label: 'Venda Realizada', cor: '#059669' }
   if (l.status === 'PERDIDO') return { chave: 'PERDIDO', label: 'Perdido', cor: '#9CA3AF' }
 
   const atrasado = l.prazoEm.getTime() < agora

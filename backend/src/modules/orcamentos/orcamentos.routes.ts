@@ -111,9 +111,20 @@ export async function orcamentosRoutes(app: FastifyInstance) {
     if (!lead) return reply.code(404).send({ erro: 'Ciclo não encontrado' })
     const pedido = lead.pedidosCatalogo[0]
     if (!pedido) return reply.code(422).send({ erro: 'Este ciclo não tem pedido montado na vitrine' })
+    // Uma vez em "Venda Realizada" o pedido fica travado — mesmo que já exista orçamento aberto
+    // (a exceção de reabertura abaixo não se aplica aqui: a venda já foi concluída).
+    if (lead.status === 'CONVERTIDO') {
+      return reply.code(422).send({ erro: 'Este ciclo já foi convertido em venda — o pedido não pode mais ser editado.' })
+    }
     if (pedido.orcamentoId) {
       const existente = await prisma.orcamento.findUnique({ where: { id: pedido.orcamentoId }, include: incluirDetalhe })
       if (existente) return existente
+    }
+    // A conversão em Orçamento só libera a partir de "Em Atendimento" — força a vendedora a
+    // atender o ciclo antes de editar/fechar o pedido (reabrir um orçamento já criado, acima,
+    // continua liberado em qualquer etapa, exceto depois de convertido).
+    if (lead.status === 'ENTROU') {
+      return reply.code(422).send({ erro: 'Marque o ciclo como "Em Atendimento" antes de editar/fechar o pedido.' })
     }
     if (!lead.clienteId) return reply.code(422).send({ erro: 'Pedido sem cliente vinculado (sem telefone identificado)' })
 

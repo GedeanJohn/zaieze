@@ -10,11 +10,11 @@ import {
 
 /**
  * Funil de atendimento & vendas. Cada Lead = uma OPORTUNIDADE (ciclo de contato).
- * Etapas: ENTROU → ATENDIDO → NEGOCIANDO → CONVERTIDO / PERDIDO.
+ * Etapas: ENTROU → ATENDIDO → NEGOCIANDO → AGUARDANDO_PAGAMENTO → CONVERTIDO / PERDIDO.
  * Portal do Cliente é ELITE → gate por feature portal_cliente.
  */
 
-const ETAPAS: StatusLead[] = ['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'CONVERTIDO', 'PERDIDO']
+const ETAPAS: StatusLead[] = ['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'AGUARDANDO_PAGAMENTO', 'CONVERTIDO', 'PERDIDO']
 
 const incluiLead = {
   vendedora: { select: { id: true, nome: true } },
@@ -72,7 +72,7 @@ export async function leadsRoutes(app: FastifyInstance) {
     const agora = Date.now()
     const pct = await pctDaLoja(lojaId)
 
-    const colunas: Record<string, ReturnType<typeof decorar>[]> = { ENTROU: [], ATENDIDO: [], NEGOCIANDO: [], CONVERTIDO: [], PERDIDO: [] }
+    const colunas: Record<string, ReturnType<typeof decorar>[]> = { ENTROU: [], ATENDIDO: [], NEGOCIANDO: [], AGUARDANDO_PAGAMENTO: [], CONVERTIDO: [], PERDIDO: [] }
     const porSituacao: Record<string, number> = {}
     let convertidos = 0, perdidos = 0, somaResposta = 0, comResposta = 0
     for (const l of leads) {
@@ -86,8 +86,8 @@ export async function leadsRoutes(app: FastifyInstance) {
     const fechados = convertidos + perdidos
     const metricas = {
       total: leads.length,
-      abertos: colunas.ENTROU.length + colunas.ATENDIDO.length + colunas.NEGOCIANDO.length,
-      atrasados: [...colunas.ENTROU, ...colunas.ATENDIDO, ...colunas.NEGOCIANDO].filter((l) => l.atrasado).length,
+      abertos: colunas.ENTROU.length + colunas.ATENDIDO.length + colunas.NEGOCIANDO.length + colunas.AGUARDANDO_PAGAMENTO.length,
+      atrasados: [...colunas.ENTROU, ...colunas.ATENDIDO, ...colunas.NEGOCIANDO, ...colunas.AGUARDANDO_PAGAMENTO].filter((l) => l.atrasado).length,
       convertidos, perdidos,
       taxaConversao: fechados > 0 ? Math.round((convertidos / fechados) * 100) : 0,
       tempoMedioRespostaMin: comResposta > 0 ? Math.round(somaResposta / comResposta / 60_000) : null,
@@ -113,7 +113,7 @@ export async function leadsRoutes(app: FastifyInstance) {
   app.patch('/:id/etapa', { preHandler: [requireFeature('funil'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { id } = request.params as { id: string }
-    const body = z.object({ etapa: z.enum(['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'CONVERTIDO', 'PERDIDO']), motivoPerda: z.string().optional() }).parse(request.body)
+    const body = z.object({ etapa: z.enum(['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'AGUARDANDO_PAGAMENTO', 'CONVERTIDO', 'PERDIDO']), motivoPerda: z.string().optional() }).parse(request.body)
 
     const lead = await prisma.lead.findFirst({ where: { id, lojaId }, include: { loja: { select: { redeId: true } } } })
     if (!lead) return reply.code(404).send({ erro: 'Ciclo não encontrado' })

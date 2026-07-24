@@ -53,10 +53,12 @@ function usePwaPersonalizado(v: Vitrine | null) {
 
     const linkManifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')
     const linkAppleIcon = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]')
+    const linkFavicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
     const metaAppleTitle = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]')
     const original = {
       manifest: linkManifest?.href ?? null,
       appleIcon: linkAppleIcon?.href ?? null,
+      favicon: linkFavicon?.href ?? null,
       appleTitle: metaAppleTitle?.content ?? null,
       titulo: document.title,
     }
@@ -78,6 +80,10 @@ function usePwaPersonalizado(v: Vitrine | null) {
 
     if (linkManifest) linkManifest.href = blobUrl
     if (linkAppleIcon) linkAppleIcon.href = v.fotoUrl
+    // Chrome/Android usa o favicon (não o apple-touch-icon) como ícone do atalho "Adicionar à
+    // Tela de Início" quando o manifesto em Blob URL não é instalável como WebAPK completo —
+    // sem isso, o atalho fica com o título certo mas o logo genérico do ZAIEZE.
+    if (linkFavicon) linkFavicon.href = v.fotoUrl
     if (metaAppleTitle) metaAppleTitle.content = v.nome
     document.title = v.nome
 
@@ -85,6 +91,7 @@ function usePwaPersonalizado(v: Vitrine | null) {
       URL.revokeObjectURL(blobUrl)
       if (linkManifest && original.manifest) linkManifest.href = original.manifest
       if (linkAppleIcon && original.appleIcon) linkAppleIcon.href = original.appleIcon
+      if (linkFavicon && original.favicon) linkFavicon.href = original.favicon
       if (metaAppleTitle && original.appleTitle) metaAppleTitle.content = original.appleTitle
       document.title = original.titulo
     }

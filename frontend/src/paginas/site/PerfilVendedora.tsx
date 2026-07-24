@@ -7,6 +7,7 @@ import { HOST } from '../../host'
 import { useToast } from '../../componentes/Toast'
 import { useMetaTags } from '../../lib/useMetaTags'
 import MeusPedidos from './MeusPedidos'
+import BotaoInstalarApp from '../../componentes/BotaoInstalarApp'
 
 function IconeWhatsApp({ size = 20 }: { size?: number }) {
   return (
@@ -252,6 +253,7 @@ export default function PerfilVendedora() {
           {p.marca.logoUrl ? <img className="pv-marca-logo" src={p.marca.logoUrl} alt={p.marca.nome} /> : <div className="pv-marca-nome">{p.marca.nome}</div>}
         </div>
         <div className="pv-topo-acoes">
+          <BotaoInstalarApp className="pv-icone-botao" />
           <button type="button" className="pv-icone-botao" aria-label="Compartilhar" onClick={compartilhar}><Share2 size={18} /></button>
           <button type="button" className="pv-icone-botao" aria-label="Menu" onClick={() => setDrawerAberto(true)}><Menu size={18} /></button>
         </div>

@@ -26,6 +26,9 @@ const envSchema = z.object({
   ZAIEZE_WA_PHONE_NUMBER_ID: z.string().optional(),
   ZAIEZE_WA_TOKEN: z.string().optional(),
   ZAIEZE_WA_TEMPLATE_SENHA: z.string().default('senha_provisoria'),
+  // Código de verificação do "Meus pedidos" (perfil público da vendedora) — mesmo número/token
+  // da própria ZAIEZE acima, requer template de autenticação aprovado à parte pela Meta.
+  ZAIEZE_WA_TEMPLATE_OTP: z.string().default('codigo_verificacao'),
   ANTHROPIC_API_KEY: z.string().optional(),
   // Mercado Pago (Assinaturas/preapproval) — sem token o checkout opera em modo simulado
   MERCADOPAGO_ACCESS_TOKEN: z.string().optional(),

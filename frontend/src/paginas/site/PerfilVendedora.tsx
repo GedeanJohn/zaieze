@@ -113,7 +113,9 @@ function usePwaPersonalizado(p: Perfil | null, corFundo: string) {
 
     const manifest = {
       name: titulo,
-      short_name: p.vendedora.primeiroNome,
+      // Android usa short_name (não name) pro rótulo sob o ícone na Tela de Início — precisa
+      // trazer a marca junto, senão só aparece o primeiro nome da vendedora.
+      short_name: titulo,
       start_url: `${window.location.pathname}?pwa=1`,
       scope: window.location.pathname,
       display: 'standalone',

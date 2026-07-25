@@ -20,6 +20,16 @@ const envSchema = z.object({
   // Chave para criptografar o token permanente da WABA em repouso (AES-256-GCM).
   // Obrigatória para SALVAR um token; ausente → o /whatsapp/config recusa gravar token.
   WA_TOKEN_SECRET: z.string().optional(),
+  // Meta Tech Provider / Embedded Signup — permite ao gestor conectar o WhatsApp em 1 clique
+  // (sem digitar Phone Number ID/token manualmente). Requer app aprovado pela Meta como Tech
+  // Provider (whatsapp_business_management + whatsapp_business_messaging em acesso avançado).
+  // Ausentes → o botão "Conectar com Facebook" fica oculto; só o formulário manual funciona.
+  META_APP_ID: z.string().optional(),
+  META_APP_SECRET: z.string().optional(),
+  META_CONFIG_ID: z.string().optional(), // ID da configuração de Embedded Signup no App Dashboard
+  // Verify token do webhook ÚNICO em nível de App (registrado 1x no App Dashboard da Meta) —
+  // diferente do Rede.waVerifyToken (por marca), usado só no fluxo manual/webhook por tenant.
+  META_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
   // Número OFICIAL da própria ZAIEZE (não o de cada marca) — usado só p/ mensagens de sistema
   // (ex.: senha provisória do "esqueci minha senha"), que não dependem da marca ter WABA própria.
   // Requer um template de autenticação aprovado 1x pela Meta. Ausente → cai no fluxo manual.

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { api, mensagemDeErro } from '../api'
 import { useToast } from '../componentes/Toast'
 import { useIdioma } from '../lib/i18n'
+import { carregarSdkMeta } from '../lib/metaSdk'
+import ConectarMetaTudo from '../componentes/ConectarMetaTudo'
 
 interface Config {
   igBusinessAccountId: string | null
@@ -14,6 +16,74 @@ interface Config {
   conectadoEm: string | null
   webhookUrl: string
   servidorPodeCifrar: boolean
+  conexaoAutomaticaDisponivel: boolean
+  metaAppId: string | null
+  metaConfigId: string | null
+}
+
+interface Candidato { pageId: string; pageNome: string; igBusinessAccountId: string; username?: string; pageToken: string }
+
+// Conexão automática: FB.login comum (sem wizard/config_id — isso é específico do WhatsApp).
+// Na maioria dos casos (1 Página com Instagram vinculado) conecta direto; se houver mais de uma,
+// mostra a lista pra o gestor escolher.
+function ConexaoAutomaticaSection({ appId, aoConectar }: { appId: string; aoConectar: () => Promise<void> }) {
+  const { t } = useIdioma()
+  const avisar = useToast()
+  const [conectando, setConectando] = useState(false)
+  const [candidatos, setCandidatos] = useState<Candidato[] | null>(null)
+
+  useEffect(() => { carregarSdkMeta(appId) }, [appId])
+
+  async function processarResposta(body: Record<string, unknown>) {
+    const { data } = await api.post('/instagram/embedded-signup/callback', body)
+    if (data.escolhaNecessaria) { setCandidatos(data.candidatos); return }
+    setCandidatos(null)
+    await aoConectar()
+    avisar(data.conectado ? t('ig.conectadoSucesso', { username: data.username ? `· @${data.username}` : '' }) : t('ig.erroConexaoAutomatica'))
+  }
+
+  function conectar() {
+    if (!window.FB) return
+    setConectando(true)
+    window.FB.login(
+      async (resposta) => {
+        const code = resposta?.authResponse?.code as string | undefined
+        if (!code) { setConectando(false); return }
+        try { await processarResposta({ code }) }
+        catch (e) { avisar(mensagemDeErro(e), 'erro') }
+        finally { setConectando(false) }
+      },
+      { scope: 'instagram_basic,instagram_manage_messages,pages_show_list', response_type: 'code', override_default_response_type: true },
+    )
+  }
+
+  async function escolher(c: Candidato) {
+    setConectando(true)
+    try { await processarResposta({ escolha: { pageId: c.pageId, igBusinessAccountId: c.igBusinessAccountId, pageToken: c.pageToken } }) }
+    catch (e) { avisar(mensagemDeErro(e), 'erro') }
+    finally { setConectando(false) }
+  }
+
+  return (
+    <div className="cartao">
+      <h2 style={{ marginTop: 0 }}>{t('ig.conexaoAutomaticaTitulo')}</h2>
+      <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{t('ig.conexaoAutomaticaExplicacao')}</p>
+      {candidatos ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ fontSize: 13 }}>{t('ig.escolherPaginaExplicacao')}</p>
+          {candidatos.map((c) => (
+            <button key={c.pageId} type="button" className="btn secundario" disabled={conectando} onClick={() => escolher(c)}>
+              {c.pageNome} {c.username ? `· @${c.username}` : ''}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <button type="button" className="btn" disabled={conectando} onClick={conectar}>
+          {conectando ? t('ig.conectandoAutomatico') : t('ig.conectarComFacebookBtn')}
+        </button>
+      )}
+    </div>
+  )
 }
 
 export default function Instagram() {
@@ -90,8 +160,20 @@ export default function Instagram() {
         )}
       </div>
 
+      {cfg.conexaoAutomaticaDisponivel && cfg.metaAppId && (
+        <ConexaoAutomaticaSection appId={cfg.metaAppId} aoConectar={async () => { const { data } = await api.get('/instagram/config'); aplicar(data) }} />
+      )}
+
+      {cfg.conexaoAutomaticaDisponivel && cfg.metaAppId && cfg.metaConfigId && (
+        <ConectarMetaTudo
+          appId={cfg.metaAppId} configId={cfg.metaConfigId}
+          aoConectarInstagram={async () => { const { data } = await api.get('/instagram/config'); aplicar(data) }}
+        />
+      )}
+
       <form className="cartao" onSubmit={salvar}>
         <h2 style={{ marginTop: 0 }}>{t('ig.credenciaisTitulo')}</h2>
+        {cfg.conexaoAutomaticaDisponivel && <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: -8 }}>{t('wa.ouConfigureManual')}</p>}
         <div className="linha-campos">
           <div className="campo">
             <label>{t('ig.businessAccountIdLabel')}</label>

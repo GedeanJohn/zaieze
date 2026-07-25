@@ -84,6 +84,80 @@ export function assinaturaValida(appSecret: string, rawBody: Buffer | string, he
   }
 }
 
+// ────────────────────── Tech Provider / Embedded Signup ──────────────────────
+// Fluxo de conexão em 1 clique: o gestor autoriza pelo SDK JS da Meta no frontend, que devolve
+// um `code` de curta duração (~30s). O backend troca esse code por um token, inscreve o app nos
+// webhooks da WABA do cliente e (se necessário) registra o número — tudo com as credenciais do
+// APP da ZAIEZE (META_APP_ID/META_APP_SECRET), nunca com as do cliente.
+
+/** true se o servidor tem as credenciais do App Tech Provider da ZAIEZE configuradas. */
+export function techProviderConfigurado(): boolean {
+  return Boolean(env.META_APP_ID && env.META_APP_SECRET && env.META_CONFIG_ID)
+}
+
+/**
+ * Conexão automática via Facebook Login comum (usada pelo Instagram) — não exige META_CONFIG_ID,
+ * que é específico do wizard "Embedded Signup" do WhatsApp (techProviderConfigurado acima).
+ */
+export function appTechProviderConfigurado(): boolean {
+  return Boolean(env.META_APP_ID && env.META_APP_SECRET)
+}
+
+/** Troca o `code` do Embedded Signup por um access token do cliente (OAuth padrão da Meta). */
+export async function trocarCodePorToken(code: string): Promise<{ ok: boolean; accessToken?: string; erro?: string }> {
+  try {
+    const url = new URL(graphUrl('oauth/access_token'))
+    url.searchParams.set('client_id', env.META_APP_ID ?? '')
+    url.searchParams.set('client_secret', env.META_APP_SECRET ?? '')
+    url.searchParams.set('code', code)
+    const resp = await fetch(url)
+    const data = (await resp.json().catch(() => ({}))) as { access_token?: string; error?: { message?: string } }
+    if (!resp.ok || !data.access_token) return { ok: false, erro: data.error?.message ?? `HTTP ${resp.status}` }
+    return { ok: true, accessToken: data.access_token }
+  } catch (e) {
+    return { ok: false, erro: String(e) }
+  }
+}
+
+/** Inscreve o App da ZAIEZE para receber os webhooks da WABA do cliente. */
+export async function inscreverWebhookWaba(wabaId: string, token: string): Promise<{ ok: boolean; erro?: string }> {
+  try {
+    const resp = await fetch(graphUrl(`${wabaId}/subscribed_apps`), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => '')
+      return { ok: false, erro: txt.slice(0, 300) }
+    }
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, erro: String(e) }
+  }
+}
+
+/**
+ * Registra o número pra uso na Cloud API (necessário para números novos; números que já vieram
+ * do app WhatsApp Business via Embedded Signup costumam já estar registrados — erro é esperado
+ * e ignorado pelo chamador nesse caso).
+ */
+export async function registrarNumero(phoneNumberId: string, token: string): Promise<{ ok: boolean; erro?: string }> {
+  try {
+    const resp = await fetch(graphUrl(`${phoneNumberId}/register`), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp' }),
+    })
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => '')
+      return { ok: false, erro: txt.slice(0, 300) }
+    }
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, erro: String(e) }
+  }
+}
+
 // ─────────────────────────── Envio (Graph API) ───────────────────────────
 
 async function chamarMensagens(phoneNumberId: string, token: string, body: Record<string, unknown>): Promise<EnvioResultado> {

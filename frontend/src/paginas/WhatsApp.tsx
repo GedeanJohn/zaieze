@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, mensagemDeErro } from '../api'
 import { useToast } from '../componentes/Toast'
 import { useIdioma } from '../lib/i18n'
+import { carregarSdkMeta } from '../lib/metaSdk'
+import ConectarMetaTudo from '../componentes/ConectarMetaTudo'
 
 interface Config {
   waPhoneNumberId: string | null
@@ -14,6 +16,9 @@ interface Config {
   conectadoEm: string | null
   webhookUrl: string
   servidorPodeCifrar: boolean
+  conexaoAutomaticaDisponivel: boolean
+  metaAppId: string | null
+  metaConfigId: string | null
 }
 
 export default function WhatsApp() {
@@ -96,8 +101,20 @@ export default function WhatsApp() {
         )}
       </div>
 
+      {cfg.conexaoAutomaticaDisponivel && cfg.metaAppId && cfg.metaConfigId && (
+        <ConexaoAutomaticaSection appId={cfg.metaAppId} configId={cfg.metaConfigId} aoConectar={async () => { const { data } = await api.get('/whatsapp/config'); aplicar(data) }} />
+      )}
+
+      {cfg.conexaoAutomaticaDisponivel && cfg.metaAppId && cfg.metaConfigId && (
+        <ConectarMetaTudo
+          appId={cfg.metaAppId} configId={cfg.metaConfigId}
+          aoConectarWhatsApp={async () => { const { data } = await api.get('/whatsapp/config'); aplicar(data) }}
+        />
+      )}
+
       <form className="cartao" onSubmit={salvar}>
         <h2 style={{ marginTop: 0 }}>{t('wa.credenciaisTitulo')}</h2>
+        {cfg.conexaoAutomaticaDisponivel && <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: -8 }}>{t('wa.ouConfigureManual')}</p>}
         <div className="linha-campos">
           <div className="campo">
             <label>{t('wa.phoneNumberIdLabel')}</label>
@@ -168,6 +185,80 @@ export default function WhatsApp() {
 
       <TemplatesSection conectado={cfg.conectado} />
     </>
+  )
+}
+
+// ── Conexão automática (Embedded Signup): 1 clique, sem digitar IDs/tokens manualmente ──
+// O fluxo da Meta entrega o resultado em DOIS sinais assíncronos independentes que precisam ser
+// combinados: o evento `message` (postMessage) do popup traz waba_id/phone_number_id quando o
+// gestor termina o cadastro (event: 'FINISH'), e o callback do FB.login traz só o `code` de troca
+// (validade ~30s). Guardamos o que a mensagem trouxe numa ref e casamos com o code ao chegar.
+function ConexaoAutomaticaSection({ appId, configId, aoConectar }: { appId: string; configId: string; aoConectar: () => Promise<void> }) {
+  const { t } = useIdioma()
+  const avisar = useToast()
+  const [conectando, setConectando] = useState(false)
+  const sessaoRef = useRef<{ wabaId: string; phoneNumberId: string } | null>(null)
+
+  useEffect(() => {
+    carregarSdkMeta(appId)
+    function aoReceberMensagem(event: MessageEvent) {
+      if (!event.origin.endsWith('facebook.com')) return
+      let dados: any
+      try { dados = JSON.parse(event.data) } catch { return }
+      if (dados?.type !== 'WA_EMBEDDED_SIGNUP') return
+      if (dados.event === 'FINISH' && dados.data?.waba_id && dados.data?.phone_number_id) {
+        sessaoRef.current = { wabaId: dados.data.waba_id, phoneNumberId: dados.data.phone_number_id }
+      } else if (dados.event === 'CANCEL') {
+        setConectando(false)
+        avisar(dados.data?.error_message ? t('wa.erroConexaoAutomatica') : t('wa.conexaoAutomaticaCancelada'))
+      }
+    }
+    window.addEventListener('message', aoReceberMensagem)
+    return () => window.removeEventListener('message', aoReceberMensagem)
+  }, [appId])
+
+  // O evento `message` (FINISH) pode chegar antes ou depois do callback do FB.login — espera até
+  // ~5s pela ref ser preenchida antes de desistir (o code em si só vale ~30s).
+  async function esperarSessao(): Promise<{ wabaId: string; phoneNumberId: string } | null> {
+    for (let i = 0; i < 20; i++) {
+      if (sessaoRef.current) return sessaoRef.current
+      await new Promise((r) => setTimeout(r, 250))
+    }
+    return null
+  }
+
+  function conectar() {
+    if (!window.FB) return
+    sessaoRef.current = null
+    setConectando(true)
+    window.FB.login(
+      async (resposta) => {
+        const code = resposta?.authResponse?.code as string | undefined
+        if (!code) { setConectando(false); return }
+        try {
+          const sessao = await esperarSessao()
+          if (!sessao) throw new Error(t('wa.erroConexaoAutomatica'))
+          const { data } = await api.post('/whatsapp/embedded-signup/callback', { code, wabaId: sessao.wabaId, phoneNumberId: sessao.phoneNumberId })
+          await aoConectar()
+          avisar(data.conectado ? t('wa.conectadoSucesso', { numero: data.numero ? `· ${data.numero}` : '' }) : t('wa.erroConexaoAutomatica'))
+        } catch (e) {
+          avisar(mensagemDeErro(e), 'erro')
+        } finally {
+          setConectando(false)
+        }
+      },
+      { config_id: configId, response_type: 'code', override_default_response_type: true, extras: { setup: {} } },
+    )
+  }
+
+  return (
+    <div className="cartao">
+      <h2 style={{ marginTop: 0 }}>{t('wa.conexaoAutomaticaTitulo')}</h2>
+      <p style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{t('wa.conexaoAutomaticaExplicacao')}</p>
+      <button type="button" className="btn" disabled={conectando} onClick={conectar}>
+        {conectando ? t('wa.conectandoAutomatico') : t('wa.conectarComFacebookBtn')}
+      </button>
+    </div>
   )
 }
 

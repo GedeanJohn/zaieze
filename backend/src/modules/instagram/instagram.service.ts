@@ -1,7 +1,7 @@
 import { env } from '../../env'
 import { cifrar, decifrar } from '../whatsapp/meta.service'
 
-export { cifrar, decifrar, assinaturaValida, podeCifrar } from '../whatsapp/meta.service'
+export { cifrar, decifrar, assinaturaValida, podeCifrar, appTechProviderConfigurado, trocarCodePorToken } from '../whatsapp/meta.service'
 
 /**
  * Cliente da Instagram Messaging API (Meta Graph API) — UMA conta por marca (Rede.ig*).
@@ -53,6 +53,31 @@ export async function enviarTextoIg(opts: { rede: RedeIG; igScopedId: string; te
   } catch (e) {
     return { status: 'FALHA', erro: String(e) }
   }
+}
+
+// ────────────────────── Conexão automática (Facebook Login comum) ──────────────────────
+// Diferente do WhatsApp, o Instagram não tem um wizard "Embedded Signup" dedicado da Meta — o
+// gestor faz um login comum (escopos instagram_basic/instagram_manage_messages/pages_show_list)
+// e nós descobrimos, a partir das Páginas do Facebook que ele administra, quais têm uma conta
+// Instagram Business vinculada.
+
+/** Páginas do Facebook do usuário (via token trocado no login) que têm Instagram Business vinculado. */
+export async function buscarPaginasComInstagram(userToken: string): Promise<
+  { pageId: string; pageNome: string; pageToken: string; igBusinessAccountId: string; username?: string }[]
+> {
+  const resp = await fetch(graphUrl('me/accounts?fields=id,name,access_token,instagram_business_account{id,username}&limit=100'), {
+    headers: { Authorization: `Bearer ${userToken}` },
+  })
+  if (!resp.ok) return []
+  const data = (await resp.json().catch(() => ({}))) as {
+    data?: { id: string; name: string; access_token: string; instagram_business_account?: { id: string; username?: string } }[]
+  }
+  return (data.data ?? [])
+    .filter((p) => p.instagram_business_account)
+    .map((p) => ({
+      pageId: p.id, pageNome: p.name, pageToken: p.access_token,
+      igBusinessAccountId: p.instagram_business_account!.id, username: p.instagram_business_account!.username,
+    }))
 }
 
 /**

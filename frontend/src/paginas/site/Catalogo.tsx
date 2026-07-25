@@ -322,6 +322,12 @@ export default function Catalogo() {
         {categorias.map((c) => (
           <button key={c} type="button" className={categoriaAtiva === c ? 'ativo' : ''} onClick={() => setCategoriaAtiva(c)}>{c}</button>
         ))}
+        <button
+          type="button" className={`cat-filtros-favoritos${categoriaAtiva === FAVORITOS ? ' ativo' : ''}`}
+          onClick={() => setCategoriaAtiva((c) => (c === FAVORITOS ? null : FAVORITOS))}
+        >
+          <Heart size={14} fill={categoriaAtiva === FAVORITOS ? 'currentColor' : 'none'} /> Favoritos{favoritos.size > 0 ? ` (${favoritos.size})` : ''}
+        </button>
         <button type="button" className="cat-filtros-mais" onClick={() => avisar('Filtros avançados chegando em breve. ✨')}>
           <SlidersHorizontal size={15} /> Filtrar
         </button>
@@ -691,6 +697,7 @@ export function CatalogoEstilos() {
       .cat-filtros::-webkit-scrollbar { display: none; }
       .cat-filtros button { flex-shrink: 0; border: 1px solid #00000018; background: #fff; color: #444; font-size: 13px; font-weight: 600; padding: 9px 16px; border-radius: 99px; cursor: pointer; white-space: nowrap; }
       .cat-filtros button.ativo { background: var(--cat-primaria, #111); border-color: transparent; color: #fff; }
+      .cat-filtros-favoritos { display: flex; align-items: center; gap: 6px; }
       .cat-filtros-mais { display: flex; align-items: center; gap: 6px; margin-left: auto; }
       /* Foto do hero "dissolve" nas bordas esquerda/direita em vez de terminar num corte reto */
       .cat-hero-foto {

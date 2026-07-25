@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { FileText, Heart, Home, MoreHorizontal, Search, ShoppingBag, SlidersHorizontal, UserRound, X } from 'lucide-react'
+import { FileText, Heart, Home, MoreHorizontal, Search, ShoppingBag, SlidersHorizontal, User, UserRound, X } from 'lucide-react'
 import { api } from '../../api'
 import { HOST } from '../../host'
 import AgenteLoja from './AgenteLoja'
@@ -402,21 +402,22 @@ export default function Catalogo() {
 
       <footer className="cat-rodape">{cat.marca.nome} · powered by ZAIEZE</footer>
 
-      {/* Mesmo rodapé de navegação da PerfilVendedora.tsx — aqui "Catálogo" fica ativo */}
+      {/* Mesmo rodapé de navegação da PerfilVendedora.tsx — "Perfil" é sempre o item em destaque
+          (bolinha brilhante), em qualquer página, não é um indicador de "página atual". */}
       <nav className="cat-bottom-nav">
         {NAV_ITENS.map(({ id, rotulo, Icone }) => (
-          <button key={id} type="button" className={`cat-nav-item${id === 'catalogo' ? ' ativo' : ''}`} onClick={() => irPara(id)}>
+          <button key={id} type="button" className={`cat-nav-item${id === 'perfil' ? ' ativo' : ''}`} onClick={() => irPara(id)}>
             <span className="cat-nav-icone">
-              {id === 'catalogo' ? (
+              {id === 'perfil' ? (
                 <>
-                  <Icone size={18} />
+                  <User size={18} fill="#fff" />
                   <span className="cat-nav-icone-rotulo">{rotulo}</span>
                 </>
               ) : (
                 <Icone size={20} />
               )}
             </span>
-            {id !== 'catalogo' && rotulo}
+            {id !== 'perfil' && rotulo}
           </button>
         ))}
       </nav>
@@ -698,7 +699,10 @@ export function CatalogoEstilos() {
         -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%);
       }
       @media (min-width: 720px) { .cat-hero-foto { aspect-ratio: 8/5; } } /* metade da altura do 4/5 na mesma largura */
-      .cat-hero-foto img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+      /* "contain" em vez de "cover": a peça costuma ter texto/logo desenhado na própria arte
+         (ex.: "ELEGÂNCIA EM CADA PASSO") — cortar a imagem cortava esse texto. Sem crop nenhum,
+         só pode sobrar uma tarja da cor de fundo do box nas laterais/topo-baixo. */
+      .cat-hero-foto img { width: 100%; height: 100%; object-fit: contain; display: block; }
       .cat-destaque-badge { position: absolute; top: 8px; left: 8px; background: var(--cat-primaria, #111); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 99px; letter-spacing: .3px; text-transform: uppercase; }
       .cat-secao { max-width: 1100px; margin: 0 auto; padding: 26px 14px 6px; }
       .cat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }

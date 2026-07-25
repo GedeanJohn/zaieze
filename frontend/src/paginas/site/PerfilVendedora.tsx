@@ -269,11 +269,25 @@ export default function PerfilVendedora() {
 
       <section className="pv-hero">
         <div className="pv-hero-topo">
-          <div className="pv-hero-foto">
-            {p.vendedora.fotoUrl
-              ? <img src={p.vendedora.fotoUrl} alt={p.vendedora.nome} />
-              : <div className="pv-hero-fotoVazia">{p.vendedora.nome.slice(0, 1).toUpperCase()}</div>}
-            {p.vendedora.temWhatsapp && <span className="pv-disponivel"><span className="pv-disponivel-bolha" /> Disponível</span>}
+          <div className="pv-hero-foto-col">
+            <div className="pv-hero-foto">
+              {p.vendedora.fotoUrl
+                ? <img src={p.vendedora.fotoUrl} alt={p.vendedora.nome} />
+                : <div className="pv-hero-fotoVazia">{p.vendedora.nome.slice(0, 1).toUpperCase()}</div>}
+              {p.vendedora.temWhatsapp && <span className="pv-disponivel"><span className="pv-disponivel-bolha" /> Disponível</span>}
+            </div>
+            {/* Contato fica embaixo da foto, na mesma largura da coluna — não mais espalhado
+                junto com as ações secundárias (ficava com larguras desiguais e "fora do padrão"). */}
+            {p.vendedora.temWhatsapp && (
+              <div className="pv-contato-btns">
+                <button type="button" className="pv-btn-primario" disabled={contatando !== null} onClick={() => contatar('whatsapp')}>
+                  <IconeWhatsApp size={18} /> {contatando === 'whatsapp' ? 'Abrindo…' : 'Falar no WhatsApp'}
+                </button>
+                <button type="button" className="pv-btn-secundario" disabled={contatando !== null} onClick={() => contatar('ligar')}>
+                  <Phone size={18} /> {contatando === 'ligar' ? 'Abrindo…' : 'Ligar'}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="pv-hero-info">
@@ -297,16 +311,6 @@ export default function PerfilVendedora() {
         </div>
 
         <div className="pv-acoes">
-          {p.vendedora.temWhatsapp && (
-            <button type="button" className="pv-btn-primario" disabled={contatando !== null} onClick={() => contatar('whatsapp')}>
-              <IconeWhatsApp size={18} /> {contatando === 'whatsapp' ? 'Abrindo…' : 'Falar no WhatsApp'}
-            </button>
-          )}
-          {p.vendedora.temWhatsapp && (
-            <button type="button" className="pv-btn-secundario" disabled={contatando !== null} onClick={() => contatar('ligar')}>
-              <Phone size={18} /> {contatando === 'ligar' ? 'Abrindo…' : 'Ligar'}
-            </button>
-          )}
           <button type="button" className="pv-btn-secundario" onClick={() => navigate(`/${vendSlug}/catalogo`)}><ShoppingBag size={18} /> Vitrine Virtual</button>
           <button type="button" className="pv-btn-secundario" onClick={() => setMeusPedidosAberto('abertos')}><ShoppingCart size={18} /> Ver Carrinho</button>
           <button type="button" className="pv-btn-secundario" onClick={() => setMeusPedidosAberto('fechados')}><Package size={18} /> Ver Pedidos</button>
@@ -505,7 +509,11 @@ function PerfilVendedoraEstilos() {
 
       .pv-hero { max-width: 1100px; margin: 0 auto; padding: 32px 24px 8px; }
       .pv-hero-topo { display: grid; grid-template-columns: 340px 1fr; gap: 40px; }
+      .pv-hero-foto-col { display: flex; flex-direction: column; gap: 12px; }
       .pv-hero-foto { position: relative; border-radius: 16px; overflow: hidden; aspect-ratio: 9/16; background: color-mix(in srgb, var(--pv-fundo) 90%, var(--pv-mistura) 10%); border: 1px solid var(--pv-borda); }
+      /* Contato (WhatsApp/Ligar) na mesma largura da foto, logo abaixo dela */
+      .pv-contato-btns { display: flex; flex-direction: column; gap: 8px; }
+      .pv-contato-btns .pv-btn-primario, .pv-contato-btns .pv-btn-secundario { width: 100%; justify-content: center; }
       .pv-hero-foto img { width: 100%; height: 100%; object-fit: cover; object-position: center 25%; display: block; }
       .pv-hero-fotoVazia { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 64px; font-weight: 800; color: var(--pv-texto-suave); }
       .pv-disponivel { position: absolute; left: 12px; bottom: 12px; display: flex; align-items: center; gap: 6px; background: rgba(10,10,10,0.72); padding: 6px 12px; border-radius: 999px; font-size: 12px; color: #eee; }
@@ -525,8 +533,10 @@ function PerfilVendedoraEstilos() {
       .pv-pilares { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
       .pv-pilares span { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--pv-borda); color: var(--pv-texto-suave); }
 
-      .pv-acoes { display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
-      .pv-btn-primario, .pv-btn-secundario { display: inline-flex; align-items: center; gap: 8px; padding: 13px 22px; border-radius: 6px; font-size: 14px; font-weight: 700; letter-spacing: 0.03em; text-decoration: none; cursor: pointer; border: none; }
+      /* Grade uniforme (2 colunas de largura igual) — antes era flex-wrap, que deixava as larguras
+         desiguais conforme o tamanho do texto de cada botão. */
+      .pv-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 28px; }
+      .pv-btn-primario, .pv-btn-secundario { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 22px; border-radius: 6px; font-size: 14px; font-weight: 700; letter-spacing: 0.03em; text-decoration: none; cursor: pointer; border: none; }
       .pv-btn-primario { background: var(--pv-acento, #c9a25f); color: var(--pv-acento-texto, #14100a); }
       .pv-btn-secundario { background: transparent; border: 1px solid var(--pv-borda); color: var(--pv-texto); }
       .pv-btn-secundario:hover { background: color-mix(in srgb, var(--pv-fundo) 94%, var(--pv-mistura) 6%); }
@@ -600,8 +610,10 @@ function PerfilVendedoraEstilos() {
         .pv-stat span { font-size: 8.5px; }
         .pv-pilares { margin-top: 10px; gap: 6px; }
         .pv-pilares span { font-size: 9.5px; padding: 4px 8px; }
-        .pv-acoes { gap: 6px; margin-top: 10px; flex-wrap: wrap; }
-        .pv-btn-primario, .pv-btn-secundario { padding: 10px 8px; font-size: 11px; gap: 5px; white-space: nowrap; flex: 1 1 auto; }
+        .pv-hero-foto-col { gap: 8px; }
+        .pv-contato-btns { gap: 6px; }
+        .pv-acoes { gap: 6px; margin-top: 10px; }
+        .pv-btn-primario, .pv-btn-secundario { padding: 10px 8px; font-size: 11px; gap: 5px; white-space: nowrap; }
         .pv-grid { grid-template-columns: repeat(2, 1fr); gap: 7px; }
         .pv-cardColecao-nome { padding: 6px; font-size: 10px; letter-spacing: 0.06em; line-height: 1.25; }
         .pv-faixa { grid-template-columns: repeat(2, 1fr); }

@@ -198,6 +198,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
           select: {
             id: true, nome: true, descricao: true, referencia: true, genero: true, pesoGramas: true,
             precoVarejo: true, precoAtacado: true, descontoOutletPct: true, fotos: true, fotosCores: true, videos: true,
+            destaque: true, destaqueEspecial: true, createdAt: true,
             categoria: { select: { nome: true } },
             variacoes: { select: { cor: true, estampa: true, tamanho: true, estoque: true } },
           },
@@ -228,6 +229,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
             preco, precoVarejo: preco,
             precoAtacado: p.precoAtacado != null ? Number(p.precoAtacado) : null,
             fotos: p.fotos, fotosPorCor, videos: p.videos,
+            destaque: p.destaque, destaqueEspecial: p.destaqueEspecial, createdAt: p.createdAt,
             outlet: c.outlet,
             descontoPct: pct > 0 ? pct : null,
             precoOriginal: pct > 0 ? base : null,

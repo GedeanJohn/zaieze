@@ -1017,6 +1017,10 @@ model Produto {
   fornecedor        String? // confecção/fornecedor
   pesoGramas        Int? // peso para frete/e-commerce
   faixaEtaria       String? // infantil (ex.: "4-6 anos")
+  destaque          Boolean  @default(false) // aparece com selo "Destaque" na vitrine
+  // Único produto que ocupa o banner/hero no topo da vitrine (singleton por rede — ver
+  // produtos.routes.ts, que desmarca qualquer outro ao ligar este).
+  destaqueEspecial  Boolean  @default(false)
   fotos             String[] @default([])
   // Cor de cada foto, alinhado por índice com `fotos` ('' = serve para todas as cores).
   // Permite trocar a galeria ao escolher a cor no catálogo.

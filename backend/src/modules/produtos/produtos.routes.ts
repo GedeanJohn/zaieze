@@ -35,6 +35,8 @@ const criarProdutoSchema = z.object({
   fornecedor: z.string().optional(),
   pesoGramas: z.coerce.number().int().nonnegative().optional(),
   faixaEtaria: z.string().optional(),
+  destaque: z.boolean().default(false), // selo "Destaque" na vitrine
+  destaqueEspecial: z.boolean().default(false), // banner do topo da vitrine (1 só por rede)
   fotos: z.array(z.string().url()).default([]),
   fotosCores: z.array(z.string()).default([]), // cor de cada foto, alinhado a `fotos` ('' = todas)
   videos: z.array(z.string().url()).default([]),
@@ -234,8 +236,8 @@ export async function produtosRoutes(app: FastifyInstance) {
     const taxonomia = await resolverTaxonomia(redeId, body)
     const referencia = await resolverReferencia(redeId, body, body.nome)
 
-    // SKU por variação derivado da referência (cor × tamanho), com unicidade garantida
-    const variacoesData = []
+    // SKU por variação derivado da referência (cor × tamanho), com unicidade garantida.
+    const variacoesData: import('@prisma/client').Prisma.VariacaoProdutoCreateWithoutProdutoInput[] = []
     for (const v of body.variacoes) {
       const sku = await skuLivre(skuBase(referencia, v.cor, v.estampa, v.tamanho))
       // Toda variação sai do cadastro já com código de barras pronto para etiqueta (gera se não veio manual).
@@ -267,6 +269,8 @@ export async function produtosRoutes(app: FastifyInstance) {
           fornecedor: body.fornecedor,
           pesoGramas: body.pesoGramas,
           faixaEtaria: body.faixaEtaria,
+          destaque: body.destaque,
+          destaqueEspecial: body.destaqueEspecial,
           ...taxonomia,
           precoVarejo: body.precoVarejo,
           precoAtacado: body.precoAtacado,

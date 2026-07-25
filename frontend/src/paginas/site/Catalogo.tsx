@@ -1,9 +1,16 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useParams } from 'react-router-dom'
+import { Heart, Search, ShoppingBag, SlidersHorizontal } from 'lucide-react'
 import { api } from '../../api'
 import { HOST } from '../../host'
 import AgenteLoja from './AgenteLoja'
 import { useMetaTags } from '../../lib/useMetaTags'
+import { useToast } from '../../componentes/Toast'
+
+/** Sem acento/caixa — "Vestido Luná" casa com a busca "vestido luna". */
+function normalizarBusca(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+}
 
 interface Variacao { cor: string; estampa: string; tamanho: string; estoque: number }
 interface Produto {
@@ -13,6 +20,7 @@ interface Produto {
   outlet?: boolean; descontoPct?: number | null; precoOriginal?: number | null
   fotos: string[]; fotosPorCor?: Record<string, string[]>; videos: string[]; categoria: string | null
   cores: string[]; estampas: string[]; tamanhos: string[]; variacoes: Variacao[]; disponivel: boolean
+  destaque: boolean; destaqueEspecial: boolean; createdAt: string
 }
 interface Colecao { id: string; nome: string; descricao?: string | null; outlet?: boolean; produtos: Produto[] }
 interface Catalogo {
@@ -36,22 +44,68 @@ export interface ItemPedido {
 }
 
 const real = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-/** Iniciais (até 2) para o avatar da vendedora quando não há foto. */
-const iniciais = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('')
 const PESO_PADRAO = 300 // g por peça quando o produto não tem peso cadastrado
 const VOLUME_PECA_L = 0.8 // litros estimados por peça dobrada
+const LANCAMENTO_DIAS = 30 // produto criado há até esse tanto de dias conta como "Lançamento"
+const LANCAMENTOS = '__lancamentos__' // valor sentinela do filtro (não é uma categoria de verdade)
 
 export default function Catalogo() {
   const { vendSlug } = useParams<{ vendSlug: string }>()
   const redeSlug = HOST.slug
+  const avisar = useToast()
   const [cat, setCat] = useState<Catalogo | null>(null)
   const [erro, setErro] = useState('')
   const [detalhe, setDetalhe] = useState<Produto | null>(null)
   const [carrinho, setCarrinho] = useState<ItemCarrinho[]>([])
   const [verCarrinho, setVerCarrinho] = useState(false)
   const [agente, setAgente] = useState<{ produtoId?: string; produtoNome?: string; resumo?: string; itens?: ItemPedido[] } | null>(null)
-  const produtosRef = useRef<HTMLDivElement>(null)
-  const irProdutos = () => produtosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const [busca, setBusca] = useState('')
+  const [categoriaAtiva, setCategoriaAtiva] = useState<string | null>(null) // null = "Todos"
+
+  // Grade única: sem separação visual por coleção — o cliente vê tudo liberado, uma vitrine só.
+  const produtosTodos = useMemo(() => (cat?.colecoes ?? []).flatMap((c) => c.produtos), [cat])
+
+  // Categorias de verdade (da taxonomia já cadastrada) + "Lançamentos" fixo — sem inventar
+  // campo novo: usa a data de criação da peça, que já existe no cadastro.
+  const categorias = useMemo(
+    () => [...new Set(produtosTodos.map((p) => p.categoria).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [produtosTodos])
+  const ehLancamento = (p: Produto) => Date.now() - new Date(p.createdAt).getTime() <= LANCAMENTO_DIAS * 86_400_000
+
+  // Busca (nome/referência/categoria) + categoria/lançamentos selecionados — os dois filtros somam.
+  const buscaNorm = normalizarBusca(busca)
+  const produtosFiltrados = useMemo(() => {
+    let lista = produtosTodos
+    if (categoriaAtiva === LANCAMENTOS) lista = lista.filter(ehLancamento)
+    else if (categoriaAtiva) lista = lista.filter((p) => p.categoria === categoriaAtiva)
+    if (buscaNorm) {
+      lista = lista.filter((p) =>
+        normalizarBusca(p.nome).includes(buscaNorm)
+        || normalizarBusca(p.referencia ?? '').includes(buscaNorm)
+        || normalizarBusca(p.categoria ?? '').includes(buscaNorm))
+    }
+    return lista
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [produtosTodos, buscaNorm, categoriaAtiva])
+
+  // Produtos que giram no carrossel do topo: todos os "destaqueEspecial"; sem nenhum marcado,
+  // cai nos "destaque" comuns. Some durante uma busca ativa — não faz sentido puxar atenção pro
+  // carrossel enquanto o cliente está procurando outra coisa.
+  const produtosDestaque = useMemo(() => {
+    if (buscaNorm) return []
+    const especiais = produtosTodos.filter((p) => p.destaqueEspecial)
+    return especiais.length > 0 ? especiais : produtosTodos.filter((p) => p.destaque)
+  }, [produtosTodos, buscaNorm])
+
+  const [heroIdx, setHeroIdx] = useState(0)
+  useEffect(() => { setHeroIdx(0) }, [produtosDestaque])
+  // Gira sozinho a cada 6s — pausa não é necessário, o clique num ponto já reinicia a contagem.
+  useEffect(() => {
+    if (produtosDestaque.length < 2) return
+    const t = setInterval(() => setHeroIdx((i) => (i + 1) % produtosDestaque.length), 6000)
+    return () => clearInterval(t)
+  }, [produtosDestaque, heroIdx])
+  const produtoDestaque = produtosDestaque[heroIdx] ?? null
 
   useEffect(() => {
     if (!redeSlug || !vendSlug) { setErro('Catálogo não encontrado.'); return }
@@ -141,49 +195,86 @@ export default function Catalogo() {
     <div className="cat-root" style={{ '--cat-primaria': primaria, '--cat-fundo': fundo } as CSSProperties}>
       <CatalogoEstilos />
 
-      <header className="cat-perfil">
-        {/* Capa (banner da marca; sem banner, mostra a logo/nome sobre a cor da marca) */}
-        <div className="cat-capa">
-          {cat.marca.bannerUrl
-            ? <img src={cat.marca.bannerUrl} alt="" />
-            : <div className="cat-capa-marca">
-                {cat.marca.logoUrl ? <img src={cat.marca.logoUrl} alt={cat.marca.nome} /> : <span>{cat.marca.nome}</span>}
-              </div>}
+      <header className="cat-topo">
+        <div className="cat-topo-marca">
+          {cat.marca.logoUrl
+            ? <img src={cat.marca.logoUrl} alt={cat.marca.nome} />
+            : <span className="cat-topo-marca-nome">{cat.marca.nome}</span>}
+          <span className="cat-topo-marca-sub">Catálogo</span>
         </div>
 
-        {/* Foto da vendedora, redonda e sobreposta */}
-        <div className="cat-avatar-perfil">
-          {cat.vendedora.fotoUrl
-            ? <img src={cat.vendedora.fotoUrl} alt={cat.vendedora.primeiroNome} />
-            : <span>{iniciais(cat.vendedora.nome)}</span>}
-        </div>
+        <label className="cat-busca">
+          <input
+            type="search" value={busca} onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar produtos ou coleções"
+          />
+          <Search size={18} />
+        </label>
 
-        {/* Cartão de perfil: nome + bio + atalhos */}
-        <div className="cat-cartao">
-          <h1 className="cat-nome-perfil">{cat.vendedora.nome} <span className="cat-sep">|</span> {cat.marca.nome}</h1>
-          {cat.vendedora.bio && <p className="cat-bio">{cat.vendedora.bio}</p>}
-          <div className="cat-atalhos">
-            <button type="button" className="cat-atalho" onClick={irProdutos}>✨ Novidades</button>
-            <button type="button" className="cat-atalho" onClick={irProdutos}>👗 Coleções</button>
-            <button type="button" className="cat-atalho cat-atalho-full" onClick={() => setAgente({})}>💬 Falar com {cat.vendedora.primeiroNome}</button>
-          </div>
+        <div className="cat-topo-acoes">
+          <button type="button" className="cat-topo-icone" onClick={() => avisar('Favoritos chegando em breve. ✨')}>
+            <Heart size={20} />
+            <span>Favoritos</span>
+          </button>
+          <button type="button" className="cat-topo-icone" onClick={() => setVerCarrinho(true)}>
+            <ShoppingBag size={20} />
+            <span>Carrinho{totais.pecas > 0 ? ` (${totais.pecas})` : ''}</span>
+          </button>
         </div>
       </header>
 
-      <div ref={produtosRef} />
-      {cat.colecoes.length === 0 && <div className="cat-vazio">Em breve, novidades por aqui. ✨</div>}
+      {produtoDestaque && (
+        <section className="cat-hero">
+          <div className="cat-hero-texto">
+            <span className="cat-hero-selo">{produtoDestaque.destaqueEspecial ? 'Destaque' : 'Novidade'}</span>
+            <h1 className="cat-hero-titulo">{produtoDestaque.nome}</h1>
+            {produtoDestaque.descricao && <p className="cat-hero-desc">{produtoDestaque.descricao}</p>}
+            <button type="button" className="cat-hero-btn" onClick={() => setDetalhe(produtoDestaque)}>Ver detalhes →</button>
+            {produtosDestaque.length > 1 && (
+              <div className="cat-hero-dots">
+                {produtosDestaque.map((p, i) => (
+                  <button
+                    key={p.id} type="button" aria-label={`Ver ${p.nome}`}
+                    className={i === heroIdx ? 'ativo' : ''} onClick={() => setHeroIdx(i)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          <button type="button" className="cat-hero-foto" onClick={() => setDetalhe(produtoDestaque)}>
+            {produtoDestaque.fotos?.[0]
+              ? <img key={produtoDestaque.id} src={produtoDestaque.fotos[0]} alt={produtoDestaque.nome} />
+              : <div className="cat-foto-vazia">{produtoDestaque.nome}</div>}
+          </button>
+        </section>
+      )}
 
-      {cat.colecoes.map((c) => (
-        <section key={c.id} className="cat-secao">
-          <h2 className="cat-secao-titulo">{c.nome}{c.outlet && <span className="cat-outlet-tag">Outlet</span>}</h2>
-          {c.descricao && <p className="cat-secao-desc">{c.descricao}</p>}
+      <div className="cat-filtros">
+        <button type="button" className={categoriaAtiva === null ? 'ativo' : ''} onClick={() => setCategoriaAtiva(null)}>Todos</button>
+        <button type="button" className={categoriaAtiva === LANCAMENTOS ? 'ativo' : ''} onClick={() => setCategoriaAtiva(LANCAMENTOS)}>Lançamentos</button>
+        {categorias.map((c) => (
+          <button key={c} type="button" className={categoriaAtiva === c ? 'ativo' : ''} onClick={() => setCategoriaAtiva(c)}>{c}</button>
+        ))}
+        <button type="button" className="cat-filtros-mais" onClick={() => avisar('Filtros avançados chegando em breve. ✨')}>
+          <SlidersHorizontal size={15} /> Filtrar
+        </button>
+      </div>
+
+      {produtosTodos.length === 0 && <div className="cat-vazio">Em breve, novidades por aqui. ✨</div>}
+      {produtosTodos.length > 0 && produtosFiltrados.length === 0 && (
+        <div className="cat-vazio">{busca ? `Nenhum produto encontrado para "${busca}".` : 'Nenhum produto nessa categoria ainda.'}</div>
+      )}
+
+      {produtosFiltrados.length > 0 && (
+        <section className="cat-secao">
           <div className="cat-grid">
-            {c.produtos.map((p) => (
+            {produtosFiltrados.map((p) => (
               <button key={p.id} className="cat-card" onClick={() => setDetalhe(p)}>
                 <div className="cat-foto">
                   {p.fotos?.[0]
                     ? <img src={p.fotos[0]} alt={p.nome} loading="lazy" />
                     : <div className="cat-foto-vazia">{p.nome}</div>}
+                  {p.destaque && <span className="cat-destaque-badge">Destaque</span>}
                   {p.videos?.length > 0 && <span className="cat-video-badge">▶ vídeo</span>}
                   {!p.disponivel && <span className="cat-esgotado">esgotado</span>}
                   {p.descontoPct ? <span className="cat-desconto">−{p.descontoPct}%</span> : null}
@@ -199,7 +290,12 @@ export default function Catalogo() {
             ))}
           </div>
         </section>
-      ))}
+      )}
+
+      {/* CTA "Falar com a vendedora" — no fluxo da página, entre a grade e o rodapé (não flutua mais) */}
+      <div className="cat-fala-wrap">
+        <button type="button" className="cat-fala-cta" onClick={() => setAgente({})}>💬 Falar com {cat.vendedora.primeiroNome}</button>
+      </div>
 
       {detalhe && <DetalheProduto produto={detalhe} onFechar={() => setDetalhe(null)} onAdicionar={adicionar} />}
 
@@ -212,11 +308,6 @@ export default function Catalogo() {
       {verCarrinho && (
         <Carrinho itens={carrinho} totais={totais} corPrimaria={primaria} vendedora={cat.vendedora.primeiroNome}
           onMudarQtd={mudarQtd} onRemover={remover} onFechar={() => setVerCarrinho(false)} onFinalizar={finalizar} />
-      )}
-
-      {/* CTA fixo — abre a Vendedora Online (Agente 2) */}
-      {carrinho.length === 0 && !verCarrinho && (
-        <button className="cat-cta-fixo" onClick={() => setAgente({})}>💬 Falar com {cat.vendedora.primeiroNome}</button>
       )}
 
       {agente && (
@@ -458,50 +549,76 @@ function Carrinho({ itens, totais, corPrimaria, vendedora, onMudarQtd, onRemover
 export function CatalogoEstilos() {
   return (
     <style>{`
-      .cat-root { --cat-creme: #f5f0e6; min-height: 100vh; background: var(--cat-fundo); color: #111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; padding-bottom: 96px; }
+      .cat-root { min-height: 100vh; background: var(--cat-fundo); color: #111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; padding-bottom: 96px; }
       .cat-vazio { min-height: 70vh; display: flex; align-items: center; justify-content: center; color: #777; font-family: sans-serif; padding: 40px; text-align: center; }
-      /* Cabeçalho estilo perfil: capa (banner) + foto redonda sobreposta + cartão */
-      .cat-perfil { max-width: 680px; margin: 0 auto; }
-      .cat-capa { position: relative; width: 100%; aspect-ratio: 16 / 7; overflow: hidden; background: var(--cat-primaria, #111); }
-      .cat-capa > img { width: 100%; height: 100%; object-fit: cover; display: block; }
-      .cat-capa-marca { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-      .cat-capa-marca img { max-height: 70%; max-width: 80%; object-fit: contain; }
-      .cat-capa-marca span { color: #fff; font-size: clamp(22px, 7vw, 40px); font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
-      .cat-avatar-perfil { width: 108px; height: 108px; border-radius: 50%; overflow: hidden; margin: -54px auto 0; position: relative; z-index: 2; border: 4px solid var(--cat-fundo, #fff); background: var(--cat-creme); box-shadow: 0 4px 14px #0000002e; display: flex; align-items: center; justify-content: center; }
-      .cat-avatar-perfil img { width: 100%; height: 100%; object-fit: cover; }
-      .cat-avatar-perfil span { font-size: 36px; font-weight: 800; color: #b6a98e; }
-      .cat-cartao { background: var(--cat-fundo, #fff); margin: 10px 14px 0; border-radius: 16px; padding: 14px 18px 18px; text-align: center; box-shadow: 0 6px 20px #0000000f; }
-      .cat-nome-perfil { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: .3px; }
-      .cat-sep { color: var(--cat-primaria, #111); font-weight: 400; opacity: .55; margin: 0 2px; }
-      .cat-bio { margin: 8px auto 0; max-width: 460px; font-size: 13.5px; line-height: 1.5; color: #555; white-space: pre-line; }
-      .cat-atalhos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
-      .cat-atalho { padding: 11px 12px; border: 1px solid #00000014; background: #00000006; border-radius: 10px; font-size: 13px; font-weight: 600; color: #222; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
-      .cat-atalho:hover { background: #0000000d; }
-      .cat-atalho-full { grid-column: 1 / -1; background: var(--cat-primaria, #111); color: #fff; border-color: transparent; }
-      .cat-atalho-full:hover { filter: brightness(1.08); }
+      /* Cabeçalho: marca (cor da própria marca) + busca (filtra a grade toda, sem ir ao backend) + atalhos */
+      .cat-topo { background: var(--cat-primaria, #111); color: #fff; display: flex; align-items: center; gap: 20px; padding: 16px 24px; flex-wrap: wrap; }
+      .cat-topo-marca { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+      .cat-topo-marca img { max-height: 30px; max-width: 150px; object-fit: contain; }
+      .cat-topo-marca-nome { font-size: 19px; font-weight: 800; letter-spacing: .5px; line-height: 1; }
+      .cat-topo-marca-sub { font-size: 10.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--cat-fundo, #fff); opacity: .65; }
+      .cat-busca { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; max-width: 520px; margin: 0 auto; background: #fff; border-radius: 99px; padding: 11px 18px; color: #888; }
+      .cat-busca input { flex: 1; border: none; background: none; outline: none; font-size: 14px; color: #222; font-family: inherit; }
+      .cat-busca input::placeholder { color: #999; }
+      .cat-busca input[type="search"]::-webkit-search-cancel-button { cursor: pointer; }
+      .cat-topo-acoes { display: flex; gap: 22px; flex-shrink: 0; margin-left: auto; }
+      .cat-topo-icone { display: flex; flex-direction: column; align-items: center; gap: 2px; background: none; border: none; color: #fff; cursor: pointer; opacity: .92; }
+      .cat-topo-icone:hover { opacity: 1; }
+      .cat-topo-icone span { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+      @media (max-width: 720px) { .cat-topo { padding: 12px 16px; gap: 12px; } .cat-topo-acoes { gap: 14px; } .cat-topo-icone span { display: none; } }
+      /* Hero: produto em destaque no topo da vitrine (substitui o antigo cabeçalho de perfil) */
+      .cat-hero { max-width: 1100px; margin: 0 auto; padding: 28px 14px; display: grid; grid-template-columns: 1fr; gap: 22px; align-items: center; }
+      @media (min-width: 720px) { .cat-hero { grid-template-columns: 1fr 1fr; padding: 40px 24px; gap: 36px; } }
+      .cat-hero-texto { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+      .cat-hero-selo { display: inline-block; border: 1px solid var(--cat-primaria, #111); color: var(--cat-primaria, #111); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: 4px 12px; border-radius: 99px; }
+      .cat-hero-titulo { margin: 4px 0 0; font-size: clamp(26px, 4.5vw, 42px); font-weight: 800; line-height: 1.1; }
+      .cat-hero-desc { margin: 0; font-size: 14px; line-height: 1.6; color: #555; max-width: 440px; }
+      .cat-hero-btn { margin-top: 10px; background: var(--cat-primaria, #111); color: #fff; border: none; padding: 13px 22px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; }
+      .cat-hero-btn:hover { filter: brightness(1.1); }
+      /* Pontinhos do carrossel do hero — só aparece com 2+ produtos em destaque */
+      .cat-hero-dots { display: flex; gap: 8px; margin-top: 22px; }
+      .cat-hero-dots button { width: 8px; height: 8px; padding: 0; border: none; border-radius: 99px; background: #00000024; cursor: pointer; }
+      .cat-hero-dots button.ativo { background: var(--cat-primaria, #111); width: 22px; transition: width .2s ease; }
+      /* Filtros por categoria (+ "Lançamentos") — puramente client-side, soma com a busca */
+      .cat-filtros { max-width: 1100px; margin: 0 auto; padding: 4px 14px 18px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+      .cat-filtros::-webkit-scrollbar { display: none; }
+      .cat-filtros button { flex-shrink: 0; border: 1px solid #00000018; background: #fff; color: #444; font-size: 13px; font-weight: 600; padding: 9px 16px; border-radius: 99px; cursor: pointer; white-space: nowrap; }
+      .cat-filtros button.ativo { background: var(--cat-primaria, #111); border-color: transparent; color: #fff; }
+      .cat-filtros-mais { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+      /* Foto do hero "dissolve" nas bordas esquerda/direita em vez de terminar num corte reto */
+      .cat-hero-foto {
+        position: relative; aspect-ratio: 4/5; background: #f2f2f2; overflow: hidden; border-radius: 12px; border: none; padding: 0; cursor: pointer; display: block; width: 100%;
+        mask-image: linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%);
+        -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%);
+      }
+      .cat-hero-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .cat-destaque-badge { position: absolute; top: 8px; left: 8px; background: var(--cat-primaria, #111); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 99px; letter-spacing: .3px; text-transform: uppercase; }
       .cat-secao { max-width: 1100px; margin: 0 auto; padding: 26px 14px 6px; }
-      .cat-secao-titulo { font-size: 18px; font-weight: 700; letter-spacing: .5px; margin: 0 0 2px; text-transform: uppercase; }
-      .cat-secao-desc { margin: 0 0 14px; color: #666; font-size: 13px; }
-      .cat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-      @media (min-width: 640px) { .cat-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; } }
+      .cat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      @media (min-width: 640px) { .cat-grid { grid-template-columns: repeat(3, 1fr); gap: 18px; } }
       @media (min-width: 960px) { .cat-grid { grid-template-columns: repeat(4, 1fr); } }
-      .cat-card { border: none; background: transparent; padding: 0; cursor: pointer; text-align: left; }
-      .cat-foto { position: relative; aspect-ratio: 3/4; background: #f2f2f2; overflow: hidden; border-radius: 4px; }
+      .cat-card { border: 1px solid rgba(0,0,0,0.08); background: #fff; border-radius: 10px; padding: 0; cursor: pointer; text-align: left; overflow: hidden; transition: box-shadow .2s ease, border-color .2s ease; }
+      .cat-card:hover { border-color: rgba(0,0,0,0.14); box-shadow: 0 6px 18px rgba(0,0,0,0.07); }
+      .cat-foto { position: relative; aspect-ratio: 3/4; background: #f2f2f2; overflow: hidden; }
       .cat-foto img { width: 100%; height: 100%; object-fit: cover; transition: transform .35s ease; }
       .cat-card:hover .cat-foto img { transform: scale(1.04); }
       .cat-foto-vazia { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 13px; padding: 8px; text-align: center; }
       .cat-esgotado { position: absolute; top: 8px; left: 8px; background: #00000099; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 99px; text-transform: uppercase; letter-spacing: .5px; }
       .cat-video-badge { position: absolute; top: 8px; right: 8px; background: #000000aa; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 99px; letter-spacing: .3px; }
-      .cat-info { padding: 8px 2px 4px; }
+      .cat-info { padding: 10px 12px 12px; }
       .cat-nome { font-size: 13px; color: #222; line-height: 1.3; }
-      .cat-preco { font-size: 14px; font-weight: 700; margin-top: 2px; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+      .cat-preco { font-size: 14px; font-weight: 700; margin-top: 4px; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
       .cat-preco-antigo { color: #999; font-weight: 500; text-decoration: line-through; font-size: 12px; }
       .cat-preco-promo { color: #d12c2c; }
       .cat-desconto { position: absolute; bottom: 8px; left: 8px; background: #d12c2c; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; letter-spacing: .3px; }
-      .cat-outlet-tag { display: inline-block; margin-left: 8px; vertical-align: middle; background: #f59e0b; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 99px; letter-spacing: .5px; text-transform: uppercase; }
 
-      /* CTA / carrinho flutuante */
-      .cat-cta-fixo, .cat-cart-fab { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--cat-primaria); color: #fff; border: none; padding: 14px 26px; border-radius: 99px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px #00000033; z-index: 20; }
+      /* Carrinho flutuante */
+      .cat-cart-fab { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--cat-primaria); color: #fff; border: none; padding: 14px 26px; border-radius: 99px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px #00000033; z-index: 20; }
+
+      /* CTA "Falar com a vendedora" — no fluxo da página, entre a grade de produtos e o rodapé */
+      .cat-fala-wrap { max-width: 1100px; margin: 0 auto; padding: 26px 14px 6px; text-align: center; }
+      .cat-fala-cta { background: var(--cat-primaria); color: #fff; border: none; padding: 14px 26px; border-radius: 99px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px #00000022; }
+      .cat-fala-cta:hover { filter: brightness(1.1); }
 
       /* Modal base */
       .cat-modal-fundo { position: fixed; inset: 0; background: #00000077; display: flex; align-items: flex-end; justify-content: center; z-index: 30; }

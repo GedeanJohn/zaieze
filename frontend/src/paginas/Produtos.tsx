@@ -49,6 +49,8 @@ interface Produto {
   fornecedor?: string | null
   pesoGramas?: number | null
   faixaEtaria?: string | null
+  destaque?: boolean
+  destaqueEspecial?: boolean
   categoria?: { nome: string } | null
   marca?: { nome: string } | null
   colecao?: { nome: string } | null
@@ -77,6 +79,8 @@ interface FormProduto {
   fornecedor?: string
   pesoGramas?: string
   faixaEtaria?: string
+  destaque: boolean
+  destaqueEspecial: boolean
   fotos: string[]
   fotosCores: string[]
   videos: string[]
@@ -174,7 +178,7 @@ export default function Produtos() {
 
   function abrirNovo() {
     setErro('')
-    setForm({ nome: '', genero: 'FEMININO', referencia: '', precoVarejo: '', fotos: [], fotosCores: [], videos: [], variacoes: [{ ...VARIACAO_VAZIA }] })
+    setForm({ nome: '', genero: 'FEMININO', referencia: '', precoVarejo: '', destaque: false, destaqueEspecial: false, fotos: [], fotosCores: [], videos: [], variacoes: [{ ...VARIACAO_VAZIA }] })
   }
 
   function abrirEdicao(p: Produto) {
@@ -197,6 +201,8 @@ export default function Produtos() {
       fornecedor: p.fornecedor ?? '',
       pesoGramas: p.pesoGramas != null ? String(p.pesoGramas) : '',
       faixaEtaria: p.faixaEtaria ?? '',
+      destaque: p.destaque ?? false,
+      destaqueEspecial: p.destaqueEspecial ?? false,
       fotos: p.fotos ?? [],
       fotosCores: (p.fotos ?? []).map((_, i) => p.fotosCores?.[i] ?? ''),
       videos: p.videos ?? [],
@@ -237,6 +243,8 @@ export default function Produtos() {
       fornecedor: limpa(form.fornecedor),
       pesoGramas: form.pesoGramas ? Number(form.pesoGramas) : undefined,
       faixaEtaria: limpa(form.faixaEtaria),
+      destaque: form.destaque,
+      destaqueEspecial: form.destaqueEspecial,
       fotos: form.fotos,
       fotosCores: form.fotos.map((_, i) => form.fotosCores[i] ?? ''),
       videos: form.videos,
@@ -410,6 +418,20 @@ export default function Produtos() {
                 <label>{t('prod.precoVarejoLabel')}</label>
                 <input type="text" inputMode="decimal" placeholder="0,00" value={form.precoVarejo} onChange={(e) => setForm({ ...form, precoVarejo: sanitizarMoeda(e.target.value) })} onFocus={(e) => e.target.select()} onMouseUp={(e) => e.preventDefault()} required />
               </div>
+            </div>
+
+            <div className="linha-campos">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 400 }}>
+                <input type="checkbox" checked={form.destaque} onChange={(e) => setForm({ ...form, destaque: e.target.checked })} />
+                {t('prod.destaqueLabel')}
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 400 }}>
+                <input type="checkbox" checked={form.destaqueEspecial} onChange={(e) => setForm({ ...form, destaqueEspecial: e.target.checked })} />
+                {t('prod.destaqueEspecialLabel')}
+              </label>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', margin: '-6px 0 14px' }}>
+              {t('prod.destaqueAjuda')} {t('prod.destaqueEspecialAjuda')}
             </div>
 
             {/* Fotos */}

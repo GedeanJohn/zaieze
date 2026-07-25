@@ -94,11 +94,16 @@ function montarPaleta(corPrimaria: string, corSecundaria: string): Paleta {
 /** "Adicionar à Tela de Início" mostra a MARCA (logo + nome da marca/vendedora), não o ícone/nome
  *  genérico do ZAIEZE — mesma estrutura de usePwaPersonalizado (VitrineAssessora.tsx), mas aqui a
  *  imagem é a logo da marca (não a foto da vendedora): é a vitrine dela, não um perfil pessoal.
- *  Troca o <link rel="manifest"> por um gerado em memória (Blob URL, sem rota nova no backend) e o
- *  ícone/título usados pelo "Adicionar à Tela de Início" do iOS. Restaura tudo ao sair da tela. */
-function usePwaPersonalizado(p: Perfil | null, corFundo: string) {
+ *  O <link rel="manifest"> aponta pro manifest.webmanifest gerado pelo backend (rota pública em
+ *  catalogo.routes.ts) — não um Blob URL em memória: o Chrome resolve a instalabilidade/ícone do
+ *  app (Android "Adicionar à Tela de Início"/WebAPK) a partir da URL que o <link> tinha no
+ *  carregamento da página, então uma troca via JS só funciona se apontar pra uma URL de rede de
+ *  verdade (um blob: nunca vira WebAPK — ficava sempre com o ícone genérico do ZAIEZE mesmo com
+ *  o título certo, que vem do document.title por outro caminho). Também troca o ícone/título
+ *  usados pelo "Adicionar à Tela de Início" do iOS. Restaura tudo ao sair da tela. */
+function usePwaPersonalizado(p: Perfil | null, redeSlug: string | null, vendSlug: string | undefined) {
   useEffect(() => {
-    if (!p || !p.marca.logoUrl) return
+    if (!p || !p.marca.logoUrl || !redeSlug || !vendSlug) return
     const titulo = `${p.marca.nome}/${p.vendedora.primeiroNome}`
 
     const linkManifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')
@@ -113,34 +118,15 @@ function usePwaPersonalizado(p: Perfil | null, corFundo: string) {
       titulo: document.title,
     }
 
-    const manifest = {
-      name: titulo,
-      // Android usa short_name (não name) pro rótulo sob o ícone na Tela de Início — precisa
-      // trazer a marca junto, senão só aparece o primeiro nome da vendedora.
-      short_name: titulo,
-      start_url: `${window.location.pathname}?pwa=1`,
-      scope: window.location.pathname,
-      display: 'standalone',
-      background_color: corFundo,
-      theme_color: corFundo,
-      icons: [
-        { src: p.marca.logoUrl, sizes: '192x192', purpose: 'any' },
-        { src: p.marca.logoUrl, sizes: '512x512', purpose: 'any' },
-      ],
-    }
-    const blobUrl = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }))
-
-    if (linkManifest) linkManifest.href = blobUrl
+    if (linkManifest) linkManifest.href = `/api/catalogo/publico/${redeSlug}/${vendSlug}/manifest.webmanifest`
     if (linkAppleIcon) linkAppleIcon.href = p.marca.logoUrl
-    // Chrome/Android usa o favicon (não o apple-touch-icon) como ícone do atalho "Adicionar à
-    // Tela de Início" quando o manifesto em Blob URL não é instalável como WebAPK completo —
-    // sem isso, o atalho fica com o título certo (marca/vendedora) mas o logo genérico do ZAIEZE.
+    // Chrome/Android usa o favicon como ícone de fallback em alguns fluxos de atalho — sem
+    // custo trocar também, mesmo com o manifest de verdade acima cobrindo o caso principal.
     if (linkFavicon) linkFavicon.href = p.marca.logoUrl
     if (metaAppleTitle) metaAppleTitle.content = titulo
     document.title = titulo
 
     return () => {
-      URL.revokeObjectURL(blobUrl)
       if (linkManifest && original.manifest) linkManifest.href = original.manifest
       if (linkAppleIcon && original.appleIcon) linkAppleIcon.href = original.appleIcon
       if (linkFavicon && original.favicon) linkFavicon.href = original.favicon
@@ -148,7 +134,7 @@ function usePwaPersonalizado(p: Perfil | null, corFundo: string) {
       document.title = original.titulo
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [p])
+  }, [p, redeSlug, vendSlug])
 }
 
 const NAV_ITENS = [
@@ -180,7 +166,7 @@ export default function PerfilVendedora() {
   }, [redeSlug, vendSlug])
 
   const paleta = p ? montarPaleta(p.marca.corPrimaria, p.marca.corSecundaria) : null
-  usePwaPersonalizado(p, paleta?.fundo ?? '#ffffff')
+  usePwaPersonalizado(p, redeSlug, vendSlug)
 
   useMetaTags({
     titulo: p ? `${p.vendedora.nome} | ${p.marca.nome}` : 'Perfil',

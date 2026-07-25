@@ -267,6 +267,41 @@ export async function catalogoRoutes(app: FastifyInstance) {
     }
   })
 
+  // Manifesto PWA por vendedora: "Adicionar à Tela de Início" (Android) precisa buscar o
+  // manifest.webmanifest por uma URL de rede de verdade — um Blob URL gerado em JS (como era
+  // antes) não é instalável como app (WebAPK): o Chrome resolve o ícone/nome do app a partir do
+  // <link rel="manifest"> tal como estava no carregamento da página, ignorando a troca feita
+  // depois via JS, então caía sempre no manifest.webmanifest estático (ícone genérico ZAIEZE)
+  // mesmo com o <link> já reescrito para a logo da marca. Mesmo padrão de assessores.routes.ts.
+  app.get('/publico/:redeSlug/:vendSlug/manifest.webmanifest', async (request, reply) => {
+    const { redeSlug, vendSlug } = request.params as { redeSlug: string; vendSlug: string }
+    const ctx = await resolverVendedoraPublica(redeSlug, vendSlug)
+    if (!ctx) return reply.code(404).send({ erro: 'Catálogo indisponível' })
+    const { rede, vend } = ctx
+    const titulo = `${rede.nome}/${vend.nome.trim().split(/\s+/)[0]}`
+    reply.type('application/manifest+json')
+    return {
+      name: titulo,
+      short_name: titulo,
+      description: `Catálogo de moda — ${titulo}`,
+      start_url: `/${vendSlug}?pwa=1`,
+      scope: `/${vendSlug}`,
+      display: 'standalone',
+      background_color: '#000000',
+      theme_color: '#000000',
+      icons: rede.logoUrl
+        ? [
+            { src: rede.logoUrl, sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: rede.logoUrl, sizes: '512x512', type: 'image/png', purpose: 'any' },
+          ]
+        : [
+            { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+            { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          ],
+    }
+  })
+
   // Lista completa dos depoimentos aprovados da vendedora (pro "ver mais" no perfil público).
   app.get('/publico/:redeSlug/:vendSlug/avaliacoes', async (request, reply) => {
     const { redeSlug, vendSlug } = request.params as { redeSlug: string; vendSlug: string }

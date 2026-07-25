@@ -145,67 +145,68 @@ export default function MeusPedidos({ redeSlug, vendSlug, abaInicial, acento, on
   }
 
   return (
-    <div className="pv-modal-fundo" onClick={onClose}>
-      <div className="pv-modal" style={{ width: 'min(480px, 100%)', textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="pv-modal-fechar" onClick={onClose} aria-label="Fechar"><X size={18} /></button>
-        <h3 className="pv-modal-nome" style={{ textAlign: 'center' }}>Meus pedidos</h3>
+    <div className="mp-fundo" onClick={onClose}>
+      <MeusPedidosEstilos />
+      <div className="mp-modal" style={{ width: 'min(480px, 100%)', textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="mp-fechar" onClick={onClose} aria-label="Fechar"><X size={18} /></button>
+        <h3 className="mp-titulo" style={{ textAlign: 'center' }}>Meus pedidos</h3>
 
         {carregando ? (
-          <p className="pv-modal-vazio">Carregando…</p>
+          <p className="mp-vazio">Carregando…</p>
         ) : etapa === 'telefone' ? (
           <>
-            <p className="pv-modal-vazio" style={{ textAlign: 'left', marginBottom: 12 }}>Informe o WhatsApp que você usou pra comprar — vamos mandar um código de confirmação por lá.</p>
-            <input className="pv-avaliacao-input" placeholder="Seu WhatsApp (com DDD)" value={telefone}
+            <p className="mp-vazio" style={{ textAlign: 'left', marginBottom: 12 }}>Informe o WhatsApp que você usou pra comprar — vamos mandar um código de confirmação por lá.</p>
+            <input className="mp-input" placeholder="Seu WhatsApp (com DDD)" value={telefone}
               onChange={(e) => setTelefone(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && enviarCodigo()} />
-            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: '#d8d3ca', margin: '10px 0' }}>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: '#555', margin: '10px 0' }}>
               <input type="checkbox" checked={aceiteTermo} onChange={(e) => setAceiteTermo(e.target.checked)} style={{ marginTop: 2 }} />
-              <span>Li e aceito <button type="button" className="pv-avaliar-link" style={{ fontSize: 12 }} onClick={abrirTermo}>o termo de responsabilidade</button>.</span>
+              <span>Li e aceito <button type="button" className="mp-link" style={{ fontSize: 12 }} onClick={abrirTermo}>o termo de responsabilidade</button>.</span>
             </label>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: '#d8d3ca', marginBottom: 14 }}>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: '#555', marginBottom: 14 }}>
               <input type="checkbox" checked={lembrar} onChange={(e) => setLembrar(e.target.checked)} />
               Lembrar neste aparelho
             </label>
-            {erro && <p className="pv-modal-vazio" style={{ color: '#e5484d' }}>{erro}</p>}
-            <button type="button" className="pv-modal-enviar" disabled={enviandoCodigo} onClick={enviarCodigo}>
+            {erro && <p className="mp-vazio" style={{ color: '#e5484d' }}>{erro}</p>}
+            <button type="button" className="mp-enviar" style={{ background: acento }} disabled={enviandoCodigo} onClick={enviarCodigo}>
               {enviandoCodigo ? 'Enviando…' : 'Enviar código por WhatsApp'}
             </button>
           </>
         ) : etapa === 'codigo' ? (
           <>
-            <p className="pv-modal-vazio" style={{ textAlign: 'left', marginBottom: 12 }}>Enviamos um código de 6 dígitos pro WhatsApp <strong>{telefone}</strong>.</p>
-            <input className="pv-avaliacao-input" placeholder="000000" maxLength={6} inputMode="numeric" value={codigo}
+            <p className="mp-vazio" style={{ textAlign: 'left', marginBottom: 12 }}>Enviamos um código de 6 dígitos pro WhatsApp <strong>{telefone}</strong>.</p>
+            <input className="mp-input" placeholder="000000" maxLength={6} inputMode="numeric" value={codigo}
               onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))} onKeyDown={(e) => e.key === 'Enter' && confirmarCodigo()} />
-            {erro && <p className="pv-modal-vazio" style={{ color: '#e5484d' }}>{erro}</p>}
-            <button type="button" className="pv-modal-enviar" disabled={confirmando} onClick={confirmarCodigo}>
+            {erro && <p className="mp-vazio" style={{ color: '#e5484d' }}>{erro}</p>}
+            <button type="button" className="mp-enviar" style={{ background: acento }} disabled={confirmando} onClick={confirmarCodigo}>
               {confirmando ? 'Confirmando…' : 'Confirmar código'}
             </button>
-            <button type="button" className="pv-avaliar-link" style={{ marginTop: 10 }} onClick={trocarNumero}>Trocar número / reenviar código</button>
+            <button type="button" className="mp-link" style={{ marginTop: 10 }} onClick={trocarNumero}>Trocar número / reenviar código</button>
           </>
         ) : (
           <>
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <button type="button" className={`pv-tab${aba === 'abertos' ? ' ativa' : ''}`} style={aba === 'abertos' ? { borderColor: acento, color: acento } : undefined} onClick={() => setAba('abertos')}>
+              <button type="button" className={`mp-tab${aba === 'abertos' ? ' ativa' : ''}`} style={aba === 'abertos' ? { borderColor: acento, color: acento } : undefined} onClick={() => setAba('abertos')}>
                 Em aberto {abertos.length > 0 && `(${abertos.length})`}
               </button>
-              <button type="button" className={`pv-tab${aba === 'fechados' ? ' ativa' : ''}`} style={aba === 'fechados' ? { borderColor: acento, color: acento } : undefined} onClick={() => setAba('fechados')}>
+              <button type="button" className={`mp-tab${aba === 'fechados' ? ' ativa' : ''}`} style={aba === 'fechados' ? { borderColor: acento, color: acento } : undefined} onClick={() => setAba('fechados')}>
                 Fechados {fechados.length > 0 && `(${fechados.length})`}
               </button>
             </div>
 
             {aba === 'abertos' && (
               abertos.length === 0
-                ? <p className="pv-modal-vazio">Nenhum pedido em aberto no momento.</p>
+                ? <p className="mp-vazio">Nenhum pedido em aberto no momento.</p>
                 : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {abertos.map((p) => (
-                      <div key={p.id} className="pv-pedidoItem">
-                        <div style={{ fontSize: 12, color: '#9a9a9a' }}>{dataBR(p.createdAt)}</div>
+                      <div key={p.id} className="mp-item">
+                        <div style={{ fontSize: 12, color: '#888' }}>{dataBR(p.createdAt)}</div>
                         <div style={{ fontSize: 14, margin: '4px 0' }}>{textoAberto(p)}</div>
                         {p.pecas != null && p.subtotal != null && (
-                          <div style={{ fontSize: 12, color: '#c9c4ba' }}>{p.pecas} peça(s) · {formataReal(Number(p.subtotal))}</div>
+                          <div style={{ fontSize: 12, color: '#777' }}>{p.pecas} peça(s) · {formataReal(Number(p.subtotal))}</div>
                         )}
                         {p.tokenOrcamento && p.statusOrcamento === 'ENVIADO' && (
-                          <button type="button" className="pv-modal-enviar" style={{ marginTop: 8, background: acento }} onClick={() => abrirOrcamento(p.tokenOrcamento!)}>
+                          <button type="button" className="mp-enviar" style={{ marginTop: 8, background: acento }} onClick={() => abrirOrcamento(p.tokenOrcamento!)}>
                             Ver orçamento
                           </button>
                         )}
@@ -217,17 +218,17 @@ export default function MeusPedidos({ redeSlug, vendSlug, abaInicial, acento, on
 
             {aba === 'fechados' && (
               fechados.length === 0
-                ? <p className="pv-modal-vazio">Nenhum pedido fechado ainda.</p>
+                ? <p className="mp-vazio">Nenhum pedido fechado ainda.</p>
                 : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     {fechados.map((p) => (
-                      <div key={p.id} className="pv-pedidoItem">
+                      <div key={p.id} className="mp-item">
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                           <span>Pedido {p.id.slice(-6).toUpperCase()} · {dataBR(p.createdAt)}</span>
                           <strong>{formataReal(Number(p.total))}</strong>
                         </div>
                         <div style={{ margin: '10px 0' }}><EtapasEntrega atual={p.statusEntrega} cor={acento} /></div>
-                        <button type="button" className="pv-avaliar-link" onClick={() => abrirPedido(p.tokenPublico)}>Ver comprovante completo</button>
+                        <button type="button" className="mp-link" onClick={() => abrirPedido(p.tokenPublico)}>Ver comprovante completo</button>
                       </div>
                     ))}
                   </div>
@@ -238,15 +239,35 @@ export default function MeusPedidos({ redeSlug, vendSlug, abaInicial, acento, on
       </div>
 
       {termoAberto && (
-        <div className="pv-modal-fundo" onClick={() => setTermoAberto(false)}>
-          <div className="pv-modal" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="pv-modal-fechar" onClick={() => setTermoAberto(false)} aria-label="Fechar"><X size={18} /></button>
-            <h3 className="pv-modal-nome">Termo de responsabilidade</h3>
-            <p style={{ fontSize: 14, lineHeight: 1.6, color: '#d8d3ca', textAlign: 'left' }}>{termoTexto || 'Carregando…'}</p>
-            <button type="button" className="pv-modal-enviar" onClick={() => setTermoAberto(false)}>Fechar</button>
+        <div className="mp-fundo" onClick={() => setTermoAberto(false)}>
+          <div className="mp-modal" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="mp-fechar" onClick={() => setTermoAberto(false)} aria-label="Fechar"><X size={18} /></button>
+            <h3 className="mp-titulo">Termo de responsabilidade</h3>
+            <p style={{ fontSize: 14, lineHeight: 1.6, color: '#555', textAlign: 'left' }}>{termoTexto || 'Carregando…'}</p>
+            <button type="button" className="mp-enviar" onClick={() => setTermoAberto(false)}>Fechar</button>
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+/** Estilos próprios (não depende do CSS da página que o abre) — funciona igual na
+ *  PerfilVendedora.tsx e na vitrine (Catalogo.tsx). */
+function MeusPedidosEstilos() {
+  return (
+    <style>{`
+      .mp-fundo { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; z-index: 70; padding: 16px; }
+      .mp-modal { background: #fff; border: 1px solid #00000014; border-radius: 16px; padding: 28px; width: min(400px, 100%); max-height: 88vh; overflow-y: auto; position: relative; text-align: center; color: #1c1a17; }
+      .mp-fechar { position: absolute; top: 14px; right: 14px; background: none; border: none; color: #888; cursor: pointer; }
+      .mp-titulo { margin: 0 0 18px; font-size: 18px; }
+      .mp-vazio { color: #888; font-size: 13px; }
+      .mp-input { width: 100%; background: #fff; border: 1px solid #ddd; border-radius: 8px; color: #1c1a17; padding: 10px 12px; font-size: 14px; font-family: inherit; margin-bottom: 10px; }
+      .mp-enviar { width: 100%; border: none; padding: 12px 14px; border-radius: 10px; background: #111; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; }
+      .mp-link { background: none; border: none; color: #111; font-size: 12px; font-weight: 700; cursor: pointer; padding: 0; }
+      .mp-tab { flex: 1; background: none; border: 1px solid #ddd; border-radius: 8px; padding: 8px; color: #666; font-size: 12px; font-weight: 700; cursor: pointer; }
+      .mp-tab.ativa { background: #00000008; }
+      .mp-item { background: #00000006; border: 1px solid #00000012; border-radius: 10px; padding: 12px 14px; color: #1c1a17; text-align: left; }
+    `}</style>
   )
 }

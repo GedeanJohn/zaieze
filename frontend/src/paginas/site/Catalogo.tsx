@@ -1,11 +1,22 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { useParams } from 'react-router-dom'
-import { Heart, Search, ShoppingBag, SlidersHorizontal } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { FileText, Heart, Home, MoreHorizontal, Search, ShoppingBag, SlidersHorizontal, UserRound, X } from 'lucide-react'
 import { api } from '../../api'
 import { HOST } from '../../host'
 import AgenteLoja from './AgenteLoja'
+import MeusPedidos from './MeusPedidos'
 import { useMetaTags } from '../../lib/useMetaTags'
 import { useToast } from '../../componentes/Toast'
+
+// Mesmo rodapé de navegação da PerfilVendedora.tsx — aqui "Catálogo" é sempre o item ativo
+// (esta página É a vitrine); "Início"/"Perfil" levam de volta pro perfil da vendedora.
+const NAV_ITENS = [
+  { id: 'inicio', rotulo: 'Início', Icone: Home },
+  { id: 'catalogo', rotulo: 'Catálogo', Icone: ShoppingBag },
+  { id: 'perfil', rotulo: 'Perfil', Icone: UserRound },
+  { id: 'pedidos', rotulo: 'Pedidos', Icone: FileText },
+  { id: 'mais', rotulo: 'Mais', Icone: MoreHorizontal },
+] as const
 
 /** Sem acento/caixa — "Vestido Luná" casa com a busca "vestido luna". */
 function normalizarBusca(s: string): string {
@@ -48,10 +59,17 @@ const PESO_PADRAO = 300 // g por peça quando o produto não tem peso cadastrado
 const VOLUME_PECA_L = 0.8 // litros estimados por peça dobrada
 const LANCAMENTO_DIAS = 30 // produto criado há até esse tanto de dias conta como "Lançamento"
 const LANCAMENTOS = '__lancamentos__' // valor sentinela do filtro (não é uma categoria de verdade)
+const FAVORITOS = '__favoritos__' // idem, acionado pelo ícone de coração (card) e pelo atalho do cabeçalho
+
+/** Favoritos são só do navegador (sem conta de cliente) — uma lista por vendedora/loja. */
+function chaveFavoritos(redeSlug: string, vendSlug: string): string {
+  return `zaieze_favoritos_${redeSlug}_${vendSlug}`
+}
 
 export default function Catalogo() {
   const { vendSlug } = useParams<{ vendSlug: string }>()
   const redeSlug = HOST.slug
+  const navigate = useNavigate()
   const avisar = useToast()
   const [cat, setCat] = useState<Catalogo | null>(null)
   const [erro, setErro] = useState('')
@@ -61,6 +79,38 @@ export default function Catalogo() {
   const [agente, setAgente] = useState<{ produtoId?: string; produtoNome?: string; resumo?: string; itens?: ItemPedido[] } | null>(null)
   const [busca, setBusca] = useState('')
   const [categoriaAtiva, setCategoriaAtiva] = useState<string | null>(null) // null = "Todos"
+  const [favoritos, setFavoritos] = useState<Set<string>>(new Set())
+  const [drawerAberto, setDrawerAberto] = useState(false)
+  const [meusPedidosAberto, setMeusPedidosAberto] = useState<'abertos' | 'fechados' | null>(null)
+
+  function irPara(id: (typeof NAV_ITENS)[number]['id']) {
+    setDrawerAberto(false)
+    if (id === 'inicio' || id === 'perfil') { navigate(`/${vendSlug}`); return }
+    if (id === 'catalogo') { window.scrollTo({ top: 0, behavior: 'smooth' }); return }
+    if (id === 'pedidos') { setMeusPedidosAberto('fechados'); return }
+    setDrawerAberto(true)
+  }
+
+  // Carrega os favoritos salvos no navegador assim que sabe de qual loja/vendedora se trata.
+  useEffect(() => {
+    if (!redeSlug || !vendSlug) return
+    try {
+      const salvos = localStorage.getItem(chaveFavoritos(redeSlug, vendSlug))
+      if (salvos) setFavoritos(new Set(JSON.parse(salvos)))
+    } catch { /* localStorage indisponível (modo privado etc.) — segue sem favoritos salvos */ }
+  }, [redeSlug, vendSlug])
+
+  function alternarFavorito(id: string, e: React.SyntheticEvent) {
+    e.stopPropagation() // o coração fica dentro do card clicável (abre o detalhe do produto)
+    setFavoritos((atual) => {
+      const novo = new Set(atual)
+      novo.has(id) ? novo.delete(id) : novo.add(id)
+      if (redeSlug && vendSlug) {
+        try { localStorage.setItem(chaveFavoritos(redeSlug, vendSlug), JSON.stringify([...novo])) } catch { /* ignora */ }
+      }
+      return novo
+    })
+  }
 
   // Grade única: sem separação visual por coleção — o cliente vê tudo liberado, uma vitrine só.
   const produtosTodos = useMemo(() => (cat?.colecoes ?? []).flatMap((c) => c.produtos), [cat])
@@ -77,6 +127,7 @@ export default function Catalogo() {
   const produtosFiltrados = useMemo(() => {
     let lista = produtosTodos
     if (categoriaAtiva === LANCAMENTOS) lista = lista.filter(ehLancamento)
+    else if (categoriaAtiva === FAVORITOS) lista = lista.filter((p) => favoritos.has(p.id))
     else if (categoriaAtiva) lista = lista.filter((p) => p.categoria === categoriaAtiva)
     if (buscaNorm) {
       lista = lista.filter((p) =>
@@ -86,7 +137,7 @@ export default function Catalogo() {
     }
     return lista
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [produtosTodos, buscaNorm, categoriaAtiva])
+  }, [produtosTodos, buscaNorm, categoriaAtiva, favoritos])
 
   // Produtos que giram no carrossel do topo: todos os "destaqueEspecial"; sem nenhum marcado,
   // cai nos "destaque" comuns. Some durante uma busca ativa — não faz sentido puxar atenção pro
@@ -212,9 +263,12 @@ export default function Catalogo() {
         </label>
 
         <div className="cat-topo-acoes">
-          <button type="button" className="cat-topo-icone" onClick={() => avisar('Favoritos chegando em breve. ✨')}>
-            <Heart size={20} />
-            <span>Favoritos</span>
+          <button
+            type="button" className={`cat-topo-icone${categoriaAtiva === FAVORITOS ? ' ativo' : ''}`}
+            onClick={() => setCategoriaAtiva((c) => (c === FAVORITOS ? null : FAVORITOS))}
+          >
+            <Heart size={20} fill={categoriaAtiva === FAVORITOS ? 'currentColor' : 'none'} />
+            <span>Favoritos{favoritos.size > 0 ? ` (${favoritos.size})` : ''}</span>
           </button>
           <button type="button" className="cat-topo-icone" onClick={() => setVerCarrinho(true)}>
             <ShoppingBag size={20} />
@@ -222,6 +276,19 @@ export default function Catalogo() {
           </button>
         </div>
       </header>
+
+      {drawerAberto && (
+        <div className="cat-drawer-fundo" onClick={() => setDrawerAberto(false)}>
+          <nav className="cat-drawer" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="cat-drawer-fechar" onClick={() => setDrawerAberto(false)} aria-label="Fechar"><X size={18} /></button>
+            {NAV_ITENS.map(({ id, rotulo, Icone }) => (
+              <button key={id} type="button" className="cat-drawer-item" onClick={() => irPara(id)}>
+                <Icone size={18} /> {rotulo}
+              </button>
+            ))}
+          </nav>
+        </div>
+      )}
 
       {produtoDestaque && (
         <section className="cat-hero">
@@ -262,7 +329,11 @@ export default function Catalogo() {
 
       {produtosTodos.length === 0 && <div className="cat-vazio">Em breve, novidades por aqui. ✨</div>}
       {produtosTodos.length > 0 && produtosFiltrados.length === 0 && (
-        <div className="cat-vazio">{busca ? `Nenhum produto encontrado para "${busca}".` : 'Nenhum produto nessa categoria ainda.'}</div>
+        <div className="cat-vazio">
+          {busca ? `Nenhum produto encontrado para "${busca}".`
+            : categoriaAtiva === FAVORITOS ? 'Você ainda não favoritou nenhuma peça. ♡'
+            : 'Nenhum produto nessa categoria ainda.'}
+        </div>
       )}
 
       {produtosFiltrados.length > 0 && (
@@ -278,6 +349,14 @@ export default function Catalogo() {
                   {p.videos?.length > 0 && <span className="cat-video-badge">▶ vídeo</span>}
                   {!p.disponivel && <span className="cat-esgotado">esgotado</span>}
                   {p.descontoPct ? <span className="cat-desconto">−{p.descontoPct}%</span> : null}
+                  <span
+                    role="button" tabIndex={0} aria-label={favoritos.has(p.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                    className={`cat-favorito${favoritos.has(p.id) ? ' ativo' : ''}`}
+                    onClick={(e) => alternarFavorito(p.id, e)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternarFavorito(p.id, e) } }}
+                  >
+                    <Heart size={16} fill={favoritos.has(p.id) ? 'currentColor' : 'none'} />
+                  </span>
                 </div>
                 <div className="cat-info">
                   <div className="cat-nome">{p.nome}</div>
@@ -322,6 +401,29 @@ export default function Catalogo() {
       )}
 
       <footer className="cat-rodape">{cat.marca.nome} · powered by ZAIEZE</footer>
+
+      {/* Mesmo rodapé de navegação da PerfilVendedora.tsx — aqui "Catálogo" fica ativo */}
+      <nav className="cat-bottom-nav">
+        {NAV_ITENS.map(({ id, rotulo, Icone }) => (
+          <button key={id} type="button" className={`cat-nav-item${id === 'catalogo' ? ' ativo' : ''}`} onClick={() => irPara(id)}>
+            <span className="cat-nav-icone">
+              {id === 'catalogo' ? (
+                <>
+                  <Icone size={18} />
+                  <span className="cat-nav-icone-rotulo">{rotulo}</span>
+                </>
+              ) : (
+                <Icone size={20} />
+              )}
+            </span>
+            {id !== 'catalogo' && rotulo}
+          </button>
+        ))}
+      </nav>
+
+      {meusPedidosAberto && (
+        <MeusPedidos redeSlug={redeSlug!} vendSlug={vendSlug!} abaInicial={meusPedidosAberto} acento={primaria} onClose={() => setMeusPedidosAberto(null)} />
+      )}
     </div>
   )
 }
@@ -549,7 +651,7 @@ function Carrinho({ itens, totais, corPrimaria, vendedora, onMudarQtd, onRemover
 export function CatalogoEstilos() {
   return (
     <style>{`
-      .cat-root { min-height: 100vh; background: var(--cat-fundo); color: #111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; padding-bottom: 96px; }
+      .cat-root { min-height: 100vh; background: var(--cat-fundo); color: #111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; padding-bottom: 128px; }
       .cat-vazio { min-height: 70vh; display: flex; align-items: center; justify-content: center; color: #777; font-family: sans-serif; padding: 40px; text-align: center; }
       /* Cabeçalho: marca (cor da própria marca) + busca (filtra a grade toda, sem ir ao backend) + atalhos */
       .cat-topo { background: var(--cat-primaria, #111); color: #fff; display: flex; align-items: center; gap: 20px; padding: 16px 24px; flex-wrap: wrap; }
@@ -564,11 +666,15 @@ export function CatalogoEstilos() {
       .cat-topo-acoes { display: flex; gap: 22px; flex-shrink: 0; margin-left: auto; }
       .cat-topo-icone { display: flex; flex-direction: column; align-items: center; gap: 2px; background: none; border: none; color: #fff; cursor: pointer; opacity: .92; }
       .cat-topo-icone:hover { opacity: 1; }
+      .cat-topo-icone.ativo { color: #ff6b6b; opacity: 1; }
       .cat-topo-icone span { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
       @media (max-width: 720px) { .cat-topo { padding: 12px 16px; gap: 12px; } .cat-topo-acoes { gap: 14px; } .cat-topo-icone span { display: none; } }
       /* Hero: produto em destaque no topo da vitrine (substitui o antigo cabeçalho de perfil) */
       .cat-hero { max-width: 1100px; margin: 0 auto; padding: 28px 14px; display: grid; grid-template-columns: 1fr; gap: 22px; align-items: center; }
-      @media (min-width: 720px) { .cat-hero { grid-template-columns: 1fr 1fr; padding: 40px 24px; gap: 36px; } }
+      /* No desktop o banner fica bem mais baixo/retangular (~metade da altura) — só a foto muda
+         de proporção (4/5 → 8/5, a mesma largura com metade da altura); no mobile empilhado
+         continua alta, que é o formato que funciona ali. */
+      @media (min-width: 720px) { .cat-hero { grid-template-columns: 1fr 1fr; padding: 24px 24px; gap: 36px; } }
       .cat-hero-texto { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
       .cat-hero-selo { display: inline-block; border: 1px solid var(--cat-primaria, #111); color: var(--cat-primaria, #111); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: 4px 12px; border-radius: 99px; }
       .cat-hero-titulo { margin: 4px 0 0; font-size: clamp(26px, 4.5vw, 42px); font-weight: 800; line-height: 1.1; }
@@ -591,7 +697,8 @@ export function CatalogoEstilos() {
         mask-image: linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%);
         -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%);
       }
-      .cat-hero-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      @media (min-width: 720px) { .cat-hero-foto { aspect-ratio: 8/5; } } /* metade da altura do 4/5 na mesma largura */
+      .cat-hero-foto img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
       .cat-destaque-badge { position: absolute; top: 8px; left: 8px; background: var(--cat-primaria, #111); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 99px; letter-spacing: .3px; text-transform: uppercase; }
       .cat-secao { max-width: 1100px; margin: 0 auto; padding: 26px 14px 6px; }
       .cat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
@@ -604,7 +711,15 @@ export function CatalogoEstilos() {
       .cat-card:hover .cat-foto img { transform: scale(1.04); }
       .cat-foto-vazia { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 13px; padding: 8px; text-align: center; }
       .cat-esgotado { position: absolute; top: 8px; left: 8px; background: #00000099; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 99px; text-transform: uppercase; letter-spacing: .5px; }
-      .cat-video-badge { position: absolute; top: 8px; right: 8px; background: #000000aa; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 99px; letter-spacing: .3px; }
+      /* Vídeo fica embaixo à direita — o topo direito agora é do coração de favoritar */
+      .cat-video-badge { position: absolute; bottom: 8px; right: 8px; background: #000000aa; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 99px; letter-spacing: .3px; }
+      .cat-favorito {
+        position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%;
+        background: #ffffffe0; color: #333; display: flex; align-items: center; justify-content: center;
+        cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: transform .15s ease, color .15s ease;
+      }
+      .cat-favorito:hover { transform: scale(1.1); }
+      .cat-favorito.ativo { color: #d12c2c; }
       .cat-info { padding: 10px 12px 12px; }
       .cat-nome { font-size: 13px; color: #222; line-height: 1.3; }
       .cat-preco { font-size: 14px; font-weight: 700; margin-top: 4px; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
@@ -612,13 +727,32 @@ export function CatalogoEstilos() {
       .cat-preco-promo { color: #d12c2c; }
       .cat-desconto { position: absolute; bottom: 8px; left: 8px; background: #d12c2c; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; letter-spacing: .3px; }
 
-      /* Carrinho flutuante */
-      .cat-cart-fab { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--cat-primaria); color: #fff; border: none; padding: 14px 26px; border-radius: 99px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px #00000033; z-index: 20; }
+      /* Carrinho flutuante — fica acima do rodapé de navegação fixo (não sobrepõe) */
+      .cat-cart-fab { position: fixed; bottom: calc(72px + env(safe-area-inset-bottom, 0)); left: 50%; transform: translateX(-50%); background: var(--cat-primaria); color: #fff; border: none; padding: 14px 26px; border-radius: 99px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px #00000033; z-index: 20; }
 
       /* CTA "Falar com a vendedora" — no fluxo da página, entre a grade de produtos e o rodapé */
       .cat-fala-wrap { max-width: 1100px; margin: 0 auto; padding: 26px 14px 6px; text-align: center; }
       .cat-fala-cta { background: var(--cat-primaria); color: #fff; border: none; padding: 14px 26px; border-radius: 99px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px #00000022; }
       .cat-fala-cta:hover { filter: brightness(1.1); }
+
+      /* Menu "Mais" (mesmo padrão da PerfilVendedora.tsx) */
+      .cat-drawer-fundo { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 60; display: flex; justify-content: flex-end; }
+      .cat-drawer { width: 260px; background: #fff; height: 100%; padding: 20px; display: flex; flex-direction: column; gap: 4px; }
+      .cat-drawer-fechar { align-self: flex-end; background: none; border: none; color: #888; cursor: pointer; margin-bottom: 12px; }
+      .cat-drawer-item { display: flex; align-items: center; gap: 12px; background: none; border: none; color: #222; text-align: left; padding: 12px 8px; border-radius: 8px; font-size: 15px; cursor: pointer; }
+      .cat-drawer-item:hover { background: #00000008; }
+
+      /* Rodapé de navegação (mesmo padrão da PerfilVendedora.tsx) — "Catálogo" fica sempre ativo aqui */
+      .cat-bottom-nav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; background: color-mix(in srgb, var(--cat-fundo) 92%, black 8%); border-top: 1px solid #00000014; padding: 8px 4px calc(8px + env(safe-area-inset-bottom, 0)); }
+      .cat-nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none; color: #777; font-size: 11px; padding: 6px 2px; cursor: pointer; }
+      .cat-nav-item.ativo { color: var(--cat-primaria); font-weight: 700; }
+      .cat-nav-icone { display: flex; }
+      .cat-nav-item.ativo .cat-nav-icone {
+        width: 50px; height: 50px; margin-top: -27px; border-radius: 50%; flex-direction: column; gap: 1px;
+        align-items: center; justify-content: center; background: var(--cat-primaria); color: #fff;
+        border: 1px solid #00000014; box-shadow: 0 0 26px 8px color-mix(in srgb, var(--cat-primaria) 45%, transparent), 0 6px 16px rgba(0,0,0,0.4);
+      }
+      .cat-nav-icone-rotulo { color: #fff; font-size: 8px; font-weight: 700; line-height: 1; }
 
       /* Modal base */
       .cat-modal-fundo { position: fixed; inset: 0; background: #00000077; display: flex; align-items: flex-end; justify-content: center; z-index: 30; }

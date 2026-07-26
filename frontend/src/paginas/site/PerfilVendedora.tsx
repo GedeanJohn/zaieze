@@ -276,18 +276,6 @@ export default function PerfilVendedora() {
                 : <div className="pv-hero-fotoVazia">{p.vendedora.nome.slice(0, 1).toUpperCase()}</div>}
               {p.vendedora.temWhatsapp && <span className="pv-disponivel"><span className="pv-disponivel-bolha" /> Disponível</span>}
             </div>
-            {/* Contato fica embaixo da foto, na mesma largura da coluna — não mais espalhado
-                junto com as ações secundárias (ficava com larguras desiguais e "fora do padrão"). */}
-            {p.vendedora.temWhatsapp && (
-              <div className="pv-contato-btns">
-                <button type="button" className="pv-btn-primario" disabled={contatando !== null} onClick={() => contatar('whatsapp')}>
-                  <IconeWhatsApp size={18} /> {contatando === 'whatsapp' ? 'Abrindo…' : 'Falar no WhatsApp'}
-                </button>
-                <button type="button" className="pv-btn-secundario" disabled={contatando !== null} onClick={() => contatar('ligar')}>
-                  <Phone size={18} /> {contatando === 'ligar' ? 'Abrindo…' : 'Ligar'}
-                </button>
-              </div>
-            )}
           </div>
 
           <div className="pv-hero-info">
@@ -310,11 +298,28 @@ export default function PerfilVendedora() {
           </div>
         </div>
 
+        {/* Fora da coluna estreita da foto — mesma largura total da lista de ações abaixo.
+            "Perfil" (compartilhar) sempre aparece, mesmo sem WhatsApp conectado. */}
+        <div className="pv-contato-btns">
+          {p.vendedora.temWhatsapp && (
+            <button type="button" className="pv-btn-primario" disabled={contatando !== null} onClick={() => contatar('whatsapp')}>
+              <IconeWhatsApp size={18} /> {contatando === 'whatsapp' ? 'Abrindo…' : 'Falar no WhatsApp'}
+            </button>
+          )}
+          {p.vendedora.temWhatsapp && (
+            <button type="button" className="pv-btn-secundario" disabled={contatando !== null} onClick={() => contatar('ligar')}>
+              <Phone size={18} /> {contatando === 'ligar' ? 'Abrindo…' : 'Ligar'}
+            </button>
+          )}
+          <button type="button" className="pv-btn-secundario" onClick={compartilhar}>
+            <Share2 size={18} /> Perfil
+          </button>
+        </div>
+
         <div className="pv-acoes">
           <button type="button" className="pv-btn-secundario" onClick={() => navigate(`/${vendSlug}/catalogo`)}><ShoppingBag size={18} /> Vitrine Virtual</button>
-          <button type="button" className="pv-btn-secundario" onClick={() => setMeusPedidosAberto('abertos')}><ShoppingCart size={18} /> Ver Carrinho</button>
-          <button type="button" className="pv-btn-secundario" onClick={() => setMeusPedidosAberto('fechados')}><Package size={18} /> Ver Pedidos</button>
-          <button type="button" className="pv-btn-secundario" onClick={compartilhar}><Share2 size={18} /> Compartilhar perfil</button>
+          <button type="button" className="pv-btn-secundario" onClick={() => setMeusPedidosAberto('fechados')}><Package size={18} /> Pedidos</button>
+          <button type="button" className="pv-btn-secundario pv-btn-full" onClick={() => setMeusPedidosAberto('abertos')}><ShoppingCart size={18} /> Carrinho</button>
         </div>
       </section>
 
@@ -511,9 +516,9 @@ function PerfilVendedoraEstilos() {
       .pv-hero-topo { display: grid; grid-template-columns: 340px 1fr; gap: 40px; }
       .pv-hero-foto-col { display: flex; flex-direction: column; gap: 12px; }
       .pv-hero-foto { position: relative; border-radius: 16px; overflow: hidden; aspect-ratio: 9/16; background: color-mix(in srgb, var(--pv-fundo) 90%, var(--pv-mistura) 10%); border: 1px solid var(--pv-borda); }
-      /* Contato (WhatsApp/Ligar) na mesma largura da foto, logo abaixo dela */
-      .pv-contato-btns { display: flex; flex-direction: column; gap: 8px; }
-      .pv-contato-btns .pv-btn-primario, .pv-contato-btns .pv-btn-secundario { width: 100%; justify-content: center; }
+      /* Contato (WhatsApp/Ligar/Perfil) fora da coluna da foto, largura total do hero, 3 colunas iguais */
+      .pv-contato-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 28px; }
+      .pv-contato-btns .pv-btn-primario, .pv-contato-btns .pv-btn-secundario { justify-content: center; padding-left: 8px; padding-right: 8px; white-space: normal; text-align: center; }
       .pv-hero-foto img { width: 100%; height: 100%; object-fit: cover; object-position: center 25%; display: block; }
       .pv-hero-fotoVazia { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 64px; font-weight: 800; color: var(--pv-texto-suave); }
       .pv-disponivel { position: absolute; left: 12px; bottom: 12px; display: flex; align-items: center; gap: 6px; background: rgba(10,10,10,0.72); padding: 6px 12px; border-radius: 999px; font-size: 12px; color: #eee; }
@@ -535,7 +540,8 @@ function PerfilVendedoraEstilos() {
 
       /* Grade uniforme (2 colunas de largura igual) — antes era flex-wrap, que deixava as larguras
          desiguais conforme o tamanho do texto de cada botão. */
-      .pv-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 28px; }
+      .pv-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+      .pv-btn-full { grid-column: 1 / -1; }
       .pv-btn-primario, .pv-btn-secundario { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 22px; border-radius: 6px; font-size: 14px; font-weight: 700; letter-spacing: 0.03em; text-decoration: none; cursor: pointer; border: none; }
       .pv-btn-primario { background: var(--pv-acento, #c9a25f); color: var(--pv-acento-texto, #14100a); }
       .pv-btn-secundario { background: transparent; border: 1px solid var(--pv-borda); color: var(--pv-texto); }

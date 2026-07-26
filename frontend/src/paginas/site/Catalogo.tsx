@@ -1038,7 +1038,7 @@ export function CatalogoEstilos() {
       .cat-nav-icone-rotulo { color: #fff; font-size: 8px; font-weight: 700; line-height: 1; }
 
       /* Modal base */
-      .cat-modal-fundo { position: fixed; inset: 0; background: #00000077; display: flex; align-items: flex-end; justify-content: center; z-index: 30; }
+      .cat-modal-fundo { position: fixed; inset: 0; background: #00000077; display: flex; align-items: flex-end; justify-content: center; z-index: 50; }
       @media (min-width: 720px) { .cat-modal-fundo { align-items: center; } }
 
       /* Detalhe da peça */

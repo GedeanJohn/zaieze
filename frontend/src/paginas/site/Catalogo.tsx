@@ -884,66 +884,6 @@ export function CatalogoEstilos() {
         position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 99px;
         background: #ff6b6b; color: #fff; font-size: 10px; font-weight: 800; line-height: 16px; text-align: center;
       }
-      @media (max-width: 720px) {
-        .cat-topo { padding: 8px 12px; gap: 8px; }
-        .cat-topo-marca img { max-height: 18px; max-width: 84px; }
-        .cat-topo-marca-nome { font-size: 13px; }
-        .cat-topo-marca-sub { font-size: 7.5px; }
-        .cat-busca { padding: 6px 10px; gap: 5px; }
-        .cat-busca input { font-size: 11px; }
-        .cat-busca svg { width: 13px; height: 13px; }
-        .cat-topo-acoes { gap: 8px; }
-        .cat-topo-icone svg { width: 15px; height: 15px; }
-      }
-
-      /* Redução proporcional de todas as seções no mobile — mesma densidade da referência
-         (cabeçalho compacto, ícones/textos/paddings menores em toda a página, não só na busca). */
-      @media (max-width: 720px) {
-        .cat-categorias { padding: 10px 10px 4px; gap: 9px; }
-        .cat-cat-item { width: 44px; gap: 3px; }
-        .cat-cat-icone { width: 38px; height: 38px; }
-        .cat-cat-rotulo { font-size: 8px; max-width: 44px; }
-
-        .cat-hero-acoes-flut { top: 8px; right: 8px; gap: 5px; }
-        .cat-hero-acao-flut { width: 26px; height: 26px; }
-        .cat-destaque-badge { font-size: 8px; padding: 2px 7px; }
-
-        .cat-selos { gap: 6px; padding: 0 10px; }
-        .cat-selo { padding: 6px 8px; gap: 5px; }
-        .cat-selo span { font-size: 8.5px; }
-        .cat-selos-compactos { margin-top: 12px; }
-        .cat-selos-compactos .cat-selo { padding: 8px 3px; }
-
-        .cat-look-banner { margin: 12px auto 0; padding: 0 10px; gap: 8px; }
-        .cat-look-texto { padding: 9px 11px; }
-        .cat-look-texto strong { font-size: 11px; margin-bottom: 3px; }
-        .cat-look-texto p { font-size: 9.5px; margin: 0 0 8px; }
-        .cat-look-btn { padding: 6px 10px; font-size: 9.5px; }
-        .cat-look-foto-item { width: 42px; height: 42px; }
-        .cat-look-desconto { width: 42px; height: 42px; font-size: 9.5px; }
-
-        .cat-secao { padding: 14px 10px 4px; }
-        .cat-secao-titulo { font-size: 11.5px; }
-        .cat-secao-link { font-size: 10px; }
-        .cat-info { padding: 5px 6px 6px; }
-        .cat-nome { font-size: 8.5px; line-height: 1.2; }
-        .cat-preco { font-size: 9.5px; gap: 3px; }
-        .cat-preco-antigo { font-size: 8px; }
-        .cat-parcela { font-size: 7px; }
-        .cat-card-rodape { align-items: center; gap: 3px; margin-top: 5px; }
-        .cat-tam-chips { gap: 2px; flex-wrap: nowrap; overflow: hidden; min-width: 0; }
-        .cat-tam-chips span { font-size: 6px; padding: 0px 2px; flex-shrink: 0; }
-        .cat-add-rapido { width: 16px; height: 16px; flex-shrink: 0; }
-        .cat-add-rapido svg { width: 10px; height: 10px; }
-        .cat-favorito { width: 18px; height: 18px; }
-        .cat-favorito svg { width: 11px; height: 11px; }
-        .cat-esgotado, .cat-desconto, .cat-video-badge { font-size: 8px; padding: 1px 6px; }
-
-        .cat-bottom-nav { padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0)); }
-        .cat-nav-item { font-size: 9px; padding: 3px 2px; }
-        .cat-nav-item.ativo .cat-nav-icone { width: 44px; height: 44px; margin-top: -24px; }
-      }
-
       /* Trilho de categorias em ícone circular — vem antes do hero */
       .cat-categorias { max-width: 1100px; margin: 0 auto; padding: 18px 14px 4px; display: flex; gap: 18px; overflow-x: auto; scrollbar-width: none; }
       .cat-categorias::-webkit-scrollbar { display: none; }
@@ -1057,7 +997,7 @@ export function CatalogoEstilos() {
       .cat-desconto { position: absolute; bottom: 8px; left: 8px; background: #d12c2c; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; letter-spacing: .3px; }
       .cat-parcela { font-size: 11px; color: #888; margin-top: 2px; }
       .cat-card-rodape { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 8px; }
-      .cat-tam-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+      .cat-tam-chips { display: flex; gap: 4px; flex-wrap: nowrap; overflow: hidden; min-width: 0; }
       .cat-tam-chips span { font-size: 10px; font-weight: 700; color: #666; border: 1px solid #00000018; border-radius: 5px; padding: 1px 5px; }
       .cat-add-rapido {
         flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--cat-primaria, #111); color: #fff;
@@ -1167,6 +1107,74 @@ export function CatalogoEstilos() {
       .cat-cart .cat-add { margin: 0 18px 18px; width: calc(100% - 36px); }
 
       .cat-rodape { text-align: center; color: #aaa; font-size: 12px; padding: 30px 0 16px; }
+
+      /* ── Redução mobile: fica no FIM do bloco de estilos de propósito ── as regras acima
+         (base + desktop) usam os mesmos seletores; em CSS, com especificidade igual, quem
+         vem depois no texto ganha, então este bloco precisa ser o último pra realmente
+         sobrescrever tudo no celular (isso já causou bug real: mudanças "sumiam" porque a
+         regra base, mais abaixo no arquivo, cancelava o que era definido aqui em cima). */
+      @media (max-width: 720px) {
+        .cat-topo { padding: 8px 12px; gap: 8px; }
+        .cat-topo-marca img { max-height: 18px; max-width: 84px; }
+        .cat-topo-marca-nome { font-size: 11.5px; }
+        .cat-topo-marca-sub { font-size: 6.5px; }
+        .cat-busca { padding: 6px 10px; gap: 5px; }
+        .cat-busca input { font-size: 9.5px; }
+        .cat-busca svg { width: 13px; height: 13px; }
+        .cat-topo-acoes { gap: 8px; }
+        .cat-topo-icone svg { width: 15px; height: 15px; }
+
+        .cat-categorias { padding: 10px 10px 4px; gap: 9px; }
+        .cat-cat-item { width: 44px; gap: 3px; }
+        .cat-cat-icone { width: 38px; height: 38px; }
+        .cat-cat-rotulo { font-size: 7px; max-width: 44px; }
+
+        .cat-hero { padding: 10px 10px; gap: 8px; }
+        .cat-hero-acoes-flut { top: 8px; right: 8px; gap: 5px; }
+        .cat-hero-acao-flut { width: 24px; height: 24px; }
+        .cat-hero-acao-flut svg { width: 13px; height: 13px; }
+        .cat-destaque-badge { font-size: 7px; padding: 2px 6px; }
+        .cat-hero-selo { font-size: 8px; padding: 2px 8px; }
+        .cat-hero-titulo { font-size: clamp(14px, 4vw, 26px); }
+        .cat-hero-desc { font-size: 9.5px; }
+        .cat-hero-btn { padding: 7px 12px; font-size: 9.5px; }
+
+        .cat-selos { gap: 6px; padding: 0 10px; }
+        .cat-selo { padding: 6px 8px; gap: 5px; }
+        .cat-selo svg { width: 14px; height: 14px; }
+        .cat-selo span { font-size: 7.5px; }
+        .cat-selos-compactos { margin-top: 12px; }
+        .cat-selos-compactos .cat-selo { padding: 8px 3px; }
+
+        .cat-look-banner { margin: 12px auto 0; padding: 0 10px; gap: 8px; }
+        .cat-look-texto { padding: 9px 11px; }
+        .cat-look-texto strong { font-size: 9.5px; margin-bottom: 3px; }
+        .cat-look-texto p { font-size: 8px; margin: 0 0 8px; }
+        .cat-look-btn { padding: 6px 10px; font-size: 8px; }
+        .cat-look-foto-item { width: 38px; height: 38px; }
+        .cat-look-desconto { width: 38px; height: 38px; font-size: 8px; }
+
+        .cat-secao { padding: 14px 10px 4px; }
+        .cat-secao-titulo { font-size: 10px; }
+        .cat-secao-link { font-size: 8.5px; }
+        .cat-info { padding: 5px 6px 6px; }
+        .cat-nome { font-size: 7.5px; line-height: 1.2; }
+        .cat-preco { font-size: 8.5px; gap: 3px; }
+        .cat-preco-antigo { font-size: 7px; }
+        .cat-parcela { font-size: 6.5px; }
+        .cat-card-rodape { align-items: center; gap: 3px; margin-top: 5px; }
+        .cat-tam-chips { gap: 2px; flex-wrap: nowrap; overflow: hidden; min-width: 0; }
+        .cat-tam-chips span { font-size: 5.5px; padding: 0px 2px; flex-shrink: 0; }
+        .cat-add-rapido { width: 15px; height: 15px; flex-shrink: 0; }
+        .cat-add-rapido svg { width: 9px; height: 9px; }
+        .cat-favorito { width: 17px; height: 17px; }
+        .cat-favorito svg { width: 10px; height: 10px; }
+        .cat-esgotado, .cat-desconto, .cat-video-badge { font-size: 7px; padding: 1px 5px; }
+
+        .cat-bottom-nav { padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0)); }
+        .cat-nav-item { font-size: 9px; padding: 3px 2px; }
+        .cat-nav-item.ativo .cat-nav-icone { width: 44px; height: 44px; margin-top: -24px; }
+      }
     `}</style>
   )
 }

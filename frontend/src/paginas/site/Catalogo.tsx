@@ -930,9 +930,10 @@ export function CatalogoEstilos() {
         .cat-preco { font-size: 9.5px; gap: 3px; }
         .cat-preco-antigo { font-size: 8px; }
         .cat-parcela { font-size: 7px; }
-        .cat-tam-chips { gap: 2px; }
-        .cat-tam-chips span { font-size: 6.5px; padding: 0px 3px; }
-        .cat-add-rapido { width: 16px; height: 16px; }
+        .cat-card-rodape { align-items: center; gap: 3px; margin-top: 5px; }
+        .cat-tam-chips { gap: 2px; flex-wrap: nowrap; overflow: hidden; min-width: 0; }
+        .cat-tam-chips span { font-size: 6px; padding: 0px 2px; flex-shrink: 0; }
+        .cat-add-rapido { width: 16px; height: 16px; flex-shrink: 0; }
         .cat-add-rapido svg { width: 10px; height: 10px; }
         .cat-favorito { width: 18px; height: 18px; }
         .cat-favorito svg { width: 11px; height: 11px; }

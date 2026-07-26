@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { FileText, Heart, Home, MoreHorizontal, Search, ShoppingBag, SlidersHorizontal, User, UserRound, X } from 'lucide-react'
+import {
+  CalendarClock, CreditCard, FileText, Gem, Heart, Headphones, Home, LayoutGrid, MessageCircle, MoreHorizontal, Plus, Search,
+  RotateCcw, Share2, ShieldCheck, Shirt, ShoppingBag, SlidersHorizontal, Sparkles, Star, Truck, User, UserRound, Wallet, X,
+} from 'lucide-react'
 import { api } from '../../api'
 import { HOST } from '../../host'
 import AgenteLoja from './AgenteLoja'
 import MeusPedidos from './MeusPedidos'
 import { useMetaTags } from '../../lib/useMetaTags'
 import { useToast } from '../../componentes/Toast'
+import { lerSessaoSalva } from '../../lib/sessaoCliente'
 
 // Mesmo rodapé de navegação da PerfilVendedora.tsx — aqui "Catálogo" é sempre o item ativo
 // (esta página É a vitrine); "Início"/"Perfil" levam de volta pro perfil da vendedora.
@@ -35,12 +39,18 @@ interface Produto {
 }
 interface Colecao { id: string; nome: string; descricao?: string | null; outlet?: boolean; produtos: Produto[] }
 interface Catalogo {
-  marca: { nome: string; logoUrl: string | null; bannerUrl: string | null; descricaoPublica: string | null; corPrimaria: string; corSecundaria: string }
+  marca: {
+    nome: string; logoUrl: string | null; bannerUrl: string | null; descricaoPublica: string | null; corPrimaria: string; corSecundaria: string
+    parcelasMax: number; parcelasFormaPagamento: string | null; parcelasMinPecas: number; parcelasMinValor: number
+    entregaPrazoTexto: string | null; entregaFreteGratisValor: number | null; entregaTexto: string | null
+    devolucaoPrazoDias: number; devolucaoTexto: string | null
+  }
   loja: { nome: string }
   vendedora: { nome: string; primeiroNome: string; fotoUrl: string | null; bio: string | null; temWhatsapp: boolean }
   pedidoMinimoAtacado?: number
   colecoes: Colecao[]
 }
+type RegrasNegocio = Catalogo['marca']
 
 type Modo = 'ATACADO' | 'VAREJO'
 interface ItemCarrinho {
@@ -54,7 +64,14 @@ export interface ItemPedido {
   cor?: string; estampa?: string; tamanho?: string; modo: Modo; precoUnit: number; qtd: number
 }
 
-const real = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+const real = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+/** "6x de R$ X" — só ilustrativo (não há gateway de cartão aqui, a compra fecha pelo WhatsApp),
+ *  por isso o número de parcelas é configurado pelo gestor (Rede.parcelasMax) e pode ficar em 1
+ *  (não exibe nada) pra quem não quiser passar essa impressão. */
+function textoParcela(preco: number, parcelasMax: number): string | null {
+  if (parcelasMax <= 1) return null
+  return `${parcelasMax}x de ${real(preco / parcelasMax)}`
+}
 const PESO_PADRAO = 300 // g por peça quando o produto não tem peso cadastrado
 const VOLUME_PECA_L = 0.8 // litros estimados por peça dobrada
 const LANCAMENTO_DIAS = 30 // produto criado há até esse tanto de dias conta como "Lançamento"
@@ -80,6 +97,9 @@ export default function Catalogo() {
   const [busca, setBusca] = useState('')
   const [categoriaAtiva, setCategoriaAtiva] = useState<string | null>(null) // null = "Todos"
   const [favoritos, setFavoritos] = useState<Set<string>>(new Set())
+  // Token do cliente verificado por WhatsApp (mesma sessão do MeusPedidos) — presente = favoritos
+  // sincronizam com o Cliente no servidor; ausente = ficam só no localStorage deste aparelho.
+  const [tokenCliente, setTokenCliente] = useState<string | null>(null)
   const [drawerAberto, setDrawerAberto] = useState(false)
   const [meusPedidosAberto, setMeusPedidosAberto] = useState<'abertos' | 'fechados' | null>(null)
 
@@ -91,25 +111,66 @@ export default function Catalogo() {
     setDrawerAberto(true)
   }
 
-  // Carrega os favoritos salvos no navegador assim que sabe de qual loja/vendedora se trata.
+  function salvarFavoritosLocal(novo: Set<string>) {
+    if (!redeSlug || !vendSlug) return
+    try { localStorage.setItem(chaveFavoritos(redeSlug, vendSlug), JSON.stringify([...novo])) } catch { /* ignora */ }
+  }
+
+  // Carrega os favoritos salvos no navegador assim que sabe de qual loja/vendedora se trata; se
+  // o cliente já verificou o WhatsApp antes (sessão salva), sincroniza com o servidor também.
   useEffect(() => {
     if (!redeSlug || !vendSlug) return
     try {
       const salvos = localStorage.getItem(chaveFavoritos(redeSlug, vendSlug))
       if (salvos) setFavoritos(new Set(JSON.parse(salvos)))
     } catch { /* localStorage indisponível (modo privado etc.) — segue sem favoritos salvos */ }
+
+    const sessao = lerSessaoSalva()
+    if (sessao) sincronizarFavoritos(sessao.token)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [redeSlug, vendSlug])
+
+  // Chamado ao abrir a vitrine já com sessão salva, ou assim que o MeusPedidos confirma o
+  // código — busca o que já tinha no servidor, mescla com o que já tinha no aparelho (nenhum
+  // dos dois lados perde favorito) e devolve a união pro servidor, se precisar.
+  async function sincronizarFavoritos(token: string) {
+    if (!redeSlug || !vendSlug) return
+    setTokenCliente(token)
+    try {
+      const { data } = await api.post(`/catalogo/publico/${redeSlug}/${vendSlug}/favoritos/buscar`, { token })
+      const doServidor: string[] = data.favoritos ?? []
+      setFavoritos((atual) => {
+        const uniao = new Set([...atual, ...doServidor])
+        salvarFavoritosLocal(uniao)
+        if (uniao.size !== doServidor.length) {
+          api.post(`/catalogo/publico/${redeSlug}/${vendSlug}/favoritos`, { token, favoritos: [...uniao] }).catch(() => {})
+        }
+        return uniao
+      })
+    } catch { /* token expirado ou erro de rede — favoritos seguem só no aparelho por ora */ }
+  }
 
   function alternarFavorito(id: string, e: React.SyntheticEvent) {
     e.stopPropagation() // o coração fica dentro do card clicável (abre o detalhe do produto)
     setFavoritos((atual) => {
       const novo = new Set(atual)
       novo.has(id) ? novo.delete(id) : novo.add(id)
-      if (redeSlug && vendSlug) {
-        try { localStorage.setItem(chaveFavoritos(redeSlug, vendSlug), JSON.stringify([...novo])) } catch { /* ignora */ }
+      salvarFavoritosLocal(novo)
+      if (tokenCliente && redeSlug && vendSlug) {
+        api.post(`/catalogo/publico/${redeSlug}/${vendSlug}/favoritos`, { token: tokenCliente, favoritos: [...novo] }).catch(() => {})
       }
       return novo
     })
+  }
+
+  function compartilharProduto(p: Produto) {
+    const url = `${window.location.origin}${window.location.pathname}${window.location.search}`
+    if (navigator.share) {
+      navigator.share({ title: p.nome, text: `Olha essa peça: ${p.nome}`, url }).catch(() => {})
+    } else {
+      navigator.clipboard?.writeText(url)
+      avisar('Link copiado.')
+    }
   }
 
   // Grade única: sem separação visual por coleção — o cliente vê tudo liberado, uma vitrine só.
@@ -180,6 +241,24 @@ export default function Catalogo() {
       url: typeof window !== 'undefined' ? window.location.href : undefined,
     } : undefined,
   })
+
+  // Botão "+" do card: só adiciona direto quando não há ambiguidade de variação (uma única
+  // combinação de cor/tamanho com estoque) — havendo escolha de verdade, abre o detalhe normal
+  // pra não arriscar mandar o tamanho errado pra vendedora.
+  function adicionarRapido(p: Produto, e: React.SyntheticEvent) {
+    e.stopPropagation()
+    const disponiveis = p.variacoes.filter((v) => v.estoque > 0)
+    const cores = new Set(disponiveis.map((v) => v.cor))
+    const tamanhos = new Set(disponiveis.map((v) => v.tamanho))
+    if (disponiveis.length === 0 || cores.size !== 1 || tamanhos.size !== 1) { setDetalhe(p); return }
+    const v = disponiveis[0]
+    adicionar({
+      chave: `${p.id}|${v.cor}|${v.estampa}|${v.tamanho}|VAREJO`,
+      produtoId: p.id, nome: p.nome, cor: v.cor, estampa: v.estampa, tamanho: v.tamanho, modo: 'VAREJO',
+      precoUnit: p.precoVarejo, economiaUnit: p.precoOriginal ? Math.max(0, p.precoOriginal - p.precoVarejo) : 0,
+      qtd: 1, loteMinimo: p.loteMinimo, pesoGramas: p.pesoGramas || PESO_PADRAO, estoque: v.estoque, foto: p.fotos?.[0],
+    })
+  }
 
   function adicionar(item: ItemCarrinho) {
     setCarrinho((cur) => {
@@ -265,14 +344,14 @@ export default function Catalogo() {
         <div className="cat-topo-acoes">
           <button
             type="button" className={`cat-topo-icone${categoriaAtiva === FAVORITOS ? ' ativo' : ''}`}
-            onClick={() => setCategoriaAtiva((c) => (c === FAVORITOS ? null : FAVORITOS))}
+            aria-label="Favoritos" onClick={() => setCategoriaAtiva((c) => (c === FAVORITOS ? null : FAVORITOS))}
           >
             <Heart size={20} fill={categoriaAtiva === FAVORITOS ? 'currentColor' : 'none'} />
-            <span>Favoritos{favoritos.size > 0 ? ` (${favoritos.size})` : ''}</span>
+            {favoritos.size > 0 && <span className="cat-topo-selo">{favoritos.size}</span>}
           </button>
-          <button type="button" className="cat-topo-icone" onClick={() => setVerCarrinho(true)}>
+          <button type="button" className="cat-topo-icone" aria-label="Carrinho" onClick={() => setVerCarrinho(true)}>
             <ShoppingBag size={20} />
-            <span>Carrinho{totais.pecas > 0 ? ` (${totais.pecas})` : ''}</span>
+            {totais.pecas > 0 && <span className="cat-topo-selo">{totais.pecas}</span>}
           </button>
         </div>
       </header>
@@ -289,6 +368,35 @@ export default function Catalogo() {
           </nav>
         </div>
       )}
+
+      {/* Trilho de categorias em ícone circular — vem antes do hero, como na referência */}
+      <div className="cat-categorias">
+        <button type="button" className={`cat-cat-item${categoriaAtiva === null ? ' ativo' : ''}`} onClick={() => setCategoriaAtiva(null)}>
+          <span className="cat-cat-icone"><LayoutGrid size={22} /></span>
+          <span className="cat-cat-rotulo">Todos</span>
+        </button>
+        <button type="button" className={`cat-cat-item${categoriaAtiva === LANCAMENTOS ? ' ativo' : ''}`} onClick={() => setCategoriaAtiva(LANCAMENTOS)}>
+          <span className="cat-cat-icone"><Star size={22} /></span>
+          <span className="cat-cat-rotulo">Lançamentos</span>
+        </button>
+        {categorias.map((c) => (
+          <button key={c} type="button" className={`cat-cat-item${categoriaAtiva === c ? ' ativo' : ''}`} onClick={() => setCategoriaAtiva(c)}>
+            <span className="cat-cat-icone"><Shirt size={22} /></span>
+            <span className="cat-cat-rotulo">{c}</span>
+          </button>
+        ))}
+        <button
+          type="button" className={`cat-cat-item${categoriaAtiva === FAVORITOS ? ' ativo' : ''}`}
+          onClick={() => setCategoriaAtiva((c) => (c === FAVORITOS ? null : FAVORITOS))}
+        >
+          <span className="cat-cat-icone"><Heart size={22} fill={categoriaAtiva === FAVORITOS ? 'currentColor' : 'none'} /></span>
+          <span className="cat-cat-rotulo">Favoritos</span>
+        </button>
+        <button type="button" className="cat-cat-item" onClick={() => avisar('Filtros avançados chegando em breve. ✨')}>
+          <span className="cat-cat-icone"><SlidersHorizontal size={22} /></span>
+          <span className="cat-cat-rotulo">Filtrar</span>
+        </button>
+      </div>
 
       {produtoDestaque && (
         <section className="cat-hero">
@@ -308,29 +416,32 @@ export default function Catalogo() {
               </div>
             )}
           </div>
-          <button type="button" className="cat-hero-foto" onClick={() => setDetalhe(produtoDestaque)}>
-            {produtoDestaque.fotos?.[0]
-              ? <img key={produtoDestaque.id} src={produtoDestaque.fotos[0]} alt={produtoDestaque.nome} />
-              : <div className="cat-foto-vazia">{produtoDestaque.nome}</div>}
-          </button>
+          <div className="cat-hero-foto-wrap">
+            <button type="button" className="cat-hero-foto" onClick={() => setDetalhe(produtoDestaque)}>
+              {produtoDestaque.fotos?.[0]
+                ? <img key={produtoDestaque.id} src={produtoDestaque.fotos[0]} alt={produtoDestaque.nome} />
+                : <div className="cat-foto-vazia">{produtoDestaque.nome}</div>}
+            </button>
+            <div className="cat-hero-acoes-flut">
+              <button
+                type="button" className={`cat-hero-acao-flut${favoritos.has(produtoDestaque.id) ? ' ativo' : ''}`}
+                aria-label="Favoritar" onClick={(e) => alternarFavorito(produtoDestaque.id, e)}
+              >
+                <Heart size={18} fill={favoritos.has(produtoDestaque.id) ? 'currentColor' : 'none'} />
+              </button>
+              <button type="button" className="cat-hero-acao-flut" aria-label="Compartilhar" onClick={() => compartilharProduto(produtoDestaque)}>
+                <Share2 size={18} />
+              </button>
+            </div>
+          </div>
         </section>
       )}
 
-      <div className="cat-filtros">
-        <button type="button" className={categoriaAtiva === null ? 'ativo' : ''} onClick={() => setCategoriaAtiva(null)}>Todos</button>
-        <button type="button" className={categoriaAtiva === LANCAMENTOS ? 'ativo' : ''} onClick={() => setCategoriaAtiva(LANCAMENTOS)}>Lançamentos</button>
-        {categorias.map((c) => (
-          <button key={c} type="button" className={categoriaAtiva === c ? 'ativo' : ''} onClick={() => setCategoriaAtiva(c)}>{c}</button>
-        ))}
-        <button
-          type="button" className={`cat-filtros-favoritos${categoriaAtiva === FAVORITOS ? ' ativo' : ''}`}
-          onClick={() => setCategoriaAtiva((c) => (c === FAVORITOS ? null : FAVORITOS))}
-        >
-          <Heart size={14} fill={categoriaAtiva === FAVORITOS ? 'currentColor' : 'none'} /> Favoritos{favoritos.size > 0 ? ` (${favoritos.size})` : ''}
-        </button>
-        <button type="button" className="cat-filtros-mais" onClick={() => avisar('Filtros avançados chegando em breve. ✨')}>
-          <SlidersHorizontal size={15} /> Filtrar
-        </button>
+      <div className="cat-selos">
+        <div className="cat-selo"><ShieldCheck size={18} /><span>Compre com<br />segurança</span></div>
+        <div className="cat-selo"><CalendarClock size={18} /><span>Atualizações<br />diárias</span></div>
+        <div className="cat-selo"><Gem size={18} /><span>Peças exclusivas<br />e limitadas</span></div>
+        <div className="cat-selo"><Headphones size={18} /><span>Atendimento<br />humano</span></div>
       </div>
 
       {produtosTodos.length === 0 && <div className="cat-vazio">Em breve, novidades por aqui. ✨</div>}
@@ -344,45 +455,106 @@ export default function Catalogo() {
 
       {produtosFiltrados.length > 0 && (
         <section className="cat-secao">
-          <div className="cat-grid">
-            {produtosFiltrados.map((p) => (
-              <button key={p.id} className="cat-card" onClick={() => setDetalhe(p)}>
-                <div className="cat-foto">
-                  {p.fotos?.[0]
-                    ? <img src={p.fotos[0]} alt={p.nome} loading="lazy" />
-                    : <div className="cat-foto-vazia">{p.nome}</div>}
-                  {p.destaque && <span className="cat-destaque-badge">Destaque</span>}
-                  {p.videos?.length > 0 && <span className="cat-video-badge">▶ vídeo</span>}
-                  {!p.disponivel && <span className="cat-esgotado">esgotado</span>}
-                  {p.descontoPct ? <span className="cat-desconto">−{p.descontoPct}%</span> : null}
-                  <span
-                    role="button" tabIndex={0} aria-label={favoritos.has(p.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-                    className={`cat-favorito${favoritos.has(p.id) ? ' ativo' : ''}`}
-                    onClick={(e) => alternarFavorito(p.id, e)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternarFavorito(p.id, e) } }}
-                  >
-                    <Heart size={16} fill={favoritos.has(p.id) ? 'currentColor' : 'none'} />
-                  </span>
-                </div>
-                <div className="cat-info">
-                  <div className="cat-nome">{p.nome}</div>
-                  <div className="cat-preco">
-                    {p.precoOriginal ? <span className="cat-preco-antigo">{real(p.precoOriginal)}</span> : null}
-                    <span className={p.descontoPct ? 'cat-preco-promo' : ''}>{real(p.preco)}</span>
-                  </div>
-                </div>
+          <div className="cat-secao-cabec">
+            <h2 className="cat-secao-titulo">Destaques para você</h2>
+            {(busca || categoriaAtiva) && (
+              <button type="button" className="cat-secao-link" onClick={() => { setBusca(''); setCategoriaAtiva(null) }}>
+                Ver todos →
               </button>
-            ))}
+            )}
+          </div>
+          <div className="cat-grid">
+            {produtosFiltrados.map((p) => {
+              // No card só dá pra respeitar o valor mínimo (1 peça) — mínimo de peças da compra
+              // é condição do PEDIDO inteiro, cabe mostrar no carrinho/detalhe, não aqui.
+              const parcela = cat.marca.parcelasMinPecas <= 1 && p.preco >= cat.marca.parcelasMinValor
+                ? textoParcela(p.preco, cat.marca.parcelasMax)
+                : null
+              return (
+                <button key={p.id} className="cat-card" onClick={() => setDetalhe(p)}>
+                  <div className="cat-foto">
+                    {p.fotos?.[0]
+                      ? <img src={p.fotos[0]} alt={p.nome} loading="lazy" />
+                      : <div className="cat-foto-vazia">{p.nome}</div>}
+                    {p.destaque && <span className="cat-destaque-badge">Destaque</span>}
+                    {p.videos?.length > 0 && <span className="cat-video-badge">▶ vídeo</span>}
+                    {!p.disponivel && <span className="cat-esgotado">esgotado</span>}
+                    {p.descontoPct ? <span className="cat-desconto">−{p.descontoPct}%</span> : null}
+                    <span
+                      role="button" tabIndex={0} aria-label={favoritos.has(p.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                      className={`cat-favorito${favoritos.has(p.id) ? ' ativo' : ''}`}
+                      onClick={(e) => alternarFavorito(p.id, e)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternarFavorito(p.id, e) } }}
+                    >
+                      <Heart size={16} fill={favoritos.has(p.id) ? 'currentColor' : 'none'} />
+                    </span>
+                  </div>
+                  <div className="cat-info">
+                    <div className="cat-nome">{p.nome}</div>
+                    <div className="cat-preco">
+                      {p.precoOriginal ? <span className="cat-preco-antigo">{real(p.precoOriginal)}</span> : null}
+                      <span className={p.descontoPct ? 'cat-preco-promo' : ''}>{real(p.preco)}</span>
+                    </div>
+                    {parcela && <div className="cat-parcela">{parcela}</div>}
+                    <div className="cat-card-rodape">
+                      {p.tamanhos.length > 0 && (
+                        <div className="cat-tam-chips">
+                          {p.tamanhos.slice(0, 4).map((t) => <span key={t}>{t}</span>)}
+                        </div>
+                      )}
+                      {p.disponivel && (
+                        <span
+                          role="button" tabIndex={0} aria-label={`Adicionar ${p.nome} ao carrinho`}
+                          className="cat-add-rapido" onClick={(e) => adicionarRapido(p, e)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); adicionarRapido(p, e) } }}
+                        >
+                          <Plus size={16} />
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </section>
       )}
+
+      {/* Vitrine de peças com foto — "Monte seu look" precisa de pelo menos 3 pra fazer sentido */}
+      {produtosTodos.filter((p) => p.fotos?.[0]).length >= 3 && (
+        <div className="cat-look-banner">
+          <div className="cat-look-texto">
+            <strong>Monte seu look<br />e ganhe desconto!</strong>
+            <p>Compre 3 ou mais peças e ganhe até 20% OFF</p>
+            <button type="button" className="cat-look-btn" onClick={() => avisar('Montador de looks chegando em breve. ✨')}>
+              <CalendarClock size={16} /> Montar look
+            </button>
+          </div>
+          <div className="cat-look-fotos">
+            {produtosTodos.filter((p) => p.fotos?.[0]).slice(0, 3).map((p, i) => (
+              <span key={p.id} className="cat-look-foto-item">
+                <img src={p.fotos[0]} alt={p.nome} />
+                {i < 2 && <span className="cat-look-mais">+</span>}
+              </span>
+            ))}
+            <span className="cat-look-desconto">20%<br />OFF</span>
+          </div>
+        </div>
+      )}
+
+      <div className="cat-selos cat-selos-compactos">
+        <div className="cat-selo"><Wallet size={18} /><span><strong>PIX</strong><br />Aprovação na hora</span></div>
+        <div className="cat-selo"><ShieldCheck size={18} /><span><strong>Compra segura</strong><br />Seus dados protegidos</span></div>
+        <div className="cat-selo"><MessageCircle size={18} /><span><strong>Atendimento</strong><br />Fale pelo WhatsApp</span></div>
+        <div className="cat-selo"><Sparkles size={18} /><span><strong>Novidades</strong><br />Peças novas toda semana</span></div>
+      </div>
 
       {/* CTA "Falar com a vendedora" — no fluxo da página, entre a grade e o rodapé (não flutua mais) */}
       <div className="cat-fala-wrap">
         <button type="button" className="cat-fala-cta" onClick={() => setAgente({})}>💬 Falar com {cat.vendedora.primeiroNome}</button>
       </div>
 
-      {detalhe && <DetalheProduto produto={detalhe} onFechar={() => setDetalhe(null)} onAdicionar={adicionar} />}
+      {detalhe && <DetalheProduto produto={detalhe} regras={cat.marca} onFechar={() => setDetalhe(null)} onAdicionar={adicionar} />}
 
       {/* Carrinho flutuante */}
       {carrinho.length > 0 && !verCarrinho && (
@@ -429,14 +601,19 @@ export default function Catalogo() {
       </nav>
 
       {meusPedidosAberto && (
-        <MeusPedidos redeSlug={redeSlug!} vendSlug={vendSlug!} abaInicial={meusPedidosAberto} acento={primaria} onClose={() => setMeusPedidosAberto(null)} />
+        <MeusPedidos
+          redeSlug={redeSlug!} vendSlug={vendSlug!} abaInicial={meusPedidosAberto} acento={primaria}
+          onClose={() => setMeusPedidosAberto(null)} aoVerificar={sincronizarFavoritos}
+        />
       )}
     </div>
   )
 }
 
 // ─────────────────────────── Detalhe da peça (galeria + zoom + compra) ───────────────────────────
-function DetalheProduto({ produto, onFechar, onAdicionar }: { produto: Produto; onFechar: () => void; onAdicionar: (i: ItemCarrinho) => void }) {
+function DetalheProduto({ produto, regras, onFechar, onAdicionar }: {
+  produto: Produto; regras: RegrasNegocio; onFechar: () => void; onAdicionar: (i: ItemCarrinho) => void
+}) {
   const [fotoIdx, setFotoIdx] = useState(0)
   const [zoom, setZoom] = useState<{ x: number; y: number } | null>(null)
   const [cor, setCor] = useState(produto.cores[0] ?? '')
@@ -589,6 +766,42 @@ function DetalheProduto({ produto, onFechar, onAdicionar }: { produto: Produto; 
               <div className="cat-urgencia">⚠️ Restam apenas {estoqueSel} unidades.</div>
             )}
 
+            {/* Parcelamento/entrega/devolução — tudo informativo (a compra fecha pelo WhatsApp
+                com a vendedora). O parcelamento aqui já considera a quantidade escolhida acima. */}
+            {(() => {
+              const subtotal = precoUnit * qtd
+              const parcelaOk = regras.parcelasMax > 1 && qtd >= regras.parcelasMinPecas && subtotal >= regras.parcelasMinValor
+              const parcela = parcelaOk ? textoParcela(subtotal, regras.parcelasMax) : null
+              const freteGratisOk = regras.entregaFreteGratisValor != null && subtotal >= regras.entregaFreteGratisValor
+              const temEntrega = regras.entregaPrazoTexto || freteGratisOk
+              if (!parcela && !temEntrega && !regras.devolucaoPrazoDias) return null
+              return (
+                <div className="cat-det-regras">
+                  {parcela && (
+                    <div className="cat-det-regra">
+                      <CreditCard size={15} />
+                      <span>{parcela} sem juros{regras.parcelasFormaPagamento ? ` no ${regras.parcelasFormaPagamento}` : ''}</span>
+                    </div>
+                  )}
+                  {temEntrega && (
+                    <div className="cat-det-regra">
+                      <Truck size={15} />
+                      <span>{regras.entregaPrazoTexto || 'Consulte o prazo de entrega'}{freteGratisOk ? ' · Frete grátis' : ''}</span>
+                    </div>
+                  )}
+                  {regras.devolucaoPrazoDias > 0 && (
+                    <div className="cat-det-regra">
+                      <RotateCcw size={15} />
+                      <span>Troca ou devolução em até {regras.devolucaoPrazoDias} dias</span>
+                    </div>
+                  )}
+                  {(regras.entregaTexto || regras.devolucaoTexto) && (
+                    <p className="cat-det-regras-obs">{[regras.entregaTexto, regras.devolucaoTexto].filter(Boolean).join(' · ')}</p>
+                  )}
+                </div>
+              )
+            })()}
+
             <button className="cat-add" onClick={addItem} disabled={!podeAdicionar}>
               {tamanho ? `Adicionar ${qtd} • ${real(precoUnit * qtd)}` : 'Escolha o tamanho'}
             </button>
@@ -670,12 +883,29 @@ export function CatalogoEstilos() {
       .cat-busca input { flex: 1; border: none; background: none; outline: none; font-size: 14px; color: #222; font-family: inherit; }
       .cat-busca input::placeholder { color: #999; }
       .cat-busca input[type="search"]::-webkit-search-cancel-button { cursor: pointer; }
-      .cat-topo-acoes { display: flex; gap: 22px; flex-shrink: 0; margin-left: auto; }
-      .cat-topo-icone { display: flex; flex-direction: column; align-items: center; gap: 2px; background: none; border: none; color: #fff; cursor: pointer; opacity: .92; }
+      .cat-topo-acoes { display: flex; gap: 18px; flex-shrink: 0; margin-left: auto; }
+      .cat-topo-icone { position: relative; display: flex; background: none; border: none; color: #fff; cursor: pointer; opacity: .92; padding: 4px; }
       .cat-topo-icone:hover { opacity: 1; }
       .cat-topo-icone.ativo { color: #ff6b6b; opacity: 1; }
-      .cat-topo-icone span { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
-      @media (max-width: 720px) { .cat-topo { padding: 12px 16px; gap: 12px; } .cat-topo-acoes { gap: 14px; } .cat-topo-icone span { display: none; } }
+      .cat-topo-selo {
+        position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 99px;
+        background: #ff6b6b; color: #fff; font-size: 10px; font-weight: 800; line-height: 16px; text-align: center;
+      }
+      @media (max-width: 720px) { .cat-topo { padding: 12px 16px; gap: 12px; } .cat-topo-acoes { gap: 14px; } }
+
+      /* Trilho de categorias em ícone circular — vem antes do hero */
+      .cat-categorias { max-width: 1100px; margin: 0 auto; padding: 18px 14px 4px; display: flex; gap: 18px; overflow-x: auto; scrollbar-width: none; }
+      .cat-categorias::-webkit-scrollbar { display: none; }
+      .cat-cat-item { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; background: none; border: none; cursor: pointer; width: 64px; }
+      .cat-cat-icone {
+        width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        border: 2px solid #00000014; color: #444; transition: border-color .15s ease, color .15s ease;
+      }
+      .cat-cat-item.ativo .cat-cat-icone { border-color: var(--cat-primaria, #111); color: var(--cat-primaria, #111); }
+      .cat-cat-rotulo { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #555; text-align: center; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 64px; }
+      .cat-cat-item.ativo .cat-cat-rotulo { color: var(--cat-primaria, #111); position: relative; }
+      .cat-cat-item.ativo .cat-cat-rotulo::after { content: ''; display: block; width: 4px; height: 4px; border-radius: 50%; background: var(--cat-primaria, #111); margin: 4px auto 0; }
+
       /* Hero: produto em destaque no topo da vitrine (substitui o antigo cabeçalho de perfil) */
       .cat-hero { max-width: 1100px; margin: 0 auto; padding: 28px 14px; display: grid; grid-template-columns: 1fr; gap: 22px; align-items: center; }
       /* No desktop o banner fica bem mais baixo/retangular (~metade da altura) — só a foto muda
@@ -693,13 +923,8 @@ export function CatalogoEstilos() {
       .cat-hero-dots button { width: 8px; height: 8px; padding: 0; border: none; border-radius: 99px; background: #00000024; cursor: pointer; }
       .cat-hero-dots button.ativo { background: var(--cat-primaria, #111); width: 22px; transition: width .2s ease; }
       /* Filtros por categoria (+ "Lançamentos") — puramente client-side, soma com a busca */
-      .cat-filtros { max-width: 1100px; margin: 0 auto; padding: 4px 14px 18px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
-      .cat-filtros::-webkit-scrollbar { display: none; }
-      .cat-filtros button { flex-shrink: 0; border: 1px solid #00000018; background: #fff; color: #444; font-size: 13px; font-weight: 600; padding: 9px 16px; border-radius: 99px; cursor: pointer; white-space: nowrap; }
-      .cat-filtros button.ativo { background: var(--cat-primaria, #111); border-color: transparent; color: #fff; }
-      .cat-filtros-favoritos { display: flex; align-items: center; gap: 6px; }
-      .cat-filtros-mais { display: flex; align-items: center; gap: 6px; margin-left: auto; }
       /* Foto do hero "dissolve" nas bordas esquerda/direita em vez de terminar num corte reto */
+      .cat-hero-foto-wrap { position: relative; }
       .cat-hero-foto {
         position: relative; aspect-ratio: 4/5; background: #f2f2f2; overflow: hidden; border-radius: 12px; border: none; padding: 0; cursor: pointer; display: block; width: 100%;
         mask-image: linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%);
@@ -710,8 +935,46 @@ export function CatalogoEstilos() {
          (ex.: "ELEGÂNCIA EM CADA PASSO") — cortar a imagem cortava esse texto. Sem crop nenhum,
          só pode sobrar uma tarja da cor de fundo do box nas laterais/topo-baixo. */
       .cat-hero-foto img { width: 100%; height: 100%; object-fit: contain; display: block; }
+      /* Coração/compartilhar flutuando na lateral direita da foto do hero */
+      .cat-hero-acoes-flut { position: absolute; top: 16px; right: 16px; display: flex; flex-direction: column; gap: 10px; }
+      .cat-hero-acao-flut {
+        width: 38px; height: 38px; border-radius: 50%; background: rgba(20,20,20,0.55); backdrop-filter: blur(2px);
+        border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer;
+      }
+      .cat-hero-acao-flut:hover { background: rgba(20,20,20,0.75); }
+      .cat-hero-acao-flut.ativo { color: #ff6b6b; }
       .cat-destaque-badge { position: absolute; top: 8px; left: 8px; background: var(--cat-primaria, #111); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 99px; letter-spacing: .3px; text-transform: uppercase; }
+
+      /* Faixas de selos de confiança (a mais robusta, logo abaixo do hero; a compacta, mais pro fim) */
+      .cat-selos { max-width: 1100px; margin: 8px auto 0; padding: 0 14px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      @media (min-width: 720px) { .cat-selos { grid-template-columns: repeat(4, 1fr); } }
+      .cat-selo { display: flex; align-items: center; gap: 8px; border: 1px solid #00000014; border-radius: 10px; padding: 10px 12px; color: var(--cat-primaria, #111); }
+      .cat-selo span { font-size: 11px; font-weight: 700; color: #333; line-height: 1.3; }
+      .cat-selos-compactos { margin-top: 22px; }
+      .cat-selos-compactos .cat-selo { border: none; border-top: 1px solid #00000014; border-bottom: 1px solid #00000014; border-radius: 0; padding: 14px 4px; }
+      .cat-selos-compactos .cat-selo span { font-weight: 500; }
+      .cat-selos-compactos .cat-selo span strong { display: block; font-weight: 800; color: #222; }
+
+      /* Banner "Monte seu look" — visual por enquanto (botão avisa "em breve") */
+      .cat-look-banner { max-width: 1100px; margin: 22px auto 0; padding: 0 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+      .cat-look-texto { flex: 1 1 200px; border: 1px solid var(--cat-primaria, #111); border-radius: 14px; padding: 16px 18px; }
+      .cat-look-texto strong { display: block; font-size: 15px; line-height: 1.3; margin-bottom: 6px; }
+      .cat-look-texto p { margin: 0 0 12px; font-size: 12px; color: #666; }
+      .cat-look-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--cat-primaria, #111); color: #fff; border: none; padding: 10px 16px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
+      .cat-look-fotos { flex: 1 1 220px; display: flex; align-items: center; gap: 8px; }
+      .cat-look-foto-item { position: relative; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+      .cat-look-foto-item img { width: 100%; height: 100%; object-fit: cover; }
+      .cat-look-mais { position: absolute; top: 50%; right: -14px; transform: translateY(-50%); font-size: 18px; font-weight: 800; color: #999; }
+      .cat-look-desconto {
+        flex-shrink: 0; width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--cat-primaria, #111);
+        display: flex; align-items: center; justify-content: center; text-align: center; font-size: 13px; font-weight: 800;
+        color: var(--cat-primaria, #111); line-height: 1.1;
+      }
+
       .cat-secao { max-width: 1100px; margin: 0 auto; padding: 26px 14px 6px; }
+      .cat-secao-cabec { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+      .cat-secao-titulo { font-size: 15px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; margin: 0; }
+      .cat-secao-link { background: none; border: none; color: var(--cat-primaria, #111); font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
       .cat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
       @media (min-width: 640px) { .cat-grid { grid-template-columns: repeat(3, 1fr); gap: 18px; } }
       @media (min-width: 960px) { .cat-grid { grid-template-columns: repeat(4, 1fr); } }
@@ -737,6 +1000,15 @@ export function CatalogoEstilos() {
       .cat-preco-antigo { color: #999; font-weight: 500; text-decoration: line-through; font-size: 12px; }
       .cat-preco-promo { color: #d12c2c; }
       .cat-desconto { position: absolute; bottom: 8px; left: 8px; background: #d12c2c; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; letter-spacing: .3px; }
+      .cat-parcela { font-size: 11px; color: #888; margin-top: 2px; }
+      .cat-card-rodape { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 8px; }
+      .cat-tam-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+      .cat-tam-chips span { font-size: 10px; font-weight: 700; color: #666; border: 1px solid #00000018; border-radius: 5px; padding: 1px 5px; }
+      .cat-add-rapido {
+        flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--cat-primaria, #111); color: #fff;
+        display: flex; align-items: center; justify-content: center; cursor: pointer; margin-left: auto;
+      }
+      .cat-add-rapido:hover { filter: brightness(1.15); }
 
       /* Carrinho flutuante — fica acima do rodapé de navegação fixo (não sobrepõe) */
       .cat-cart-fab { position: fixed; bottom: calc(72px + env(safe-area-inset-bottom, 0)); left: 50%; transform: translateX(-50%); background: var(--cat-primaria); color: #fff; border: none; padding: 14px 26px; border-radius: 99px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px #00000033; z-index: 20; }
@@ -811,6 +1083,10 @@ export function CatalogoEstilos() {
       .cat-qtd.peq button { width: 28px; height: 28px; font-size: 16px; }
       .cat-qtd.peq { gap: 8px; }
       .cat-urgencia { font-size: 12px; color: #d12c2c; font-weight: 700; margin-bottom: 8px; }
+      .cat-det-regras { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; padding: 12px 14px; background: #00000006; border-radius: 10px; }
+      .cat-det-regra { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #333; }
+      .cat-det-regra svg { flex-shrink: 0; color: var(--cat-primaria, #111); }
+      .cat-det-regras-obs { margin: 2px 0 0 23px; font-size: 11px; color: #888; }
       .cat-add { width: 100%; margin-top: 14px; background: var(--cat-primaria, #111); color: #fff; border: none; padding: 15px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
       .cat-add:disabled { opacity: .5; cursor: not-allowed; }
 

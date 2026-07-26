@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { api, formataReal, mensagemDeErro } from '../../api'
 import { EtapasEntrega, type StatusEntrega } from '../../componentes/EtapasEntrega'
+import { lerSessaoSalva, limparSessao, salvarSessao } from '../../lib/sessaoCliente'
 
 interface PedidoAberto {
   id: string; status: 'ENTROU' | 'ATENDIDO' | 'NEGOCIANDO'; createdAt: string
@@ -16,7 +17,6 @@ interface PedidoFechado {
 }
 
 const CHAVE_TELEFONE = 'zz_meu_telefone'
-const CHAVE_SESSAO = 'zz_pedido_sessao'
 const dataBR = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
 function textoAberto(p: PedidoAberto): string {
@@ -27,31 +27,17 @@ function textoAberto(p: PedidoAberto): string {
   return 'Sua vendedora está preparando seu orçamento.'
 }
 
-/** Sessão verificada (telefone + token) — em localStorage se "lembrar neste aparelho" foi
- *  marcado (sobrevive a fechar o navegador), senão em sessionStorage (só durante esta aba). */
-function lerSessaoSalva(): { telefone: string; token: string } | null {
-  const raw = localStorage.getItem(CHAVE_SESSAO) ?? sessionStorage.getItem(CHAVE_SESSAO)
-  if (!raw) return null
-  try { return JSON.parse(raw) } catch { return null }
-}
-function salvarSessao(telefone: string, token: string, lembrar: boolean) {
-  const raw = JSON.stringify({ telefone, token })
-  if (lembrar) localStorage.setItem(CHAVE_SESSAO, raw)
-  else sessionStorage.setItem(CHAVE_SESSAO, raw)
-}
-function limparSessao() {
-  localStorage.removeItem(CHAVE_SESSAO)
-  sessionStorage.removeItem(CHAVE_SESSAO)
-}
-
 type Etapa = 'telefone' | 'codigo' | 'resultados'
 
 /** "Ver Carrinho" (pedidos em aberto) e "Ver Pedidos" (fechados, com etapas de entrega) do perfil
  *  público da vendedora. Sem login: confirma o dono do WhatsApp com um código de 6 dígitos
  *  enviado pela própria ZAIEZE (mesmo canal do "esqueci minha senha") antes de mostrar qualquer
  *  pedido — sem isso, bastava digitar qualquer número pra ver os pedidos dele. */
-export default function MeusPedidos({ redeSlug, vendSlug, abaInicial, acento, onClose }: {
+export default function MeusPedidos({ redeSlug, vendSlug, abaInicial, acento, onClose, aoVerificar }: {
   redeSlug: string; vendSlug: string; abaInicial: 'abertos' | 'fechados'; acento: string; onClose: () => void
+  /** Chamado com o token assim que a sessão é confirmada (agora ou de uma verificação
+   *  anterior) — usado pelo Catalogo.tsx pra sincronizar os favoritos com esse cliente. */
+  aoVerificar?: (token: string) => void
 }) {
   const navigate = useNavigate()
   const [etapa, setEtapa] = useState<Etapa>('telefone')
@@ -74,6 +60,7 @@ export default function MeusPedidos({ redeSlug, vendSlug, abaInicial, acento, on
       const { data } = await api.post(`/catalogo/publico/${redeSlug}/${vendSlug}/meus-pedidos`, { token })
       setAbertos(data.abertos); setFechados(data.fechados)
       setEtapa('resultados')
+      aoVerificar?.(token)
       return true
     } catch {
       limparSessao()

@@ -140,7 +140,7 @@ export function mensagemDeErro(e: unknown): string {
 }
 
 export function formataReal(v: number | string): string {
-  return `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  return `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export function formataUsd(v: number | string): string {

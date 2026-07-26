@@ -32,6 +32,18 @@ const atualizarSchema = z.object({
   pedidoMinimoAtacado: z.coerce.number().int().min(2).max(1000).optional(),
   textoDisparoPadrao: z.string().max(1000).optional(),
   disparoVendedoraEditavel: z.boolean().optional(),
+  // Regras do Negócio — Parcelamento
+  parcelasMax: z.coerce.number().int().min(1).max(24).optional(),
+  parcelasFormaPagamento: z.string().trim().max(80).nullish(),
+  parcelasMinPecas: z.coerce.number().int().min(0).max(1000).optional(),
+  parcelasMinValor: z.coerce.number().min(0).optional(),
+  // Regras do Negócio — Entrega
+  entregaPrazoTexto: z.string().trim().max(160).nullish(),
+  entregaFreteGratisValor: z.coerce.number().min(0).nullish(),
+  entregaTexto: z.string().trim().max(1000).nullish(),
+  // Regras do Negócio — Devolução
+  devolucaoPrazoDias: z.coerce.number().int().min(0).max(90).optional(),
+  devolucaoTexto: z.string().trim().max(1000).nullish(),
 })
 
 const selectMarca = {
@@ -39,6 +51,9 @@ const selectMarca = {
   slaEntrouMin: true, slaAtendidoMin: true, slaNegociandoMin: true, slaApertadoPct: true, slaAutoRedistribuir: true,
   pedidoMinimoAtacado: true,
   textoDisparoPadrao: true, disparoVendedoraEditavel: true,
+  parcelasMax: true, parcelasFormaPagamento: true, parcelasMinPecas: true, parcelasMinValor: true,
+  entregaPrazoTexto: true, entregaFreteGratisValor: true, entregaTexto: true,
+  devolucaoPrazoDias: true, devolucaoTexto: true,
 }
 
 export async function marcaRoutes(app: FastifyInstance) {

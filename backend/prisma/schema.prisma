@@ -232,6 +232,24 @@ model Rede {
   pedidoMinimoAtacado      Int       @default(6)
   // Lote mínimo de atacado para INFANTIL (costuma ser maior, ex.: 12). Demais gêneros usam pedidoMinimoAtacado.
   pedidoMinimoInfantil     Int       @default(12)
+  // ── Regras do Negócio (vitrine) — Parcelamento / Entrega / Devolução ──
+  // Tudo aqui é só INFORMATIVO pro cliente (não há gateway de pagamento nem logística integrada:
+  // a compra fecha pelo WhatsApp com a vendedora). Definido pelo gestor em Marca > Regras do Negócio.
+
+  // Parcelamento: "6x de R$ X" exibido na vitrine (varejo). 1 = não exibe parcelamento nenhum.
+  // Condicionado pelo gestor a uma forma de pagamento (texto livre, ex.: "Cartão de crédito") e/ou
+  // a um mínimo de peças/valor no pedido — abaixo do mínimo, o parcelamento não é anunciado.
+  parcelasMax              Int       @default(1)
+  parcelasFormaPagamento   String? // ex.: "Cartão de crédito"; null = não especifica
+  parcelasMinPecas         Int       @default(0) // 0 = sem mínimo de peças
+  parcelasMinValor         Decimal   @default(0) @db.Decimal(12, 2) // 0 = sem valor mínimo
+  // Entrega: texto livre (prazo varia por região/transportadora) + limiar opcional de frete grátis.
+  entregaPrazoTexto        String? // ex.: "5 a 10 dias úteis, conforme a região"
+  entregaFreteGratisValor  Decimal? @db.Decimal(12, 2) // null = sem frete grátis configurado
+  entregaTexto             String? // condições adicionais (textarea livre do gestor)
+  // Devolução: prazo em dias (padrão 7 = direito de arrependimento do CDC p/ compra online) + texto livre.
+  devolucaoPrazoDias       Int       @default(7)
+  devolucaoTexto           String? // condições adicionais (textarea livre do gestor)
   // Desconto no PDV: régua sugerida por total (JSON [{ate, pct}]) + limites de autorização.
   descontoRegua            Json? // null = usa a régua padrão do sistema
   descontoAutoMaxPct       Int       @default(10) // até este % a vendedora aplica sozinha
@@ -833,6 +851,10 @@ model Cliente {
   // Portal do Cliente (fase 7): acesso próprio do cliente + saldo de cashback acumulado
   senhaHash                String?
   saldoCashback            Decimal         @default(0) @db.Decimal(12, 2)
+  // Favoritos da vitrine (Portal do Cliente) — IDs de Produto. Sincronizado a partir do
+  // localStorage do navegador assim que o cliente verifica o WhatsApp (ver catalogo.routes.ts);
+  // sem verificar, os favoritos ficam só no aparelho (não chegam aqui).
+  favoritosVitrine         String[]        @default([])
   // Chat de Atendimento (add-on por vendedora): estado do pré-atendimento roteirizado deste
   // cliente. null = ainda não passou pelo bot (ou a vendedora não tem o add-on); intercepta só
   // no 1º contato — uma vez CONCLUIDO, nunca mais roda pra este cliente (ver chat-atendimento.service.ts).

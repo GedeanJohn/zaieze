@@ -19,6 +19,15 @@ interface Marca {
   pedidoMinimoAtacado: number
   textoDisparoPadrao: string | null
   disparoVendedoraEditavel: boolean
+  parcelasMax: number
+  parcelasFormaPagamento: string | null
+  parcelasMinPecas: number
+  parcelasMinValor: number
+  entregaPrazoTexto: string | null
+  entregaFreteGratisValor: number | null
+  entregaTexto: string | null
+  devolucaoPrazoDias: number
+  devolucaoTexto: string | null
 }
 
 interface Sugestao { cor: string; origem: 'logo' | 'banner' }
@@ -123,6 +132,15 @@ export default function Marca() {
         pedidoMinimoAtacado: marca.pedidoMinimoAtacado,
         textoDisparoPadrao: marca.textoDisparoPadrao ?? '',
         disparoVendedoraEditavel: marca.disparoVendedoraEditavel,
+        parcelasMax: marca.parcelasMax,
+        parcelasFormaPagamento: marca.parcelasFormaPagamento?.trim() || null,
+        parcelasMinPecas: marca.parcelasMinPecas,
+        parcelasMinValor: marca.parcelasMinValor,
+        entregaPrazoTexto: marca.entregaPrazoTexto?.trim() || null,
+        entregaFreteGratisValor: marca.entregaFreteGratisValor,
+        entregaTexto: marca.entregaTexto?.trim() || null,
+        devolucaoPrazoDias: marca.devolucaoPrazoDias,
+        devolucaoTexto: marca.devolucaoTexto?.trim() || null,
       })
       setMarca(data)
       avisar(t('marca.identidadeSalva'))
@@ -354,7 +372,68 @@ export default function Marca() {
             <input type="number" min={2} value={marca.pedidoMinimoAtacado} onChange={(e) => setMarca({ ...marca, pedidoMinimoAtacado: Number(e.target.value) })} />
           </div>
         </div>
-        <h3 style={{ margin: '8px 0 4px' }}>{t('marca.textoDisparoTitulo')}</h3>
+        <h2 style={{ margin: '20px 0 4px', paddingTop: 16, borderTop: '1px solid var(--ink-soft-25, #0a0a0b22)' }}>{t('marca.regrasNegocioTitulo')}</h2>
+        <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 0 }}>{t('marca.regrasNegocioExplicacao')}</p>
+
+        <h4 style={{ margin: '14px 0 4px' }}>{t('marca.parcelamentoTitulo')}</h4>
+        <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 0 }}>{t('marca.parcelamentoExplicacao')}</p>
+        <div className="linha-campos">
+          <div className="campo" style={{ maxWidth: 200 }}>
+            <label>{t('marca.parcelasMaxLabel')}</label>
+            <input type="number" min={1} max={24} value={marca.parcelasMax} onChange={(e) => setMarca({ ...marca, parcelasMax: Number(e.target.value) })} />
+          </div>
+          <div className="campo" style={{ maxWidth: 240 }}>
+            <label>{t('marca.parcelasFormaPagamentoLabel')}</label>
+            <input value={marca.parcelasFormaPagamento ?? ''} placeholder={t('marca.parcelasFormaPagamentoPlaceholder')}
+              onChange={(e) => setMarca({ ...marca, parcelasFormaPagamento: e.target.value })} />
+          </div>
+        </div>
+        <div className="linha-campos">
+          <div className="campo" style={{ maxWidth: 200 }}>
+            <label>{t('marca.parcelasMinPecasLabel')}</label>
+            <input type="number" min={0} value={marca.parcelasMinPecas} onChange={(e) => setMarca({ ...marca, parcelasMinPecas: Number(e.target.value) })} />
+          </div>
+          <div className="campo" style={{ maxWidth: 200 }}>
+            <label>{t('marca.parcelasMinValorLabel')}</label>
+            <input type="number" min={0} step="0.01" value={marca.parcelasMinValor} onChange={(e) => setMarca({ ...marca, parcelasMinValor: Number(e.target.value) })} />
+          </div>
+        </div>
+
+        <h4 style={{ margin: '18px 0 4px' }}>{t('marca.entregaTitulo')}</h4>
+        <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 0 }}>{t('marca.entregaExplicacao')}</p>
+        <div className="linha-campos">
+          <div className="campo" style={{ maxWidth: 280 }}>
+            <label>{t('marca.entregaPrazoLabel')}</label>
+            <input value={marca.entregaPrazoTexto ?? ''} placeholder={t('marca.entregaPrazoPlaceholder')}
+              onChange={(e) => setMarca({ ...marca, entregaPrazoTexto: e.target.value })} />
+          </div>
+          <div className="campo" style={{ maxWidth: 200 }}>
+            <label>{t('marca.entregaFreteGratisLabel')}</label>
+            <input type="number" min={0} step="0.01" value={marca.entregaFreteGratisValor ?? ''} placeholder={t('marca.entregaFreteGratisPlaceholder')}
+              onChange={(e) => setMarca({ ...marca, entregaFreteGratisValor: e.target.value === '' ? null : Number(e.target.value) })} />
+          </div>
+        </div>
+        <div className="campo">
+          <label>{t('marca.entregaTextoLabel')}</label>
+          <textarea rows={2} value={marca.entregaTexto ?? ''} placeholder={t('marca.entregaTextoPlaceholder')}
+            onChange={(e) => setMarca({ ...marca, entregaTexto: e.target.value })} />
+        </div>
+
+        <h4 style={{ margin: '18px 0 4px' }}>{t('marca.devolucaoTitulo')}</h4>
+        <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 0 }}>{t('marca.devolucaoExplicacao')}</p>
+        <div className="linha-campos">
+          <div className="campo" style={{ maxWidth: 200 }}>
+            <label>{t('marca.devolucaoPrazoLabel')}</label>
+            <input type="number" min={0} max={90} value={marca.devolucaoPrazoDias} onChange={(e) => setMarca({ ...marca, devolucaoPrazoDias: Number(e.target.value) })} />
+          </div>
+        </div>
+        <div className="campo">
+          <label>{t('marca.devolucaoTextoLabel')}</label>
+          <textarea rows={2} value={marca.devolucaoTexto ?? ''} placeholder={t('marca.devolucaoTextoPlaceholder')}
+            onChange={(e) => setMarca({ ...marca, devolucaoTexto: e.target.value })} />
+        </div>
+
+        <h3 style={{ margin: '20px 0 4px', paddingTop: 16, borderTop: '1px solid #0a0a0b22' }}>{t('marca.textoDisparoTitulo')}</h3>
         <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 0 }}>
           {t('marca.textoDisparoExplicacao')} {'{primeiroNome}'} {'{nome}'} {'{loja}'} {'{vendedora}'}.
         </p>

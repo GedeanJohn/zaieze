@@ -78,7 +78,13 @@ function whatsappUrl(numero: string | null, texto: string): string | null {
 async function resolverVendedoraPublica(redeSlug: string, vendSlug: string) {
   const rede = await prisma.rede.findUnique({
     where: { slug: redeSlug },
-    select: { id: true, nome: true, plano: true, ativo: true, logoUrl: true, bannerUrl: true, descricaoPublica: true, corPrimaria: true, corSecundaria: true, pedidoMinimoAtacado: true, pedidoMinimoInfantil: true, waPhoneNumberId: true, waNumeroExibicao: true },
+    select: {
+      id: true, nome: true, plano: true, ativo: true, logoUrl: true, bannerUrl: true, descricaoPublica: true, corPrimaria: true, corSecundaria: true,
+      pedidoMinimoAtacado: true, pedidoMinimoInfantil: true, waPhoneNumberId: true, waNumeroExibicao: true,
+      parcelasMax: true, parcelasFormaPagamento: true, parcelasMinPecas: true, parcelasMinValor: true,
+      entregaPrazoTexto: true, entregaFreteGratisValor: true, entregaTexto: true,
+      devolucaoPrazoDias: true, devolucaoTexto: true,
+    },
   })
   if (!rede || !rede.ativo || !planoInclui(rede.plano, 'portal_cliente')) return null
   const vend = await prisma.usuario.findFirst({
@@ -256,7 +262,16 @@ export async function catalogoRoutes(app: FastifyInstance) {
     ])
 
     return {
-      marca: { nome: rede.nome, logoUrl: rede.logoUrl, bannerUrl: rede.bannerUrl, descricaoPublica: rede.descricaoPublica, corPrimaria: rede.corPrimaria, corSecundaria: rede.corSecundaria },
+      marca: {
+        nome: rede.nome, logoUrl: rede.logoUrl, bannerUrl: rede.bannerUrl, descricaoPublica: rede.descricaoPublica,
+        corPrimaria: rede.corPrimaria, corSecundaria: rede.corSecundaria,
+        parcelasMax: rede.parcelasMax, parcelasFormaPagamento: rede.parcelasFormaPagamento,
+        parcelasMinPecas: rede.parcelasMinPecas, parcelasMinValor: Number(rede.parcelasMinValor),
+        entregaPrazoTexto: rede.entregaPrazoTexto,
+        entregaFreteGratisValor: rede.entregaFreteGratisValor != null ? Number(rede.entregaFreteGratisValor) : null,
+        entregaTexto: rede.entregaTexto,
+        devolucaoPrazoDias: rede.devolucaoPrazoDias, devolucaoTexto: rede.devolucaoTexto,
+      },
       loja: { nome: vend.loja!.nome },
       vendedora: {
         nome: vend.nome, primeiroNome: vend.nome.trim().split(/\s+/)[0], fotoUrl: vend.fotoUrl, bio: vend.bioCatalogo, temWhatsapp: !!vend.telefone,
@@ -599,5 +614,67 @@ export async function catalogoRoutes(app: FastifyInstance) {
         statusEntrega: v.statusEntrega, pecas: v.itens.reduce((s, i) => s + i.quantidade, 0),
       })),
     }
+  })
+
+  // ─────── Favoritos da vitrine sincronizados (Portal do Cliente) ───────
+  // Mesmo token do /meus-pedidos (verificação por WhatsApp). Sem verificar, os favoritos
+  // continuam só no localStorage do navegador — isso aqui é o "espelho" no servidor.
+  function verificarTokenCliente(reply: import('fastify').FastifyReply, token: string, lojaId: string): string | null {
+    let payload: Partial<ClientePedidosPayload>
+    try {
+      payload = app.jwt.verify(token) as unknown as ClientePedidosPayload
+    } catch {
+      reply.code(401).send({ erro: 'Verificação expirada. Confirme seu WhatsApp de novo.' })
+      return null
+    }
+    if (payload.tipo !== 'cliente_pedidos' || payload.lojaId !== lojaId || !payload.telefone) {
+      reply.code(401).send({ erro: 'Verificação expirada. Confirme seu WhatsApp de novo.' })
+      return null
+    }
+    return payload.telefone
+  }
+
+  // Busca os favoritos já salvos pra esse cliente (chamado ao verificar/abrir a vitrine).
+  app.post('/publico/:redeSlug/:vendSlug/favoritos/buscar', { config: { rateLimit: { max: 30, timeWindow: '10 minutes' } } }, async (request, reply) => {
+    const { redeSlug, vendSlug } = request.params as { redeSlug: string; vendSlug: string }
+    const ctx = await resolverVendedoraPublica(redeSlug, vendSlug)
+    if (!ctx) return reply.code(404).send({ erro: 'Página não encontrada' })
+    const { vend } = ctx
+    const { token } = z.object({ token: z.string() }).parse(request.body)
+    const telefone = verificarTokenCliente(reply, token, vend.lojaId!)
+    if (!telefone) return
+
+    const cliente = await prisma.cliente.findUnique({
+      where: { lojaId_telefone: { lojaId: vend.lojaId!, telefone } },
+      select: { favoritosVitrine: true },
+    })
+    return { favoritos: cliente?.favoritosVitrine ?? [] }
+  })
+
+  // Salva (substitui) a lista de favoritos do cliente — o cliente sempre manda a lista completa
+  // e atual (já mesclada no front), então dá pra favoritar E desfavoritar corretamente.
+  const salvarFavoritosSchema = z.object({ token: z.string(), favoritos: z.array(z.string()).max(500) })
+  app.post('/publico/:redeSlug/:vendSlug/favoritos', { config: { rateLimit: { max: 60, timeWindow: '10 minutes' } } }, async (request, reply) => {
+    const { redeSlug, vendSlug } = request.params as { redeSlug: string; vendSlug: string }
+    const ctx = await resolverVendedoraPublica(redeSlug, vendSlug)
+    if (!ctx) return reply.code(404).send({ erro: 'Página não encontrada' })
+    const { vend } = ctx
+    const body = salvarFavoritosSchema.parse(request.body)
+    const telefone = verificarTokenCliente(reply, body.token, vend.lojaId!)
+    if (!telefone) return
+
+    // Cliente pode não existir ainda (verificou o WhatsApp só pra favoritar, sem nunca ter
+    // mandado mensagem) — cria com o mínimo, igual ao /lead, na carteira desta vendedora.
+    const cliente = await prisma.cliente.upsert({
+      where: { lojaId_telefone: { lojaId: vend.lojaId!, telefone } },
+      create: {
+        lojaId: vend.lojaId!, telefone, nome: 'Cliente do catálogo', vendedoraId: vend.id,
+        consentimentoLgpd: true, favoritosVitrine: body.favoritos,
+        observacoes: 'Entrou pelo catálogo (Portal do Cliente)',
+      },
+      update: { favoritosVitrine: body.favoritos },
+      select: { favoritosVitrine: true },
+    })
+    return { favoritos: cliente.favoritosVitrine }
   })
 }

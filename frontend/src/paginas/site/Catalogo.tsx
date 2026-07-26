@@ -1124,7 +1124,7 @@ export function CatalogoEstilos() {
         .cat-topo-acoes { gap: 8px; }
         .cat-topo-icone svg { width: 15px; height: 15px; }
 
-        .cat-categorias { padding: 10px 10px 4px; gap: 9px; }
+        .cat-categorias { padding: 10px 10px 4px; gap: 9px; justify-content: space-between; }
         .cat-cat-item { width: 44px; gap: 3px; }
         .cat-cat-icone { width: 38px; height: 38px; }
         .cat-cat-rotulo { font-size: 7px; max-width: 44px; }

@@ -1129,15 +1129,18 @@ export function CatalogoEstilos() {
         .cat-cat-icone { width: 38px; height: 38px; }
         .cat-cat-rotulo { font-size: 7px; max-width: 44px; }
 
-        .cat-hero { padding: 10px 10px; gap: 8px; }
+        .cat-hero { padding: 10px 10px; gap: 8px; align-items: stretch; }
+        .cat-hero-texto { justify-content: space-between; height: 100%; }
         .cat-hero-acoes-flut { top: 8px; right: 8px; gap: 5px; }
         .cat-hero-acao-flut { width: 24px; height: 24px; }
         .cat-hero-acao-flut svg { width: 13px; height: 13px; }
         .cat-destaque-badge { font-size: 7px; padding: 2px 6px; }
-        .cat-hero-selo { font-size: 8px; padding: 2px 8px; }
-        .cat-hero-titulo { font-size: clamp(14px, 4vw, 26px); }
+        /* +30% em relação ao tamanho anterior (8px→10.4px, 14/26→18.2/33.8) */
+        .cat-hero-selo { font-size: 10.5px; padding: 3px 10px; }
+        .cat-hero-titulo { font-size: clamp(18px, 5.2vw, 34px); }
         .cat-hero-desc { font-size: 9.5px; }
         .cat-hero-btn { padding: 7px 12px; font-size: 9.5px; }
+        .cat-hero-dots { margin-top: 0; }
 
         .cat-selos { gap: 6px; padding: 0 10px; }
         .cat-selo { padding: 6px 8px; gap: 5px; }
@@ -1174,6 +1177,10 @@ export function CatalogoEstilos() {
         .cat-bottom-nav { padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0)); }
         .cat-nav-item { font-size: 9px; padding: 3px 2px; }
         .cat-nav-item.ativo .cat-nav-icone { width: 44px; height: 44px; margin-top: -24px; }
+
+        .cat-fala-wrap { padding: 16px 10px 4px; }
+        .cat-fala-cta { padding: 9px 18px; font-size: 11px; }
+        .cat-rodape { font-size: 9px; padding: 18px 0 10px; }
       }
     `}</style>
   )

@@ -885,63 +885,61 @@ export function CatalogoEstilos() {
         background: #ff6b6b; color: #fff; font-size: 10px; font-weight: 800; line-height: 16px; text-align: center;
       }
       @media (max-width: 720px) {
-        .cat-topo { padding: 10px 14px; gap: 10px; }
-        .cat-topo-marca img { max-height: 22px; max-width: 100px; }
-        .cat-topo-marca-nome { font-size: 15px; }
-        .cat-topo-marca-sub { font-size: 8.5px; }
-        .cat-busca { padding: 8px 12px; gap: 6px; }
-        .cat-busca input { font-size: 12.5px; }
-        .cat-busca svg { width: 15px; height: 15px; }
-        .cat-topo-acoes { gap: 10px; }
-        .cat-topo-icone svg { width: 17px; height: 17px; }
+        .cat-topo { padding: 8px 12px; gap: 8px; }
+        .cat-topo-marca img { max-height: 18px; max-width: 84px; }
+        .cat-topo-marca-nome { font-size: 13px; }
+        .cat-topo-marca-sub { font-size: 7.5px; }
+        .cat-busca { padding: 6px 10px; gap: 5px; }
+        .cat-busca input { font-size: 11px; }
+        .cat-busca svg { width: 13px; height: 13px; }
+        .cat-topo-acoes { gap: 8px; }
+        .cat-topo-icone svg { width: 15px; height: 15px; }
       }
 
       /* Redução proporcional de todas as seções no mobile — mesma densidade da referência
          (cabeçalho compacto, ícones/textos/paddings menores em toda a página, não só na busca). */
       @media (max-width: 720px) {
-        .cat-categorias { padding: 12px 12px 4px; gap: 12px; }
-        .cat-cat-item { width: 52px; gap: 4px; }
-        .cat-cat-icone { width: 46px; height: 46px; }
-        .cat-cat-rotulo { font-size: 9px; max-width: 52px; }
+        .cat-categorias { padding: 10px 10px 4px; gap: 9px; }
+        .cat-cat-item { width: 44px; gap: 3px; }
+        .cat-cat-icone { width: 38px; height: 38px; }
+        .cat-cat-rotulo { font-size: 8px; max-width: 44px; }
 
-        .cat-hero { padding: 18px 12px; gap: 14px; }
-        .cat-hero-selo { font-size: 9.5px; padding: 3px 10px; }
-        .cat-hero-titulo { font-size: clamp(20px, 6vw, 26px); }
-        .cat-hero-desc { font-size: 12px; }
-        .cat-hero-btn { padding: 10px 16px; font-size: 12px; }
-        .cat-hero-acoes-flut { top: 10px; right: 10px; gap: 7px; }
-        .cat-hero-acao-flut { width: 32px; height: 32px; }
-        .cat-destaque-badge { font-size: 9.5px; padding: 2px 8px; }
+        .cat-hero-acoes-flut { top: 8px; right: 8px; gap: 5px; }
+        .cat-hero-acao-flut { width: 26px; height: 26px; }
+        .cat-destaque-badge { font-size: 8px; padding: 2px 7px; }
 
-        .cat-selos { gap: 8px; padding: 0 12px; }
-        .cat-selo { padding: 8px 10px; gap: 6px; }
-        .cat-selo span { font-size: 10px; }
-        .cat-selos-compactos { margin-top: 16px; }
-        .cat-selos-compactos .cat-selo { padding: 10px 4px; }
+        .cat-selos { gap: 6px; padding: 0 10px; }
+        .cat-selo { padding: 6px 8px; gap: 5px; }
+        .cat-selo span { font-size: 8.5px; }
+        .cat-selos-compactos { margin-top: 12px; }
+        .cat-selos-compactos .cat-selo { padding: 8px 3px; }
 
-        .cat-look-banner { margin: 16px auto 0; padding: 0 12px; gap: 10px; }
-        .cat-look-texto { padding: 12px 14px; }
-        .cat-look-texto strong { font-size: 13px; margin-bottom: 4px; }
-        .cat-look-texto p { font-size: 11px; margin: 0 0 10px; }
-        .cat-look-btn { padding: 8px 12px; font-size: 11px; }
-        .cat-look-foto-item { width: 52px; height: 52px; }
-        .cat-look-desconto { width: 52px; height: 52px; font-size: 11px; }
+        .cat-look-banner { margin: 12px auto 0; padding: 0 10px; gap: 8px; }
+        .cat-look-texto { padding: 9px 11px; }
+        .cat-look-texto strong { font-size: 11px; margin-bottom: 3px; }
+        .cat-look-texto p { font-size: 9.5px; margin: 0 0 8px; }
+        .cat-look-btn { padding: 6px 10px; font-size: 9.5px; }
+        .cat-look-foto-item { width: 42px; height: 42px; }
+        .cat-look-desconto { width: 42px; height: 42px; font-size: 9.5px; }
 
-        .cat-secao { padding: 18px 12px 6px; }
-        .cat-secao-titulo { font-size: 13px; }
-        .cat-secao-link { font-size: 11px; }
-        .cat-grid { gap: 8px; }
-        .cat-info { padding: 8px 10px 10px; }
-        .cat-nome { font-size: 12px; }
-        .cat-preco { font-size: 13px; }
-        .cat-preco-antigo { font-size: 11px; }
-        .cat-parcela { font-size: 10px; }
-        .cat-tam-chips span { font-size: 9px; padding: 1px 4px; }
-        .cat-add-rapido { width: 24px; height: 24px; }
-        .cat-favorito { width: 26px; height: 26px; }
+        .cat-secao { padding: 14px 10px 4px; }
+        .cat-secao-titulo { font-size: 11.5px; }
+        .cat-secao-link { font-size: 10px; }
+        .cat-info { padding: 5px 6px 6px; }
+        .cat-nome { font-size: 8.5px; line-height: 1.2; }
+        .cat-preco { font-size: 9.5px; gap: 3px; }
+        .cat-preco-antigo { font-size: 8px; }
+        .cat-parcela { font-size: 7px; }
+        .cat-tam-chips { gap: 2px; }
+        .cat-tam-chips span { font-size: 6.5px; padding: 0px 3px; }
+        .cat-add-rapido { width: 16px; height: 16px; }
+        .cat-add-rapido svg { width: 10px; height: 10px; }
+        .cat-favorito { width: 18px; height: 18px; }
+        .cat-favorito svg { width: 11px; height: 11px; }
+        .cat-esgotado, .cat-desconto, .cat-video-badge { font-size: 8px; padding: 1px 6px; }
 
-        .cat-bottom-nav { padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0)); }
-        .cat-nav-item { font-size: 10px; padding: 4px 2px; }
+        .cat-bottom-nav { padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0)); }
+        .cat-nav-item { font-size: 9px; padding: 3px 2px; }
         .cat-nav-item.ativo .cat-nav-icone { width: 44px; height: 44px; margin-top: -24px; }
       }
 
@@ -958,20 +956,24 @@ export function CatalogoEstilos() {
       .cat-cat-item.ativo .cat-cat-rotulo { color: var(--cat-primaria, #111); position: relative; }
       .cat-cat-item.ativo .cat-cat-rotulo::after { content: ''; display: block; width: 4px; height: 4px; border-radius: 50%; background: var(--cat-primaria, #111); margin: 4px auto 0; }
 
-      /* Hero: produto em destaque no topo da vitrine (substitui o antigo cabeçalho de perfil) */
-      .cat-hero { max-width: 1100px; margin: 0 auto; padding: 28px 14px; display: grid; grid-template-columns: 1fr; gap: 22px; align-items: center; }
-      /* No desktop o banner fica bem mais baixo/retangular (~metade da altura) — só a foto muda
-         de proporção (4/5 → 8/5, a mesma largura com metade da altura); no mobile empilhado
-         continua alta, que é o formato que funciona ali. */
+      /* Hero: produto em destaque no topo da vitrine (substitui o antigo cabeçalho de perfil).
+         Texto e foto lado a lado (2 colunas) em qualquer largura, inclusive mobile — igual à
+         referência de mockup: no celular a foto fica só um pouco mais estreita, nunca empilhada. */
+      .cat-hero { max-width: 1100px; margin: 0 auto; padding: 16px 12px; display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 12px; align-items: center; }
       @media (min-width: 720px) { .cat-hero { grid-template-columns: 1fr 1fr; padding: 24px 24px; gap: 36px; } }
-      .cat-hero-texto { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
-      .cat-hero-selo { display: inline-block; border: 1px solid var(--cat-primaria, #111); color: var(--cat-primaria, #111); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: 4px 12px; border-radius: 99px; }
-      .cat-hero-titulo { margin: 4px 0 0; font-size: clamp(26px, 4.5vw, 42px); font-weight: 800; line-height: 1.1; }
-      .cat-hero-desc { margin: 0; font-size: 14px; line-height: 1.6; color: #555; max-width: 440px; }
-      .cat-hero-btn { margin-top: 10px; background: var(--cat-primaria, #111); color: #fff; border: none; padding: 13px 22px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; }
+      .cat-hero-texto { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+      .cat-hero-selo { display: inline-block; border: 1px solid var(--cat-primaria, #111); color: var(--cat-primaria, #111); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 3px 9px; border-radius: 99px; }
+      .cat-hero-titulo { margin: 3px 0 0; font-size: clamp(16px, 4.6vw, 42px); font-weight: 800; line-height: 1.1; }
+      .cat-hero-desc { margin: 0; font-size: 11px; line-height: 1.4; color: #555; max-width: 440px; }
+      .cat-hero-btn { margin-top: 6px; background: var(--cat-primaria, #111); color: #fff; border: none; padding: 8px 14px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; }
       .cat-hero-btn:hover { filter: brightness(1.1); }
+      @media (min-width: 720px) {
+        .cat-hero-selo { font-size: 11px; padding: 4px 12px; }
+        .cat-hero-desc { font-size: 14px; line-height: 1.6; }
+        .cat-hero-btn { padding: 13px 22px; font-size: 14px; margin-top: 10px; }
+      }
       /* Pontinhos do carrossel do hero — só aparece com 2+ produtos em destaque */
-      .cat-hero-dots { display: flex; gap: 8px; margin-top: 22px; }
+      .cat-hero-dots { display: flex; gap: 8px; margin-top: 10px; }
       .cat-hero-dots button { width: 8px; height: 8px; padding: 0; border: none; border-radius: 99px; background: #00000024; cursor: pointer; }
       .cat-hero-dots button.ativo { background: var(--cat-primaria, #111); width: 22px; transition: width .2s ease; }
       /* Filtros por categoria (+ "Lançamentos") — puramente client-side, soma com a busca */
@@ -1027,9 +1029,9 @@ export function CatalogoEstilos() {
       .cat-secao-cabec { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
       .cat-secao-titulo { font-size: 15px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; margin: 0; }
       .cat-secao-link { background: none; border: none; color: var(--cat-primaria, #111); font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
-      .cat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-      @media (min-width: 640px) { .cat-grid { grid-template-columns: repeat(3, 1fr); gap: 18px; } }
-      @media (min-width: 960px) { .cat-grid { grid-template-columns: repeat(4, 1fr); } }
+      /* 4 colunas mesmo no mobile — igual à referência (Destaques para você) */
+      .cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+      @media (min-width: 640px) { .cat-grid { gap: 18px; } }
       .cat-card { border: 1px solid rgba(0,0,0,0.08); background: #fff; border-radius: 10px; padding: 0; cursor: pointer; text-align: left; overflow: hidden; transition: box-shadow .2s ease, border-color .2s ease; }
       .cat-card:hover { border-color: rgba(0,0,0,0.14); box-shadow: 0 6px 18px rgba(0,0,0,0.07); }
       .cat-foto { position: relative; aspect-ratio: 3/4; background: #f2f2f2; overflow: hidden; }

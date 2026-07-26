@@ -342,13 +342,6 @@ export default function Catalogo() {
         </label>
 
         <div className="cat-topo-acoes">
-          <button
-            type="button" className={`cat-topo-icone${categoriaAtiva === FAVORITOS ? ' ativo' : ''}`}
-            aria-label="Favoritos" onClick={() => setCategoriaAtiva((c) => (c === FAVORITOS ? null : FAVORITOS))}
-          >
-            <Heart size={20} fill={categoriaAtiva === FAVORITOS ? 'currentColor' : 'none'} />
-            {favoritos.size > 0 && <span className="cat-topo-selo">{favoritos.size}</span>}
-          </button>
           <button type="button" className="cat-topo-icone" aria-label="Carrinho" onClick={() => setVerCarrinho(true)}>
             <ShoppingBag size={20} />
             {totais.pecas > 0 && <span className="cat-topo-selo">{totais.pecas}</span>}
@@ -879,8 +872,8 @@ export function CatalogoEstilos() {
       .cat-topo-marca img { max-height: 30px; max-width: 150px; object-fit: contain; }
       .cat-topo-marca-nome { font-size: 19px; font-weight: 800; letter-spacing: .5px; line-height: 1; }
       .cat-topo-marca-sub { font-size: 10.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--cat-fundo, #fff); opacity: .65; }
-      .cat-busca { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; max-width: 312px; background: #fff; border-radius: 99px; padding: 11px 18px; color: #888; }
-      .cat-busca input { flex: 1; min-width: 0; border: none; background: none; outline: none; font-size: 14px; color: #222; font-family: inherit; text-overflow: ellipsis; }
+      .cat-busca { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; max-width: 460px; background: #fff; border-radius: 99px; padding: 11px 18px; color: #888; }
+      .cat-busca input { flex: 1; min-width: 0; border: none; background: none; outline: none; font-size: 14px; color: #222; font-family: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .cat-busca input::placeholder { color: #999; }
       .cat-busca input[type="search"]::-webkit-search-cancel-button { cursor: pointer; }
       .cat-topo-acoes { display: flex; gap: 18px; flex-shrink: 0; margin-left: auto; }
@@ -891,7 +884,66 @@ export function CatalogoEstilos() {
         position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 99px;
         background: #ff6b6b; color: #fff; font-size: 10px; font-weight: 800; line-height: 16px; text-align: center;
       }
-      @media (max-width: 720px) { .cat-topo { padding: 12px 16px; gap: 12px; } .cat-topo-acoes { gap: 14px; } }
+      @media (max-width: 720px) {
+        .cat-topo { padding: 10px 14px; gap: 10px; }
+        .cat-topo-marca img { max-height: 22px; max-width: 100px; }
+        .cat-topo-marca-nome { font-size: 15px; }
+        .cat-topo-marca-sub { font-size: 8.5px; }
+        .cat-busca { padding: 8px 12px; gap: 6px; }
+        .cat-busca input { font-size: 12.5px; }
+        .cat-busca svg { width: 15px; height: 15px; }
+        .cat-topo-acoes { gap: 10px; }
+        .cat-topo-icone svg { width: 17px; height: 17px; }
+      }
+
+      /* Redução proporcional de todas as seções no mobile — mesma densidade da referência
+         (cabeçalho compacto, ícones/textos/paddings menores em toda a página, não só na busca). */
+      @media (max-width: 720px) {
+        .cat-categorias { padding: 12px 12px 4px; gap: 12px; }
+        .cat-cat-item { width: 52px; gap: 4px; }
+        .cat-cat-icone { width: 46px; height: 46px; }
+        .cat-cat-rotulo { font-size: 9px; max-width: 52px; }
+
+        .cat-hero { padding: 18px 12px; gap: 14px; }
+        .cat-hero-selo { font-size: 9.5px; padding: 3px 10px; }
+        .cat-hero-titulo { font-size: clamp(20px, 6vw, 26px); }
+        .cat-hero-desc { font-size: 12px; }
+        .cat-hero-btn { padding: 10px 16px; font-size: 12px; }
+        .cat-hero-acoes-flut { top: 10px; right: 10px; gap: 7px; }
+        .cat-hero-acao-flut { width: 32px; height: 32px; }
+        .cat-destaque-badge { font-size: 9.5px; padding: 2px 8px; }
+
+        .cat-selos { gap: 8px; padding: 0 12px; }
+        .cat-selo { padding: 8px 10px; gap: 6px; }
+        .cat-selo span { font-size: 10px; }
+        .cat-selos-compactos { margin-top: 16px; }
+        .cat-selos-compactos .cat-selo { padding: 10px 4px; }
+
+        .cat-look-banner { margin: 16px auto 0; padding: 0 12px; gap: 10px; }
+        .cat-look-texto { padding: 12px 14px; }
+        .cat-look-texto strong { font-size: 13px; margin-bottom: 4px; }
+        .cat-look-texto p { font-size: 11px; margin: 0 0 10px; }
+        .cat-look-btn { padding: 8px 12px; font-size: 11px; }
+        .cat-look-foto-item { width: 52px; height: 52px; }
+        .cat-look-desconto { width: 52px; height: 52px; font-size: 11px; }
+
+        .cat-secao { padding: 18px 12px 6px; }
+        .cat-secao-titulo { font-size: 13px; }
+        .cat-secao-link { font-size: 11px; }
+        .cat-grid { gap: 8px; }
+        .cat-info { padding: 8px 10px 10px; }
+        .cat-nome { font-size: 12px; }
+        .cat-preco { font-size: 13px; }
+        .cat-preco-antigo { font-size: 11px; }
+        .cat-parcela { font-size: 10px; }
+        .cat-tam-chips span { font-size: 9px; padding: 1px 4px; }
+        .cat-add-rapido { width: 24px; height: 24px; }
+        .cat-favorito { width: 26px; height: 26px; }
+
+        .cat-bottom-nav { padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0)); }
+        .cat-nav-item { font-size: 10px; padding: 4px 2px; }
+        .cat-nav-item.ativo .cat-nav-icone { width: 44px; height: 44px; margin-top: -24px; }
+      }
 
       /* Trilho de categorias em ícone circular — vem antes do hero */
       .cat-categorias { max-width: 1100px; margin: 0 auto; padding: 18px 14px 4px; display: flex; gap: 18px; overflow-x: auto; scrollbar-width: none; }

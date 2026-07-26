@@ -1135,9 +1135,9 @@ export function CatalogoEstilos() {
         .cat-hero-acao-flut { width: 24px; height: 24px; }
         .cat-hero-acao-flut svg { width: 13px; height: 13px; }
         .cat-destaque-badge { font-size: 7px; padding: 2px 6px; }
-        /* +30% em relação ao tamanho anterior (8px→10.4px, 14/26→18.2/33.8) */
+        /* +30% acumulado duas vezes no nome do produto (14/26 → 18.2/33.8 → 23.7/44) */
         .cat-hero-selo { font-size: 10.5px; padding: 3px 10px; }
-        .cat-hero-titulo { font-size: clamp(18px, 5.2vw, 34px); }
+        .cat-hero-titulo { font-size: clamp(23px, 6.8vw, 44px); }
         .cat-hero-desc { font-size: 9.5px; }
         .cat-hero-btn { padding: 7px 12px; font-size: 9.5px; }
         .cat-hero-dots { margin-top: 0; }

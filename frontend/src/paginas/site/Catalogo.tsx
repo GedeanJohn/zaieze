@@ -874,13 +874,13 @@ export function CatalogoEstilos() {
       .cat-root { min-height: 100vh; background: var(--cat-fundo); color: #111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; padding-bottom: 128px; }
       .cat-vazio { min-height: 70vh; display: flex; align-items: center; justify-content: center; color: #777; font-family: sans-serif; padding: 40px; text-align: center; }
       /* Cabeçalho: marca (cor da própria marca) + busca (filtra a grade toda, sem ir ao backend) + atalhos */
-      .cat-topo { background: var(--cat-primaria, #111); color: #fff; display: flex; align-items: center; gap: 20px; padding: 16px 24px; flex-wrap: wrap; }
+      .cat-topo { background: var(--cat-primaria, #111); color: #fff; display: flex; align-items: center; gap: 20px; padding: 16px 24px; flex-wrap: nowrap; }
       .cat-topo-marca { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
       .cat-topo-marca img { max-height: 30px; max-width: 150px; object-fit: contain; }
       .cat-topo-marca-nome { font-size: 19px; font-weight: 800; letter-spacing: .5px; line-height: 1; }
       .cat-topo-marca-sub { font-size: 10.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--cat-fundo, #fff); opacity: .65; }
-      .cat-busca { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; max-width: 520px; margin: 0 auto; background: #fff; border-radius: 99px; padding: 11px 18px; color: #888; }
-      .cat-busca input { flex: 1; border: none; background: none; outline: none; font-size: 14px; color: #222; font-family: inherit; }
+      .cat-busca { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; max-width: 312px; background: #fff; border-radius: 99px; padding: 11px 18px; color: #888; }
+      .cat-busca input { flex: 1; min-width: 0; border: none; background: none; outline: none; font-size: 14px; color: #222; font-family: inherit; text-overflow: ellipsis; }
       .cat-busca input::placeholder { color: #999; }
       .cat-busca input[type="search"]::-webkit-search-cancel-button { cursor: pointer; }
       .cat-topo-acoes { display: flex; gap: 18px; flex-shrink: 0; margin-left: auto; }

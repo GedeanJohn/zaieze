@@ -12,6 +12,8 @@ import { removerUploadLocal } from '../midia/limpeza.service'
 import { gerarSenhaProvisoria } from '../auth/senha-provisoria'
 import { criarAfiliado } from '../afiliados/afiliado.service'
 import { criarAssessor, slugDisponivel, normalizarSlug } from '../assessores/assessor.service'
+import { sincronizarZaiezeLeads } from '../zaiezeleads/zaiezeleads.service'
+import { exportarCsv, exportarTxt, exportarXlsx, exportarSql, type LinhaZaiezeLead } from '../zaiezeleads/exportar-zaiezeleads'
 
 const num = (v: unknown) => Number(v ?? 0)
 
@@ -630,5 +632,51 @@ export async function adminRoutes(app: FastifyInstance) {
     const { percentualPadrao } = z.object({ percentualPadrao: z.coerce.number().nonnegative().max(100) }).parse(request.body)
     const config = await prisma.configAssessorIndicacao.upsert({ where: { id: 1 }, create: { id: 1, percentualPadrao }, update: { percentualPadrao } })
     return { percentualPadrao: num(config.percentualPadrao) }
+  })
+
+  // ── Base de leads própria da ZAIEZE (cross-tenant) ──
+  app.get('/zaiezeleads', async () => {
+    const [total, ultima, amostra] = await Promise.all([
+      prisma.zaiezeLead.count(),
+      prisma.zaiezeLead.aggregate({ _max: { sincronizadoEm: true } }),
+      prisma.zaiezeLead.findMany({ orderBy: { entradaEm: 'desc' }, take: 20 }),
+    ])
+    return { total, ultimaSincronizacaoEm: ultima._max.sincronizadoEm, amostra }
+  })
+
+  app.post('/zaiezeleads/sincronizar', async () => {
+    const sincronizados = await sincronizarZaiezeLeads()
+    return { ok: true, sincronizados }
+  })
+
+  app.get('/zaiezeleads/exportar', async (request, reply) => {
+    const { formato } = request.query as { formato?: string }
+    const registros = await prisma.zaiezeLead.findMany({ orderBy: { entradaEm: 'desc' } })
+    const linhas: LinhaZaiezeLead[] = registros.map((r) => ({
+      nome: r.nome, telefone: r.telefone, cidade: r.cidade, uf: r.uf,
+      redeNome: r.redeNome, lojaNome: r.lojaNome, vendedoraNome: r.vendedoraNome,
+      origemCanal: r.origemCanal, segmento: r.segmento, entradaEm: r.entradaEm,
+    }))
+    const nomeArquivo = 'zaiezeleads'
+
+    if (formato === 'xlsx') {
+      const buffer = await exportarXlsx(linhas)
+      reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      reply.header('Content-Disposition', `attachment; filename="${nomeArquivo}.xlsx"`)
+      return reply.send(buffer)
+    }
+    if (formato === 'sql') {
+      reply.header('Content-Type', 'application/sql; charset=utf-8')
+      reply.header('Content-Disposition', `attachment; filename="${nomeArquivo}.sql"`)
+      return reply.send(exportarSql(linhas))
+    }
+    if (formato === 'txt') {
+      reply.header('Content-Type', 'text/plain; charset=utf-8')
+      reply.header('Content-Disposition', `attachment; filename="${nomeArquivo}.txt"`)
+      return reply.send(exportarTxt(linhas))
+    }
+    reply.header('Content-Type', 'text/csv; charset=utf-8')
+    reply.header('Content-Disposition', `attachment; filename="${nomeArquivo}.csv"`)
+    return reply.send(exportarCsv(linhas))
   })
 }

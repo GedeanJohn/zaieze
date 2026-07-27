@@ -888,6 +888,30 @@ model Cliente {
   @@map("clientes")
 }
 
+// Base de leads PRÓPRIA da ZAIEZE (cross-tenant): cópia agregada de todo Cliente cadastrado em
+// qualquer marca/rede do SaaS, de uso exclusivo do SUPER_ADMIN (exportação xlsx/csv/txt/sql).
+// Sem @relation para Cliente de propósito — é uma cópia desacoplada, não cascateia com o tenant
+// de origem. Populada por um job periódico (ver zaiezeleads.service.ts), não por hooks espalhados
+// em cada ponto de criação de Cliente.
+model ZaiezeLead {
+  id             String          @id @default(cuid())
+  clienteId      String          @unique // referência informativa ao Cliente de origem
+  nome           String
+  telefone       String?
+  cidade         String?
+  uf             String?
+  redeNome       String
+  lojaNome       String
+  vendedoraNome  String?
+  origemCanal    OrigemLead? // do Lead mais antigo do cliente, quando existir
+  segmento       SegmentoCliente
+  entradaEm      DateTime // Cliente.createdAt
+  sincronizadoEm DateTime        @updatedAt
+
+  @@index([entradaEm])
+  @@map("zaiezeleads")
+}
+
 // ─────────────────────────── Leads (entrada pelo catálogo) ───────────────────────────
 // O cliente acessa o link do catálogo da vendedora → é direcionado ao WhatsApp dela.
 // Esse contato vira um Lead atribuído à vendedora. "Atender" = a vendedora responder.

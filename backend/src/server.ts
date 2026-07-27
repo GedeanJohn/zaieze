@@ -14,6 +14,7 @@ import { atualizarCotacaoUsd } from './modules/cambio/cambio.service'
 import { atualizarPerfisNegocioVencidos } from './modules/chat-atendimento/perfil-negocio.service'
 import { encerrarChatAtendimentoVencidos } from './modules/chat-atendimento/assinatura-chat-atendimento.service'
 import { restaurarConexoes } from './modules/whatsapp/baileys.service'
+import { sincronizarZaiezeLeads } from './modules/zaiezeleads/zaiezeleads.service'
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000
 
@@ -104,6 +105,14 @@ async function main() {
       .catch((err) => app.log.error({ err }, 'Falha no job do Chat de Atendimento'))
     atualizarChatAtendimento()
     setInterval(atualizarChatAtendimento, UM_DIA_MS).unref()
+
+    // Base de leads própria da ZAIEZE (cross-tenant, uso do SUPER_ADMIN): sincroniza a partir de
+    // todo Cliente ativo de qualquer marca. Boot + 24h; também disparável na hora pelo admin.
+    const sincronizarLeadsZaieze = () => sincronizarZaiezeLeads()
+      .then((n) => app.log.info(`Base de leads ZAIEZE sincronizada: ${n} contato(s)`))
+      .catch((err) => app.log.error({ err }, 'Falha ao sincronizar a base de leads ZAIEZE'))
+    sincronizarLeadsZaieze()
+    setInterval(sincronizarLeadsZaieze, UM_DIA_MS).unref()
 
     // Segmentação automática: em produção roda via agendamento diário (cron).
     // No boot só roda se SEGMENTAR_BOOT=true — assim, em dev/demo, o recálculo

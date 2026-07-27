@@ -92,6 +92,17 @@ a { color: var(--accent); text-decoration: none; }
 
 /* Recolher é um recurso só de desktop (no mobile a sidebar já é um drawer off-canvas próprio). */
 @media (min-width: 861px) {
+  /* Fixa a sidebar no viewport (abaixo da topbar sticky) — sem isso, como ela é um item flex ao
+     lado de .conteudo, o fundo preto estica pra acompanhar a altura da página inteira e some da
+     tela ao rolar (você passa do menu e só sobra o preto vazio). align-self:flex-start evita que
+     o flexbox force a altura dela a igualar a de .conteudo antes do sticky entrar em ação. O
+     scroll interno fica só no .sidebar-nav (não na .sidebar toda) pra não cortar o botão de
+     recolher, que fica meio pra fora da borda direita (right: -12px). */
+  .sidebar {
+    position: sticky; top: var(--zz-navh); align-self: flex-start;
+    height: calc(100vh - var(--zz-navh));
+  }
+  .sidebar-nav { flex: 1; min-height: 0; overflow-y: auto; }
   .sidebar.recolhida { width: 72px; }
   .sidebar.recolhida .sidebar-marca { text-align: center; margin-left: 0; margin-right: 0; }
   .sidebar.recolhida a { justify-content: center; padding: 10px; }
@@ -138,7 +149,7 @@ a { color: var(--accent); text-decoration: none; }
 }
 .sidebar .rodape button:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
 
-.conteudo { flex: 1; padding: 32px 40px; max-width: 1200px; }
+.conteudo { flex: 1; padding: 32px 40px; max-width: 1600px; }
 .conteudo header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
 .conteudo header h1 { margin: 0; font-size: 26px; }
 

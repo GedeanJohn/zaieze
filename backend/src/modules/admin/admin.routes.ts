@@ -133,7 +133,7 @@ export async function adminRoutes(app: FastifyInstance) {
       include: {
         assinatura: { select: { plano: true, status: true, valor: true, cicloFimEm: true, cancelamentoSolicitadoEm: true, simulada: true } },
         _count: { select: { lojas: true, usuarios: true } },
-        usuarios: { where: { role: 'GESTOR' }, select: { id: true, nome: true, email: true }, take: 1 },
+        usuarios: { where: { role: 'GESTOR' }, select: { id: true, nome: true, email: true, telefone: true }, take: 1 },
       },
     })
     return {

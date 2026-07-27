@@ -5,11 +5,6 @@ import { entrarComoUsuario } from '../lib/impersonar'
 
 interface PlanoAdmin { plano: Plano; nome: string; limite: string; resumo: string; preco: number }
 interface AddonAdmin { tipo: string; nome: string; resumo: string; preco: number }
-interface RedeAdmin {
-  id: string; nome: string; slug: string; plano: Plano; ativo: boolean; criadoEm: string; lojas: number; usuarios: number
-  gestor: { id: string; nome: string; email: string } | null
-  assinatura: { plano: Plano; status: string; valor: number; cicloFimEm: string | null; cancelamentoAgendado: boolean; simulada: boolean } | null
-}
 interface Promo { id: string; codigo: string; tipo: 'DIAS_GRATIS' | 'PERCENTUAL'; aplicaA: 'REDE' | 'ASSESSOR'; plano: string | null; dias: number | null; percentual: string | null; descricao: string | null; validadeAte: string | null; maxUsos: number | null; usos: number; ativo: boolean }
 
 const fmtData = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—')
@@ -21,10 +16,8 @@ export default function Admin() {
   const [precosAddon, setPrecosAddon] = useState<Record<string, string>>({})
   const [precoChatAtendimento, setPrecoChatAtendimento] = useState('')
   const [descontoAnual, setDescontoAnual] = useState('10')
-  const [redes, setRedes] = useState<RedeAdmin[]>([])
   const [promos, setPromos] = useState<Promo[]>([])
   const [ocupado, setOcupado] = useState(false)
-  const [senhaGestorGerada, setSenhaGestorGerada] = useState<{ rede: string; nome: string; senha: string } | null>(null)
   const avisar = useToast()
 
   function carregar() {
@@ -37,52 +30,10 @@ export default function Admin() {
       setPrecosAddon(Object.fromEntries(data.addons.map((a: AddonAdmin) => [a.tipo, String(a.preco)])))
     }).catch((e) => avisar(mensagemDeErro(e), 'erro'))
     api.get('/admin/chat-atendimento-preco').then(({ data }) => setPrecoChatAtendimento(String(data.preco))).catch(() => {})
-    api.get('/admin/redes').then(({ data }) => setRedes(data.redes)).catch(() => {})
     api.get('/admin/promos').then(({ data }) => setPromos(data.promos)).catch(() => {})
     api.get('/admin/config-assinatura').then(({ data }) => setDescontoAnual(String(data.percentualDescontoAnual))).catch(() => {})
   }
   useEffect(() => { carregar() }, [])
-
-  async function ativarCortesia(r: RedeAdmin) {
-    if (!window.confirm(`Ativar ${r.nome} em modo CORTESIA (grátis)? Destrava o acesso e cancela qualquer cobrança pendente no Mercado Pago.`)) return
-    const codigoPromo = window.prompt('Foi combinado algum código promocional com o lojista? Deixe vazio se não.')?.trim() || undefined
-    setOcupado(true)
-    try {
-      await api.post(`/admin/redes/${r.id}/ativar-cortesia`, { codigoPromo })
-      avisar(`${r.nome} ativada (cortesia).` + (codigoPromo ? ` Uso do cupom ${codigoPromo.toUpperCase()} contabilizado.` : ' O lojista já pode acessar.'))
-      carregar()
-    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
-  }
-
-  async function excluirRede(r: RedeAdmin) {
-    const digitado = window.prompt(
-      `Isso apaga a marca "${r.nome}" PERMANENTEMENTE — lojas, usuários, clientes, produtos, vendas, mensagens, mídias e qualquer cobrança futura no Mercado Pago. Não tem volta.\n\nPara confirmar, digite exatamente o nome da marca:`,
-    )
-    if (digitado === null) return
-    if (digitado.trim() !== r.nome) { avisar('Nome não confere. Nada foi excluído.', 'erro'); return }
-    setOcupado(true)
-    try {
-      await api.delete(`/admin/redes/${r.id}`, { data: { confirmarNome: digitado.trim() } })
-      avisar(`${r.nome} excluída permanentemente.`)
-      carregar()
-    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
-  }
-
-  async function entrarComoGestor(r: RedeAdmin) {
-    if (!r.gestor) return
-    if (!window.confirm(`Entrar como ${r.gestor.nome} (${r.nome})? Fica registrado. Um banner aparece pra você voltar quando quiser.`)) return
-    try { await entrarComoUsuario(r.gestor.id) } catch (e) { avisar(mensagemDeErro(e), 'erro') }
-  }
-
-  async function resetarSenhaGestor(r: RedeAdmin) {
-    if (!r.gestor) return
-    if (!window.confirm(`Gerar uma senha provisória nova para ${r.gestor.nome} (${r.nome})? A senha atual dele deixa de funcionar.`)) return
-    setOcupado(true)
-    try {
-      const { data } = await api.post(`/admin/redes/${r.id}/gestor/resetar-senha`)
-      setSenhaGestorGerada({ rede: r.nome, nome: data.nome, senha: data.senha })
-    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
-  }
 
   async function salvarPrecos() {
     setOcupado(true)
@@ -200,55 +151,6 @@ export default function Admin() {
       {/* ── Brand Partners ── */}
       <AssessoresSection />
       <ComissoesAssessorSection />
-
-      {/* ── Redes (clientes) ── */}
-      <div className="cartao">
-        <h2 style={{ marginTop: 0 }}>🏢 Redes (clientes) · {redes.length}</h2>
-        {senhaGestorGerada && (
-          <div className="sucesso" style={{ marginBottom: 10 }}>
-            Senha provisória de <strong>{senhaGestorGerada.nome}</strong> ({senhaGestorGerada.rede}): <strong>{senhaGestorGerada.senha}</strong> — copie e envie manualmente.
-            <button type="button" className="btn-link" style={{ marginLeft: 10 }} onClick={() => setSenhaGestorGerada(null)}>fechar</button>
-          </div>
-        )}
-        <table>
-          <thead><tr><th>Marca</th><th>Endereço</th><th>Gestor</th><th>Plano</th><th>Assinatura</th><th>Lojas</th><th>Usuários</th><th>Desde</th><th>Ações</th></tr></thead>
-          <tbody>
-            {redes.map((r) => (
-              <tr key={r.id} style={{ opacity: r.ativo ? 1 : 0.5 }}>
-                <td>{r.nome}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>{r.slug}.zaieze.com</td>
-                <td>{r.gestor ? <span title={r.gestor.email}>{r.gestor.nome}</span> : '—'}</td>
-                <td>{r.plano}</td>
-                <td>
-                  {r.assinatura
-                    ? <span className={`selo ${r.assinatura.status === 'ATIVA' ? 'ok' : r.assinatura.status === 'CANCELADA' ? 'baixo' : 'ATACADO'}`}>{r.assinatura.status}{r.assinatura.simulada ? ' (sim)' : ''}</span>
-                    : '—'}
-                </td>
-                <td>{r.lojas}</td>
-                <td>{r.usuarios}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>{fmtData(r.criadoEm)}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>
-                  {(!r.ativo || r.assinatura?.status === 'PENDENTE') && (
-                    <a href="#" onClick={(e) => { e.preventDefault(); ativarCortesia(r) }} style={{ color: '#16a34a', fontWeight: 600 }}>Ativar (cortesia)</a>
-                  )}
-                  {(!r.ativo || r.assinatura?.status === 'PENDENTE') && ' · '}
-                  {r.gestor && (
-                    <a href="#" onClick={(e) => { e.preventDefault(); entrarComoGestor(r) }} style={{ fontWeight: 600 }}>Entrar como</a>
-                  )}
-                  {r.gestor && ' · '}
-                  {r.gestor && (
-                    <a href="#" onClick={(e) => { e.preventDefault(); resetarSenhaGestor(r) }} style={{ fontWeight: 600 }}>Resetar senha</a>
-                  )}
-                  {r.gestor && ' · '}
-                  <a href="#" onClick={(e) => { e.preventDefault(); excluirRede(r) }} style={{ color: 'var(--danger)', fontWeight: 600 }}>Excluir loja</a>
-                </td>
-              </tr>
-            ))}
-            {redes.length === 0 && <tr><td colSpan={9} style={{ color: 'var(--ink-soft)' }}>Nenhuma rede ainda.</td></tr>}
-          </tbody>
-        </table>
-      </div>
-
     </>
   )
 }

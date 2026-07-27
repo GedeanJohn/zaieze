@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
   Megaphone, Package, Tag, Layers, Boxes, UsersRound, Eye, Receipt,
   Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Wrench, Smartphone, Camera, Store, Shirt,
-  ChevronLeft, ChevronRight, ChevronDown, Bot, Landmark, Sparkles, Contact2,
+  ChevronLeft, ChevronRight, ChevronDown, Bot, Landmark, Sparkles, Contact2, Building2,
   type LucideIcon,
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, temAddon, usuarioLogado } from '../api'
@@ -182,6 +182,11 @@ export default function Layout() {
     { to: '/termos-uso', label: t('layout.termosDeUso'), Icone: FileText, mostrar: ehDonoRede },
   ].filter((i) => i.mostrar)
 
+  const itensLeadsZaieze: ItemMenu[] = [
+    { to: '/leads-zaieze', label: t('layout.leadsZaieze'), Icone: Contact2, mostrar: ehAdmin },
+    { to: '/gestores-marca', label: t('layout.gestoresMarca'), Icone: Building2, mostrar: ehAdmin },
+  ].filter((i) => i.mostrar)
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -223,8 +228,9 @@ export default function Layout() {
         <SecaoMenu titulo={t('layout.secao.financeiro')} itens={itensFinanceiro} fechada={!!secoesFechadas.financeiro} onToggle={() => alternarSecao('financeiro')} />
         <SecaoMenu titulo={t('layout.secao.institucional')} itens={itensInstitucional} fechada={!!secoesFechadas.institucional} onToggle={() => alternarSecao('institucional')} />
 
+        <SecaoMenu titulo={t('layout.leadsZaieze')} itens={itensLeadsZaieze} fechada={!!secoesFechadas.leadsZaieze} onToggle={() => alternarSecao('leadsZaieze')} />
+
         {ehAdmin && <NavLink to="/admin" className={cls} title={t('layout.admin')}><Wrench {...ICON} /><span>{t('layout.admin')}</span></NavLink>}
-        {ehAdmin && <NavLink to="/leads-zaieze" className={cls} title={t('layout.leadsZaieze')}><Contact2 {...ICON} /><span>{t('layout.leadsZaieze')}</span></NavLink>}
         <NavLink to="/conta" className={cls} title={t('layout.minhaConta')}><UserCog {...ICON} /><span>{t('layout.minhaConta')}</span></NavLink>
         </nav>
         <div className="rodape">

@@ -91,7 +91,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const token = app.jwt.sign(
-      { sub: usuario.id, redeId, lojaId: usuario.lojaId, role: usuario.role, nome: usuario.nome, plano: rede?.plano ?? null },
+      { sub: usuario.id, redeId, lojaId: usuario.lojaId, role: usuario.role, nome: usuario.nome, plano: rede?.plano ?? null, comercial: usuario.comercial },
       { expiresIn: '12h' },
     )
 
@@ -108,6 +108,7 @@ export async function authRoutes(app: FastifyInstance) {
         nome: usuario.nome,
         email: usuario.email,
         role: usuario.role,
+        comercial: usuario.comercial,
         fotoUrl: usuario.fotoUrl,
         idioma: usuario.idioma,
         rede: rede ? { id: rede.id, nome: rede.nome, plano: rede.plano, addonsAtivos } : null,

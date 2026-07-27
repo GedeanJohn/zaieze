@@ -27,6 +27,9 @@ export interface Usuario {
   nome: string
   email: string
   role: Papel
+  // Só relevante quando role === 'SUPER_ADMIN': é o login "Gestor Comercial do Sistema" (mesmas
+  // atribuições do Gestor Administrador — muda só o rótulo exibido, ver Layout.tsx).
+  comercial?: boolean
   fotoUrl?: string | null
   idioma?: string
   rede: { id: string; nome: string; plano: string; addonsAtivos?: string[] } | null

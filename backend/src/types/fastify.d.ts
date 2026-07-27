@@ -8,6 +8,9 @@ export interface JwtUser {
   role: Role
   nome: string
   plano: Plano | null
+  // Só relevante para role SUPER_ADMIN: é o login "Gestor Comercial do Sistema" (mesmas
+  // atribuições, exceto criar/gerenciar outros gestores comerciais — só o SUPER_ADMIN "titular" pode).
+  comercial?: boolean
 }
 
 declare module '@fastify/jwt' {

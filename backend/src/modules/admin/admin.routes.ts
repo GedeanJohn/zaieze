@@ -292,6 +292,58 @@ export async function adminRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
+  // ── Gestores Comerciais do Sistema (login próprio, mesmas atribuições do SUPER_ADMIN — só o
+  // rótulo exibido muda: "Gestor Comercial do Sistema" em vez de "Gestor Administrador do
+  // Sistema"). Não é um papel novo no banco — é o mesmo Role.SUPER_ADMIN com `comercial:true`,
+  // pra não precisar replicar toda checagem de permissão que hoje só olha SUPER_ADMIN. ──
+  app.get('/gestores-comerciais', async () => ({
+    gestores: await prisma.usuario.findMany({
+      where: { role: 'SUPER_ADMIN', comercial: true },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, nome: true, email: true, telefone: true, ativo: true, createdAt: true },
+    }),
+  }))
+
+  const criarGestorComercialSchema = z.object({
+    nome: z.string().min(2),
+    email: z.string().email(),
+    telefone: z.string().trim().optional(),
+  })
+  app.post('/gestores-comerciais', async (request, reply) => {
+    if (request.user.comercial) return reply.code(403).send({ erro: 'Só o Gestor Administrador do Sistema pode criar gestores comerciais.' })
+    const b = criarGestorComercialSchema.parse(request.body)
+    const email = b.email.toLowerCase()
+    if (await prisma.usuario.findUnique({ where: { email } })) {
+      return reply.code(409).send({ erro: 'Já existe uma conta com este e-mail.' })
+    }
+    const senha = gerarSenhaProvisoria()
+    const usuario = await prisma.usuario.create({
+      data: { nome: b.nome, email, senhaHash: await bcrypt.hash(senha, 10), role: 'SUPER_ADMIN', comercial: true, telefone: b.telefone ?? null },
+      select: { id: true, nome: true, email: true, telefone: true, ativo: true, createdAt: true },
+    })
+    return reply.code(201).send({ usuario, senha })
+  })
+
+  app.patch('/gestores-comerciais/:id', async (request, reply) => {
+    if (request.user.comercial) return reply.code(403).send({ erro: 'Só o Gestor Administrador do Sistema pode gerenciar gestores comerciais.' })
+    const { id } = request.params as { id: string }
+    const { ativo } = z.object({ ativo: z.boolean() }).parse(request.body)
+    const alvo = await prisma.usuario.findFirst({ where: { id, role: 'SUPER_ADMIN', comercial: true } })
+    if (!alvo) return reply.code(404).send({ erro: 'Gestor comercial não encontrado' })
+    await prisma.usuario.update({ where: { id }, data: { ativo } })
+    return { ok: true }
+  })
+
+  app.post('/gestores-comerciais/:id/resetar-senha', async (request, reply) => {
+    if (request.user.comercial) return reply.code(403).send({ erro: 'Só o Gestor Administrador do Sistema pode gerenciar gestores comerciais.' })
+    const { id } = request.params as { id: string }
+    const alvo = await prisma.usuario.findFirst({ where: { id, role: 'SUPER_ADMIN', comercial: true } })
+    if (!alvo) return reply.code(404).send({ erro: 'Gestor comercial não encontrado' })
+    const senha = gerarSenhaProvisoria()
+    await prisma.usuario.update({ where: { id }, data: { senhaHash: await bcrypt.hash(senha, 10) } })
+    return { nome: alvo.nome, senha }
+  })
+
   // ── Códigos promocionais ──
   app.get('/promos', async () => ({
     promos: await prisma.codigoPromocional.findMany({ orderBy: { createdAt: 'desc' } }),

@@ -235,7 +235,11 @@ export default function Layout() {
         </nav>
         <div className="rodape">
           <div className="rodape-nome">{usuario.nome}</div>
-          <div>{usuario.loja?.nome ?? usuario.rede?.nome ?? 'SaaS Admin'} · {t(`papel.${usuario.role}`) || rotuloPapel[usuario.role]}</div>
+          <div>
+            {usuario.loja?.nome ?? usuario.rede?.nome ?? 'SaaS Admin'} · {usuario.role === 'SUPER_ADMIN' && usuario.comercial
+              ? t('papel.superAdminComercial')
+              : (t(`papel.${usuario.role}`) || rotuloPapel[usuario.role])}
+          </div>
           {usuario.rede && <div style={{ marginTop: 4 }}>{t('layout.plano')} <strong style={{ color: '#e8a87c' }}>{usuario.rede.plano}</strong></div>}
           <button onClick={sair} title={t('layout.sair')}><LogOut size={15} strokeWidth={1.75} /> <span>{t('layout.sair')}</span></button>
         </div>

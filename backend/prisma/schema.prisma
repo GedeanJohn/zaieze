@@ -689,6 +689,10 @@ model Usuario {
   email          String   @unique
   senhaHash      String
   role           Role
+  // Só relevante para role=SUPER_ADMIN: distingue o login "Gestor Comercial do Sistema" do
+  // "Gestor Administrador do Sistema" — MESMAS atribuições (é o mesmo Role.SUPER_ADMIN por baixo,
+  // nenhuma checagem de permissão olha este campo), é só o rótulo exibido que muda (ver Layout.tsx).
+  comercial      Boolean  @default(false)
   // WhatsApp pessoal: recebe a senha provisória no "esqueci minha senha" E, pra VENDEDORA, é o
   // número usado no deep link wa.me do handoff "Falar com a vendedora" na vitrine (Portal do
   // Cliente) quando a marca ainda não conectou o WhatsApp oficial da MARCA (Rede.wa*).

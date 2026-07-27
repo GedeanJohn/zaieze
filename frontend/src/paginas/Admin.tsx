@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, formataReal, mensagemDeErro, type Plano } from '../api'
+import { api, formataReal, mensagemDeErro, usuarioLogado, type Plano } from '../api'
 import { useToast } from '../componentes/Toast'
 import { entrarComoUsuario } from '../lib/impersonar'
 
@@ -76,6 +76,9 @@ export default function Admin() {
 
       {/* ── Pedidos de redefinição de senha (gestores sem WhatsApp cadastrado) ── */}
       <SolicitacoesSenhaSection />
+
+      {/* ── Gestores Comerciais do Sistema (login próprio, mesmas atribuições do SUPER_ADMIN) ── */}
+      <GestoresComerciaisSection />
 
       {/* ── Preços & Reajuste ── */}
       <div className="cartao">
@@ -877,6 +880,100 @@ function ComissoesAssessorSection() {
             </tr>
           ))}
           {comissoes.length === 0 && <tr><td colSpan={9} style={{ color: 'var(--ink-soft)' }}>Nenhuma comissão aqui.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Gestores Comerciais do Sistema — login próprio, mesmas atribuições do SUPER_ADMIN (é o
+// mesmo Role.SUPER_ADMIN por baixo; só o rótulo muda). Só o Gestor Administrador (não-comercial)
+// pode criar/gerenciar — um gestor comercial não pode criar outro (ver admin.routes.ts). ──
+interface GestorComercial { id: string; nome: string; email: string; telefone: string | null; ativo: boolean; createdAt: string }
+
+function GestoresComerciaisSection() {
+  const usuario = usuarioLogado()!
+  const podeGerenciar = !usuario.comercial
+  const [gestores, setGestores] = useState<GestorComercial[]>([])
+  const [nome, setNome] = useState('')
+  const [email, setEmail] = useState('')
+  const [telefone, setTelefone] = useState('')
+  const [erro, setErro] = useState('')
+  const [ocupado, setOcupado] = useState(false)
+  const [gerado, setGerado] = useState<{ nome: string; senha: string } | null>(null)
+
+  function carregar() {
+    api.get('/admin/gestores-comerciais').then(({ data }) => setGestores(data.gestores)).catch(() => {})
+  }
+  useEffect(() => { carregar() }, [])
+
+  async function criar(e: React.FormEvent) {
+    e.preventDefault(); setErro(''); setOcupado(true)
+    try {
+      const { data } = await api.post('/admin/gestores-comerciais', { nome, email, telefone: telefone || undefined })
+      setGerado({ nome, senha: data.senha })
+      setNome(''); setEmail(''); setTelefone('')
+      carregar()
+    } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setOcupado(false) }
+  }
+
+  async function alternarAtivo(g: GestorComercial) {
+    await api.patch(`/admin/gestores-comerciais/${g.id}`, { ativo: !g.ativo }).catch(() => {})
+    carregar()
+  }
+
+  async function resetarSenha(g: GestorComercial) {
+    if (!window.confirm(`Gerar uma senha provisória nova para ${g.nome}? A senha atual dele(a) deixa de funcionar.`)) return
+    try {
+      const { data } = await api.post(`/admin/gestores-comerciais/${g.id}/resetar-senha`)
+      setGerado({ nome: data.nome, senha: data.senha })
+    } catch (e) { setErro(mensagemDeErro(e)) }
+  }
+
+  return (
+    <div className="cartao">
+      <h2 style={{ marginTop: 0 }}>🧑‍💼 Gestores Comerciais do Sistema</h2>
+      <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
+        Login próprio, com as <strong>mesmas atribuições</strong> do Gestor Administrador do Sistema — só muda o rótulo
+        exibido. {!podeGerenciar && 'Só o Gestor Administrador do Sistema (não-comercial) pode criar ou gerenciar esses acessos.'}
+      </div>
+
+      {podeGerenciar && (
+        <form onSubmit={criar} className="linha-campos" style={{ alignItems: 'end' }}>
+          <div className="campo"><label>Nome</label><input value={nome} onChange={(e) => setNome(e.target.value)} required /></div>
+          <div className="campo"><label>E-mail</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
+          <div className="campo"><label>Telefone (opcional)</label><input value={telefone} onChange={(e) => setTelefone(e.target.value)} /></div>
+          <div><button className="btn" disabled={ocupado}>Criar acesso</button></div>
+        </form>
+      )}
+      {erro && <div className="alerta" style={{ marginTop: 8 }}>{erro}</div>}
+      {gerado && (
+        <div className="sucesso" style={{ marginTop: 8 }}>
+          Senha provisória de <strong>{gerado.nome}</strong>: <strong>{gerado.senha}</strong> — copie e envie manualmente.
+          <button type="button" className="btn-link" style={{ marginLeft: 10 }} onClick={() => setGerado(null)}>fechar</button>
+        </div>
+      )}
+
+      <table style={{ marginTop: 14 }}>
+        <thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Status</th><th>Desde</th>{podeGerenciar && <th>Ações</th>}</tr></thead>
+        <tbody>
+          {gestores.map((g) => (
+            <tr key={g.id}>
+              <td>{g.nome}</td>
+              <td>{g.email}</td>
+              <td>{g.telefone ?? '—'}</td>
+              <td><span className={`selo ${g.ativo ? 'ok' : 'baixo'}`}>{g.ativo ? 'Ativo' : 'Inativo'}</span></td>
+              <td>{fmtData(g.createdAt)}</td>
+              {podeGerenciar && (
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <a href="#" onClick={(e) => { e.preventDefault(); alternarAtivo(g) }} style={{ fontWeight: 600 }}>{g.ativo ? 'Desativar' : 'Ativar'}</a>
+                  {' · '}
+                  <a href="#" onClick={(e) => { e.preventDefault(); resetarSenha(g) }} style={{ fontWeight: 600 }}>Resetar senha</a>
+                </td>
+              )}
+            </tr>
+          ))}
+          {gestores.length === 0 && <tr><td colSpan={podeGerenciar ? 6 : 5} style={{ color: 'var(--ink-soft)' }}>Nenhum gestor comercial ainda.</td></tr>}
         </tbody>
       </table>
     </div>

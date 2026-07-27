@@ -183,13 +183,16 @@ export default function Campanhas() {
       </header>
 
 
-      {/* Conexão agora é por MARCA (WhatsApp oficial da Meta), configurada pelo gestor. */}
+      {/* Conexão oficial por MARCA (WhatsApp Cloud API da Meta), configurada pelo gestor. */}
       <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
         📱 <strong>{t('camp.oficialTitulo')}</strong> {t('camp.oficialDescricao')} <strong>{t('camp.numeroOficial')}</strong> {t('camp.oficialCloudApi')}
         {ehGestor
           ? <> {t('camp.oficialGestorTexto1')} <strong>{t('camp.oficialGestorDestaque')}</strong> {t('camp.oficialGestorTexto2')}</>
           : <> {t('camp.oficialVendedoraTexto')}</>}
       </div>
+
+      {/* Conexão alternativa por QR Code, individual — só a própria vendedora conecta o WhatsApp pessoal dela. */}
+      {!gerente && <MeuWhatsAppPessoal />}
 
       {/* Campanhas da marca — o gestor monta e disponibiliza */}
       {ehGestor && (
@@ -387,5 +390,84 @@ export default function Campanhas() {
         </table>
       </div>
     </>
+  )
+}
+
+// ── Meu WhatsApp (QR Code) — conexão pessoal da vendedora, alternativa ao número da marca ──
+interface StatusPessoal { conectado: boolean; conectadoEm: string | null; numero: string | null }
+
+function MeuWhatsAppPessoal() {
+  const { t } = useIdioma()
+  const avisar = useToast()
+  const [status, setStatus] = useState<StatusPessoal | null>(null)
+  const [qrCode, setQrCode] = useState<string | null>(null)
+  const [ocupado, setOcupado] = useState(false)
+
+  const carregarStatus = useCallback(() => {
+    api.get('/whatsapp/pessoal/status').then(({ data }) => setStatus(data)).catch(() => {})
+  }, [])
+
+  useEffect(() => { carregarStatus() }, [carregarStatus])
+
+  // Enquanto o QR está exibido, faz polling do status até a vendedora escanear (ou desistir).
+  useEffect(() => {
+    if (!qrCode) return
+    let tentativas = 0
+    const id = setInterval(() => {
+      tentativas += 1
+      api.get('/whatsapp/pessoal/status').then(({ data }) => {
+        setStatus(data)
+        if (data.conectado) { setQrCode(null); clearInterval(id) }
+        else if (tentativas >= 20) { setQrCode(null); clearInterval(id); avisar(t('camp.pessoalTimeout')) }
+      }).catch(() => {})
+    }, 3000)
+    return () => clearInterval(id)
+  }, [qrCode, avisar, t])
+
+  async function conectar() {
+    setOcupado(true)
+    try {
+      const { data } = await api.post('/whatsapp/pessoal/conectar')
+      if (data.qrCode) setQrCode(data.qrCode)
+      else if (data.conectado) { setQrCode(null); carregarStatus() }
+      else avisar(t('camp.pessoalErro'), 'erro')
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') }
+    finally { setOcupado(false) }
+  }
+
+  async function desconectar() {
+    setOcupado(true)
+    try { await api.post('/whatsapp/pessoal/desconectar'); setQrCode(null); await conectar() }
+    catch (e) { avisar(mensagemDeErro(e), 'erro') }
+    finally { setOcupado(false) }
+  }
+
+  return (
+    <div className="cartao">
+      <h2 className="painel-titulo">
+        {t('camp.pessoalTitulo')} {status?.conectado
+          ? <span style={{ color: 'var(--ok)', fontSize: 13 }}>{t('camp.pessoalConectado')}{status.numero ? ` · ${status.numero}` : ''}</span>
+          : <span style={{ color: 'var(--ink-soft)', fontSize: 13 }}>{t('camp.pessoalNaoConectado')}</span>}
+      </h2>
+      <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>{t('camp.pessoalDescricao')}</p>
+
+      {qrCode && (
+        <div style={{ textAlign: 'center', margin: '12px 0' }}>
+          <p style={{ fontSize: 13 }}>{t('camp.pessoalEscaneie')}</p>
+          <img src={qrCode} alt="QR Code" style={{ width: 220, height: 220 }} />
+        </div>
+      )}
+
+      {!status?.conectado && !qrCode && (
+        <button type="button" className="btn" disabled={ocupado} onClick={conectar}>
+          {ocupado ? t('camp.pessoalGerandoQr') : t('camp.pessoalConectarBtn')}
+        </button>
+      )}
+      {status?.conectado && (
+        <button type="button" className="btn secundario" disabled={ocupado} onClick={desconectar}>
+          {ocupado ? t('camp.pessoalDesconectando') : t('camp.pessoalTrocarNumeroBtn')}
+        </button>
+      )}
+    </div>
   )
 }

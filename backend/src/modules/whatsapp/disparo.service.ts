@@ -101,7 +101,7 @@ export async function dispararParaClientes(opts: {
     // fora da janela de 24h. Sem template → texto livre (só entrega dentro da janela; senão SIMULADA/FALHA).
     const r = tpl
       ? await enviarTemplate({ rede: redeWA, telefone: c.telefone, templateNome: tpl.metaNome, idioma: tpl.idioma, params: variaveis.map((v) => ({ texto: aplicarTemplate(`{${v}}`, dados) })) })
-      : await enviarWhatsapp({ rede: redeWA, telefone: c.telefone, texto })
+      : await enviarWhatsapp({ rede: redeWA, telefone: c.telefone, texto, vendedoraId: vend.id })
     const status = r.status
 
     await prisma.mensagemWhatsapp.create({

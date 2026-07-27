@@ -5,14 +5,13 @@ import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
 import { lojaIdDe, redeIdDe } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
-import { enviarWhatsapp, enviarWhatsappAudio } from './whatsapp.service'
-import { metaConfigurado, cifrar, decifrar, podeCifrar, verificarNumero, enviarTexto, criarTemplateMeta, consultarTemplatesMeta, placeholdersDoCorpo, corpoParaMeta, mapearStatusTemplate, baixarMidia, extDoMime, assinaturaValida } from './meta.service'
-import { marcarLeadAtendido, garantirCicloAberto } from '../leads/leads.service'
+import { enviarWhatsapp, enviarWhatsappAudio, registrarMensagemRecebida } from './whatsapp.service'
+import { estaConectado as baileysConectado } from './baileys.service'
+import { metaConfigurado, cifrar, decifrar, podeCifrar, verificarNumero, enviarTexto, criarTemplateMeta, consultarTemplatesMeta, placeholdersDoCorpo, corpoParaMeta, mapearStatusTemplate, baixarMidia, extDoMime, assinaturaValida, techProviderConfigurado, trocarCodePorToken, inscreverWebhookWaba, registrarNumero } from './meta.service'
+import { marcarLeadAtendido } from '../leads/leads.service'
 import { transcodificarAudioOpus, salvarUploadLocal } from '../midia/midia.routes'
 import { enviarParaR2 } from '../midia/r2.service'
-import { contextoVendedoraIa, usuarioEhAgenteIa, responderVendedoraZaieze } from '../vendedora-zaieze/vendedora-zaieze.service'
-import { chatAtendimentoAtivo } from '../chat-atendimento/assinatura-chat-atendimento.service'
-import { responderChatAtendimento } from '../chat-atendimento/motor.service'
+import { contextoVendedoraIa } from '../vendedora-zaieze/vendedora-zaieze.service'
 
 const JANELA_MS = 24 * 60 * 60 * 1000
 
@@ -41,7 +40,9 @@ function dentroDaJanela(ultimaEntradaEm: Date | null | undefined): boolean {
  * Com número por marca não há mais auto-criação por instância: se o cliente não existe na
  * rede (ou está sem vendedora), a mensagem fica sem roteamento (roteado:false).
  */
-async function rotearMensagemRecebida(params: { numero: string; texto: string; redeId?: string | null; nome?: string | null }) {
+async function rotearMensagemRecebida(params: { numero: string; texto: string; redeId?: string | null; nome?: string | null }): Promise<
+  { roteado: true; mensagemId: string; lojaId: string; novoLead: boolean } | { roteado: false }
+> {
   const numero = params.numero.replace(/\D/g, '')
   if (!numero) return { roteado: false }
 
@@ -90,35 +91,7 @@ async function rotearMensagemRecebida(params: { numero: string; texto: string; r
 
   if (!cliente || !cliente.vendedoraId) return { roteado: false }
 
-  // Janela de 24h: marca o instante da última entrada do cliente.
-  await prisma.cliente.update({ where: { id: cliente.id }, data: { waUltimaEntradaEm: new Date() } })
-
-  const atendidoPelaIa = await usuarioEhAgenteIa(cliente.vendedoraId)
-  // Chat de Atendimento: vendedora HUMANA (não a IA), cliente ainda não passou pelo bot (1º
-  // contato) e ela tem o add-on ativo — pré-qualifica antes de cair como lead cru na carteira.
-  const chatAtendimentoVaiRodar = !atendidoPelaIa && cliente.chatAtendimentoStatus === null && (await chatAtendimentoAtivo(cliente.vendedoraId))
-
-  const ciclo = await garantirCicloAberto({
-    lojaId: cliente.lojaId, vendedoraId: cliente.vendedoraId, redeId: cliente.loja.redeId,
-    clienteId: cliente.id, telefone: numero, nome: params.nome,
-    origem: atendidoPelaIa ? 'VENDEDORA_IA' : chatAtendimentoVaiRodar ? 'CHAT_ATENDIMENTO' : undefined,
-  })
-  const msg = await prisma.mensagemWhatsapp.create({
-    data: {
-      lojaId: cliente.lojaId, clienteId: cliente.id, vendedoraId: cliente.vendedoraId,
-      direcao: 'RECEBIDA', status: 'RECEBIDA', origem: 'ENTRADA', telefone: numero, texto: params.texto,
-    },
-  })
-
-  // Dispara a resposta automática sem atrasar o retorno do webhook à Meta; falha vira log.
-  if (atendidoPelaIa) {
-    const clienteId = cliente.id
-    responderVendedoraZaieze({ clienteId, canal: 'WHATSAPP' }).catch((e) => console.error('[vendedora-zaieze]', e))
-  } else if (chatAtendimentoVaiRodar) {
-    responderChatAtendimento({ clienteId: cliente.id, texto: params.texto, canal: 'WHATSAPP' }).catch((e) => console.error('[chat-atendimento]', e))
-  }
-
-  return { roteado: true, mensagemId: msg.id, lojaId: cliente.lojaId, novoLead: ciclo.novo }
+  return registrarMensagemRecebida({ cliente: { ...cliente, vendedoraId: cliente.vendedoraId }, numero, texto: params.texto, nome: params.nome })
 }
 
 /** Extrai id/tipo de mídia de uma mensagem recebida da Cloud API (imagem/áudio/vídeo/doc). */
@@ -213,7 +186,43 @@ export async function whatsappRoutes(app: FastifyInstance) {
       conectadoEm: r.waConectadoEm,
       webhookUrl: `${env.TENANT_SCHEME}://${r.slug}.${env.DOMINIO_BASE}/api/whatsapp/webhook/${r.slug}`,
       servidorPodeCifrar: podeCifrar(),
+      // Tech Provider / Embedded Signup: conexão em 1 clique (ver ConectarMetaTudo.tsx). App
+      // ID/Config ID não são segredos — o App Secret nunca é exposto ao frontend.
+      conexaoAutomaticaDisponivel: techProviderConfigurado(),
+      metaAppId: env.META_APP_ID ?? null,
+      metaConfigId: env.META_CONFIG_ID ?? null,
     }
+  })
+
+  // Conclui o Embedded Signup: troca o `code` por um token, inscreve o webhook central da ZAIEZE
+  // na WABA do cliente e registra o número (best-effort — números que já vieram do wizard costumam
+  // já estar registrados; erro nesse passo é esperado e ignorado).
+  app.post('/embedded-signup/callback', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
+    const redeId = redeIdDe(request)
+    const { code, wabaId, phoneNumberId } = z.object({
+      code: z.string().min(1), wabaId: z.string().min(1), phoneNumberId: z.string().min(1),
+    }).parse(request.body)
+
+    const troca = await trocarCodePorToken(code)
+    if (!troca.ok || !troca.accessToken) return reply.code(502).send({ erro: troca.erro ?? 'Falha ao trocar o code por um token.' })
+    const token = troca.accessToken
+
+    const inscricao = await inscreverWebhookWaba(wabaId, token)
+    if (!inscricao.ok) return reply.code(502).send({ erro: inscricao.erro ?? 'Falha ao inscrever o webhook na WABA.' })
+
+    await registrarNumero(phoneNumberId, token) // best-effort: número já registrado é esperado e ignorado
+
+    if (!podeCifrar()) return reply.code(422).send({ erro: 'Servidor sem WA_TOKEN_SECRET — não é possível guardar o token com segurança.' })
+
+    const v = await verificarNumero(phoneNumberId, token)
+    await prisma.rede.update({
+      where: { id: redeId },
+      data: {
+        waPhoneNumberId: phoneNumberId, waWabaId: wabaId, waTokenCifrado: cifrar(token),
+        waNumeroExibicao: v.numero ?? null, waConectado: v.ok, waConectadoEm: v.ok ? new Date() : null,
+      },
+    })
+    return { ok: true, conectado: v.ok, numero: v.numero ?? null, erro: v.ok ? null : v.erro ?? null }
   })
 
   // Grava a config; se houver número + token válidos, testa no Graph e marca conectado.
@@ -404,12 +413,16 @@ export async function whatsappRoutes(app: FastifyInstance) {
     if (!vendId) return reply.code(422).send({ erro: 'Cliente sem vendedora responsável — defina a carteira primeiro.' })
 
     const rede = await redeDaLoja(lojaId)
+    const viaBaileys = baileysConectado(vendId)
     // Conectada à Meta e fora da janela → texto livre não é permitido (precisa de template HSM).
-    if (rede && metaConfigurado(rede) && !dentroDaJanela(cliente.waUltimaEntradaEm)) {
+    // Não se aplica ao WhatsApp pessoal (Baileys) — número pessoal não tem janela de 24h da Meta.
+    if (!viaBaileys && rede && metaConfigurado(rede) && !dentroDaJanela(cliente.waUltimaEntradaEm)) {
       return reply.code(422).send({ erro: 'Fora da janela de 24h. Para reabrir a conversa, use um template aprovado (campanha).' })
     }
 
-    const r = rede ? await enviarWhatsapp({ rede, telefone: cliente.telefone, texto }) : { status: 'SIMULADA' as StatusMensagem }
+    const r = viaBaileys || rede
+      ? await enviarWhatsapp({ rede: rede ?? { waPhoneNumberId: null, waTokenCifrado: null }, telefone: cliente.telefone, texto, vendedoraId: vendId })
+      : { status: 'SIMULADA' as StatusMensagem }
     const msg = await prisma.mensagemWhatsapp.create({
       data: {
         lojaId, clienteId, vendedoraId: vendId,
@@ -509,6 +522,43 @@ export async function whatsappRoutes(app: FastifyInstance) {
     for (const entry of body.entry ?? []) {
       for (const change of entry.changes ?? []) {
         await processarValorWebhook(rede, change.value ?? {})
+      }
+    }
+    return reply.code(200).send({ ok: true })
+  })
+
+  // Webhook CENTRAL do app Tech Provider da ZAIEZE: /api/whatsapp/webhook-central (sem auth por
+  // rota — 1 único endpoint registrado no App Dashboard da Meta pra TODAS as WABAs conectadas via
+  // Embedded Signup). Diferente do webhook por tenant acima: a marca é resolvida pelo
+  // `phone_number_id` do payload, não pelo slug da URL.
+  app.get('/webhook-central', async (request, reply) => {
+    const q = request.query as Record<string, string>
+    const modo = q['hub.mode']; const token = q['hub.verify_token']; const challenge = q['hub.challenge']
+    if (modo === 'subscribe' && env.META_WEBHOOK_VERIFY_TOKEN && token === env.META_WEBHOOK_VERIFY_TOKEN) {
+      return reply.code(200).type('text/plain').send(challenge ?? '')
+    }
+    return reply.code(403).send('forbidden')
+  })
+
+  app.post('/webhook-central', async (request, reply) => {
+    // Valida a assinatura X-Hub-Signature-256 com o App Secret do Tech Provider (nível de App).
+    if (env.META_APP_SECRET) {
+      const raw = (request as unknown as { rawBody?: Buffer }).rawBody
+      const assinatura = request.headers['x-hub-signature-256'] as string | undefined
+      if (!raw || !assinaturaValida(env.META_APP_SECRET, raw, assinatura)) {
+        return reply.code(401).send({ ok: false })
+      }
+    }
+
+    const body = request.body as { entry?: { changes?: { value?: Record<string, any> }[] }[] }
+    for (const entry of body.entry ?? []) {
+      for (const change of entry.changes ?? []) {
+        const value = change.value ?? {}
+        const phoneNumberId = value.metadata?.phone_number_id as string | undefined
+        if (!phoneNumberId) continue
+        const rede = await prisma.rede.findFirst({ where: { waPhoneNumberId: phoneNumberId }, select: { id: true, waPhoneNumberId: true, waTokenCifrado: true } })
+        if (!rede) continue
+        await processarValorWebhook(rede, value)
       }
     }
     return reply.code(200).send({ ok: true })

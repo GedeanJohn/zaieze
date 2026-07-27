@@ -44,6 +44,9 @@ const envSchema = z.object({
   MERCADOPAGO_ACCESS_TOKEN: z.string().optional(),
   // Pasta onde os uploads (ex.: logo da marca) são gravados; servidos em /api/uploads
   UPLOAD_DIR: z.string().default('uploads'),
+  // Pasta onde ficam as sessões do WhatsApp pessoal (Baileys, QR Code por vendedora) — uma
+  // subpasta por usuarioId, persistida entre restarts (volume Docker em produção).
+  WA_SESSIONS_DIR: z.string().default('wa-sessions'),
   // Cloudflare R2 (mídia do catálogo: fotos/vídeos). Ausentes → upload de mídia em modo simulado.
   R2_ACCOUNT_ID: z.string().optional(),
   R2_BUCKET: z.string().optional(),

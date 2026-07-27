@@ -13,6 +13,7 @@ import { aplicarDistratoTermosUso } from './modules/termos-uso/termos-uso.servic
 import { atualizarCotacaoUsd } from './modules/cambio/cambio.service'
 import { atualizarPerfisNegocioVencidos } from './modules/chat-atendimento/perfil-negocio.service'
 import { encerrarChatAtendimentoVencidos } from './modules/chat-atendimento/assinatura-chat-atendimento.service'
+import { restaurarConexoes } from './modules/whatsapp/baileys.service'
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000
 
@@ -20,6 +21,10 @@ async function main() {
   const app = await buildApp()
   try {
     await app.listen({ port: env.PORT, host: env.HOST })
+
+    // WhatsApp pessoal (Baileys/QR Code): restaura as sessões de vendedoras que estavam
+    // conectadas antes do restart, usando a sessão salva no volume — sem exigir novo QR.
+    restaurarConexoes().catch((err) => app.log.error({ err }, 'Falha ao restaurar sessões do WhatsApp pessoal'))
 
     // SLA dos leads: a cada minuto, redistribui os atrasados das redes com auto-redistribuição ligada.
     setInterval(() => {

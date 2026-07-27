@@ -27,9 +27,11 @@ services:
         condition: service_healthy
     expose:
       - "3050"
-    # Persiste os uploads (ex.: logo da marca) entre redeploys/rebuilds.
+    # Persiste os uploads (ex.: logo da marca) e as sessões do WhatsApp pessoal (Baileys)
+    # entre redeploys/rebuilds.
     volumes:
       - uploads:/app/uploads
+      - wa_sessions:/app/wa-sessions
 
   web:
     build: ./frontend
@@ -42,9 +44,11 @@ services:
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
 
-  # WhatsApp: migrado para a Cloud API oficial da Meta (sem container — a API do ZAIEZE
-  # fala direto com o Graph). As credenciais (WABA/número) ficam por marca (Rede.wa*).
+  # WhatsApp: dois canais, ambos sem container à parte — a API do ZAIEZE fala direto com o
+  # Graph (Cloud API oficial, credenciais por marca em Rede.wa*) e roda o Baileys embutido no
+  # próprio processo (QR Code por vendedora, sessão persistida no volume wa_sessions).
 
 volumes:
   pgdata:
   uploads:
+  wa_sessions:

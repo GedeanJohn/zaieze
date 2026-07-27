@@ -693,6 +693,11 @@ model Usuario {
   // número usado no deep link wa.me do handoff "Falar com a vendedora" na vitrine (Portal do
   // Cliente) quando a marca ainda não conectou o WhatsApp oficial da MARCA (Rede.wa*).
   telefone       String?
+  // WhatsApp pessoal via QR Code (Baileys) — conexão alternativa à Cloud API da marca, só
+  // VENDEDORA. Sessão/credenciais ficam em disco (WA_SESSIONS_DIR/<usuarioId>), não no banco.
+  waPessoalConectado   Boolean   @default(false)
+  waPessoalConectadoEm DateTime?
+  waPessoalNumero      String? // número detectado (JID) após conectar
   // foto de perfil da vendedora (exibida no cabeçalho do Chat Zaieze; URL no R2/local)
   fotoUrl        String?
   // slug do catálogo da vendedora: loja.com/<loja>/<slugCatalogo> (fase 6)

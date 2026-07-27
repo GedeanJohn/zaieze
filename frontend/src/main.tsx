@@ -33,6 +33,7 @@ import Privacidade from './paginas/Privacidade'
 import TermosUso from './paginas/TermosUso'
 import ChatAtendimento from './paginas/ChatAtendimento'
 import Admin from './paginas/Admin'
+import LeadsZaieze from './paginas/LeadsZaieze'
 import WhatsAppOficial from './paginas/WhatsApp'
 import InstagramOficial from './paginas/Instagram'
 import PainelAfiliado from './paginas/afiliado/PainelAfiliado'
@@ -167,6 +168,7 @@ function CrmApp() {
         <Route path="termos-uso" element={<TermosUso />} />
         <Route path="chat-atendimento" element={<ChatAtendimento />} />
         <Route path="admin" element={<Admin />} />
+        <Route path="leads-zaieze" element={<LeadsZaieze />} />
         <Route path="whatsapp-config" element={<WhatsAppOficial />} />
         <Route path="instagram-config" element={<InstagramOficial />} />
         <Route path="vendedora-zaieze" element={<VendedoraZaieze />} />

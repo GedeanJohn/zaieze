@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
   Megaphone, Package, Tag, Layers, Boxes, UsersRound, Eye, Receipt,
   Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Wrench, Smartphone, Camera, Store, Shirt,
-  ChevronLeft, ChevronRight, ChevronDown, Bot, Landmark, Sparkles,
+  ChevronLeft, ChevronRight, ChevronDown, Bot, Landmark, Sparkles, Contact2,
   type LucideIcon,
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, temAddon, usuarioLogado } from '../api'
@@ -224,6 +224,7 @@ export default function Layout() {
         <SecaoMenu titulo={t('layout.secao.institucional')} itens={itensInstitucional} fechada={!!secoesFechadas.institucional} onToggle={() => alternarSecao('institucional')} />
 
         {ehAdmin && <NavLink to="/admin" className={cls} title={t('layout.admin')}><Wrench {...ICON} /><span>{t('layout.admin')}</span></NavLink>}
+        {ehAdmin && <NavLink to="/leads-zaieze" className={cls} title={t('layout.leadsZaieze')}><Contact2 {...ICON} /><span>{t('layout.leadsZaieze')}</span></NavLink>}
         <NavLink to="/conta" className={cls} title={t('layout.minhaConta')}><UserCog {...ICON} /><span>{t('layout.minhaConta')}</span></NavLink>
         </nav>
         <div className="rodape">

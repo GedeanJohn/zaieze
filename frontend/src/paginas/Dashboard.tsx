@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, formataReal, rotuloForma, usuarioLogado } from '../api'
 import DashboardEstoque from './DashboardEstoque'
+import Admin from './Admin'
 import { useIdioma } from '../lib/i18n'
 
 // ─── Tipos das três visões devolvidas por /api/dashboard ───
@@ -103,6 +104,9 @@ function BarraMeta({ pct }: { pct: number }) {
 }
 
 export default function Dashboard() {
+  // SUPER_ADMIN não pertence a loja/rede alguma — /api/dashboard é sempre escopado por loja
+  // (lojaIdDe exige ?lojaId= pra esse papel), então a "home" dele é o próprio painel Admin.
+  if (usuarioLogado()?.role === 'SUPER_ADMIN') return <Admin />
   // O estoquista tem um dashboard próprio, focado em indicadores de estoque.
   if (usuarioLogado()?.role === 'ESTOQUISTA') return <DashboardEstoque />
   return <DashboardGeral />

@@ -165,6 +165,19 @@ export async function enviarTextoBaileys(usuarioId: string, telefone: string, te
   }
 }
 
+/** Envia áudio (PTT/mensagem de voz) pelo WhatsApp pessoal da vendedora. Sem sessão ativa → SIMULADA. */
+export async function enviarAudioBaileys(usuarioId: string, telefone: string, buffer: Buffer): Promise<{ status: StatusMensagem; waMessageId?: string; erro?: string }> {
+  const sessao = sessoes.get(usuarioId)
+  if (!sessao?.sock?.user) return { status: 'SIMULADA' }
+  try {
+    const jid = `${telefone.replace(/\D/g, '')}@s.whatsapp.net`
+    const r = await sessao.sock.sendMessage(jid, { audio: buffer, mimetype: 'audio/ogg; codecs=opus', ptt: true })
+    return { status: 'ENVIADA', waMessageId: r?.key?.id ?? undefined }
+  } catch (e) {
+    return { status: 'FALHA', erro: String(e) }
+  }
+}
+
 /**
  * Restaura, no boot do servidor, as sessões que estavam conectadas antes do restart (o container
  * pode subir de novo a qualquer momento — as credenciais persistidas no volume `wa-sessions`

@@ -465,7 +465,10 @@ export async function whatsappRoutes(app: FastifyInstance) {
     }
 
     const rede = await redeDaLoja(lojaId)
-    const r = rede ? await enviarWhatsappAudio({ rede, telefone: cliente.telefone, buffer: ogg }) : { status: 'SIMULADA' as StatusMensagem }
+    const viaBaileys = baileysConectado(vendId)
+    const r = viaBaileys || rede
+      ? await enviarWhatsappAudio({ rede: rede ?? { waPhoneNumberId: null, waTokenCifrado: null }, telefone: cliente.telefone, buffer: ogg, vendedoraId: vendId })
+      : { status: 'SIMULADA' as StatusMensagem }
     const msg = await prisma.mensagemWhatsapp.create({
       data: {
         lojaId, clienteId, vendedoraId: vendId,

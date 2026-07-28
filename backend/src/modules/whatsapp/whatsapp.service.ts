@@ -1,5 +1,5 @@
 import { enviarTexto, uploadMidia, enviarMidia, type EnvioResultado, type RedeWA } from './meta.service'
-import { estaConectado as baileysConectado, enviarTextoBaileys } from './baileys.service'
+import { estaConectado as baileysConectado, enviarTextoBaileys, enviarAudioBaileys } from './baileys.service'
 import { prisma } from '../../lib/prisma'
 import { garantirCicloAberto } from '../leads/leads.service'
 import { usuarioEhAgenteIa, responderVendedoraZaieze } from '../vendedora-zaieze/vendedora-zaieze.service'
@@ -50,10 +50,14 @@ export async function enviarWhatsapp(opts: { rede: RedeWA; telefone: string; tex
 }
 
 /**
- * Mensagem de voz (PTT) pela Cloud API: sobe o áudio (OGG/Opus) como mídia e envia (tipo audio).
- * Só dentro da janela de 24h (áudio é mensagem de sessão). Sem config → SIMULADA.
+ * Mensagem de voz (PTT). Mesma prioridade do texto: WhatsApp pessoal (Baileys) primeiro se
+ * conectado, senão Cloud API da marca — sobe o áudio (OGG/Opus) como mídia e envia (tipo audio).
+ * Cloud API só dentro da janela de 24h (áudio é mensagem de sessão). Sem config nenhuma → SIMULADA.
  */
-export async function enviarWhatsappAudio(opts: { rede: RedeWA; telefone: string; buffer: Buffer }): Promise<EnvioResultado> {
+export async function enviarWhatsappAudio(opts: { rede: RedeWA; telefone: string; buffer: Buffer; vendedoraId?: string | null }): Promise<EnvioResultado> {
+  if (opts.vendedoraId && baileysConectado(opts.vendedoraId)) {
+    return enviarAudioBaileys(opts.vendedoraId, opts.telefone, opts.buffer)
+  }
   const mediaId = await uploadMidia({ rede: opts.rede, buffer: opts.buffer, mime: 'audio/ogg', filename: 'audio.ogg' })
   if (!mediaId) return { status: 'SIMULADA' } // sem WABA (ou upload indisponível) → registra simulado
   return enviarMidia({ rede: opts.rede, telefone: opts.telefone, tipo: 'audio', mediaId })

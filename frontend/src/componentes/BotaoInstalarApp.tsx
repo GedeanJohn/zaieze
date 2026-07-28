@@ -70,15 +70,29 @@ export default function BotaoInstalarApp({ className = 'vit-icone-botao' }: { cl
     <>
       <button type="button" className={className} aria-label="Instalar app" onClick={clicar}><Download size={18} /></button>
       {instrucoesIosAbertas && (
-        <div className="vit-modal-fundo" onClick={() => setInstrucoesIosAbertas(false)}>
-          <div className="vit-modal" onClick={(e) => e.stopPropagation()} style={{ textAlign: 'center' }}>
-            <button type="button" className="vit-modal-fechar" onClick={() => setInstrucoesIosAbertas(false)} aria-label="Fechar"><X size={18} /></button>
-            <h3 className="vit-modal-nome">Instalar na tela de início</h3>
+        // Estilo 100% inline (não depende de classes "vit-*"/"pv-*" da página que renderiza este
+        // componente) — ele é usado em telas com temas diferentes (Brand Partner, vitrine da
+        // vendedora), e depender de CSS externo deixava o modal sem estilo (texto ilegível, botão
+        // parecendo desativado) fora da página onde essas classes foram originalmente definidas.
+        <div
+          onClick={() => setInstrucoesIosAbertas(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: 28, width: 'min(400px, 100%)', maxHeight: '88vh', overflowY: 'auto', position: 'relative', textAlign: 'center', color: '#f2efe9' }}
+          >
+            <button type="button" onClick={() => setInstrucoesIosAbertas(false)} aria-label="Fechar" style={{ position: 'absolute', top: 14, right: 14, background: 'none', border: 'none', color: '#ccc', cursor: 'pointer' }}><X size={18} /></button>
+            <h3 style={{ margin: '0 0 18px', fontSize: 18 }}>Instalar na tela de início</h3>
             <p style={{ margin: '16px 0 6px', lineHeight: 1.6, fontSize: 13, color: '#b8b3ac' }}>
               Abriu esse link pelo WhatsApp, Instagram ou outro app? "Adicionar à Tela de Início" só
               funciona no Safari de verdade — copie o link abaixo e cole no Safari.
             </p>
-            <button type="button" className="vit-modal-catalogo" style={{ marginTop: 10, width: '100%', border: 'none' }} onClick={copiarLink}>
+            <button
+              type="button"
+              onClick={copiarLink}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, width: '100%', border: 'none', padding: '12px 14px', borderRadius: 10, background: 'linear-gradient(135deg, #d6b06f, #b8863f)', color: '#14100a', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+            >
               {linkCopiado ? <Check size={18} /> : <Copy size={18} />} {linkCopiado ? 'Link copiado' : 'Copiar link'}
             </button>
             <p style={{ margin: '18px 0 0', lineHeight: 1.6 }}>

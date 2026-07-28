@@ -79,3 +79,42 @@ export async function sugerirMensagem(opts: { segmento?: string | null; contexto
     return { texto: fallback, viaIa: false }
   }
 }
+
+/**
+ * Radar de Oportunidades (add-on): explica por que um produto parado × carteira de clientes é
+ * uma boa oportunidade. Incluído na mensalidade do add-on (Haiku é barato/previsível) — não
+ * consome crédito de IA Captador, diferente da prospecção de empresas novas (Google Places).
+ */
+export async function explicarOportunidade(opts: {
+  produto: string
+  categoria: string | null
+  diasParado: number
+  valorParado: number
+  clientesAlvo: number
+}): Promise<{ texto: string; viaIa: boolean }> {
+  const fallback = `${opts.produto} está parado há ${opts.diasParado} dias (R$ ${opts.valorParado.toFixed(2)} em estoque) e ${opts.clientesAlvo} cliente(s) da carteira já compraram ${opts.categoria ? `a categoria ${opts.categoria}` : 'produtos parecidos'} — boa chance de recompra.`
+  if (!env.ANTHROPIC_API_KEY) return { texto: fallback, viaIa: false }
+
+  try {
+    const { default: Anthropic } = await import('@anthropic-ai/sdk')
+    const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
+    const resp = await client.messages.create({
+      model: MODELO_IA,
+      max_tokens: 200,
+      system:
+        'Você é um(a) consultor(a) comercial de uma loja de moda. Explique em 1-2 frases, português do Brasil, ' +
+        'por que vale a pena a vendedora oferecer este produto parado para estes clientes da carteira. ' +
+        'Seja direto e prático, sem enrolação. Responda apenas a explicação, sem aspas.',
+      messages: [{
+        role: 'user',
+        content: `Produto: ${opts.produto}. Categoria: ${opts.categoria ?? 'não informada'}. Parado há ${opts.diasParado} dias, R$ ${opts.valorParado.toFixed(2)} em estoque. ${opts.clientesAlvo} cliente(s) da carteira já compraram essa categoria (ou são VIP/Frequente).`,
+      }],
+    })
+    let texto = ''
+    for (const b of resp.content) if (b.type === 'text') texto += b.text
+    texto = texto.trim()
+    return { texto: texto || fallback, viaIa: true }
+  } catch {
+    return { texto: fallback, viaIa: false }
+  }
+}

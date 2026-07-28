@@ -4,7 +4,7 @@ import { useToast } from '../componentes/Toast'
 import { entrarComoUsuario } from '../lib/impersonar'
 
 interface PlanoAdmin { plano: Plano; nome: string; limite: string; resumo: string; preco: number }
-interface AddonAdmin { tipo: string; nome: string; resumo: string; preco: number }
+interface AddonAdmin { tipo: string; nome: string; resumo: string; preco: number; cotaCreditosMes: number | null }
 interface Promo { id: string; codigo: string; tipo: 'DIAS_GRATIS' | 'PERCENTUAL'; aplicaA: 'REDE' | 'ASSESSOR'; plano: string | null; dias: number | null; percentual: string | null; descricao: string | null; validadeAte: string | null; maxUsos: number | null; usos: number; ativo: boolean }
 
 const fmtData = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—')
@@ -14,6 +14,7 @@ export default function Admin() {
   const [precos, setPrecos] = useState<Record<string, string>>({})
   const [addons, setAddons] = useState<AddonAdmin[]>([])
   const [precosAddon, setPrecosAddon] = useState<Record<string, string>>({})
+  const [cotasAddon, setCotasAddon] = useState<Record<string, string>>({})
   const [precoChatAtendimento, setPrecoChatAtendimento] = useState('')
   const [descontoAnual, setDescontoAnual] = useState('10')
   const [promos, setPromos] = useState<Promo[]>([])
@@ -28,6 +29,7 @@ export default function Admin() {
     api.get('/admin/addons').then(({ data }) => {
       setAddons(data.addons)
       setPrecosAddon(Object.fromEntries(data.addons.map((a: AddonAdmin) => [a.tipo, String(a.preco)])))
+      setCotasAddon(Object.fromEntries(data.addons.filter((a: AddonAdmin) => a.cotaCreditosMes != null).map((a: AddonAdmin) => [a.tipo, String(a.cotaCreditosMes)])))
     }).catch((e) => avisar(mensagemDeErro(e), 'erro'))
     api.get('/admin/chat-atendimento-preco').then(({ data }) => setPrecoChatAtendimento(String(data.preco))).catch(() => {})
     api.get('/admin/promos').then(({ data }) => setPromos(data.promos)).catch(() => {})
@@ -50,6 +52,15 @@ export default function Admin() {
     try {
       await api.put(`/admin/addons/${tipo}/preco`, { preco: Number(precosAddon[tipo]) })
       avisar('Preço do add-on salvo. Vale para novas assinaturas.')
+      carregar()
+    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
+  }
+
+  async function salvarCotaAddon(tipo: string) {
+    setOcupado(true)
+    try {
+      await api.put(`/admin/addons/${tipo}/cota`, { cotaCreditosMes: Number(cotasAddon[tipo]) })
+      avisar('Cota de créditos salva.')
       carregar()
     } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
   }
@@ -123,6 +134,15 @@ export default function Admin() {
               <input type="number" step="0.01" min="0" value={precosAddon[a.tipo] ?? ''} onChange={(e) => setPrecosAddon({ ...precosAddon, [a.tipo]: e.target.value })} />
             </div>
             <div><button className="btn" onClick={() => salvarPrecoAddon(a.tipo)} disabled={ocupado}>Salvar</button></div>
+            {a.cotaCreditosMes != null && (
+              <>
+                <div className="campo" style={{ maxWidth: 200 }}>
+                  <label>Créditos de IA Captador/mês</label>
+                  <input type="number" step="1" min="0" value={cotasAddon[a.tipo] ?? ''} onChange={(e) => setCotasAddon({ ...cotasAddon, [a.tipo]: e.target.value })} />
+                </div>
+                <div><button className="btn secundario" onClick={() => salvarCotaAddon(a.tipo)} disabled={ocupado}>Salvar cota</button></div>
+              </>
+            )}
             <div style={{ fontSize: 12, color: 'var(--ink-soft)', maxWidth: 320 }}>{a.resumo}</div>
           </div>
         ))}

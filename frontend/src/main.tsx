@@ -35,6 +35,7 @@ import ChatAtendimento from './paginas/ChatAtendimento'
 import Admin from './paginas/Admin'
 import LeadsZaieze from './paginas/LeadsZaieze'
 import GestoresMarca from './paginas/GestoresMarca'
+import Prospeccao from './paginas/Prospeccao'
 import WhatsAppOficial from './paginas/WhatsApp'
 import InstagramOficial from './paginas/Instagram'
 import PainelAfiliado from './paginas/afiliado/PainelAfiliado'
@@ -171,6 +172,7 @@ function CrmApp() {
         <Route path="admin" element={<Admin />} />
         <Route path="leads-zaieze" element={<LeadsZaieze />} />
         <Route path="gestores-marca" element={<GestoresMarca />} />
+        <Route path="prospeccao" element={<Prospeccao />} />
         <Route path="whatsapp-config" element={<WhatsAppOficial />} />
         <Route path="instagram-config" element={<InstagramOficial />} />
         <Route path="vendedora-zaieze" element={<VendedoraZaieze />} />

@@ -1,15 +1,19 @@
 import type { TipoAddon } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 
-// Preço do Estoque Inteligente é placeholder (não validado com o usuário) — ajustável no painel
-// do super admin (definirPrecoAddon), mesmo mecanismo dos outros add-ons.
-const PADRAO: Record<TipoAddon, number> = { PROVADOR: 59.99, VENDEDORA_ZAIEZE: 297, ESTOQUE_INTELIGENTE: 49.9 }
-const NOMES: Record<TipoAddon, string> = { PROVADOR: 'Provador Virtual', VENDEDORA_ZAIEZE: 'Vendedora ZAIEZE', ESTOQUE_INTELIGENTE: 'Estoque Inteligente' }
+// Preço do Estoque Inteligente e do Radar são placeholders (não validados com o usuário) —
+// ajustáveis no painel do super admin (definirPrecoAddon), mesmo mecanismo dos outros add-ons.
+const PADRAO: Record<TipoAddon, number> = { PROVADOR: 59.99, VENDEDORA_ZAIEZE: 297, ESTOQUE_INTELIGENTE: 49.9, RADAR: 79.9 }
+const NOMES: Record<TipoAddon, string> = { PROVADOR: 'Provador Virtual', VENDEDORA_ZAIEZE: 'Vendedora ZAIEZE', ESTOQUE_INTELIGENTE: 'Estoque Inteligente', RADAR: 'Radar de Oportunidades' }
 const RESUMOS: Record<TipoAddon, string> = {
   PROVADOR: 'Prova virtual com IA (foto e vídeo) — disponível para qualquer plano, cobrada à parte.',
   VENDEDORA_ZAIEZE: 'Loja 100% automatizada por IA: atende WhatsApp/Instagram, recomenda produtos e fecha vendas sozinha — disponível para qualquer plano, cobrada à parte.',
   ESTOQUE_INTELIGENTE: 'Campeões de venda e risco de ruptura por produto — disponível para qualquer plano, cobrada à parte.',
+  RADAR: 'IA explica as melhores oportunidades da sua carteira + créditos de IA Captador para prospectar empresas novas — disponível para qualquer plano, cobrada à parte.',
 }
+// Cota mensal padrão de créditos de IA Captador (prospecção via Google Places) do add-on RADAR —
+// só usada quando ConfigAddon.cotaCreditosMes está ausente (editável pelo super admin sem deploy).
+const COTA_CREDITOS_PADRAO = 50
 
 /** Preço vigente de um add-on (banco; cai no padrão se ainda não houver registro). */
 export async function precoDoAddon(tipo: TipoAddon): Promise<number> {
@@ -22,10 +26,29 @@ export async function definirPrecoAddon(tipo: TipoAddon, preco: number): Promise
   await prisma.configAddon.upsert({ where: { tipo }, update: { preco }, create: { tipo, preco } })
 }
 
+/** Cota mensal de créditos de IA Captador do add-on RADAR (banco; cai no padrão sem registro). */
+export async function cotaCreditosAddon(tipo: TipoAddon): Promise<number> {
+  const c = await prisma.configAddon.findUnique({ where: { tipo }, select: { cotaCreditosMes: true } })
+  return c?.cotaCreditosMes ?? COTA_CREDITOS_PADRAO
+}
+
+/** Define manualmente a cota mensal de créditos (admin) — hoje só o add-on RADAR usa isso. */
+export async function definirCotaCreditosAddon(tipo: TipoAddon, cotaCreditosMes: number): Promise<void> {
+  await prisma.configAddon.upsert({
+    where: { tipo },
+    update: { cotaCreditosMes },
+    create: { tipo, preco: PADRAO[tipo], cotaCreditosMes },
+  })
+}
+
 /** Catálogo de add-ons (metadados do código + preço do banco) — usado em Planos e no admin. */
 export async function listarAddons() {
   const tipos = Object.keys(NOMES) as TipoAddon[]
-  return Promise.all(tipos.map(async (tipo) => ({ tipo, nome: NOMES[tipo], resumo: RESUMOS[tipo], preco: await precoDoAddon(tipo) })))
+  return Promise.all(tipos.map(async (tipo) => ({
+    tipo, nome: NOMES[tipo], resumo: RESUMOS[tipo], preco: await precoDoAddon(tipo),
+    // Só o RADAR usa cota de créditos hoje — os demais ficam com null (frontend ignora).
+    cotaCreditosMes: tipo === 'RADAR' ? await cotaCreditosAddon(tipo) : null,
+  })))
 }
 
 /** Fim do próximo ciclo mensal de um add-on (add-ons não têm opção anual). */

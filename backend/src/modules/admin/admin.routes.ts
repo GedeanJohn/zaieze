@@ -3,7 +3,7 @@ import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { aplicarReajuste, definirPrecos, listarPlanos, listarReajustes, percentualDescontoAnual, definirDescontoAnual } from '../planos/planos.service'
-import { listarAddons, definirPrecoAddon } from '../addons/addon.service'
+import { listarAddons, definirPrecoAddon, definirCotaCreditosAddon } from '../addons/addon.service'
 import { precoChatAtendimento, definirPrecoChatAtendimento } from '../chat-atendimento/assinatura-chat-atendimento.service'
 import { normalizarCodigo } from '../promo/promo.service'
 import { cancelarPreapproval, mpConfigurado } from '../assinaturas/mercadopago.service'
@@ -14,6 +14,7 @@ import { criarAfiliado } from '../afiliados/afiliado.service'
 import { criarAssessor, slugDisponivel, normalizarSlug } from '../assessores/assessor.service'
 import { sincronizarZaiezeLeads } from '../zaiezeleads/zaiezeleads.service'
 import { exportarCsv, exportarTxt, exportarXlsx, exportarSql, type LinhaZaiezeLead } from '../zaiezeleads/exportar-zaiezeleads'
+import { googlePlacesConfigurado, geocodificar, buscarEmpresas, gerarResultadosSimulados, type EmpresaEncontrada } from '../prospeccao/places.service'
 
 const num = (v: unknown) => Number(v ?? 0)
 
@@ -64,9 +65,17 @@ export async function adminRoutes(app: FastifyInstance) {
 
   const precoAddonSchema = z.object({ preco: z.coerce.number().nonnegative() })
   app.put('/addons/:tipo/preco', async (request) => {
-    const { tipo } = z.object({ tipo: z.enum(['PROVADOR', 'VENDEDORA_ZAIEZE', 'ESTOQUE_INTELIGENTE']) }).parse(request.params)
+    const { tipo } = z.object({ tipo: z.enum(['PROVADOR', 'VENDEDORA_ZAIEZE', 'ESTOQUE_INTELIGENTE', 'RADAR']) }).parse(request.params)
     const { preco } = precoAddonSchema.parse(request.body)
     await definirPrecoAddon(tipo, preco)
+    return { ok: true, addons: await listarAddons() }
+  })
+
+  // Cota mensal de créditos de IA Captador — só o add-on RADAR usa isso hoje.
+  app.put('/addons/:tipo/cota', async (request) => {
+    const { tipo } = z.object({ tipo: z.enum(['RADAR']) }).parse(request.params)
+    const { cotaCreditosMes } = z.object({ cotaCreditosMes: z.coerce.number().int().nonnegative() }).parse(request.body)
+    await definirCotaCreditosAddon(tipo, cotaCreditosMes)
     return { ok: true, addons: await listarAddons() }
   })
 
@@ -342,6 +351,57 @@ export async function adminRoutes(app: FastifyInstance) {
     const senha = gerarSenhaProvisoria()
     await prisma.usuario.update({ where: { id }, data: { senhaHash: await bcrypt.hash(senha, 10) } })
     return { nome: alvo.nome, senha }
+  })
+
+  // ── Captador Leads Zaieze (prospecção de empresas novas via Google Places, fora do SaaS) ──
+  const buscaProspeccaoSchema = z.object({
+    segmento: z.string().min(2),
+    cidade: z.string().min(2),
+    uf: z.string().length(2),
+    raioKm: z.coerce.number().int().positive().optional(),
+    tipoEmpresa: z.string().trim().optional(),
+    perfilIdeal: z.string().trim().optional(),
+    quantidade: z.coerce.number().int().positive().max(20),
+  })
+  app.post('/prospeccao/buscas', async (request, reply) => {
+    const b = buscaProspeccaoSchema.parse(request.body)
+    const uf = b.uf.toUpperCase()
+
+    const simulada = !googlePlacesConfigurado()
+    let empresas: EmpresaEncontrada[]
+    if (simulada) {
+      empresas = gerarResultadosSimulados({ segmento: b.segmento, cidade: b.cidade, uf, quantidade: b.quantidade })
+    } else {
+      const ponto = await geocodificar(b.cidade, uf)
+      if (!ponto) return reply.code(422).send({ erro: 'Não foi possível localizar essa cidade/UF.' })
+      empresas = await buscarEmpresas({ segmento: b.segmento, tipoEmpresa: b.tipoEmpresa, ponto, raioKm: b.raioKm, quantidade: b.quantidade })
+    }
+
+    const busca = await prisma.prospeccaoBusca.create({
+      data: {
+        criadoPorId: request.user.sub, segmento: b.segmento, cidade: b.cidade, uf,
+        raioKm: b.raioKm ?? null, tipoEmpresa: b.tipoEmpresa ?? null, perfilIdeal: b.perfilIdeal ?? null,
+        quantidade: b.quantidade, simulada,
+        empresas: { create: empresas.map((e) => ({ ...e, horarioFuncionamento: e.horarioFuncionamento ?? undefined })) },
+      },
+      include: { empresas: true },
+    })
+    return reply.code(201).send(busca)
+  })
+
+  app.get('/prospeccao/buscas', async () => ({
+    buscas: await prisma.prospeccaoBusca.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { _count: { select: { empresas: true } }, criadoPor: { select: { nome: true } } },
+    }),
+  }))
+
+  app.get('/prospeccao/buscas/:id', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const busca = await prisma.prospeccaoBusca.findUnique({ where: { id }, include: { empresas: { orderBy: { createdAt: 'asc' } } } })
+    if (!busca) return reply.code(404).send({ erro: 'Busca não encontrada' })
+    return busca
   })
 
   // ── Códigos promocionais ──

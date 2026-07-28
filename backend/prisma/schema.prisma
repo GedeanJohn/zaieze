@@ -31,6 +31,7 @@ enum TipoAddon {
   PROVADOR // Provador Virtual (FASHN AI — try-on de foto e vídeo)
   VENDEDORA_ZAIEZE // Vendedora ZAIEZE — loja 100% automatizada por IA (WhatsApp/Instagram → fecha venda)
   ESTOQUE_INTELIGENTE // Análise de campeões de venda e risco de ruptura (saiu do plano Elite, assinatura à parte)
+  RADAR // Radar de Oportunidades com IA (saiu do plano Elite) + prospecção de empresas novas (créditos de IA Captador)
 }
 
 enum StatusAddon {
@@ -327,6 +328,7 @@ model Rede {
   assessorMarcas             AssessorMarca[]
   perfilNegocio              PerfilNegocioRede?
   assinaturasChatAtendimento AssinaturaChatAtendimento[]
+  prospeccoesBuscas          ProspeccaoBusca[]
 
   @@map("redes")
 }
@@ -462,6 +464,9 @@ model ConfigPlano {
 model ConfigAddon {
   tipo      TipoAddon @id
   preco     Decimal   @db.Decimal(12, 2)
+  // Cota mensal de "créditos de IA Captador" — só usado pelo add-on RADAR (prospecção de
+  // empresas novas via Google Places). null → usa o default hardcoded em addon.service.ts.
+  cotaCreditosMes Int?
   updatedAt DateTime  @default(now()) @updatedAt
 
   @@map("config_addons")
@@ -743,6 +748,7 @@ model Usuario {
   assessor                   Assessor?
   assinaturasChatAtendimento AssinaturaChatAtendimento[]
   avaliacoes                 VendedoraAvaliacao[]
+  prospeccoesBuscas          ProspeccaoBusca[]
 
   @@unique([lojaId, slugCatalogo])
   @@index([lojaId, role])
@@ -952,6 +958,65 @@ model Lead {
   @@index([lojaId, status])
   @@index([vendedoraId, status])
   @@map("leads")
+}
+
+// ─────────────────────────── Captador Leads Zaieze (prospecção de empresas novas) ───────────────────────────
+// Ferramenta de uso do time comercial da PRÓPRIA ZAIEZE (SUPER_ADMIN/Gestor Comercial) pra
+// prospectar empresas de fora do SaaS via Google Places API — NÃO confundir com o model `Lead`
+// (funil de catálogo de uma loja) nem com `ZaiezeLead` (cópia dos clientes finais dos tenants).
+// Também não é a mesma coisa que a feature paga "Radar de Oportunidades" (módulo `radar/`, plano
+// ELITE) — aquela é sobre a carteira de clientes já existente de uma loja; esta é prospecção de
+// empresas novas, de fora do SaaS.
+model ProspeccaoBusca {
+  id          String   @id @default(cuid())
+  criadoPorId String
+  // null = uso interno da ZAIEZE (Captador Leads Zaieze, SUPER_ADMIN); preenchido = uso pago de
+  // um tenant via o add-on RADAR (consome 1 crédito de IA Captador por busca).
+  redeId      String?
+  segmento    String
+  cidade      String
+  uf          String
+  raioKm      Int?
+  tipoEmpresa String?
+  perfilIdeal String?
+  quantidade  Int
+  // true quando rodou sem GOOGLE_PLACES_API_KEY configurada (resultados fictícios, não gasta API).
+  simulada    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  criadoPor Usuario             @relation(fields: [criadoPorId], references: [id], onDelete: Cascade)
+  rede      Rede?               @relation(fields: [redeId], references: [id], onDelete: Cascade)
+  empresas  ProspeccaoEmpresa[]
+
+  @@index([redeId, createdAt])
+  @@map("prospeccao_buscas")
+}
+
+// Uma empresa encontrada numa busca — campos vêm do Google Places (Text Search + Place Details).
+// CNPJ e Instagram propositalmente NÃO existem aqui: a Places API não fornece nenhum dos dois
+// (fica pra uma fase futura, com outra integração paga).
+model ProspeccaoEmpresa {
+  id                   String   @id @default(cuid())
+  buscaId              String
+  googlePlaceId        String? // id do lugar no Google (referência, sem @unique — mesma empresa pode repetir entre buscas)
+  nome                 String
+  categoria            String?
+  telefone             String?
+  site                 String?
+  endereco             String?
+  cidade               String?
+  uf                   String?
+  notaGoogle           Decimal? @db.Decimal(2, 1)
+  totalAvaliacoes      Int?
+  horarioFuncionamento Json?
+  latitude             Float?
+  longitude            Float?
+  createdAt            DateTime @default(now())
+
+  busca ProspeccaoBusca @relation(fields: [buscaId], references: [id], onDelete: Cascade)
+
+  @@index([buscaId])
+  @@map("prospeccao_empresas")
 }
 
 // Snapshot do carrinho que o cliente montou na vitrine (Portal do Cliente) ao clicar em

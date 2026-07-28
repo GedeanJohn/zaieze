@@ -53,6 +53,9 @@ const envSchema = z.object({
   R2_PUBLIC_URL: z.string().url().optional(), // ex.: https://cdn.zaieze.com
   R2_ACCESS_KEY_ID: z.string().optional(),
   R2_SECRET_ACCESS_KEY: z.string().optional(),
+  // Captador Leads Zaieze (prospecção de empresas novas — Google Places API + Geocoding API, uso do
+  // time comercial da própria ZAIEZE). Ausente → modo simulado (empresas fictícias; não gasta API).
+  GOOGLE_PLACES_API_KEY: z.string().optional(),
   // Provador virtual (módulo 13 — FASHN AI: foto try-on + image-to-video).
   // Ausente → modo simulado (usa a própria foto do produto; não gera vídeo; não gasta API).
   FASHN_API_KEY: z.string().optional(),

@@ -6,7 +6,7 @@ export type Feature =
   | 'vendas' | 'produtos' | 'estoque' | 'clientes' | 'dashboard' | 'forma_recebimento' | 'whatsapp'
   | 'funil' | 'atacado'
   | 'crm_segmentacao' | 'gamificacao'
-  | 'multi_loja' | 'radar' | 'ia_avancada' | 'portal_cliente'
+  | 'multi_loja' | 'ia_avancada' | 'portal_cliente'
 
 /** Plano mínimo que libera cada funcionalidade (matriz central — ajustável). */
 export const FEATURE_MIN_PLANO: Record<Feature, Plano> = {
@@ -16,8 +16,9 @@ export const FEATURE_MIN_PLANO: Record<Feature, Plano> = {
   // PRO — relacionamento & performance
   crm_segmentacao: 'PRO', gamificacao: 'PRO',
   // ELITE — inteligência avançada & canais premium
-  // (Estoque Inteligente saiu daqui — virou add-on de assinatura à parte, ver TipoAddon.ESTOQUE_INTELIGENTE)
-  radar: 'ELITE', ia_avancada: 'ELITE',
+  // (Estoque Inteligente e Radar de Oportunidades saíram daqui — viraram add-ons de assinatura
+  // à parte, ver TipoAddon.ESTOQUE_INTELIGENTE / TipoAddon.RADAR)
+  ia_avancada: 'ELITE',
 }
 
 const ORDEM: Record<Plano, number> = { START: 0, PRO: 1, ELITE: 2 }
@@ -34,7 +35,7 @@ export function planoInclui(plano: Plano, feature: Feature): boolean {
 export const PLANOS_META = [
   { plano: 'START' as Plano, nome: 'Start', limite: 'Lojas e vendedoras ilimitadas', resumo: 'Operação completa + WhatsApp + funil de vendas, atacado, operação em rede e Portal do Cliente (loja da vendedora)' },
   { plano: 'PRO' as Plano, nome: 'Pro', limite: 'Lojas e vendedoras ilimitadas', resumo: 'Tudo do Start + carteira inteligente e comissão/ranking' },
-  { plano: 'ELITE' as Plano, nome: 'Elite', limite: 'Lojas e vendedoras ilimitadas', resumo: 'Tudo do Pro + Radar de Oportunidades' },
+  { plano: 'ELITE' as Plano, nome: 'Elite', limite: 'Lojas e vendedoras ilimitadas', resumo: 'Tudo do Pro + inteligência avançada' },
 ]
 
 /**

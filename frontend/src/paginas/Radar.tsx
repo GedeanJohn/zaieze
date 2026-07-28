@@ -14,7 +14,16 @@ interface Oportunidade {
   clientesAlvo: number
   clienteIds: string[]
   mensagemSugerida: string
+  explicacaoIa: string
+  viaIa: boolean
 }
+
+interface Creditos { usados: number; limite: number; ok: boolean }
+interface EmpresaProspeccao {
+  id: string; nome: string; categoria: string | null; telefone: string | null; site: string | null
+  endereco: string | null; notaGoogle: string | null; totalAvaliacoes: number | null; horarioFuncionamento: string[] | null
+}
+interface BuscaProspeccao { id: string; segmento: string; cidade: string; uf: string; simulada: boolean; empresas: EmpresaProspeccao[] }
 
 export default function Radar() {
   const escopo = useLojaAtiva()
@@ -25,6 +34,16 @@ export default function Radar() {
   const avisar = useToast()
   const [enviando, setEnviando] = useState(false)
 
+  // Prospecção de empresas novas (créditos de IA Captador)
+  const [creditos, setCreditos] = useState<Creditos | null>(null)
+  const [segmento, setSegmento] = useState('')
+  const [cidade, setCidade] = useState('')
+  const [uf, setUf] = useState('')
+  const [tipoEmpresa, setTipoEmpresa] = useState('')
+  const [perfilIdeal, setPerfilIdeal] = useState('')
+  const [buscando, setBuscando] = useState(false)
+  const [resultadoBusca, setResultadoBusca] = useState<BuscaProspeccao | null>(null)
+
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
     const { data } = await api.get('/radar', { params: escopo.params })
@@ -32,6 +51,24 @@ export default function Radar() {
   }, [escopo.pronto, escopo.params])
 
   useEffect(() => { carregar() }, [carregar])
+
+  const carregarCreditos = useCallback(async () => {
+    if (!escopo.pronto) return
+    const { data } = await api.get('/radar/creditos', { params: escopo.params })
+    setCreditos(data)
+  }, [escopo.pronto, escopo.params])
+
+  useEffect(() => { carregarCreditos() }, [carregarCreditos])
+
+  async function buscarEmpresas(e: React.FormEvent) {
+    e.preventDefault()
+    setBuscando(true)
+    try {
+      const { data } = await api.post('/radar/prospeccao', { segmento, cidade, uf, tipoEmpresa: tipoEmpresa || undefined, perfilIdeal: perfilIdeal || undefined }, { params: escopo.params })
+      setResultadoBusca(data)
+      carregarCreditos()
+    } catch (e2) { avisar(mensagemDeErro(e2), 'erro') } finally { setBuscando(false) }
+  }
 
   async function confirmar() {
     if (!disparo) return
@@ -79,6 +116,7 @@ export default function Radar() {
             <div style={{ fontSize: 15 }}>
               🎯 <strong>{op.clientesAlvo}</strong> {t('radar.clientesPerfilSufixo')}
             </div>
+            <div style={{ fontSize: 13, color: 'var(--ink-soft)', fontStyle: 'italic' }}>💡 {op.explicacaoIa}</div>
             <button className="btn" style={{ marginTop: 'auto' }} onClick={() => setDisparo({ op, texto: op.mensagemSugerida })}>
               {t('radar.dispararCampanha')}
             </button>
@@ -88,6 +126,63 @@ export default function Radar() {
           <div className="cartao" style={{ color: 'var(--ink-soft)' }}>
             {t('radar.nenhumaOportunidade')}
           </div>
+        )}
+      </div>
+
+      {/* ── Prospecção de empresas novas (créditos de IA Captador) ── */}
+      <div className="cartao">
+        <h2 style={{ marginTop: 0 }}>
+          {t('radar.prospTitulo')}
+          {creditos && (
+            <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ink-soft)', marginLeft: 10 }}>
+              {t('radar.prospCreditos', { usados: creditos.usados, limite: creditos.limite })}
+            </span>
+          )}
+        </h2>
+        <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>{t('radar.prospExplicacao')}</p>
+
+        <form onSubmit={buscarEmpresas} className="linha-campos" style={{ alignItems: 'end' }}>
+          <div className="campo"><label>{t('radar.prospSegmentoLabel')}</label><input value={segmento} onChange={(e) => setSegmento(e.target.value)} required minLength={2} /></div>
+          <div className="campo"><label>{t('radar.prospCidadeLabel')}</label><input value={cidade} onChange={(e) => setCidade(e.target.value)} required minLength={2} /></div>
+          <div className="campo" style={{ maxWidth: 90 }}><label>{t('radar.prospUfLabel')}</label><input value={uf} onChange={(e) => setUf(e.target.value.toUpperCase())} maxLength={2} required /></div>
+          <div className="campo"><label>{t('radar.prospTipoEmpresaLabel')}</label><input value={tipoEmpresa} onChange={(e) => setTipoEmpresa(e.target.value)} /></div>
+          <div>
+            <button className="btn" disabled={buscando || (creditos ? !creditos.ok : false)}>
+              {buscando ? t('radar.prospBuscando') : t('radar.prospBuscarBtn')}
+            </button>
+          </div>
+        </form>
+        <div className="campo">
+          <label>{t('radar.prospPerfilIdealLabel')}</label>
+          <textarea rows={2} value={perfilIdeal} onChange={(e) => setPerfilIdeal(e.target.value)} />
+        </div>
+        {creditos && !creditos.ok && <div className="alerta">{t('radar.prospSemCreditos')}</div>}
+
+        {resultadoBusca && (
+          <>
+            {resultadoBusca.simulada && <div className="alerta" style={{ marginBottom: 10 }}>{t('radar.prospSimulado')}</div>}
+            <table style={{ marginTop: 10 }}>
+              <thead>
+                <tr>
+                  <th>{t('radar.prospColNome')}</th><th>{t('radar.prospColTelefone')}</th><th>{t('radar.prospColSite')}</th>
+                  <th>{t('radar.prospColEndereco')}</th><th>{t('radar.prospColNota')}</th><th>{t('radar.prospColHorario')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resultadoBusca.empresas.map((emp) => (
+                  <tr key={emp.id}>
+                    <td>{emp.nome}</td>
+                    <td>{emp.telefone ? <a href={`https://wa.me/${emp.telefone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">{emp.telefone}</a> : '—'}</td>
+                    <td>{emp.site ? <a href={emp.site} target="_blank" rel="noreferrer">site</a> : '—'}</td>
+                    <td style={{ fontSize: 12 }}>{emp.endereco ?? '—'}</td>
+                    <td>{emp.notaGoogle ? `★ ${emp.notaGoogle} (${emp.totalAvaliacoes ?? 0})` : '—'}</td>
+                    <td style={{ fontSize: 12 }}>{emp.horarioFuncionamento?.[0] ?? '—'}</td>
+                  </tr>
+                ))}
+                {resultadoBusca.empresas.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--ink-soft)' }}>{t('radar.prospNenhumaEmpresa')}</td></tr>}
+              </tbody>
+            </table>
+          </>
         )}
       </div>
 

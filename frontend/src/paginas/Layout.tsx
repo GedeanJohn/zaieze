@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
   Megaphone, Package, Tag, Layers, Boxes, UsersRound, Eye, Receipt,
   Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Wrench, Smartphone, Camera, Store, Shirt,
-  ChevronLeft, ChevronRight, ChevronDown, Bot, Landmark, Sparkles, Contact2, Building2,
+  ChevronLeft, ChevronRight, ChevronDown, Bot, Landmark, Sparkles, Contact2, Building2, Compass,
   type LucideIcon,
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, temAddon, usuarioLogado } from '../api'
@@ -133,7 +133,7 @@ export default function Layout() {
     { to: '/orcamentos', label: t('layout.orcamentos'), Icone: Receipt, mostrar: podeVendasClientes },
     { to: '/clientes', label: t('layout.clientes'), Icone: Users, mostrar: podeVendasClientes },
     { to: '/funil', label: t('layout.funil'), Icone: Filter, mostrar: podeVendasClientes && temFeature('funil') },
-    { to: '/radar', label: t('layout.radar'), Icone: Radar, mostrar: podeVendasClientes && temFeature('radar') },
+    { to: '/radar', label: t('layout.radar'), Icone: Radar, mostrar: podeVendasClientes && temAddon('RADAR') },
     { to: '/atacado', label: t('layout.atacado'), Icone: Package, mostrar: podeVendasClientes && temFeature('atacado') },
   ].filter((i) => i.mostrar)
 
@@ -185,6 +185,7 @@ export default function Layout() {
   const itensLeadsZaieze: ItemMenu[] = [
     { to: '/leads-zaieze', label: t('layout.leadsZaieze'), Icone: Contact2, mostrar: ehAdmin },
     { to: '/gestores-marca', label: t('layout.gestoresMarca'), Icone: Building2, mostrar: ehAdmin },
+    { to: '/prospeccao', label: t('layout.radarComercial'), Icone: Compass, mostrar: ehAdmin },
   ].filter((i) => i.mostrar)
 
   return (

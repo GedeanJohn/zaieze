@@ -82,9 +82,15 @@ export async function iniciarConexao(usuarioId: string): Promise<{ qrCode?: stri
   const existente = sessoes.get(usuarioId)
   if (existente?.sock?.user) return { conectado: true }
 
-  const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = await carregarBaileys()
+  const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, DisconnectReason } = await carregarBaileys()
   const { state, saveCreds } = await useMultiFileAuthState(sessionDir(usuarioId))
-  const sock = makeWASocket({ auth: state })
+  // A versão do protocolo do WhatsApp Web embutida no pacote `baileys` fica desatualizada com o
+  // tempo — a Meta passa a rejeitar a conexão ("Connection Failure" no handshake de registro,
+  // QR nunca chega a ser emitido). Buscar a versão mais recente a cada conexão evita esse problema
+  // se autoatualizar sozinho, em vez de depender de fixar manualmente um número de versão (como
+  // era preciso no antigo Evolution — ver zaieze-evolution-qr-quebrado, memória histórica).
+  const { version } = await fetchLatestBaileysVersion()
+  const sock = makeWASocket({ auth: state, version })
   sessoes.set(usuarioId, { sock })
 
   return new Promise((resolve) => {
@@ -113,12 +119,18 @@ export async function iniciarConexao(usuarioId: string): Promise<{ qrCode?: stri
       if (connection === 'close') {
         sessoes.delete(usuarioId)
         const status = (lastDisconnect?.error as { output?: { statusCode?: number } } | undefined)?.output?.statusCode
-        if (status !== DisconnectReason.loggedOut) {
-          // Sessão ainda válida (queda de rede, etc.) — reconecta sozinho com as credenciais salvas.
-          iniciarConexao(usuarioId).catch((e) => console.error('[baileys] falha ao reconectar', usuarioId, e))
-        } else {
+        if (status === DisconnectReason.loggedOut) {
           await marcarDesconectado(usuarioId)
           await fs.rm(sessionDir(usuarioId), { recursive: true, force: true }).catch(() => {})
+        } else if (state.creds.registered) {
+          // Sessão já tinha pareado antes (queda de rede, etc.) — reconecta sozinho com as credenciais salvas.
+          iniciarConexao(usuarioId).catch((e) => console.error('[baileys] falha ao reconectar', usuarioId, e))
+        } else {
+          // Falhou ANTES de completar o pareamento (ex.: handshake rejeitado) — não retenta sozinho
+          // pra não empilhar tentativas idênticas em loop; resolve agora pro chamador (tela de QR)
+          // mostrar o erro e deixar o usuário decidir se tenta de novo.
+          console.error('[baileys] falha ao parear (sem QR/login concluído)', usuarioId, lastDisconnect?.error)
+          resolver({})
         }
       }
     })

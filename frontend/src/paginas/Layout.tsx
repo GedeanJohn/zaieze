@@ -221,7 +221,7 @@ export default function Layout() {
       <div className="shell-corpo">
       <aside
         className={`sidebar ${menuAberto ? 'aberta' : ''} ${menuRecolhido ? 'recolhida' : ''}`}
-        onClick={(e) => { if ((e.target as HTMLElement).closest('a')) setMenuAberto(false) }}
+        onClick={(e) => { if ((e.target as HTMLElement).closest('a, .sidebar-nav button')) setMenuAberto(false) }}
       >
         <button
           type="button" className="sidebar-recolher"

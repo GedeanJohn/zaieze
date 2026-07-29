@@ -295,7 +295,7 @@ label { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 
 
 .modal-fundo {
   position: fixed; inset: 0; background: rgba(30, 20, 15, 0.45);
-  display: grid; place-items: center; z-index: 50;
+  display: grid; place-items: center; z-index: 70;
 }
 .modal {
   background: var(--surface); border-radius: 16px; padding: 28px; width: min(640px, 92vw);

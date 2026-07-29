@@ -442,6 +442,14 @@ function MeuWhatsAppPessoal() {
     finally { setOcupado(false) }
   }
 
+  // Desiste de uma tentativa travada (ex.: "Gerando QR Code..." sem nunca terminar) — libera a tela
+  // pra tentar de novo e avisa o servidor pra descartar a sessão pendente em vez de deixá-la solta.
+  async function cancelar() {
+    setOcupado(false)
+    setQrCode(null)
+    api.post('/whatsapp/pessoal/desconectar').catch(() => {})
+  }
+
   return (
     <div className="cartao">
       <h2 className="painel-titulo">
@@ -459,9 +467,16 @@ function MeuWhatsAppPessoal() {
       )}
 
       {!status?.conectado && !qrCode && (
-        <button type="button" className="btn" disabled={ocupado} onClick={conectar}>
-          {ocupado ? t('camp.pessoalGerandoQr') : t('camp.pessoalConectarBtn')}
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button type="button" className="btn" disabled={ocupado} onClick={conectar}>
+            {ocupado ? t('camp.pessoalGerandoQr') : t('camp.pessoalConectarBtn')}
+          </button>
+          {ocupado && (
+            <button type="button" className="btn secundario" onClick={cancelar}>
+              {t('camp.pessoalCancelar')}
+            </button>
+          )}
+        </div>
       )}
       {status?.conectado && (
         <button type="button" className="btn secundario" disabled={ocupado} onClick={desconectar}>

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { api, rotuloPapel, temFeature, temAddon, usuarioLogado } from '../api'
 import { useIdioma } from '../lib/i18n'
+import ManualModal from '../componentes/ManualModal'
 
 const ICON = { size: 18, strokeWidth: 1.75 } as const
 
@@ -19,7 +20,10 @@ function iniciais(nome: string): string {
 }
 
 interface ItemMenu {
-  to: string
+  /** Rota de navegação normal. Omitir quando o item usa `onClick` (ex.: abrir uma janela/modal). */
+  to?: string
+  /** Ação alternativa à navegação — ex.: abrir o Manual em janela sem sair da tela atual. */
+  onClick?: () => void
   label: string
   Icone: LucideIcon
   mostrar: boolean
@@ -40,8 +44,12 @@ function SecaoMenu({ titulo, itens, fechada, onToggle }: { titulo: string; itens
         <ChevronDown size={14} strokeWidth={2} style={{ transform: aberta ? undefined : 'rotate(-90deg)', transition: 'transform 0.15s ease' }} />
       </button>
       <div className="sidebar-secao-corpo" style={{ display: aberta ? 'flex' : 'none' }}>
-        {itens.map(({ to, label, Icone }) => (
-          <NavLink key={to} to={to} className={({ isActive }) => (isActive ? 'ativo' : '')} title={label}>
+        {itens.map(({ to, onClick, label, Icone }) => onClick ? (
+          <button key={label} type="button" onClick={onClick} title={label}>
+            <Icone {...ICON} /><span>{label}</span>
+          </button>
+        ) : (
+          <NavLink key={to} to={to!} className={({ isActive }) => (isActive ? 'ativo' : '')} title={label}>
             <Icone {...ICON} /><span>{label}</span>
           </NavLink>
         ))}
@@ -54,6 +62,7 @@ export default function Layout() {
   const usuario = usuarioLogado()!
   const navigate = useNavigate()
   const [menuAberto, setMenuAberto] = useState(false)
+  const [manualAberto, setManualAberto] = useState(false)
   // Sidebar recolhida (só ícones) no desktop — vale para qualquer perfil, preferência salva por navegador
   const [menuRecolhido, setMenuRecolhido] = useState(() => localStorage.getItem('zaieze_menu_recolhido') === '1')
   useEffect(() => { localStorage.setItem('zaieze_menu_recolhido', menuRecolhido ? '1' : '0') }, [menuRecolhido])
@@ -177,10 +186,15 @@ export default function Layout() {
 
   const itensInstitucional: ItemMenu[] = [
     { to: '/marca', label: t('layout.minhaLoja'), Icone: Palette, mostrar: ehDonoRede && temFeature('portal_cliente') },
-    { to: '/manual', label: t('layout.manual'), Icone: BookOpen, mostrar: ehDonoRede },
     { to: '/privacidade', label: t('layout.privacidade'), Icone: FileText, mostrar: ehDonoRede },
     { to: '/termos-uso', label: t('layout.termosDeUso'), Icone: FileText, mostrar: ehDonoRede },
   ].filter((i) => i.mostrar)
+
+  // Manual de instruções: um por perfil (Gestor/Gerente/Vendedora/Gestor de Estoque), aberto em
+  // janela a partir do menu — fora do accordion Institucional (que é só do dono da marca) porque
+  // todo mundo que vende ou opera estoque precisa dele, sempre visível perto de "Minha conta".
+  const papelComManual: 'GESTOR' | 'GERENTE' | 'VENDEDORA' | 'ESTOQUISTA' | null =
+    role === 'GESTOR' || role === 'GERENTE' || role === 'VENDEDORA' || role === 'ESTOQUISTA' ? role : null
 
   const itensLeadsZaieze: ItemMenu[] = [
     { to: '/leads-zaieze', label: t('layout.leadsZaieze'), Icone: Contact2, mostrar: ehAdmin },
@@ -203,6 +217,7 @@ export default function Layout() {
         )}
       </header>
       {menuAberto && <div className="menu-overlay" onClick={() => setMenuAberto(false)} />}
+      {manualAberto && papelComManual && <ManualModal papel={papelComManual} aoFechar={() => setManualAberto(false)} />}
       <div className="shell-corpo">
       <aside
         className={`sidebar ${menuAberto ? 'aberta' : ''} ${menuRecolhido ? 'recolhida' : ''}`}
@@ -232,6 +247,11 @@ export default function Layout() {
         <SecaoMenu titulo={t('layout.leadsZaieze')} itens={itensLeadsZaieze} fechada={!!secoesFechadas.leadsZaieze} onToggle={() => alternarSecao('leadsZaieze')} />
 
         {ehAdmin && <NavLink to="/admin" className={cls} title={t('layout.admin')}><Wrench {...ICON} /><span>{t('layout.admin')}</span></NavLink>}
+        {papelComManual && (
+          <button type="button" onClick={() => setManualAberto(true)} title={t('layout.manual')}>
+            <BookOpen {...ICON} /><span>{t('layout.manual')}</span>
+          </button>
+        )}
         <NavLink to="/conta" className={cls} title={t('layout.minhaConta')}><UserCog {...ICON} /><span>{t('layout.minhaConta')}</span></NavLink>
         </nav>
         <div className="rodape">

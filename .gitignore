@@ -6,7 +6,7 @@ dist/
 *.tsbuildinfo
 
 # Manuais em PDF (gerados localmente — não sobem para o servidor)
-manuais/
+/manuais/
 
 # Uploads em runtime (ex.: logo da marca)
 backend/uploads/

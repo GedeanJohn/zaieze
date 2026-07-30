@@ -23,6 +23,17 @@ interface Sessao {
 
 const sessoes = new Map<string, Sessao>()
 
+// QR mais recente por usuário (data URL). O WhatsApp ROTACIONA o QR sozinho a cada ~20-60s
+// enquanto ninguém escaneia — sem isso, a tela ficava com uma imagem parada/vencida, a câmera lia
+// normalmente mas o pareamento falhava (WhatsApp pedia "escaneie novamente" em loop, porque o
+// código lido já não era mais o atual do lado do servidor).
+const qrsAtuais = new Map<string, string>()
+
+/** QR code (data URL) mais recente pro usuário, se ainda estiver no meio do pareamento. */
+export function obterQrAtual(usuarioId: string): string | null {
+  return qrsAtuais.get(usuarioId) ?? null
+}
+
 let baileysMod: typeof import('baileys') | null = null
 async function carregarBaileys() {
   if (!baileysMod) baileysMod = await import('baileys')
@@ -140,9 +151,12 @@ export async function iniciarConexao(usuarioId: string): Promise<{ qrCode?: stri
       const { connection, qr, lastDisconnect } = update
       if (qr) {
         const { default: QRCode } = await import('qrcode')
-        resolver({ qrCode: await QRCode.toDataURL(qr) })
+        const dataUrl = await QRCode.toDataURL(qr)
+        qrsAtuais.set(usuarioId, dataUrl) // sempre atualiza, mesmo depois do 1º QR (rotação)
+        resolver({ qrCode: dataUrl })
       }
       if (connection === 'open') {
+        qrsAtuais.delete(usuarioId)
         const numero = numeroDoJid(state.creds.me?.id)
         await marcarConectado(usuarioId, numero)
         resolver({ conectado: true })
@@ -151,6 +165,7 @@ export async function iniciarConexao(usuarioId: string): Promise<{ qrCode?: stri
         sessoes.delete(usuarioId)
         const status = (lastDisconnect?.error as { output?: { statusCode?: number } } | undefined)?.output?.statusCode
         if (status === DisconnectReason.loggedOut) {
+          qrsAtuais.delete(usuarioId)
           await marcarDesconectado(usuarioId)
           await fs.rm(sessionDir(usuarioId), { recursive: true, force: true }).catch(() => {})
         } else if (state.creds.registered) {
@@ -182,6 +197,7 @@ export async function iniciarConexao(usuarioId: string): Promise<{ qrCode?: stri
 export async function desconectar(usuarioId: string): Promise<void> {
   const sessao = sessoes.get(usuarioId)
   sessoes.delete(usuarioId)
+  qrsAtuais.delete(usuarioId)
   if (sessao?.sock) {
     try { await sessao.sock.logout() } catch { /* pode já estar desconectado do lado da Meta */ }
   }

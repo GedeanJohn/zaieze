@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '../../lib/prisma'
 import { requireFeature } from '../../plugins/planos'
-import { iniciarConexao, desconectar } from './baileys.service'
+import { iniciarConexao, desconectar, obterQrAtual } from './baileys.service'
 
 /**
  * WhatsApp PESSOAL via QR Code (Baileys) — conexão individual da VENDEDORA, alternativa à
@@ -18,6 +18,9 @@ export async function whatsappPessoalRoutes(app: FastifyInstance) {
       conectado: usuario.waPessoalConectado,
       conectadoEm: usuario.waPessoalConectadoEm,
       numero: usuario.waPessoalNumero,
+      // QR rotaciona sozinho a cada ~20-60s enquanto ninguém escaneia — o front usa isto pra
+      // atualizar a imagem na tela em vez de deixar exibida uma versão já vencida.
+      qrCode: obterQrAtual(request.user.sub),
     }
   })
 

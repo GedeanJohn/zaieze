@@ -394,7 +394,7 @@ export default function Campanhas() {
 }
 
 // ── Meu WhatsApp (QR Code) — conexão pessoal da vendedora, alternativa ao número da marca ──
-interface StatusPessoal { conectado: boolean; conectadoEm: string | null; numero: string | null }
+interface StatusPessoal { conectado: boolean; conectadoEm: string | null; numero: string | null; qrCode?: string | null }
 
 function MeuWhatsAppPessoal() {
   const { t } = useIdioma()
@@ -410,6 +410,9 @@ function MeuWhatsAppPessoal() {
   useEffect(() => { carregarStatus() }, [carregarStatus])
 
   // Enquanto o QR está exibido, faz polling do status até a vendedora escanear (ou desistir).
+  // O WhatsApp rotaciona o QR sozinho a cada ~20-60s enquanto ninguém escaneia — sem atualizar a
+  // imagem aqui, a câmera lia um QR já vencido (pareamento falhava, pedindo "escaneie de novo" em
+  // loop). Toda vez que o servidor manda um QR mais novo, troca a imagem e reinicia a contagem.
   useEffect(() => {
     if (!qrCode) return
     let tentativas = 0
@@ -418,6 +421,7 @@ function MeuWhatsAppPessoal() {
       api.get('/whatsapp/pessoal/status').then(({ data }) => {
         setStatus(data)
         if (data.conectado) { setQrCode(null); clearInterval(id) }
+        else if (data.qrCode && data.qrCode !== qrCode) { setQrCode(data.qrCode) }
         else if (tentativas >= 20) { setQrCode(null); clearInterval(id); avisar(t('camp.pessoalTimeout')) }
       }).catch(() => {})
     }, 3000)

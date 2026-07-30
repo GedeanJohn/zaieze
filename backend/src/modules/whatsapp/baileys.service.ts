@@ -39,6 +39,31 @@ function numeroDoJid(jid?: string | null): string | null {
   return jid.split('@')[0].split(':')[0].replace(/\D/g, '') || null
 }
 
+/** Tipo de mídia recebida (imagem/áudio/vídeo) — só pra rotular a mensagem no Chat Zaieze.
+ * Decisão de produto: NÃO baixar/guardar o arquivo (a vendedora já vê a mídia no próprio celular,
+ * que é o dono real da conversa no WhatsApp pessoal) — evita gasto de memória/storage à toa.
+ * Diferente do canal oficial (Cloud API), onde não existe celular nenhum por trás do número. */
+function tipoDaMidiaBaileys(m: any): string | null {
+  const conteudo = m.message ?? {}
+  if (conteudo.imageMessage) return 'IMAGEM'
+  if (conteudo.audioMessage) return 'AUDIO'
+  if (conteudo.videoMessage) return 'VIDEO'
+  return null
+}
+
+/** Texto exibível no Chat Zaieze pra qualquer tipo de mensagem recebida (não só texto puro). */
+function textoDaMensagemBaileys(m: any): string | null {
+  const conteudo = m.message ?? {}
+  if (conteudo.conversation) return conteudo.conversation
+  if (conteudo.extendedTextMessage?.text) return conteudo.extendedTextMessage.text
+  if (conteudo.imageMessage) return conteudo.imageMessage.caption || '[imagem]'
+  if (conteudo.videoMessage) return conteudo.videoMessage.caption || '[vídeo]'
+  if (conteudo.audioMessage) return '[áudio]'
+  if (conteudo.stickerMessage) return '[figurinha]'
+  if (conteudo.documentMessage) return conteudo.documentMessage.fileName || '[documento]'
+  return null
+}
+
 async function marcarConectado(usuarioId: string, numero: string | null): Promise<void> {
   await prisma.usuario.update({
     where: { id: usuarioId },
@@ -54,8 +79,12 @@ async function marcarDesconectado(usuarioId: string): Promise<void> {
 }
 
 /** Encaminha uma mensagem recebida no WhatsApp pessoal — o dono já é conhecido (a própria vendedora
- * da sessão), sem a ambiguidade de roteamento que o webhook da Meta (número por marca) precisa resolver. */
-async function encaminharRecebida(usuarioId: string, numero: string, texto: string, nome?: string) {
+ * da sessão), sem a ambiguidade de roteamento que o webhook da Meta (número por marca) precisa resolver.
+ * Mídia (imagem/áudio/vídeo) vira só uma etiqueta na conversa — sem baixar o arquivo (ver `tipoDaMidiaBaileys`). */
+async function encaminharRecebida(usuarioId: string, numero: string, m: any, nome?: string) {
+  const texto = textoDaMensagemBaileys(m)
+  if (!texto) return // tipo de mensagem sem texto/mídia tratado (ex.: reação, enquete) — ignora
+
   const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId }, select: { lojaId: true } })
   if (!usuario?.lojaId) return
   const cliente = await prisma.cliente.upsert({
@@ -68,8 +97,10 @@ async function encaminharRecebida(usuarioId: string, numero: string, texto: stri
     select: { id: true, lojaId: true, vendedoraId: true, chatAtendimentoStatus: true, loja: { select: { redeId: true } } },
   })
   if (!cliente.vendedoraId) return
-  await registrarMensagemRecebida({ cliente: { ...cliente, vendedoraId: cliente.vendedoraId }, numero, texto, nome })
-    .catch((e) => console.error('[baileys] falha ao registrar mensagem recebida', usuarioId, e))
+  await registrarMensagemRecebida({
+    cliente: { ...cliente, vendedoraId: cliente.vendedoraId }, numero, texto, nome,
+    tipoMidia: tipoDaMidiaBaileys(m),
+  }).catch((e) => console.error('[baileys] falha ao registrar mensagem recebida', usuarioId, e))
 }
 
 /**
@@ -140,9 +171,8 @@ export async function iniciarConexao(usuarioId: string): Promise<{ qrCode?: stri
       for (const m of messages) {
         if (m.key?.fromMe) continue
         const numero = numeroDoJid(m.key?.remoteJid)
-        const texto = m.message?.conversation ?? m.message?.extendedTextMessage?.text
-        if (!numero || !texto) continue
-        await encaminharRecebida(usuarioId, numero, texto, m.pushName ?? undefined)
+        if (!numero) continue
+        await encaminharRecebida(usuarioId, numero, m, m.pushName ?? undefined)
       }
     })
   })

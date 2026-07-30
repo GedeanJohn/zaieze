@@ -84,6 +84,8 @@ export async function registrarMensagemRecebida(params: {
   numero: string
   texto: string
   nome?: string | null
+  /** Só etiqueta a mensagem (IMAGEM/AUDIO/VIDEO) — sem arquivo anexado (ver baileys.service.ts). */
+  tipoMidia?: string | null
 }): Promise<{ roteado: true; mensagemId: string; lojaId: string; novoLead: boolean }> {
   const { cliente } = params
 
@@ -104,6 +106,7 @@ export async function registrarMensagemRecebida(params: {
     data: {
       lojaId: cliente.lojaId, clienteId: cliente.id, vendedoraId: cliente.vendedoraId,
       direcao: 'RECEBIDA', status: 'RECEBIDA', origem: 'ENTRADA', telefone: params.numero, texto: params.texto,
+      tipoMidia: params.tipoMidia ?? null,
     },
   })
 

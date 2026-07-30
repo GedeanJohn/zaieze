@@ -30,6 +30,10 @@ interface Mensagem {
 }
 
 interface ChatStats { receitaMes: number; negociosAtivos: number; novosLeads: number; taxaConversao: number; metaMes: number | null; pctMeta: number | null }
+
+// Mídia recebida pelo WhatsApp pessoal (Baileys) vira só uma etiqueta — sem o arquivo em si
+// (a vendedora já vê no próprio celular, dono da conversa; ver baileys.service.ts no backend).
+const ROTULO_MIDIA: Record<string, string> = { IMAGEM: '📷 Imagem', AUDIO: '🎤 Áudio', VIDEO: '🎥 Vídeo' }
 interface ClienteLite { id: string; nome: string; telefone: string | null; segmento: string }
 interface Grupo { id: string; nome: string; membros: number; ultimaMensagem: string | null; ultimaEm: string }
 interface Disparo { id: string; texto: string; status: string; createdAt: string }
@@ -405,7 +409,16 @@ export default function CaixaEntrada() {
                       ? <audio className="cz-audio" src={m.midiaUrl} controls preload="none" />
                       : m.tipoMidia === 'IMAGEM' && m.midiaUrl
                         ? <a href={m.midiaUrl} target="_blank" rel="noreferrer"><img className="cz-img" src={m.midiaUrl} alt="" /></a>
-                        : <div>{m.texto}</div>}
+                        : m.tipoMidia && !m.midiaUrl
+                          // Cliente enviou mídia pelo WhatsApp pessoal (Baileys) — só a etiqueta,
+                          // sem baixar o arquivo (a vendedora já vê no próprio celular, dono da conversa).
+                          ? (
+                            <div>
+                              <span className="cz-etiqueta-midia">{ROTULO_MIDIA[m.tipoMidia] ?? m.tipoMidia}</span>
+                              {!['[imagem]', '[áudio]', '[vídeo]'].includes(m.texto) && <div className="cz-etiqueta-legenda">{m.texto}</div>}
+                            </div>
+                          )
+                          : <div>{m.texto}</div>}
                     <span className="cz-meta">
                       {hora(m.createdAt)}
                       {m.direcao === 'ENVIADA' && <> · <span style={m.status === 'LIDA' ? { color: '#53bdeb' } : undefined}>{recibo(m.status, t)}</span></>}

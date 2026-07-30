@@ -27,6 +27,10 @@ interface Mensagem {
 
 interface Vendedora { id: string; nome: string; role: string }
 
+// Mídia recebida pelo WhatsApp pessoal (Baileys) vira só uma etiqueta — sem o arquivo em si
+// (a vendedora já vê no próprio celular, dono da conversa; ver baileys.service.ts no backend).
+const ROTULO_MIDIA: Record<string, string> = { IMAGEM: '📷 Imagem', AUDIO: '🎤 Áudio', VIDEO: '🎥 Vídeo' }
+
 const POLL_MS = 18000
 const TITULO_PADRAO = document.title
 
@@ -207,7 +211,14 @@ export default function Supervisao() {
                           ? <audio className="cz-audio" src={m.midiaUrl} controls preload="none" />
                           : m.tipoMidia === 'IMAGEM' && m.midiaUrl
                             ? <a href={m.midiaUrl} target="_blank" rel="noreferrer"><img className="cz-img" src={m.midiaUrl} alt="" /></a>
-                            : <div>{m.texto}</div>}
+                            : m.tipoMidia && !m.midiaUrl
+                              ? (
+                                <div>
+                                  <span className="cz-etiqueta-midia">{ROTULO_MIDIA[m.tipoMidia] ?? m.tipoMidia}</span>
+                                  {!['[imagem]', '[áudio]', '[vídeo]'].includes(m.texto) && <div className="cz-etiqueta-legenda">{m.texto}</div>}
+                                </div>
+                              )
+                              : <div>{m.texto}</div>}
                         <span className="cz-meta">
                           {hora(m.createdAt)}
                           {m.direcao === 'ENVIADA' && <> · <span style={m.status === 'LIDA' ? { color: '#53bdeb' } : undefined}>{recibo(m.status, t)}</span></>}

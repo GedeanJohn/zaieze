@@ -905,6 +905,9 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 /* Balão de áudio compacto, em superfície escura (player nativo integra melhor que sobre o gradiente). */
 .cz-bolha:has(.cz-audio) { padding: 6px; max-width: 240px; }
 .cz-bolha.saida:has(.cz-audio) { background: #241f33; color: #ece9f5; }
+/* Etiqueta de mídia recebida pelo WhatsApp pessoal (sem arquivo anexado — ver CaixaEntrada.tsx) */
+.cz-etiqueta-midia { display: inline-block; font-size: 13px; font-weight: 600; opacity: 0.9; }
+.cz-etiqueta-legenda { margin-top: 4px; font-size: 13px; }
 .cz-btn { background: linear-gradient(135deg, #a855f7, #ec4899); border: none; color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .cz-voltar { display: none; background: var(--cz-surf2); border: 1px solid var(--cz-line); color: var(--cz-tx); border-radius: 10px; padding: 4px 11px; font-size: 16px; cursor: pointer; }
 .cz-alerta { margin: 0 12px; background: #4a1d1d; color: #ffb4b4; border-radius: 10px; padding: 8px 12px; font-size: 13px; }

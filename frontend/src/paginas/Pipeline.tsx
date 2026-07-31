@@ -109,14 +109,17 @@ function ColunaDrop({ etapa, children }: { etapa: Etapa; children: ReactNode }) 
   )
 }
 
-// Card do cliente. No desktop é ARRASTÁVEL (alça ⠿) — mudança de etapa só por arrastar. No
-// celular (aoMover presente) a alça some e vira um botão "Mover etapa" que abre um menu (ver
-// SheetMoverEtapa) — arrastar entre colunas distantes não funciona bem numa tela estreita.
-// Clicar no nome/telefone abre a conversa do cliente no Chat Zaieze.
-function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, aoMover, t }: {
+// Card do cliente. No desktop é ARRASTÁVEL (alça ⠿) E também tem o botão "Mover etapa" (menu) como
+// caminho garantido — o arrastar depende de o navegador/coluna cooperar (relatado quebrando em
+// alguns casos só pra soltar fora da coluna de origem), então o menu fica sempre disponível como
+// alternativa que não depende de drag-and-drop. No celular a alça some (não cabe/não funciona bem
+// numa tela estreita) e só o botão "Mover etapa" aparece. Clicar no nome/telefone abre a conversa
+// do cliente no Chat Zaieze.
+function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, aoMover, arrastavel, t }: {
   c: Card; redistribuir: (c: Card) => void; podeRedistribuir: boolean; abrirChat: (clienteId: string) => void
   verPedido: (pedido: PedidoCatalogo, etapa: Etapa) => void
   aoMover?: (c: Card) => void
+  arrastavel?: boolean
   t: (chave: string, vars?: Record<string, string | number>) => string
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: c.id, data: { card: c } })
@@ -127,9 +130,9 @@ function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, aoM
   const pedido = c.pedidosCatalogo?.[0]
   const avaliacao = c.cliente?.avaliacoes?.[0]
   return (
-    <div ref={aoMover ? undefined : setNodeRef} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `4px solid ${ct ?? c.situacao.cor}`, background: ct ? `${ct}22` : undefined, opacity: isDragging ? 0.4 : 1, userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
+    <div ref={arrastavel ? setNodeRef : undefined} className="cartao" style={{ padding: 10, marginBottom: 8, borderLeft: `4px solid ${ct ?? c.situacao.cor}`, background: ct ? `${ct}22` : undefined, opacity: isDragging ? 0.4 : 1, userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-        {!aoMover && (
+        {arrastavel && (
           <button type="button" {...attributes} {...listeners} title={t('pipe.arrastarParaMudar')} aria-label={t('pipe.arrastarCard')}
             style={{ cursor: 'grab', touchAction: 'none', border: 'none', background: 'none', color: 'var(--ink-soft)', fontSize: 24, padding: '2px 4px', lineHeight: 1, alignSelf: 'stretch' }}>⠿</button>
         )}
@@ -443,7 +446,8 @@ export default function Pipeline() {
                   </div>
                   {cards.map((c) => (
                     <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat}
-                      verPedido={(pedido, etapa) => { setPedidoAberto(pedido); setPedidoAbertoEtapa(etapa) }} t={t} />
+                      verPedido={(pedido, etapa) => { setPedidoAberto(pedido); setPedidoAbertoEtapa(etapa) }}
+                      aoMover={(card) => setCardMoverMobile(card)} arrastavel t={t} />
                   ))}
                   {cards.length === 0 && <div style={{ color: 'var(--ink-soft)', fontSize: 12, padding: 6 }}>—</div>}
                 </ColunaDrop>

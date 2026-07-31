@@ -234,6 +234,14 @@ export async function redistribuirLead(leadId: string, novaVendedoraId: string, 
   })
 }
 
+/** Teto de redistribuições automáticas por ciclo — passado isso, fica "atrasado" parado em ENTROU
+ * esperando uma ação manual (gestor/gerente vê o alerta de atraso) em vez de girar entre vendedoras
+ * pra sempre. Sem esse limite, um lead que nunca é atendido por ninguém redistribui indefinidamente
+ * a cada SLA estourado (visto em produção: ciclos de teste com 1000+ redistribuições). Redistribuição
+ * MANUAL (botão "Redistribuir", clique do gestor/gerente) não tem esse teto — é uma decisão humana.
+ */
+const TETO_REDISTRIBUICOES_AUTO = 5
+
 /**
  * Redistribui automaticamente os ciclos que estouraram o SLA de ENTROU (sem 1ª resposta),
  * apenas nas redes com auto-redistribuição ligada. Retorna quantos foram redistribuídos.
@@ -241,7 +249,10 @@ export async function redistribuirLead(leadId: string, novaVendedoraId: string, 
 export async function redistribuirAtrasados(): Promise<number> {
   const agora = new Date()
   const atrasados = await prisma.lead.findMany({
-    where: { status: 'ENTROU', prazoEm: { lt: agora }, loja: { rede: { slaAutoRedistribuir: true } } },
+    where: {
+      status: 'ENTROU', prazoEm: { lt: agora }, loja: { rede: { slaAutoRedistribuir: true } },
+      redistribuicoes: { lt: TETO_REDISTRIBUICOES_AUTO },
+    },
     select: { id: true, lojaId: true, vendedoraId: true, loja: { select: { redeId: true } } },
     take: 200,
   })

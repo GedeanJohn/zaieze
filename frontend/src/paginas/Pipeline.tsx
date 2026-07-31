@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors, useDraggable, useDroppable,
+  DndContext, DragOverlay, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, useDraggable, useDroppable,
   type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core'
 import { api, mensagemDeErro, usuarioLogado } from '../api'
@@ -308,8 +308,12 @@ export default function Pipeline() {
   }
 
   // Drag-and-drop (desktop = mouse; mobile = pressionar e segurar p/ não brigar com o scroll).
+  // MouseSensor (não PointerSensor) — eventos de mouse "clássicos" (mousedown/mousemove/mouseup),
+  // sem passar pela API de Pointer Events; e closestCenter (não o rectIntersection padrão) — decide
+  // a coluna de destino pelo CENTRO mais próximo do ponto onde soltou, mais tolerante que exigir
+  // intersecção exata de retângulos, principalmente perto da borda de colunas adjacentes.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
   )
   const [arrastando, setArrastando] = useState<Card | null>(null)
@@ -318,7 +322,10 @@ export default function Pipeline() {
     setArrastando(null)
     const card = e.active.data.current?.card as Card | undefined
     const destino = e.over?.id as Etapa | undefined
-    if (card && destino && ETAPAS.includes(destino) && destino !== card.status) mover(card, destino)
+    if (!card) { console.warn('[funil] soltou sem um card de origem identificado', e); return }
+    if (!destino) { console.warn('[funil] soltou fora de qualquer coluna', e); return }
+    if (!ETAPAS.includes(destino)) { console.warn('[funil] destino não é uma etapa válida', destino); return }
+    if (destino !== card.status) mover(card, destino)
   }
 
   const m = pipe?.metricas
@@ -428,7 +435,7 @@ export default function Pipeline() {
         </div>
       )}
 
-      <DndContext sensors={sensors} onDragStart={aoIniciarArrasto} onDragEnd={aoSoltar}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={aoIniciarArrasto} onDragEnd={aoSoltar}>
         {/* Kanban com arrastar-e-soltar (alça ⠿) — só desktop (≥861px). No celular, uma tela com 6
             colunas de 180px não cabe — vira abas de etapa + lista vertical (funil-mobile abaixo). */}
         <div className="funil-desktop-only">

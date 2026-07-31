@@ -127,13 +127,15 @@ function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, aoM
   arrastavel?: boolean
   t: (chave: string, vars?: Record<string, string | number>) => string
 }) {
-  // `disabled: !arrastavel` é essencial aqui: a lista mobile (escondida por CSS, mas continua
-  // MONTADA no DOM) renderiza o card da aba selecionada (por padrão "Entrou") com o MESMO id do
-  // card do Kanban desktop — sem isso, os dois `useDraggable` com o mesmo id competem pelo mesmo
-  // registro no dnd-kit, e a versão mobile (sem alça, sem `setNodeRef`) nunca mede um retângulo,
-  // zerando a medição do card ativo (sintoma real visto em produção: over/collisions sempre null
-  // ao soltar um card que começou em "Entrou").
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: c.id, data: { card: c }, disabled: !arrastavel })
+  // ID ÚNICO por instância é essencial aqui: a lista mobile (escondida por CSS, mas continua
+  // MONTADA no DOM) renderiza o card da aba selecionada (por padrão "Entrou") — se usasse o MESMO
+  // id do card do Kanban desktop, os dois `useDraggable` colidiriam no registro interno do dnd-kit
+  // (o `disabled` sozinho não evita isso, só impede o clique de ativar o arrastar). A versão mobile
+  // nunca mede um retângulo (sem alça, sem `setNodeRef`) e, colidindo pelo id, zerava a medição do
+  // card ativo mesmo pro Kanban desktop — sintoma real visto em produção: over/collisions sempre
+  // null ao soltar um card que começou em "Entrou" (a aba mobile padrão).
+  const idArrasto = arrastavel ? c.id : `mobile-${c.id}`
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: idArrasto, data: { card: c }, disabled: !arrastavel })
   const ct = corTempoEspera(c)
   const clienteId = c.cliente?.id ?? null
   const nome = c.cliente?.nome ?? c.nome ?? '—'

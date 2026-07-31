@@ -168,8 +168,12 @@ export async function iniciarConexao(usuarioId: string): Promise<{ qrCode?: stri
           qrsAtuais.delete(usuarioId)
           await marcarDesconectado(usuarioId)
           await fs.rm(sessionDir(usuarioId), { recursive: true, force: true }).catch(() => {})
-        } else if (state.creds.registered) {
-          // Sessão já tinha pareado antes (queda de rede, etc.) — reconecta sozinho com as credenciais salvas.
+        } else if (status === DisconnectReason.restartRequired || state.creds.registered) {
+          // restartRequired (515): a Meta SEMPRE fecha a conexão logo depois do celular escanear o QR
+          // e pede um reinício — é parte normal do protocolo, não uma falha. Sem reconectar aqui, o
+          // pareamento nunca terminava: o celular mostrava "Não foi possível conectar" mesmo com o
+          // QR lido certinho. `state.creds.registered` cobre o caso de sessão já pareada antes
+          // (queda de rede, etc.) reconectando sozinha com as credenciais salvas.
           iniciarConexao(usuarioId).catch((e) => console.error('[baileys] falha ao reconectar', usuarioId, e))
         } else {
           // Falhou ANTES de completar o pareamento (ex.: handshake rejeitado) — não retenta sozinho

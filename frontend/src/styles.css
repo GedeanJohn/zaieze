@@ -223,8 +223,14 @@ input, select, textarea {
 input[type="checkbox"], input[type="radio"] { width: auto; padding: 0; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
 label { font-size: 13px; color: var(--ink-soft); display: block; margin-bottom: 4px; }
-.campo { margin-bottom: 14px; }
+.campo { margin-bottom: 14px; min-width: 0; }
+/* min-width:0 nos itens é essencial: por padrão, item de grid tem min-width:auto e nunca encolhe
+   além do tamanho "natural" do conteúdo (ex.: um texto de descrição sem quebra) — em telas menores
+   (1366x768 é a resolução mais comum), isso empurrava o grid pra fora da largura da tela. Como
+   html/body tem overflow-x:clip (evita scroll horizontal acidental em outras telas), o conteúdo
+   excedente simplesmente sumia, sem barra de rolagem nem aviso nenhum. */
 .linha-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.linha-campos > * { min-width: 0; }
 
 .selo {
   display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;

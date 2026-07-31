@@ -127,7 +127,13 @@ function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, aoM
   arrastavel?: boolean
   t: (chave: string, vars?: Record<string, string | number>) => string
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: c.id, data: { card: c } })
+  // `disabled: !arrastavel` é essencial aqui: a lista mobile (escondida por CSS, mas continua
+  // MONTADA no DOM) renderiza o card da aba selecionada (por padrão "Entrou") com o MESMO id do
+  // card do Kanban desktop — sem isso, os dois `useDraggable` com o mesmo id competem pelo mesmo
+  // registro no dnd-kit, e a versão mobile (sem alça, sem `setNodeRef`) nunca mede um retângulo,
+  // zerando a medição do card ativo (sintoma real visto em produção: over/collisions sempre null
+  // ao soltar um card que começou em "Entrou").
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: c.id, data: { card: c }, disabled: !arrastavel })
   const ct = corTempoEspera(c)
   const clienteId = c.cliente?.id ?? null
   const nome = c.cliente?.nome ?? c.nome ?? '—'

@@ -2,8 +2,13 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   DndContext, DragOverlay, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, useDraggable, useDroppable,
-  type DragEndEvent, type DragStartEvent,
+  MeasuringStrategy, type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core'
+
+// Remede a posição das colunas continuamente durante o arrastar (não só uma vez, no início) — o
+// Kanban tem rolagem horizontal, e uma medição só-no-início pode ficar desatualizada, fazendo o
+// dnd-kit não achar nenhuma coluna válida na hora de soltar (sintoma: onDragEnd com over: null).
+const MEDICAO_CONTINUA = { droppable: { strategy: MeasuringStrategy.Always } }
 import { api, mensagemDeErro, usuarioLogado } from '../api'
 import { urlCatalogo } from '../host'
 import { useLojaAtiva, SeletorLoja } from '../componentes/SeletorLoja'
@@ -323,7 +328,12 @@ export default function Pipeline() {
     const card = e.active.data.current?.card as Card | undefined
     const destino = e.over?.id as Etapa | undefined
     if (!card) { console.warn('[funil] soltou sem um card de origem identificado', e); return }
-    if (!destino) { console.warn('[funil] soltou fora de qualquer coluna', e); return }
+    if (!destino) {
+      console.warn('[funil] soltou fora de qualquer coluna', {
+        origem: card.status, delta: e.delta, activeRect: e.active.rect.current, collisions: e.collisions,
+      })
+      return
+    }
     if (!ETAPAS.includes(destino)) { console.warn('[funil] destino não é uma etapa válida', destino); return }
     if (destino !== card.status) mover(card, destino)
   }
@@ -435,7 +445,7 @@ export default function Pipeline() {
         </div>
       )}
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={aoIniciarArrasto} onDragEnd={aoSoltar}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} measuring={MEDICAO_CONTINUA} onDragStart={aoIniciarArrasto} onDragEnd={aoSoltar}>
         {/* Kanban com arrastar-e-soltar (alça ⠿) — só desktop (≥861px). No celular, uma tela com 6
             colunas de 180px não cabe — vira abas de etapa + lista vertical (funil-mobile abaixo). */}
         <div className="funil-desktop-only">

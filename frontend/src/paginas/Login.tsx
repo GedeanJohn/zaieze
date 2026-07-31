@@ -37,7 +37,7 @@ export default function Login() {
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={entrar}>
-        <h1>Zaieze</h1>
+        <h1><a href="https://zaieze.com" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>Zaieze</a></h1>
         <p className="login-lema">{t('footer.tagline')}</p>
         {erro && <div className="alerta">{erro}</div>}
         <div className="campo">
@@ -83,7 +83,7 @@ function EsqueciSenha({ onVoltar }: { onVoltar: () => void }) {
   return (
     <div className="login-wrap">
       <div className="login-card">
-        <h1>Zaieze</h1>
+        <h1><a href="https://zaieze.com" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>Zaieze</a></h1>
         {!resultado ? (
           <form onSubmit={enviar}>
             {modo === 'telefone' ? (

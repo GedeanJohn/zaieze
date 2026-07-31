@@ -472,7 +472,7 @@ export default function Pipeline() {
                   {cards.map((c) => (
                     <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat}
                       verPedido={(pedido, etapa) => { setPedidoAberto(pedido); setPedidoAbertoEtapa(etapa) }}
-                      aoMover={(card) => setCardMoverMobile(card)} arrastavel t={t} />
+                      arrastavel t={t} />
                   ))}
                   {cards.length === 0 && <div style={{ color: 'var(--ink-soft)', fontSize: 12, padding: 6 }}>—</div>}
                 </ColunaDrop>

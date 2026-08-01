@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Menu, Search, Sparkles, ChevronRight, MoreHorizontal } from 'lucide-react'
 import { api, mensagemDeErro, formataReal } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
@@ -94,6 +95,7 @@ export default function CaixaEntrada() {
   const avisar = useToast()
   const [searchParams] = useSearchParams()
   const abriuParam = useRef(false)
+  const buscaRef = useRef<HTMLInputElement>(null)
   const [stats, setStats] = useState<ChatStats | null>(null)
 
   const [conversas, setConversas] = useState<Conversa[]>([])
@@ -308,6 +310,28 @@ export default function CaixaEntrada() {
   return (
     <div className={`cz-pagina${temSel ? ' zen' : ''}`}>
       {!temSel && (
+        <div className="cz-multicanal-topo">
+          <div className="cz-multicanal-linha">
+            <button type="button" className="cz-multicanal-icone" onClick={() => window.dispatchEvent(new CustomEvent('zz:abrir-menu'))} aria-label={t('layout.mais')}>
+              <Menu size={19} strokeWidth={1.8} />
+            </button>
+            <div className="cz-multicanal-marca">
+              <strong>ZAIEZE</strong>
+              <span>MULTICANAL</span>
+            </div>
+            <div className="cz-multicanal-acoes">
+              <button type="button" className="cz-multicanal-icone" onClick={() => buscaRef.current?.focus()} aria-label={t('caixa.buscarConversas')}>
+                <Search size={17} strokeWidth={1.8} />
+              </button>
+              <button type="button" className="cz-multicanal-icone" title="ZAI.AI" aria-hidden="true">
+                <Sparkles size={17} strokeWidth={1.8} />
+              </button>
+            </div>
+          </div>
+          <div className="cz-multicanal-arco" aria-hidden="true" />
+        </div>
+      )}
+      {!temSel && (
         <div className="cz-topo">
           <SeletorLoja escopo={escopo} />
         </div>
@@ -328,6 +352,9 @@ export default function CaixaEntrada() {
               <span className={`cz-canal-ico ${c.chave}`}><c.Icone size={13} /></span>{c.rotulo}
             </button>
           ))}
+          <button type="button" className="cz-canal-tab" disabled title={t('caixa.canalEmBreve')} onClick={() => clicarCanalFuturo(t('caixa.canalMais'))}>
+            <span className="cz-canal-ico mais"><MoreHorizontal size={15} /></span>{t('caixa.canalMais')}
+          </button>
         </div>
       )}
 
@@ -344,6 +371,7 @@ export default function CaixaEntrada() {
             <div className="cz-ai-metrica"><strong>{stats?.tempoMedioRespostaMin != null ? `${stats.tempoMedioRespostaMin}min` : '—'}</strong><span>{t('caixa.aiTempoMedio')}</span></div>
             <div className="cz-ai-metrica"><strong>{stats?.satisfacaoPct != null ? `${stats.satisfacaoPct}%` : '—'}</strong><span>{t('caixa.aiSatisfacao')}</span></div>
           </div>
+          <ChevronRight size={18} className="cz-ai-seta" aria-hidden="true" />
         </div>
       )}
 
@@ -360,7 +388,7 @@ export default function CaixaEntrada() {
         {/* Lista (conversas ou grupos) */}
         <aside className="cz-lista">
           <div className="cz-lista-top">
-            <input className="cz-busca" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={filtro === 'GRUPOS' ? t('caixa.buscarGrupos') : t('caixa.buscarConversas')} />
+            <input ref={buscaRef} className="cz-busca" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={filtro === 'GRUPOS' ? t('caixa.buscarGrupos') : t('caixa.buscarConversas')} />
             <div className="cz-tabs">
               <button type="button" className={`cz-tab${filtro === 'NOVIDADES' ? ' ativo' : ''}`} onClick={() => { setFiltro('NOVIDADES'); setGrupoSel(null) }}>{t('caixa.novidades')}</button>
               <button type="button" className={`cz-tab${filtro === 'NAO_LIDAS' ? ' ativo' : ''}`} onClick={() => { setFiltro('NAO_LIDAS'); setGrupoSel(null) }}>

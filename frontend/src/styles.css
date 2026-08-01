@@ -43,6 +43,9 @@ a { color: var(--accent); text-decoration: none; }
   background: #0a0a0b; color: #f3f3f3; padding: 10px 20px;
   position: sticky; top: 0; z-index: 40; border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
+/* Chat Zaieze tem seu próprio cabeçalho ("ZAIEZE MULTICANAL", ver .cz-multicanal-topo) —
+   esconde a barra genérica do app pra não duplicar, em qualquer tamanho de tela. */
+.app-shell:has(.cz-pagina) .topbar { display: none; }
 .marca-zaieze { font-family: var(--marca); font-weight: 600; font-size: 24px; letter-spacing: 0.10em; color: #fff; line-height: 1; }
 .menu-toggle { display: none; background: none; border: none; color: #f5efe9; cursor: pointer; padding: 0 2px; align-items: center; }
 .topbar-perfil {
@@ -844,6 +847,27 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 /* Estatísticas da vendedora no topo do chat */
 .cz-topo { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
 
+/* ── Cabeçalho próprio do Chat Zaieze ("ZAIEZE MULTICANAL") — substitui a topbar genérica do app
+   só nesta tela (ver .app-shell:has(.cz-pagina) .topbar acima). Arco decorativo por baixo,
+   conectando visualmente até a barra de canais (⌒). ── */
+.cz-multicanal-topo { position: relative; padding: 6px 2px 26px; margin-bottom: -10px; }
+.cz-multicanal-linha { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.cz-multicanal-icone {
+  width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04); color: #f4f2f8; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+}
+.cz-multicanal-icone:hover { background: rgba(255, 255, 255, 0.1); }
+.cz-multicanal-marca { text-align: center; flex: 1; }
+.cz-multicanal-marca strong { font-family: var(--marca); font-size: 22px; letter-spacing: 0.14em; color: #fff; line-height: 1; }
+.cz-multicanal-marca span { display: block; font-size: 8.5px; letter-spacing: 0.32em; color: #9a95a8; margin-top: 3px; }
+.cz-multicanal-acoes { display: flex; gap: 8px; flex-shrink: 0; }
+.cz-multicanal-arco {
+  position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+  width: min(420px, 90%); height: 20px; border-top: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%; pointer-events: none;
+}
+
 /* ── Abas de canal (Todas/WhatsApp/Instagram/Messenger/Email/Telegram) ── */
 .cz-canais { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 14px; }
 .cz-canal-tab {
@@ -862,10 +886,13 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 }
 .cz-canal-tab:disabled { cursor: not-allowed; opacity: 0.45; }
 .cz-canal-tab .cz-canal-ico.wa { background: #25d366; color: #fff; }
-.cz-canal-tab .cz-canal-ico.instagram { background: radial-gradient(circle at 30% 110%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%); color: #fff; }
+.cz-canal-tab .cz-canal-ico.instagram { background: radial-gradient(circle at 30% 110%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%); color: #fff; border-radius: 9px; }
 .cz-canal-tab .cz-canal-ico.messenger { background: linear-gradient(135deg, #00b2ff, #a033ff, #ff5280); color: #fff; }
 .cz-canal-tab .cz-canal-ico.email { background: #6b7280; color: #fff; }
 .cz-canal-tab .cz-canal-ico.telegram { background: #29a9eb; color: #fff; }
+.cz-canal-tab .cz-canal-ico.mais { background: rgba(255, 255, 255, 0.08); color: #cfcbe0; font-weight: 800; }
+
+.cz-ai-seta { color: #6b7280; flex-shrink: 0; margin-left: 4px; }
 
 /* ── Card "ZAI.AI" — resumo da IA de atendimento, estilo do mockup ── */
 .cz-ai-card {

@@ -66,6 +66,14 @@ export default function Layout() {
   // Sidebar recolhida (só ícones) no desktop — vale para qualquer perfil, preferência salva por navegador
   const [menuRecolhido, setMenuRecolhido] = useState(() => localStorage.getItem('zaieze_menu_recolhido') === '1')
   useEffect(() => { localStorage.setItem('zaieze_menu_recolhido', menuRecolhido ? '1' : '0') }, [menuRecolhido])
+  // O cabeçalho próprio do Chat Zaieze (visual "ZAIEZE MULTICANAL", ver CaixaEntrada.tsx) tem seu
+  // próprio botão de menu (☰), fora da árvore deste componente — abre a sidebar por evento global
+  // em vez de prop-drilling um controller até uma página específica.
+  useEffect(() => {
+    const abrir = () => setMenuAberto(true)
+    window.addEventListener('zz:abrir-menu', abrir)
+    return () => window.removeEventListener('zz:abrir-menu', abrir)
+  }, [])
   // Seções do menu colapsadas (accordion) — preferência salva por navegador, mesmo espírito do recolhido acima.
   const [secoesFechadas, setSecoesFechadas] = useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem('zaieze_menu_secoes_fechadas') ?? '{}') } catch { return {} }

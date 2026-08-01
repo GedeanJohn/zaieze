@@ -870,15 +870,24 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   border-radius: 50%; pointer-events: none;
   box-shadow: 0 -1px 16px 1px rgba(255, 255, 255, 0.28), 0 2px 24px rgba(255, 255, 255, 0.1);
 }
-.cz-multicanal-busca {
-  display: flex; align-items: center; gap: 8px; margin-top: 10px;
-  background: rgba(255, 255, 255, 0.06); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 11px; padding: 9px 12px; color: #9a95a8;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 18px rgba(255, 255, 255, 0.08);
+/* ── Barra de busca única, fixa logo abaixo do card ZAI.AI (mockup) ── */
+.cz-busca-topo {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding: 10px 14px;
+  color: #9a95a8; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 13px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 20px rgba(255, 255, 255, 0.06);
 }
-.cz-multicanal-busca input { flex: 1; background: none; border: none; outline: none; color: #f4f2f8; font-size: 13px; }
-.cz-multicanal-busca input::placeholder { color: #9a95a8; }
+.cz-busca-topo input { flex: 1; background: none; border: none; outline: none; color: #f4f2f8; font-size: 13.5px; }
+.cz-busca-topo input::placeholder { color: #9a95a8; }
+.cz-busca-filtro {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.16); color: #cfcbe0; cursor: pointer;
+}
+@media (max-width: 720px) {
+  .cz-busca-topo { padding: 8px 12px; margin-bottom: 8px; gap: 8px; }
+  .cz-busca-topo input { font-size: 12px; }
+  .cz-busca-filtro { width: 26px; height: 26px; border-radius: 8px; }
+}
 
 /* ── Abas de canal (Todas/WhatsApp/Instagram/Messenger/Email/Telegram) ── */
 .cz-canais { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 14px; }
@@ -897,6 +906,12 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-canal-tab.ativo {
   color: #f4f2f8; border-color: rgba(255, 255, 255, 0.5); background: rgba(255, 255, 255, 0.1);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.3), 0 0 26px rgba(255, 255, 255, 0.22);
+}
+/* Ícone "Todas" (grade de pontos): housing em quadrado arredondado com brilho próprio quando ativo,
+   pra se distinguir dos badges circulares dos outros canais — como no mockup. */
+.cz-canal-tab.ativo .cz-canal-ico:not(.wa):not(.instagram):not(.messenger):not(.email):not(.telegram):not(.mais) {
+  border-radius: 9px; background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6), 0 0 14px rgba(255, 255, 255, 0.4);
 }
 .cz-canal-tab:disabled { cursor: not-allowed; opacity: 0.45; }
 .cz-canal-tab .cz-canal-ico.wa { background: #25d366; color: #fff; }
@@ -917,6 +932,13 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 0 1px rgba(255, 255, 255, 0.05),
     0 0 40px rgba(255, 255, 255, 0.08), 0 20px 50px rgba(0, 0, 0, 0.5);
 }
+.cz-ai-avatar-orbita { position: relative; flex: 0 0 auto; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; }
+.cz-ai-anel {
+  position: absolute; inset: -9px; width: calc(100% + 18px); height: calc(100% + 18px);
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.5));
+  animation: cz-orbita-spin 10s linear infinite;
+}
+@keyframes cz-orbita-spin { to { transform: rotate(360deg); } }
 .cz-ai-avatar {
   width: 52px; height: 52px; border-radius: 50%; flex: 0 0 auto; position: relative;
   display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; color: #0a0a10;
@@ -930,24 +952,24 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-ai-status { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #4ade80; margin-top: 4px; font-weight: 600; }
 .cz-ai-status-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 8px #4ade80; }
 .cz-ai-metricas { display: flex; gap: 22px; flex: 0 0 auto; }
-.cz-ai-metrica { text-align: center; }
-.cz-ai-metrica strong { display: block; font-size: 18px; font-weight: 800; font-family: var(--fonte-titulo); color: #f4f2f8; }
-.cz-ai-metrica span { font-size: 10.5px; color: #9a95a8; white-space: nowrap; }
+.cz-ai-metrica { display: flex; flex-direction: column; align-items: center; gap: 1px; text-align: center; }
+.cz-ai-metrica strong { font-size: 18px; font-weight: 800; font-family: var(--fonte-titulo); color: #f4f2f8; line-height: 1.15; }
+.cz-ai-metrica-topo, .cz-ai-metrica-baixo { font-size: 10px; color: #9a95a8; white-space: nowrap; line-height: 1.2; }
 @media (max-width: 720px) {
   .cz-multicanal-topo { padding: 2px 0 14px; }
   .cz-multicanal-icone { width: 32px; height: 32px; border-radius: 9px; }
   .cz-multicanal-marca strong { font-size: 16px; letter-spacing: 0.1em; }
   .cz-multicanal-marca span { font-size: 7px; letter-spacing: 0.26em; margin-top: 2px; }
   .cz-multicanal-arco { height: 12px; }
-  .cz-multicanal-busca { padding: 7px 10px; margin-top: 7px; }
-  .cz-multicanal-busca input { font-size: 12px; }
 
   .cz-canais { gap: 5px; margin-bottom: 8px; }
   .cz-canal-tab { padding: 5px 8px; font-size: 8.5px; gap: 3px; border-radius: 11px; }
   .cz-canal-tab .cz-canal-ico { width: 20px; height: 20px; }
 
   .cz-ai-card { padding: 9px 12px; gap: 8px; margin-bottom: 8px; border-radius: 14px; }
+  .cz-ai-avatar-orbita { width: 34px; height: 34px; }
   .cz-ai-avatar { width: 34px; height: 34px; font-size: 13px; }
+  .cz-ai-anel { inset: -6px; width: calc(100% + 12px); height: calc(100% + 12px); }
   .cz-ai-nome { font-size: 12px; gap: 5px; }
   .cz-ai-beta { font-size: 8px; padding: 1px 6px; }
   .cz-ai-sub { font-size: 9.5px; margin-top: 1px; }
@@ -955,7 +977,7 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   .cz-ai-status-dot { width: 5px; height: 5px; }
   .cz-ai-metricas { gap: 10px; }
   .cz-ai-metrica strong { font-size: 12.5px; }
-  .cz-ai-metrica span { font-size: 7px; }
+  .cz-ai-metrica-topo, .cz-ai-metrica-baixo { font-size: 7px; }
   .cz-ai-seta { display: none; }
 }
 

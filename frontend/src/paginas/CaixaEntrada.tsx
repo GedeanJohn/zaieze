@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Menu, Search, X, Sparkles, ChevronRight, MoreHorizontal } from 'lucide-react'
+import { Menu, Search, SlidersHorizontal, Sparkles, ChevronRight, MoreHorizontal } from 'lucide-react'
 import { api, mensagemDeErro } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
@@ -95,7 +95,7 @@ export default function CaixaEntrada() {
   const avisar = useToast()
   const [searchParams] = useSearchParams()
   const abriuParam = useRef(false)
-  const [buscaAberta, setBuscaAberta] = useState(false)
+  const buscaRef = useRef<HTMLInputElement>(null)
   const [stats, setStats] = useState<ChatStats | null>(null)
 
   const [conversas, setConversas] = useState<Conversa[]>([])
@@ -320,25 +320,14 @@ export default function CaixaEntrada() {
               <span>MULTICANAL</span>
             </div>
             <div className="cz-multicanal-acoes">
-              <button type="button" className="cz-multicanal-icone" onClick={() => setBuscaAberta((v) => !v)} aria-label={t('caixa.buscarConversas')}>
-                {buscaAberta ? <X size={17} strokeWidth={1.8} /> : <Search size={17} strokeWidth={1.8} />}
+              <button type="button" className="cz-multicanal-icone" onClick={() => buscaRef.current?.focus()} aria-label={t('caixa.buscarConversas')}>
+                <Search size={17} strokeWidth={1.8} />
               </button>
               <button type="button" className="cz-multicanal-icone" title="ZAI.AI" aria-hidden="true">
                 <Sparkles size={17} strokeWidth={1.8} />
               </button>
             </div>
           </div>
-          {buscaAberta && (
-            <div className="cz-multicanal-busca">
-              <Search size={14} strokeWidth={2} />
-              <input
-                autoFocus
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                placeholder={filtro === 'GRUPOS' ? t('caixa.buscarGrupos') : t('caixa.buscarConversas')}
-              />
-            </div>
-          )}
           <div className="cz-multicanal-arco" aria-hidden="true" />
         </div>
       )}
@@ -371,18 +360,52 @@ export default function CaixaEntrada() {
 
       {!temSel && (
         <div className="cz-ai-card">
-          <div className="cz-ai-avatar">Z</div>
+          <div className="cz-ai-avatar-orbita">
+            <svg className="cz-ai-anel" viewBox="0 0 64 64" aria-hidden="true">
+              <circle cx="32" cy="32" r="30" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1" strokeDasharray="1.5 4.5" />
+              <circle cx="32" cy="2" r="2.4" fill="#fff" />
+              <circle cx="4" cy="44" r="1.8" fill="#fff" opacity="0.75" />
+            </svg>
+            <div className="cz-ai-avatar">Z</div>
+          </div>
           <div className="cz-ai-info">
             <div className="cz-ai-nome">ZAI.AI <span className="cz-ai-beta">BETA</span></div>
             <div className="cz-ai-sub">{t('caixa.aiSubtitulo')}</div>
             <div className="cz-ai-status"><span className="cz-ai-status-dot" />{t('caixa.aiAtiva')}</div>
           </div>
           <div className="cz-ai-metricas">
-            <div className="cz-ai-metrica"><strong>{stats ? stats.conversasAtivas : '—'}</strong><span>{t('caixa.aiConversasAtivas')}</span></div>
-            <div className="cz-ai-metrica"><strong>{stats?.tempoMedioRespostaMin != null ? `${stats.tempoMedioRespostaMin}min` : '—'}</strong><span>{t('caixa.aiTempoMedio')}</span></div>
-            <div className="cz-ai-metrica"><strong>{stats?.satisfacaoPct != null ? `${stats.satisfacaoPct}%` : '—'}</strong><span>{t('caixa.aiSatisfacao')}</span></div>
+            <div className="cz-ai-metrica">
+              <span className="cz-ai-metrica-topo">{t('caixa.aiMetConversasTopo')}</span>
+              <strong>{stats ? stats.conversasAtivas : '—'}</strong>
+              <span className="cz-ai-metrica-baixo">{t('caixa.aiMetConversasBaixo')}</span>
+            </div>
+            <div className="cz-ai-metrica">
+              <span className="cz-ai-metrica-topo">{t('caixa.aiMetTempoTopo')}</span>
+              <strong>{stats?.tempoMedioRespostaMin != null ? `${stats.tempoMedioRespostaMin}min` : '—'}</strong>
+              <span className="cz-ai-metrica-baixo">{t('caixa.aiMetTempoBaixo')}</span>
+            </div>
+            <div className="cz-ai-metrica">
+              <span className="cz-ai-metrica-topo">{t('caixa.aiMetSatisfacaoTopo')}</span>
+              <strong>{stats?.satisfacaoPct != null ? `${stats.satisfacaoPct}%` : '—'}</strong>
+              <span className="cz-ai-metrica-baixo">{t('caixa.aiMetSatisfacaoBaixo')}</span>
+            </div>
           </div>
           <ChevronRight size={18} className="cz-ai-seta" aria-hidden="true" />
+        </div>
+      )}
+
+      {!temSel && (
+        <div className="cz-busca-topo">
+          <Search size={16} strokeWidth={2} />
+          <input
+            ref={buscaRef}
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder={filtro === 'GRUPOS' ? t('caixa.buscarGrupos') : t('caixa.buscarConversas')}
+          />
+          <button type="button" className="cz-busca-filtro" aria-label={t('caixa.canalTodas')}>
+            <SlidersHorizontal size={15} strokeWidth={2} />
+          </button>
         </div>
       )}
 

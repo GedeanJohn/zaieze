@@ -131,12 +131,21 @@ export async function authRoutes(app: FastifyInstance) {
 
     if (usuario.telefone) {
       const senha = gerarSenhaProvisoria()
-      await prisma.usuario.update({ where: { id: usuario.id }, data: { senhaHash: await bcrypt.hash(senha, 10) } })
-      await enviarTemplatePlataforma({
+      const resultado = await enviarTemplatePlataforma({
         telefone: usuario.telefone,
         templateNome: env.ZAIEZE_WA_TEMPLATE_SENHA,
         params: [{ texto: senha }],
       })
+      // Sem checar o resultado, dizíamos "via WhatsApp" mesmo quando nada foi enviado de verdade
+      // (credenciais ZAIEZE_WA_* ausentes → SIMULADA, ou falha real na API da Meta) — a pessoa
+      // ficava esperando uma senha que nunca chegava. Cai no mesmo caminho de "sem WhatsApp": vira
+      // solicitação pendente pro humano atender.
+      if (resultado.status !== 'ENVIADA') {
+        request.log.warn({ telefone: usuario.telefone, resultado }, 'Senha provisória (esqueci-senha) não foi enviada de verdade')
+        await prisma.solicitacaoSenha.create({ data: { usuarioId: usuario.id } })
+        return { ok: true, via: 'pendente' as const }
+      }
+      await prisma.usuario.update({ where: { id: usuario.id }, data: { senhaHash: await bcrypt.hash(senha, 10) } })
       return { ok: true, via: 'whatsapp' as const }
     }
 

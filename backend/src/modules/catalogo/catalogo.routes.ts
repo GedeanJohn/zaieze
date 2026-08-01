@@ -508,7 +508,14 @@ export async function catalogoRoutes(app: FastifyInstance) {
         expiraEm: new Date(Date.now() + 10 * 60_000),
       },
     })
-    await enviarTemplatePlataforma({ telefone: telefoneLimpo, templateNome: env.ZAIEZE_WA_TEMPLATE_OTP, params: [{ texto: codigo }] })
+    const resultado = await enviarTemplatePlataforma({ telefone: telefoneLimpo, templateNome: env.ZAIEZE_WA_TEMPLATE_OTP, params: [{ texto: codigo }] })
+    // Sem isso, o cliente via "Enviamos o código!" mesmo quando NADA foi enviado de verdade
+    // (ZAIEZE_WA_PHONE_NUMBER_ID/ZAIEZE_WA_TOKEN não configurados → SIMULADA, ou a chamada pra
+    // API da Meta falhou de verdade → FALHA) — ficava esperando um código que nunca chegava.
+    if (resultado.status !== 'ENVIADA') {
+      request.log.warn({ telefone: telefoneLimpo, resultado }, 'Código de verificação (Meus Pedidos) não foi enviado de verdade')
+      return reply.code(502).send({ erro: 'Não foi possível enviar o código por WhatsApp agora. Tente novamente em alguns instantes.' })
+    }
     return { ok: true }
   })
 

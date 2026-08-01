@@ -324,9 +324,6 @@ export default function CaixaEntrada() {
               <span>MULTICANAL</span>
             </div>
             <div className="cz-multicanal-acoes">
-              <button type="button" className="cz-multicanal-icone" onClick={() => buscaRef.current?.focus()} aria-label={t('caixa.buscarConversas')}>
-                <Search size={17} strokeWidth={1.8} />
-              </button>
               <button type="button" className="cz-multicanal-icone" title="ZAI.AI" aria-hidden="true">
                 <Sparkles size={17} strokeWidth={1.8} />
               </button>

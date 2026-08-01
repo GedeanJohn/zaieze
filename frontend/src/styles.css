@@ -940,7 +940,7 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 0 30px rgba(255, 255, 255, 0.45);
 }
 .cz-ai-info { flex: 1; min-width: 0; }
-.cz-ai-nome { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+.cz-ai-nome { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: #fff; }
 .cz-ai-beta { background: rgba(255, 255, 255, 0.1); color: #cfcbe0; font-size: 10px; font-weight: 700; padding: 1px 8px; border-radius: 999px; }
 .cz-ai-sub { font-size: 12px; color: #9a95a8; margin-top: 2px; }
 .cz-ai-status { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #4ade80; margin-top: 4px; font-weight: 600; }

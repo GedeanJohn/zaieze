@@ -1069,6 +1069,79 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-alerta { margin: 0 12px; background: #4a1d1d; color: #ffb4b4; border-radius: 10px; padding: 8px 12px; font-size: 13px; }
 .cz-aviso { color: var(--cz-mut); padding: 14px; font-size: 13px; }
 
+/* ── Carrinho do cliente, aberto de dentro da conversa (CarrinhoCliente.tsx) ──
+   .cz-conv-corpo agrupa mensagens+composer num único filho flexível de .cz-conversa, pra que o
+   painel do carrinho (flex fixo, abaixo) encolha o corpo do chat automaticamente, no mobile e no
+   desktop, sem lógica separada por breakpoint. */
+.cz-conv-corpo { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.cz-btn-carrinho.ativo { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+.cz-carrinho-painel {
+  flex: 0 0 46%; min-height: 0; display: flex; flex-direction: column;
+  border-top: 1px solid var(--cz-line); background: var(--cz-surf);
+}
+.cz-carrinho { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.cz-cart-topo { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--cz-line); }
+.cz-cart-busca, .cz-cart-voltar {
+  flex: 1; background: var(--cz-bg); border: 1px solid var(--cz-line); color: var(--cz-tx);
+  border-radius: 10px; padding: 8px 12px; font-size: 13px; text-align: left; cursor: pointer;
+}
+.cz-cart-busca::placeholder { color: var(--cz-mut); }
+.cz-cart-fechar { flex: 0 0 auto; background: var(--cz-surf2); border: 1px solid var(--cz-line); color: var(--cz-tx); border-radius: 10px; width: 34px; height: 34px; cursor: pointer; }
+
+.cz-cart-grid { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; padding: 10px; }
+.cz-cart-vazio { grid-column: 1 / -1; color: var(--cz-mut); font-size: 13px; text-align: center; padding: 18px 0; }
+.cz-cart-card {
+  display: flex; flex-direction: column; gap: 4px; background: var(--cz-surf2); border: 1px solid var(--cz-line);
+  border-radius: 10px; padding: 6px; cursor: pointer; text-align: left; color: var(--cz-tx);
+}
+.cz-cart-card img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 7px; }
+.cz-cart-card-nome { font-size: 11.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cz-cart-card-preco { font-size: 11px; color: var(--cz-mut); }
+.cz-cart-semfoto { width: 100%; aspect-ratio: 3 / 4; border-radius: 7px; background: var(--cz-bg); }
+.cz-cart-semfoto.sm { width: 34px; height: 34px; aspect-ratio: auto; flex: 0 0 auto; }
+.cz-cart-semfoto.lg { width: 96px; height: 128px; aspect-ratio: auto; align-self: center; }
+
+.cz-cart-ficha { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.cz-cart-ficha-foto { width: 96px; height: 128px; object-fit: cover; border-radius: 10px; align-self: center; }
+.cz-cart-ficha-nome { font-size: 14px; align-self: center; }
+.cz-cart-opcs { display: flex; flex-direction: column; gap: 5px; width: 100%; }
+.cz-cart-opcs > span { font-size: 11px; color: var(--cz-mut); font-weight: 600; }
+.cz-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cz-chips button {
+  background: var(--cz-surf2); border: 1px solid var(--cz-line); color: var(--cz-tx);
+  border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer;
+}
+.cz-chips button.on { background: var(--cz-accent); border-color: var(--cz-accent); color: #fff; }
+.cz-chips button:disabled { opacity: .4; cursor: not-allowed; text-decoration: line-through; }
+.cz-cart-qtd { display: flex; align-items: center; gap: 10px; }
+.cz-cart-qtd button { background: var(--cz-surf2); border: 1px solid var(--cz-line); color: var(--cz-tx); width: 28px; height: 28px; border-radius: 8px; font-size: 15px; cursor: pointer; }
+.cz-cart-qtd button:disabled { opacity: .4; cursor: not-allowed; }
+.cz-cart-qtd span { min-width: 18px; text-align: center; font-weight: 600; }
+.cz-cart-qtd-ficha { align-self: center; }
+.cz-cart-estoque { font-size: 11px; color: var(--cz-mut); margin-left: 4px; }
+.cz-cart-adicionar { align-self: stretch; text-align: center; }
+
+.cz-cart-rodape { flex: 0 0 auto; border-top: 1px solid var(--cz-line); }
+.cz-cart-rodape-vazio { display: block; padding: 12px; color: var(--cz-mut); font-size: 12.5px; text-align: center; }
+.cz-cart-itens { max-height: 30dvh; overflow-y: auto; padding: 6px 10px; display: flex; flex-direction: column; gap: 6px; }
+.cz-cart-linha { display: flex; align-items: center; gap: 8px; }
+.cz-cart-linha img { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex: 0 0 auto; }
+.cz-cart-linha-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cz-cart-linha-info strong { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cz-cart-linha-info span { font-size: 11px; color: var(--cz-mut); }
+.cz-cart-remover { flex: 0 0 auto; background: transparent; border: none; color: var(--cz-mut); font-size: 18px; cursor: pointer; }
+.cz-cart-cancelar { flex: 0 0 auto; background: transparent; border: 1px solid #ff8d8d; color: #ff8d8d; border-radius: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; white-space: nowrap; }
+.cz-cart-total-linha { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; font-size: 13px; font-weight: 600; border-top: 1px solid var(--cz-line); }
+.cz-cart-status { font-size: 11px; font-weight: 700; color: var(--cz-mut); }
+.cz-cart-status.erro { color: #ff8d8d; }
+.cz-cart-alerta { margin: 8px 10px; background: #4a1d1d; color: #ffb4b4; border-radius: 10px; padding: 6px 10px; font-size: 12px; }
+
+@media (max-width: 720px) {
+  .cz-carrinho-painel { flex-basis: 52%; }
+  .cz-btn-carrinho .cz-btn-txt { display: none; }
+  .cz-btn-carrinho { padding: 9px 12px; font-size: 16px; }
+}
+
 /* Abas da Supervisão (1 aba = 1 vendedora), estilo abas de navegador — a ativa "gruda" no painel abaixo. */
 .superv-abas { display: flex; gap: 4px; overflow-x: auto; padding: 0 4px; margin-top: 4px; }
 .superv-aba {

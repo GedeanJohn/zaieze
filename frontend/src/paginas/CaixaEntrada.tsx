@@ -6,6 +6,7 @@ import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
 import { useIdioma } from '../lib/i18n'
 import { IconeWhatsApp, IconeInstagram, IconeMessenger, IconeTelegram, IconeEmail, IconeTodosCanais } from '../componentes/IconesCanal'
+import CarrinhoCliente from '../componentes/CarrinhoCliente'
 
 type Canal = 'whatsapp' | 'instagram'
 // Canais que ainda não têm integração de verdade — aparecem na barra (mockup multicanal), mas
@@ -100,6 +101,7 @@ export default function CaixaEntrada() {
 
   const [conversas, setConversas] = useState<Conversa[]>([])
   const [sel, setSel] = useState<Conversa | null>(null)
+  const [carrinhoAberto, setCarrinhoAberto] = useState(false)
   const [thread, setThread] = useState<Mensagem[]>([])
   const [texto, setTexto] = useState('')
   const [busca, setBusca] = useState('')
@@ -152,7 +154,7 @@ export default function CaixaEntrada() {
   useEffect(() => { if (filtro === 'GRUPOS') carregarGrupos() }, [filtro, carregarGrupos])
 
   const abrir = useCallback(async (c: Conversa) => {
-    setGrupoSel(null); setSel(c); setErro(''); setTexto('')
+    setGrupoSel(null); setSel(c); setErro(''); setTexto(''); setCarrinhoAberto(false)
     const { data } = await api.get(`/${c.canal}/conversas/${c.cliente.id}`, { params: escopo.params })
     setThread(data)
   }, [escopo.params])
@@ -170,7 +172,7 @@ export default function CaixaEntrada() {
         const { data } = await api.get(`/clientes/${id}`, { params: escopo.params })
         // Sem telefone → só pode ter chegado pelo Instagram.
         const canal: Canal = data.telefone ? 'whatsapp' : 'instagram'
-        setGrupoSel(null); setErro(''); setTexto('')
+        setGrupoSel(null); setErro(''); setTexto(''); setCarrinhoAberto(false)
         setSel({
           canal,
           cliente: { id: data.id, nome: data.nome, telefone: data.telefone, segmento: data.segmento, vendedoraId: data.vendedoraId ?? null },
@@ -184,7 +186,7 @@ export default function CaixaEntrada() {
   }, [searchParams, escopo.pronto, escopo.params, conversas, abrir])
 
   const abrirGrupo = useCallback(async (id: string) => {
-    setSel(null); setErro(''); setTextoGrupo(''); setResultadoGrupo(null)
+    setSel(null); setErro(''); setTextoGrupo(''); setResultadoGrupo(null); setCarrinhoAberto(false)
     const { data } = await api.get(`/whatsapp/grupos/${id}`, { params: escopo.params })
     setGrupoSel(data)
   }, [escopo.params])
@@ -538,50 +540,66 @@ export default function CaixaEntrada() {
                   <span>{sel.canal === 'instagram' ? '📷 Instagram' : sel.cliente.telefone}</span>
                 </div>
                 <button className="cz-btn cz-btn-venda" onClick={() => navigate(`/vendas?cliente=${sel.cliente.id}`)} title={t('caixa.registrarVenda')}>🛒<span className="cz-btn-txt"> {t('caixa.registrarVenda')}</span></button>
+                <button
+                  type="button" className={`cz-btn cz-btn-venda cz-btn-carrinho${carrinhoAberto ? ' ativo' : ''}`}
+                  onClick={() => setCarrinhoAberto((v) => !v)} title={t('caixa.carrinho')}
+                >🛍<span className="cz-btn-txt"> {t('caixa.carrinho')}</span></button>
               </div>
 
-              <div className="cz-bolhas">
-                {thread.map((m) => (
-                  <div key={m.id} className={`cz-bolha ${m.direcao === 'ENVIADA' ? 'saida' : 'entrada'}`}>
-                    {m.tipoMidia === 'AUDIO' && m.midiaUrl
-                      ? <audio className="cz-audio" src={m.midiaUrl} controls preload="none" />
-                      : m.tipoMidia === 'IMAGEM' && m.midiaUrl
-                        ? <a href={m.midiaUrl} target="_blank" rel="noreferrer"><img className="cz-img" src={m.midiaUrl} alt="" /></a>
-                        : m.tipoMidia && !m.midiaUrl
-                          // Cliente enviou mídia pelo WhatsApp pessoal (Baileys) — só a etiqueta,
-                          // sem baixar o arquivo (a vendedora já vê no próprio celular, dono da conversa).
-                          ? (
-                            <div>
-                              <span className="cz-etiqueta-midia">{ROTULO_MIDIA[m.tipoMidia] ?? m.tipoMidia}</span>
-                              {!['[imagem]', '[áudio]', '[vídeo]'].includes(m.texto) && <div className="cz-etiqueta-legenda">{m.texto}</div>}
-                            </div>
-                          )
-                          : <div>{m.texto}</div>}
-                    <span className="cz-meta">
-                      {hora(m.createdAt)}
-                      {m.direcao === 'ENVIADA' && <> · <span style={m.status === 'LIDA' ? { color: '#53bdeb' } : undefined}>{recibo(m.status, t)}</span></>}
-                    </span>
-                  </div>
-                ))}
-                {thread.length === 0 && <div style={{ color: 'var(--cz-mut)', margin: 'auto' }}>{t('caixa.semMensagens')}</div>}
-              </div>
-
-              {erro && <div className="cz-alerta">{erro}</div>}
-              {gravando ? (
-                <div className="cz-gravando">
-                  <button type="button" className="cz-grav-lixo" onClick={cancelarGravacao} aria-label={t('caixa.cancelarGravacao')}>🗑</button>
-                  <span className="cz-grav-rec"><span className="cz-grav-dot" />{t('caixa.gravando', { tempo: mmss(segGrav) })}</span>
-                  <button type="button" className="cz-enviar" onClick={enviarGravacao} disabled={enviando} aria-label={t('caixa.enviarAudio')}>{enviando ? '…' : '➤'}</button>
+              <div className="cz-conv-corpo">
+                <div className="cz-bolhas">
+                  {thread.map((m) => (
+                    <div key={m.id} className={`cz-bolha ${m.direcao === 'ENVIADA' ? 'saida' : 'entrada'}`}>
+                      {m.tipoMidia === 'AUDIO' && m.midiaUrl
+                        ? <audio className="cz-audio" src={m.midiaUrl} controls preload="none" />
+                        : m.tipoMidia === 'IMAGEM' && m.midiaUrl
+                          ? <a href={m.midiaUrl} target="_blank" rel="noreferrer"><img className="cz-img" src={m.midiaUrl} alt="" /></a>
+                          : m.tipoMidia && !m.midiaUrl
+                            // Cliente enviou mídia pelo WhatsApp pessoal (Baileys) — só a etiqueta,
+                            // sem baixar o arquivo (a vendedora já vê no próprio celular, dono da conversa).
+                            ? (
+                              <div>
+                                <span className="cz-etiqueta-midia">{ROTULO_MIDIA[m.tipoMidia] ?? m.tipoMidia}</span>
+                                {!['[imagem]', '[áudio]', '[vídeo]'].includes(m.texto) && <div className="cz-etiqueta-legenda">{m.texto}</div>}
+                              </div>
+                            )
+                            : <div>{m.texto}</div>}
+                      <span className="cz-meta">
+                        {hora(m.createdAt)}
+                        {m.direcao === 'ENVIADA' && <> · <span style={m.status === 'LIDA' ? { color: '#53bdeb' } : undefined}>{recibo(m.status, t)}</span></>}
+                      </span>
+                    </div>
+                  ))}
+                  {thread.length === 0 && <div style={{ color: 'var(--cz-mut)', margin: 'auto' }}>{t('caixa.semMensagens')}</div>}
                 </div>
-              ) : (
-                <form className="cz-responder" onSubmit={responder}>
-                  <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={t('caixa.digiteMensagem')} />
-                  {texto.trim() || sel.canal === 'instagram'
-                    ? <button className="cz-enviar" disabled={enviando || !texto.trim()} aria-label={t('caixa.enviar')}>{enviando ? '…' : '➤'}</button>
-                    : <button type="button" className="cz-mic" onClick={iniciarGravacao} disabled={enviando} aria-label={t('caixa.gravarAudio')}>
-                        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>
-                      </button>}
-                </form>
+
+                {erro && <div className="cz-alerta">{erro}</div>}
+                {gravando ? (
+                  <div className="cz-gravando">
+                    <button type="button" className="cz-grav-lixo" onClick={cancelarGravacao} aria-label={t('caixa.cancelarGravacao')}>🗑</button>
+                    <span className="cz-grav-rec"><span className="cz-grav-dot" />{t('caixa.gravando', { tempo: mmss(segGrav) })}</span>
+                    <button type="button" className="cz-enviar" onClick={enviarGravacao} disabled={enviando} aria-label={t('caixa.enviarAudio')}>{enviando ? '…' : '➤'}</button>
+                  </div>
+                ) : (
+                  <form className="cz-responder" onSubmit={responder}>
+                    <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={t('caixa.digiteMensagem')} />
+                    {texto.trim() || sel.canal === 'instagram'
+                      ? <button className="cz-enviar" disabled={enviando || !texto.trim()} aria-label={t('caixa.enviar')}>{enviando ? '…' : '➤'}</button>
+                      : <button type="button" className="cz-mic" onClick={iniciarGravacao} disabled={enviando} aria-label={t('caixa.gravarAudio')}>
+                          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>
+                        </button>}
+                  </form>
+                )}
+              </div>
+
+              {carrinhoAberto && (
+                <div className="cz-carrinho-painel">
+                  <CarrinhoCliente
+                    clienteId={sel.cliente.id}
+                    atacado={sel.cliente.segmento === 'ATACADO'}
+                    onFechar={() => setCarrinhoAberto(false)}
+                  />
+                </div>
               )}
             </>
           )}

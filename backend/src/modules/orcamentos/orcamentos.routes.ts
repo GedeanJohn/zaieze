@@ -162,8 +162,10 @@ export async function orcamentosRoutes(app: FastifyInstance) {
 
   app.get('/', { preHandler: [app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
+    const { clienteId } = request.query as { clienteId?: string }
     const where: Prisma.OrcamentoWhereInput = { lojaId }
     if (request.user.role === 'VENDEDORA') where.vendedoraId = request.user.sub
+    if (clienteId) where.clienteId = clienteId
     return prisma.orcamento.findMany({ where, orderBy: { createdAt: 'desc' }, take: 200, include: incluirDetalhe })
   })
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Menu, Search, X, Sparkles, ChevronRight, MoreHorizontal } from 'lucide-react'
-import { api, mensagemDeErro, formataReal } from '../api'
+import { api, mensagemDeErro } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
 import { useIdioma } from '../lib/i18n'
@@ -386,15 +386,6 @@ export default function CaixaEntrada() {
         </div>
       )}
 
-      {!temSel && (
-        <div className="cz-stats">
-          <StatCard rotulo={t('caixa.receitaMes')} valor={stats ? formataReal(stats.receitaMes) : '—'} cor="#a855f7" />
-          <MetaCard pct={stats ? stats.pctMeta : null} cor="#c084fc" rotulo={t('caixa.metaMes')} />
-          <StatCard rotulo={t('caixa.novosLeads')} valor={stats ? String(stats.novosLeads) : '—'} cor="#22c55e" />
-          <StatCard rotulo={t('caixa.taxaConversao')} valor={stats ? `${stats.taxaConversao}%` : '—'} cor="#ec4899" />
-        </div>
-      )}
-
       <div className={`chatz${temSel ? ' tem-sel' : ''}`}>
         {/* Lista (conversas ou grupos) */}
         <aside className="cz-lista">
@@ -573,39 +564,6 @@ export default function CaixaEntrada() {
           onCriado={() => { setModalGrupo(false); carregarGrupos() }}
         />
       )}
-    </div>
-  )
-}
-
-/** Cartão de estatística no topo do chat (por vendedora). */
-function StatCard({ rotulo, valor, cor }: { rotulo: string; valor: string; cor: string }) {
-  return (
-    <div className="cz-stat" style={{ borderTop: `3px solid ${cor}` }}>
-      <span className="cz-stat-rot">{rotulo}</span>
-      <strong className="cz-stat-val">{valor}</strong>
-    </div>
-  )
-}
-
-/** Card "Meta do mês": anel de progresso com o % atingido no centro. */
-function MetaCard({ pct, cor, rotulo }: { pct: number | null; cor: string; rotulo: string }) {
-  const v = Math.max(0, Math.min(pct ?? 0, 100))
-  const r = 15
-  const circ = 2 * Math.PI * r
-  const off = circ * (1 - v / 100)
-  return (
-    <div className="cz-stat cz-stat-meta" style={{ borderTop: `3px solid ${cor}` }}>
-      <span className="cz-stat-rot">{rotulo}</span>
-      <div className="cz-meta-anel">
-        <svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
-          <circle cx="20" cy="20" r={r} fill="none" stroke="rgba(0,0,0,0.12)" strokeWidth="4" />
-          <circle
-            cx="20" cy="20" r={r} fill="none" stroke={cor} strokeWidth="4" strokeLinecap="round"
-            strokeDasharray={circ} strokeDashoffset={off} transform="rotate(-90 20 20)"
-          />
-        </svg>
-        <strong className="cz-meta-pct">{pct != null ? `${pct}%` : '—'}</strong>
-      </div>
     </div>
   )
 }

@@ -951,14 +951,6 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   .cz-ai-seta { display: none; }
 }
 
-.cz-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.cz-stat { background: #111118; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 11px; padding: 9px 12px; display: flex; flex-direction: column; gap: 3px; }
-.cz-stat-rot { font-size: 11px; color: #9a95a8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cz-stat-val { font-size: 17px; font-weight: 800; color: #f4f2f8; font-family: var(--fonte-titulo); line-height: 1.1; }
-/* Card da Meta: anel de progresso com o % no centro */
-.cz-stat-meta { align-items: flex-start; }
-.cz-meta-anel { position: relative; display: flex; align-items: center; justify-content: center; align-self: center; }
-.cz-meta-pct { position: absolute; font-size: 12px; font-weight: 800; color: #f4f2f8; font-family: var(--fonte-titulo); }
 .chatz strong { color: var(--cz-tx); }
 .cz-lista, .cz-conversa {
   background: var(--cz-surf); border: 1px solid var(--cz-line); border-radius: 16px;
@@ -1177,20 +1169,9 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 
 @media (max-width: 720px) {
   .cz-pagina { margin: -18px -16px; padding: 14px 16px 18px; }
-  /* Cards (com a Meta no lugar de "Negócios ativos") numa faixa fixa ACIMA do menu do rodapé — só no Chat */
-  .cz-stats {
-    position: fixed; left: 0; right: 0; bottom: var(--zz-navh); z-index: 40; margin: 0;
-    grid-template-columns: repeat(4, 1fr); gap: 6px;
-    padding: 7px 10px; background: #0e0e16; border-top: 1px solid rgba(255, 255, 255, 0.08);
-  }
-  .cz-stat { padding: 6px 7px; border-radius: 9px; gap: 1px; }
-  .cz-stat-rot { font-size: 8.5px; }
-  .cz-stat-val { font-size: 11px; }
-  .cz-meta-anel svg { width: 28px; height: 28px; }
-  .cz-meta-pct { font-size: 9.5px; }
   .cz-marca { font-size: 24px; padding: 12px 26px; }
   .cz-topo { margin-bottom: 8px; gap: 6px; }
-  .chatz { grid-template-columns: 1fr; height: calc(100dvh - 96px - var(--zz-navh) - var(--zz-strip)); padding: 0; gap: 0; margin: 0 -16px; }
+  .chatz { grid-template-columns: 1fr; height: calc(100dvh - 96px - var(--zz-navh)); padding: 0; gap: 0; margin: 0 -16px; }
   .cz-lista, .cz-conversa { border-radius: 0; }
   .cz-lista-top { padding: 9px 10px; gap: 6px; }
   .cz-tab { padding: 4px 10px; font-size: 11px; }

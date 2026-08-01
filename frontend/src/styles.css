@@ -866,9 +866,9 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-multicanal-acoes { display: flex; gap: 8px; flex-shrink: 0; }
 .cz-multicanal-arco {
   position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
-  width: min(420px, 90%); height: 20px; border-top: 1px solid rgba(255, 255, 255, 0.35);
+  width: min(420px, 90%); height: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 50%; pointer-events: none;
-  box-shadow: 0 -1px 16px 1px rgba(255, 255, 255, 0.28), 0 2px 24px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1px 16px 1px rgba(255, 255, 255, 0.28), 0 -2px 24px rgba(255, 255, 255, 0.1);
 }
 /* ── Barra de busca única, fixa logo abaixo do card ZAI.AI (mockup) ── */
 .cz-busca-topo {
@@ -889,14 +889,13 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   .cz-busca-filtro { width: 26px; height: 26px; border-radius: 8px; }
 }
 
-/* ── Abas de canal (Todas/WhatsApp/Instagram/Messenger/Email/Telegram) ── */
+/* ── Abas de canal (Todas/WhatsApp/Instagram/Messenger/Email/Telegram) — só a aba ATIVA tem
+   caixa/glow; as demais ficam "soltas" (ícone + rótulo, sem fundo/borda), como no mockup. ── */
 .cz-canais { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 14px; }
 .cz-canal-tab {
   display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 0 0 auto;
-  background: rgba(255, 255, 255, 0.04); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px;
-  padding: 8px 12px; cursor: pointer; color: #9a95a8; font-size: 10.5px; font-weight: 600;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  background: transparent; border: 1px solid transparent; border-radius: 14px;
+  padding: 6px 10px; cursor: pointer; color: #9a95a8; font-size: 10.5px; font-weight: 600;
   transition: box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 .cz-canal-tab .cz-canal-ico {
@@ -904,14 +903,9 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   background: rgba(255, 255, 255, 0.06); color: #cfcbe0;
 }
 .cz-canal-tab.ativo {
-  color: #f4f2f8; border-color: rgba(255, 255, 255, 0.5); background: rgba(255, 255, 255, 0.1);
+  color: #f4f2f8; border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.06); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.3), 0 0 26px rgba(255, 255, 255, 0.22);
-}
-/* Ícone "Todas" (grade de pontos): housing em quadrado arredondado com brilho próprio quando ativo,
-   pra se distinguir dos badges circulares dos outros canais — como no mockup. */
-.cz-canal-tab.ativo .cz-canal-ico:not(.wa):not(.instagram):not(.messenger):not(.email):not(.telegram):not(.mais) {
-  border-radius: 9px; background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6), 0 0 14px rgba(255, 255, 255, 0.4);
 }
 .cz-canal-tab:disabled { cursor: not-allowed; opacity: 0.45; }
 .cz-canal-tab .cz-canal-ico.wa { background: #25d366; color: #fff; }
@@ -962,11 +956,11 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   .cz-multicanal-marca span { font-size: 7px; letter-spacing: 0.26em; margin-top: 2px; }
   .cz-multicanal-arco { height: 12px; }
 
-  /* Só o ícone no mobile (sem rótulo) — a rede já fica clara pela conversa/lead, e assim as 7 abas cabem sem cortar na borda da tela. */
-  .cz-canais { gap: 7px; margin-bottom: 8px; justify-content: space-between; }
-  .cz-canal-rotulo { display: none; }
-  .cz-canal-tab { flex-direction: row; padding: 0; width: 34px; height: 34px; border-radius: 50%; justify-content: center; }
-  .cz-canal-tab .cz-canal-ico { width: 22px; height: 22px; }
+  /* Ícone + rótulo compactos no mobile — como as inativas não têm mais caixa/borda, as 7 abas
+     cabem na largura da tela sem cortar na borda mesmo com o texto. */
+  .cz-canais { gap: 4px; margin-bottom: 8px; justify-content: space-between; }
+  .cz-canal-tab { padding: 4px 3px; gap: 3px; font-size: 7.5px; border-radius: 10px; }
+  .cz-canal-tab .cz-canal-ico { width: 21px; height: 21px; }
 
   .cz-ai-card { padding: 9px 12px; gap: 8px; margin-bottom: 8px; border-radius: 14px; }
   .cz-ai-avatar-orbita { width: 34px; height: 34px; }
@@ -980,16 +974,28 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   .cz-ai-metricas { gap: 10px; }
   .cz-ai-metrica strong { font-size: 12.5px; }
   .cz-ai-metrica-topo, .cz-ai-metrica-baixo { font-size: 7px; }
-  .cz-ai-seta { display: none; }
+  .cz-ai-seta { width: 14px; flex-shrink: 0; }
 }
 
 .chatz strong { color: var(--cz-tx); }
 .cz-lista, .cz-conversa {
+  position: relative;
   background: linear-gradient(165deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.015)), rgba(12, 12, 18, 0.55);
   backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px;
   display: flex; flex-direction: column; overflow: hidden; min-width: 0; min-height: 0;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+/* Botão flutuante "Novo Atendimento", ancorado no canto inferior direito da lista (mockup). */
+.cz-novo-atendimento {
+  position: absolute; right: 14px; bottom: 14px; z-index: 5;
+  display: flex; align-items: center; gap: 6px; padding: 11px 16px;
+  background: #fff; color: #15121f; border: none; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 255, 255, 0.2);
+}
+@media (max-width: 720px) {
+  .cz-novo-atendimento { right: 10px; bottom: 10px; padding: 9px 13px; font-size: 11px; }
 }
 .cz-lista-top { padding: 14px; border-bottom: 1px solid var(--cz-line); display: flex; flex-direction: column; gap: 10px; }
 .cz-titulo { font-weight: 700; font-size: 18px; display: flex; align-items: center; gap: 8px; font-family: var(--fonte-titulo); }
@@ -1000,7 +1006,7 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-tab { background: transparent; border: 1px solid var(--cz-line); color: var(--cz-mut); border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .cz-tab.ativo { background: var(--cz-accent); border-color: var(--cz-accent); color: #fff; }
 .cz-tab-badge { background: linear-gradient(135deg, #ec4899, #db2777); color: #fff; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 0 6px; margin-left: 6px; min-width: 16px; display: inline-block; text-align: center; }
-.cz-itens { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px; display: flex; flex-direction: column; gap: 0; }
+.cz-itens { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px; padding-bottom: 56px; display: flex; flex-direction: column; gap: 0; }
 .cz-item { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 12px; padding: 11px 10px; cursor: pointer; color: var(--cz-tx); position: relative; }
 .cz-item + .cz-item::before { content: ''; position: absolute; top: 0; left: 63px; right: 10px; border-top: 1px solid var(--cz-line); }
 .cz-item:hover { background: var(--cz-surf2); }
@@ -1019,7 +1025,7 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-item-top strong { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex-shrink: 1; }
 .cz-hora { font-size: 11px; color: var(--cz-mut); white-space: nowrap; }
 .cz-previa { font-size: 12.5px; color: var(--cz-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
-.cz-badge { background: linear-gradient(135deg, #ec4899, #db2777); color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 7px; min-width: 22px; text-align: center; box-shadow: 0 2px 8px #ec489966; align-self: center; }
+.cz-badge { background: linear-gradient(135deg, #a855f7, #7e22ce); color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 7px; min-width: 22px; text-align: center; box-shadow: 0 2px 8px #a855f766; align-self: center; }
 .cz-vazio { margin: auto; color: var(--cz-mut); }
 .cz-conv-top { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--cz-line); }
 .cz-conv-nome { flex: 1; min-width: 0; }
@@ -1077,6 +1083,9 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 /* Avatar do grupo (tom diferente das pessoas) + selo/online */
 .cz-avatar.grupo { background: linear-gradient(135deg, #14b8a6, #0ea5e9); }
 .cz-avatar-wrap { position: relative; flex: 0 0 auto; display: inline-flex; }
+/* Anel colorido no avatar identificando o canal, como no mockup. */
+.cz-avatar-wrap.whatsapp .cz-avatar { box-shadow: 0 0 0 2px #25d366; }
+.cz-avatar-wrap.instagram .cz-avatar { box-shadow: 0 0 0 2px #d6249f; }
 .cz-online { position: absolute; right: 0; bottom: 0; width: 11px; height: 11px; border-radius: 50%; background: #22c55e; border: 2px solid var(--cz-surf); }
 /* Selo de canal (WhatsApp/Instagram) no canto do avatar da conversa */
 .cz-canal { position: absolute; left: -2px; bottom: -2px; width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; border: 2px solid var(--cz-surf); background: #f1efe9; }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Menu, Search, SlidersHorizontal, Sparkles, ChevronRight, MoreHorizontal } from 'lucide-react'
+import { Menu, Search, SlidersHorizontal, Sparkles, ChevronRight, MoreHorizontal, Headset, Plus } from 'lucide-react'
 import { api, mensagemDeErro } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
@@ -293,6 +293,10 @@ export default function CaixaEntrada() {
     avisar(`${rotulo}: em breve — chega junto com a conexão oficial da Meta / decisão do provedor de e-mail.`)
   }
 
+  function clicarNovoAtendimento() {
+    avisar(t('caixa.novoAtendimentoEmBreve'))
+  }
+
   /** "Chegou agora": mensagem não lida nos últimos 10 minutos — vira a tag "Nova Mensagem" do mockup
    * (diferente do badge numérico, que conta todo não lido, mesmo mais antigo). */
   function ehNovaMensagem(c: Conversa): boolean {
@@ -320,6 +324,9 @@ export default function CaixaEntrada() {
               <span>MULTICANAL</span>
             </div>
             <div className="cz-multicanal-acoes">
+              <button type="button" className="cz-multicanal-icone" onClick={() => buscaRef.current?.focus()} aria-label={t('caixa.buscarConversas')}>
+                <Search size={17} strokeWidth={1.8} />
+              </button>
               <button type="button" className="cz-multicanal-icone" title="ZAI.AI" aria-hidden="true">
                 <Sparkles size={17} strokeWidth={1.8} />
               </button>
@@ -360,8 +367,8 @@ export default function CaixaEntrada() {
           <div className="cz-ai-avatar-orbita">
             <svg className="cz-ai-anel" viewBox="0 0 64 64" aria-hidden="true">
               <circle cx="32" cy="32" r="30" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="0.8" strokeDasharray="1.2 9" />
-              <circle cx="34" cy="2.2" r="2.2" fill="#fff" />
-              <circle cx="3" cy="46" r="1.6" fill="#fff" opacity="0.75" />
+              <circle cx="14" cy="7" r="2.2" fill="#fff" />
+              <circle cx="4" cy="48" r="1.6" fill="#fff" opacity="0.75" />
             </svg>
             <div className="cz-ai-avatar">Z</div>
           </div>
@@ -437,7 +444,7 @@ export default function CaixaEntrada() {
             <div className="cz-itens">
               {lista.map((c) => (
                 <button key={`${c.canal}-${c.cliente.id}`} className={`cz-item${sel?.cliente.id === c.cliente.id && sel.canal === c.canal ? ' ativo' : ''}`} onClick={() => abrir(c)}>
-                  <span className="cz-avatar-wrap">
+                  <span className={`cz-avatar-wrap ${c.canal}`}>
                     <span className="cz-avatar">{iniciais(c.cliente.nome)}</span>
                     {c.online && <span className="cz-online" />}
                     <span className={`cz-canal ${c.canal}`} title={c.canal === 'instagram' ? 'Instagram' : 'WhatsApp'}>
@@ -458,7 +465,7 @@ export default function CaixaEntrada() {
                       <span className="cz-hora">{hora(c.ultimaEm)}</span>
                     </span>
                     <span className="cz-previa">{c.ultimaDirecao === 'ENVIADA' ? '↩ ' : ''}{c.ultimaMensagem}</span>
-                    <span className="cz-item-rodape">👤 {c.vendedoraNome ?? '—'} · {c.cliente.segmento}</span>
+                    <span className="cz-item-rodape"><Headset size={11} strokeWidth={2} />{c.vendedoraNome ?? '—'} / {c.cliente.segmento}</span>
                   </span>
                   {c.naoLidas > 0
                     ? <span className="cz-badge">{c.naoLidas}</span>
@@ -468,6 +475,9 @@ export default function CaixaEntrada() {
               {lista.length === 0 && <div className="cz-aviso">{conversas.length === 0 ? t('caixa.nenhumaConversaAinda') : t('caixa.nadaEncontrado')}</div>}
             </div>
           )}
+          <button type="button" className="cz-novo-atendimento" onClick={clicarNovoAtendimento}>
+            <Plus size={16} strokeWidth={2.4} />{t('caixa.novoAtendimento')}
+          </button>
         </aside>
 
         {/* Painel direito: conversa OU grupo */}

@@ -934,9 +934,9 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 }
 .cz-ai-avatar-orbita { position: relative; flex: 0 0 auto; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; }
 .cz-ai-anel {
-  position: absolute; inset: -9px; width: calc(100% + 18px); height: calc(100% + 18px);
-  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.5));
-  animation: cz-orbita-spin 10s linear infinite;
+  position: absolute; inset: -5px; width: calc(100% + 10px); height: calc(100% + 10px);
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.45));
+  animation: cz-orbita-spin 12s linear infinite;
 }
 @keyframes cz-orbita-spin { to { transform: rotate(360deg); } }
 .cz-ai-avatar {

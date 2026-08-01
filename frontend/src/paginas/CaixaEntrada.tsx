@@ -359,9 +359,9 @@ export default function CaixaEntrada() {
         <div className="cz-ai-card">
           <div className="cz-ai-avatar-orbita">
             <svg className="cz-ai-anel" viewBox="0 0 64 64" aria-hidden="true">
-              <circle cx="32" cy="32" r="30" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1" strokeDasharray="1.5 4.5" />
-              <circle cx="32" cy="2" r="2.4" fill="#fff" />
-              <circle cx="4" cy="44" r="1.8" fill="#fff" opacity="0.75" />
+              <circle cx="32" cy="32" r="30" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="0.8" strokeDasharray="1.2 9" />
+              <circle cx="34" cy="2.2" r="2.2" fill="#fff" />
+              <circle cx="3" cy="46" r="1.6" fill="#fff" opacity="0.75" />
             </svg>
             <div className="cz-ai-avatar">Z</div>
           </div>

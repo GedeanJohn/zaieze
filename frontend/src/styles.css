@@ -962,9 +962,11 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   .cz-multicanal-marca span { font-size: 7px; letter-spacing: 0.26em; margin-top: 2px; }
   .cz-multicanal-arco { height: 12px; }
 
-  .cz-canais { gap: 5px; margin-bottom: 8px; }
-  .cz-canal-tab { padding: 5px 8px; font-size: 8.5px; gap: 3px; border-radius: 11px; }
-  .cz-canal-tab .cz-canal-ico { width: 20px; height: 20px; }
+  /* Só o ícone no mobile (sem rótulo) — a rede já fica clara pela conversa/lead, e assim as 7 abas cabem sem cortar na borda da tela. */
+  .cz-canais { gap: 7px; margin-bottom: 8px; justify-content: space-between; }
+  .cz-canal-rotulo { display: none; }
+  .cz-canal-tab { flex-direction: row; padding: 0; width: 34px; height: 34px; border-radius: 50%; justify-content: center; }
+  .cz-canal-tab .cz-canal-ico { width: 22px; height: 22px; }
 
   .cz-ai-card { padding: 9px 12px; gap: 8px; margin-bottom: 8px; border-radius: 14px; }
   .cz-ai-avatar-orbita { width: 34px; height: 34px; }
@@ -998,8 +1000,8 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-tab { background: transparent; border: 1px solid var(--cz-line); color: var(--cz-mut); border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .cz-tab.ativo { background: var(--cz-accent); border-color: var(--cz-accent); color: #fff; }
 .cz-tab-badge { background: linear-gradient(135deg, #ec4899, #db2777); color: #fff; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 0 6px; margin-left: 6px; min-width: 16px; display: inline-block; text-align: center; }
-.cz-itens { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 0; }
-.cz-item { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 12px; padding: 11px 10px; cursor: pointer; color: var(--cz-tx); position: relative; }
+.cz-itens { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px; display: flex; flex-direction: column; gap: 0; }
+.cz-item { display: flex; align-items: center; gap: 11px; width: 100%; max-width: 100%; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 12px; padding: 11px 10px; cursor: pointer; color: var(--cz-tx); position: relative; overflow: hidden; }
 .cz-item + .cz-item::before { content: ''; position: absolute; top: 0; left: 63px; right: 10px; border-top: 1px solid var(--cz-line); }
 .cz-item:hover { background: var(--cz-surf2); }
 .cz-item:hover::before, .cz-item.ativo::before, .cz-item.ativo + .cz-item::before { border-color: transparent; }

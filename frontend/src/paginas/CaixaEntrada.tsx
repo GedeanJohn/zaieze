@@ -320,9 +320,6 @@ export default function CaixaEntrada() {
               <span>MULTICANAL</span>
             </div>
             <div className="cz-multicanal-acoes">
-              <button type="button" className="cz-multicanal-icone" onClick={() => buscaRef.current?.focus()} aria-label={t('caixa.buscarConversas')}>
-                <Search size={17} strokeWidth={1.8} />
-              </button>
               <button type="button" className="cz-multicanal-icone" title="ZAI.AI" aria-hidden="true">
                 <Sparkles size={17} strokeWidth={1.8} />
               </button>
@@ -338,22 +335,22 @@ export default function CaixaEntrada() {
       )}
       {!temSel && (
         <div className="cz-canais">
-          <button type="button" className={`cz-canal-tab${canalFiltro === 'todas' ? ' ativo' : ''}`} onClick={() => setCanalFiltro('todas')}>
-            <span className="cz-canal-ico"><IconeTodosCanais size={13} /></span>{t('caixa.canalTodas')}
+          <button type="button" className={`cz-canal-tab${canalFiltro === 'todas' ? ' ativo' : ''}`} title={t('caixa.canalTodas')} onClick={() => setCanalFiltro('todas')}>
+            <span className="cz-canal-ico"><IconeTodosCanais size={13} /></span><span className="cz-canal-rotulo">{t('caixa.canalTodas')}</span>
           </button>
-          <button type="button" className={`cz-canal-tab${canalFiltro === 'whatsapp' ? ' ativo' : ''}`} onClick={() => setCanalFiltro('whatsapp')}>
-            <span className="cz-canal-ico wa"><IconeWhatsApp size={13} /></span>WhatsApp
+          <button type="button" className={`cz-canal-tab${canalFiltro === 'whatsapp' ? ' ativo' : ''}`} title="WhatsApp" onClick={() => setCanalFiltro('whatsapp')}>
+            <span className="cz-canal-ico wa"><IconeWhatsApp size={13} /></span><span className="cz-canal-rotulo">WhatsApp</span>
           </button>
-          <button type="button" className={`cz-canal-tab${canalFiltro === 'instagram' ? ' ativo' : ''}`} onClick={() => setCanalFiltro('instagram')}>
-            <span className="cz-canal-ico instagram"><IconeInstagram size={13} /></span>Instagram
+          <button type="button" className={`cz-canal-tab${canalFiltro === 'instagram' ? ' ativo' : ''}`} title="Instagram" onClick={() => setCanalFiltro('instagram')}>
+            <span className="cz-canal-ico instagram"><IconeInstagram size={13} /></span><span className="cz-canal-rotulo">Instagram</span>
           </button>
           {CANAIS_FUTUROS.map((c) => (
             <button key={c.chave} type="button" className="cz-canal-tab" disabled title={t('caixa.canalEmBreve')} onClick={() => clicarCanalFuturo(c.rotulo)}>
-              <span className={`cz-canal-ico ${c.chave}`}><c.Icone size={13} /></span>{c.rotulo}
+              <span className={`cz-canal-ico ${c.chave}`}><c.Icone size={13} /></span><span className="cz-canal-rotulo">{c.rotulo}</span>
             </button>
           ))}
           <button type="button" className="cz-canal-tab" disabled title={t('caixa.canalEmBreve')} onClick={() => clicarCanalFuturo(t('caixa.canalMais'))}>
-            <span className="cz-canal-ico mais"><MoreHorizontal size={15} /></span>{t('caixa.canalMais')}
+            <span className="cz-canal-ico mais"><MoreHorizontal size={15} /></span><span className="cz-canal-rotulo">{t('caixa.canalMais')}</span>
           </button>
         </div>
       )}

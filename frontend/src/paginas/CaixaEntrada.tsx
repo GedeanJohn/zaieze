@@ -103,6 +103,7 @@ export default function CaixaEntrada() {
   const [sel, setSel] = useState<Conversa | null>(null)
   const [carrinhoAberto, setCarrinhoAberto] = useState(false)
   const [thread, setThread] = useState<Mensagem[]>([])
+  const fimThreadRef = useRef<HTMLDivElement>(null)
   const [texto, setTexto] = useState('')
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState<Filtro>('NOVIDADES')
@@ -149,6 +150,11 @@ export default function CaixaEntrada() {
   }, [escopo.pronto, escopo.params])
 
   useEffect(() => { carregar() }, [carregar])
+
+  // Rola pro fim da conversa ao trocar de thread e a cada mensagem nova (enviada ou recebida) —
+  // sem isso, a última mensagem ficava fora da área visível, principalmente com o painel do
+  // Carrinho aberto (que encolhe bastante a altura da lista de mensagens).
+  useEffect(() => { fimThreadRef.current?.scrollIntoView({ block: 'end' }) }, [thread])
 
   // Fotos de perfil reais do WhatsApp — busca em lote pros telefones ainda não conhecidos, uma vez
   // que a lista de conversas chega (canal pessoal/Baileys; ver obterFotoPerfil no backend).
@@ -600,6 +606,7 @@ export default function CaixaEntrada() {
                     </div>
                   ))}
                   {thread.length === 0 && <div style={{ color: 'var(--cz-mut)', margin: 'auto' }}>{t('caixa.semMensagens')}</div>}
+                  <div ref={fimThreadRef} />
                 </div>
 
                 {erro && <div className="cz-alerta">{erro}</div>}

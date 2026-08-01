@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   DndContext, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors, useDraggable, useDroppable,
   type DragEndEvent, type DragStartEvent,
@@ -277,14 +278,21 @@ export default function CarrinhoCliente({ clienteId, atacado, onFechar }: Props)
         {salvando === 'erro' && <div className="cz-cart-alerta">{erroSync || t('caixa.erroSincronizar')}</div>}
       </div>
     </div>
-    <DragOverlay>
-      {arrastando && (
-        <div className="cz-cart-card cz-cart-card-fantasma">
-          {arrastando.fotos?.[0] ? <img src={arrastando.fotos[0]} alt="" /> : <div className="cz-cart-semfoto" />}
-          <span className="cz-cart-card-nome">{arrastando.nome}</span>
-        </div>
-      )}
-    </DragOverlay>
+    {createPortal(
+      // Porta pro <body> — o overlay do dnd-kit não se move sozinho pra fora da árvore, e ficando
+      // dentro de .cz-conversa (que tem backdrop-filter pro efeito de vidro) o "position: fixed"
+      // dele passa a ser relativo a esse ancestral em vez da janela, descolando do cursor ao
+      // arrastar. O contexto do React continua funcionando normal através do portal.
+      <DragOverlay>
+        {arrastando && (
+          <div className="cz-cart-card cz-cart-card-fantasma">
+            {arrastando.fotos?.[0] ? <img src={arrastando.fotos[0]} alt="" /> : <div className="cz-cart-semfoto" />}
+            <span className="cz-cart-card-nome">{arrastando.nome}</span>
+          </div>
+        )}
+      </DragOverlay>,
+      document.body,
+    )}
     </DndContext>
   )
 }

@@ -356,7 +356,6 @@ export default function CaixaEntrada() {
               </button>
             </div>
           </div>
-          <div className="cz-multicanal-arco" aria-hidden="true" />
         </div>
       )}
       {!temSel && (

@@ -864,12 +864,6 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-multicanal-marca strong { font-family: var(--marca); font-size: 22px; letter-spacing: 0.3em; color: #fff; line-height: 1; }
 .cz-multicanal-marca span { display: block; font-size: 8.5px; letter-spacing: 0.32em; color: #9a95a8; margin-top: 3px; }
 .cz-multicanal-acoes { display: flex; gap: 8px; flex-shrink: 0; }
-.cz-multicanal-arco {
-  position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
-  width: min(420px, 90%); height: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 50%; pointer-events: none;
-  box-shadow: 0 1px 16px 1px rgba(255, 255, 255, 0.28), 0 -2px 24px rgba(255, 255, 255, 0.1);
-}
 /* ── Barra de busca única, fixa logo abaixo do card ZAI.AI (mockup) ── */
 .cz-busca-topo {
   display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding: 10px 14px;
@@ -907,8 +901,8 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
    esquerda, sobrando bastante espaço vazio à direita. */
 @media (min-width: 721px) {
   .cz-canais { justify-content: space-between; gap: 10px; }
-  .cz-canal-tab { padding: 10px 16px; font-size: 12.5px; gap: 7px; }
-  .cz-canal-tab .cz-canal-ico { width: 38px; height: 38px; }
+  .cz-canal-tab { padding: 12px 18px; font-size: 13.5px; gap: 8px; }
+  .cz-canal-tab .cz-canal-ico { width: 48px; height: 48px; }
 }
 .cz-canal-tab.ativo {
   color: #f4f2f8; border-color: rgba(255, 255, 255, 0.5);
@@ -962,7 +956,6 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   .cz-multicanal-icone { width: 32px; height: 32px; border-radius: 9px; }
   .cz-multicanal-marca strong { font-size: 16px; letter-spacing: 0.22em; }
   .cz-multicanal-marca span { font-size: 7px; letter-spacing: 0.26em; margin-top: 2px; }
-  .cz-multicanal-arco { height: 12px; }
 
   /* Ícone + rótulo compactos no mobile — como as inativas não têm mais caixa/borda, as 7 abas
      cabem na largura da tela sem cortar na borda mesmo com o texto. */

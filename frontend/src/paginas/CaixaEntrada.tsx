@@ -124,6 +124,7 @@ export default function CaixaEntrada() {
   const [textoGrupo, setTextoGrupo] = useState('')
   const [resultadoGrupo, setResultadoGrupo] = useState<ResultadoDisparo | null>(null)
   const [modalGrupo, setModalGrupo] = useState(false)
+  const [modalImportar, setModalImportar] = useState(false)
 
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
@@ -427,7 +428,10 @@ export default function CaixaEntrada() {
 
           {filtro === 'GRUPOS' ? (
             <div className="cz-itens">
-              <button type="button" className="cz-criar-grupo" onClick={() => setModalGrupo(true)}>{t('caixa.criarGrupo')}</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className="cz-criar-grupo" style={{ flex: 1, width: 'auto' }} onClick={() => setModalGrupo(true)}>{t('caixa.criarGrupo')}</button>
+                <button type="button" className="cz-criar-grupo" style={{ flex: 1, width: 'auto' }} onClick={() => setModalImportar(true)}>{t('caixa.importarDoWhatsapp')}</button>
+              </div>
               {gruposFiltrados.map((g) => (
                 <button key={g.id} className={`cz-item${grupoSel?.id === g.id ? ' ativo' : ''}`} onClick={() => abrirGrupo(g.id)}>
                   <span className="cz-avatar grupo">{iniciais(g.nome)}</span>
@@ -613,6 +617,13 @@ export default function CaixaEntrada() {
           onCriado={() => { setModalGrupo(false); carregarGrupos() }}
         />
       )}
+      {modalImportar && (
+        <ModalImportarGrupos
+          escopo={escopo}
+          onFechar={() => setModalImportar(false)}
+          onImportado={(id) => { setModalImportar(false); carregarGrupos(); abrirGrupo(id) }}
+        />
+      )}
     </div>
   )
 }
@@ -682,6 +693,78 @@ function ModalCriarGrupo({ escopo, onFechar, onCriado }: { escopo: ReturnType<ty
         <div className="cz-modal-acoes">
           <button className="cz-btn fantasma" onClick={onFechar}>{t('comum.cancelar')}</button>
           <button className="cz-btn" disabled={salvando || !nome.trim()} onClick={salvar}>{salvando ? t('caixa.criando') : t('caixa.criarGrupoBtn')}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface GrupoReal {
+  waId: string; nome: string; totalParticipantes: number
+  membrosEncontrados: { id: string; nome: string }[]; naoEncontrados: number
+}
+
+/** Modal "Importar do WhatsApp": só funciona com o WhatsApp pessoal (Baileys) conectado — a API
+ * oficial da Meta não tem visibilidade nenhuma sobre grupos reais. Foto do momento, sob demanda
+ * (não fica sincronizado com o grupo real depois — ver TROUBLESHOOTING/plano desta feature). */
+function ModalImportarGrupos({ escopo, onFechar, onImportado }: { escopo: ReturnType<typeof useLojaAtiva>; onFechar: () => void; onImportado: (id: string) => void }) {
+  const { t } = useIdioma()
+  const [grupos, setGrupos] = useState<GrupoReal[] | null>(null)
+  const [erro, setErro] = useState('')
+  const [nomesEditados, setNomesEditados] = useState<Record<string, string>>({})
+  const [importandoWaId, setImportandoWaId] = useState<string | null>(null)
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await api.get('/whatsapp/pessoal/grupos-reais', { params: escopo.params })
+        setGrupos(data)
+      } catch (e) { setErro(mensagemDeErro(e)) }
+    })()
+  }, [escopo.params])
+
+  async function importar(g: GrupoReal) {
+    setImportandoWaId(g.waId); setErro('')
+    try {
+      const { data } = await api.post(
+        `/whatsapp/pessoal/grupos-reais/${g.waId}/importar`,
+        { nome: nomesEditados[g.waId]?.trim() || undefined },
+        { params: escopo.params },
+      )
+      onImportado(data.id)
+    } catch (e) {
+      setErro(mensagemDeErro(e))
+    } finally {
+      setImportandoWaId(null)
+    }
+  }
+
+  return (
+    <div className="cz-modal-fundo" onClick={onFechar}>
+      <div className="cz-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="cz-modal-top">
+          <strong>{t('caixa.importarGruposTitulo')}</strong>
+          <button className="cz-modal-x" onClick={onFechar} aria-label={t('comum.fechar')}>×</button>
+        </div>
+        {erro && <div className="cz-alerta">{erro}</div>}
+        {grupos === null && !erro && <div className="cz-aviso">{t('caixa.carregandoGrupos')}</div>}
+        {grupos !== null && grupos.length === 0 && <div className="cz-aviso">{t('caixa.importarGruposVazio')}</div>}
+        <div className="cz-modal-clientes">
+          {grupos?.map((g) => (
+            <div key={g.waId} className="cz-cliente-op" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+              <input
+                className="cz-busca" value={nomesEditados[g.waId] ?? g.nome}
+                onChange={(e) => setNomesEditados((n) => ({ ...n, [g.waId]: e.target.value }))}
+              />
+              <span style={{ fontSize: 12, color: 'var(--cz-mut)' }}>
+                {t('caixa.participantesEncontrados', { n: g.membrosEncontrados.length, total: g.totalParticipantes })}
+              </span>
+              <button
+                type="button" className="cz-btn" disabled={importandoWaId === g.waId || g.membrosEncontrados.length === 0}
+                onClick={() => importar(g)}
+              >{importandoWaId === g.waId ? '…' : t('caixa.importar')}</button>
+            </div>
+          ))}
         </div>
       </div>
     </div>

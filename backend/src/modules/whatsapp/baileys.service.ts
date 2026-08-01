@@ -240,6 +240,21 @@ export async function enviarAudioBaileys(usuarioId: string, telefone: string, bu
   }
 }
 
+/** Lista real de grupos do WhatsApp pessoal (nome + telefones dos participantes, normalizados) —
+ * usada pra "importar grupo do WhatsApp" como Grupo interno do Chat Zaieze (ver grupos.routes.ts).
+ * `null` quando não há sessão Baileys ativa (a rota traduz pra "conecte seu WhatsApp primeiro"). */
+export async function listarGruposReais(usuarioId: string): Promise<{ waId: string; nome: string; participantes: string[] }[] | null> {
+  const sessao = sessoes.get(usuarioId)
+  if (!sessao?.sock?.user) return null
+  const grupos: Record<string, { id: string; subject: string; participants: { id: string }[] }> =
+    await sessao.sock.groupFetchAllParticipating()
+  return Object.values(grupos).map((g) => ({
+    waId: g.id,
+    nome: g.subject,
+    participantes: g.participants.map((p) => p.id.split('@')[0].replace(/\D/g, '')),
+  }))
+}
+
 /**
  * Restaura, no boot do servidor, as sessões que estavam conectadas antes do restart (o container
  * pode subir de novo a qualquer momento — as credenciais persistidas no volume `wa-sessions`

@@ -114,6 +114,37 @@ async function encaminharRecebida(usuarioId: string, numero: string, m: any, nom
   }).catch((e) => console.error('[baileys] falha ao registrar mensagem recebida', usuarioId, e))
 }
 
+/** Encaminha uma mensagem ENVIADA direto do celular da vendedora (fora do Chat Zaieze — ela abriu
+ * o WhatsApp normal e respondeu por lá). Sem isso, o Chat Zaieze ficava com a conversa incompleta:
+ * só as mensagens mandadas pelo próprio app apareciam, as que saíam direto do aparelho sumiam.
+ * (Mensagens mandadas PELO app não passam por aqui — o `messages.upsert` já vê o eco delas com o
+ * mesmo `waMessageId` que `enviarTextoBaileys`/`enviarAudioBaileys` gravaram na hora do envio; o
+ * chamador filtra isso antes de chegar aqui, ver `messages.upsert` abaixo.) */
+async function encaminharEnviadaDoCelular(usuarioId: string, numero: string, m: any) {
+  const texto = textoDaMensagemBaileys(m)
+  if (!texto) return
+
+  const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId }, select: { lojaId: true } })
+  if (!usuario?.lojaId) return
+  const cliente = await prisma.cliente.upsert({
+    where: { lojaId_telefone: { lojaId: usuario.lojaId, telefone: numero } },
+    create: {
+      lojaId: usuario.lojaId, telefone: numero, nome: 'Cliente do WhatsApp',
+      vendedoraId: usuarioId, consentimentoLgpd: true, observacoes: 'Entrou pelo WhatsApp pessoal da vendedora',
+    },
+    update: {},
+    select: { id: true, lojaId: true, vendedoraId: true },
+  })
+  if (!cliente.vendedoraId) return
+  await prisma.mensagemWhatsapp.create({
+    data: {
+      lojaId: cliente.lojaId, clienteId: cliente.id, vendedoraId: cliente.vendedoraId,
+      direcao: 'ENVIADA', status: 'ENVIADA', origem: 'MANUAL', telefone: numero, texto,
+      tipoMidia: tipoDaMidiaBaileys(m), waMessageId: m.key?.id ?? null,
+    },
+  }).catch((e) => console.error('[baileys] falha ao registrar mensagem enviada pelo celular', usuarioId, e))
+}
+
 /**
  * Abre (ou restaura) a sessão do WhatsApp pessoal da vendedora. Resolve assim que houver um QR
  * pra mostrar OU a conexão abrir sozinha (sessão salva restaurada sem precisar de novo QR) —
@@ -188,9 +219,19 @@ export async function iniciarConexao(usuarioId: string): Promise<{ qrCode?: stri
     sock.ev.on('messages.upsert', async ({ messages, type }: { messages: any[]; type: string }) => {
       if (type !== 'notify') return
       for (const m of messages) {
-        if (m.key?.fromMe) continue
         const numero = numeroDoJid(m.key?.remoteJid)
         if (!numero) continue
+        if (m.key?.fromMe) {
+          // Eco de uma mensagem ENVIADA — se foi pelo próprio Chat Zaieze, já foi gravada na hora
+          // do envio (mesmo waMessageId); só falta registrar quando ela saiu direto do celular da
+          // vendedora, fora do app (ver encaminharEnviadaDoCelular).
+          const id = m.key?.id
+          if (!id) continue
+          const jaRegistrada = await prisma.mensagemWhatsapp.findFirst({ where: { waMessageId: id }, select: { id: true } })
+          if (jaRegistrada) continue
+          await encaminharEnviadaDoCelular(usuarioId, numero, m)
+          continue
+        }
         await encaminharRecebida(usuarioId, numero, m, m.pushName ?? undefined)
       }
     })

@@ -125,6 +125,9 @@ export default function CaixaEntrada() {
   const [resultadoGrupo, setResultadoGrupo] = useState<ResultadoDisparo | null>(null)
   const [modalGrupo, setModalGrupo] = useState(false)
   const [modalImportar, setModalImportar] = useState(false)
+  // Foto de perfil real (só existe pelo canal pessoal/Baileys — ver obterFotoPerfil no backend).
+  // Sem sessão pessoal conectada, a rota devolve tudo null e a inicial continua aparecendo.
+  const [fotosPerfil, setFotosPerfil] = useState<Record<string, string | null>>({})
 
   const carregar = useCallback(async () => {
     if (!escopo.pronto) return
@@ -146,6 +149,21 @@ export default function CaixaEntrada() {
   }, [escopo.pronto, escopo.params])
 
   useEffect(() => { carregar() }, [carregar])
+
+  // Fotos de perfil reais do WhatsApp — busca em lote pros telefones ainda não conhecidos, uma vez
+  // que a lista de conversas chega (canal pessoal/Baileys; ver obterFotoPerfil no backend).
+  useEffect(() => {
+    if (!escopo.pronto) return
+    const telefones = [...new Set(
+      conversas.filter((c) => c.canal === 'whatsapp' && c.cliente.telefone && !(c.cliente.telefone in fotosPerfil))
+        .map((c) => c.cliente.telefone as string),
+    )]
+    if (telefones.length === 0) return
+    api.post('/whatsapp/pessoal/fotos-perfil', { telefones }, { params: escopo.params })
+      .then(({ data }) => setFotosPerfil((atual) => ({ ...atual, ...data })))
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversas, escopo.pronto, escopo.params])
 
   // Estatísticas da vendedora (topo do chat)
   useEffect(() => {
@@ -451,7 +469,14 @@ export default function CaixaEntrada() {
                 return (
                 <button key={`${c.canal}-${c.cliente.id}`} className={`cz-item${ativo ? ' ativo' : ''}${destaque ? ' destaque' : ''}`} onClick={() => abrir(c)}>
                   <span className={`cz-avatar-wrap ${c.canal}`}>
-                    <span className="cz-avatar">{iniciais(c.cliente.nome)}</span>
+                    {c.cliente.telefone && fotosPerfil[c.cliente.telefone]
+                      ? (
+                        <img
+                          className="cz-avatar" src={fotosPerfil[c.cliente.telefone]!} alt=""
+                          onError={() => setFotosPerfil((atual) => ({ ...atual, [c.cliente.telefone!]: null }))}
+                        />
+                      )
+                      : <span className="cz-avatar">{iniciais(c.cliente.nome)}</span>}
                     {c.online && <span className="cz-online" />}
                     <span className={`cz-canal ${c.canal}`} title={c.canal === 'instagram' ? 'Instagram' : 'WhatsApp'}>
                       {c.canal === 'instagram' ? <IconeInstagram size={9} /> : <IconeWhatsApp size={9} />}

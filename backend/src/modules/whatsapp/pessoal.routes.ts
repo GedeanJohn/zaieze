@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { requireFeature } from '../../plugins/planos'
 import { lojaIdDe } from '../../plugins/auth'
-import { iniciarConexao, desconectar, obterQrAtual, listarGruposReais } from './baileys.service'
+import { iniciarConexao, desconectar, obterQrAtual, listarGruposReais, obterFotoPerfil } from './baileys.service'
 
 /** Cruza os participantes reais do grupo (telefones já normalizados) com os clientes da carteira
  * da vendedora — só o que já existe como Cliente entra; o resto fica de fora silenciosamente
@@ -79,5 +79,17 @@ export async function whatsappPessoalRoutes(app: FastifyInstance) {
       select: { id: true, nome: true },
     })
     return reply.code(201).send({ id: criado.id, nome: criado.nome, membros: membrosEncontrados.length, naoEncontrados })
+  })
+
+  // Fotos de perfil reais do WhatsApp (só existe pelo canal pessoal, ver obterFotoPerfil) — em
+  // lote pra carregar a lista de conversas inteira numa chamada só. `app.authenticate` (não exige
+  // VENDEDORA): se quem chamar não tiver sessão Baileys própria, a função já devolve null pra tudo,
+  // sem quebrar a tela de quem só acompanha (GERENTE/GESTOR).
+  const fotosPerfilSchema = z.object({ telefones: z.array(z.string()).max(100) })
+  app.post('/fotos-perfil', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request) => {
+    const { telefones } = fotosPerfilSchema.parse(request.body)
+    const unicos = [...new Set(telefones.map((t) => t.replace(/\D/g, '')).filter(Boolean))]
+    const entradas = await Promise.all(unicos.map(async (tel) => [tel, await obterFotoPerfil(request.user.sub, tel)] as const))
+    return Object.fromEntries(entradas)
   })
 }

@@ -255,6 +255,33 @@ export async function listarGruposReais(usuarioId: string): Promise<{ waId: stri
   }))
 }
 
+// Cache em memória (chave: usuarioId:telefone) — evita bater no WhatsApp de novo a cada carregamento
+// da lista de conversas. Reseta a cada deploy/restart do servidor, o que é aceitável aqui (a foto
+// raramente muda, e uma foto desatualizada por até 1h não é um problema visível).
+const FOTO_CACHE_MS = 60 * 60 * 1000
+const fotosPerfilCache = new Map<string, { url: string | null; em: number }>()
+
+/** Foto de perfil real do contato — só existe pelo canal pessoal (Baileys); a API oficial da Meta
+ * não expõe foto de perfil de cliente pra quem usa a Business Platform. `null` sem sessão ativa,
+ * sem foto cadastrada ou quando a privacidade do contato não permite ver. */
+export async function obterFotoPerfil(usuarioId: string, telefone: string): Promise<string | null> {
+  const tel = telefone.replace(/\D/g, '')
+  const chave = `${usuarioId}:${tel}`
+  const emCache = fotosPerfilCache.get(chave)
+  if (emCache && Date.now() - emCache.em < FOTO_CACHE_MS) return emCache.url
+
+  const sessao = sessoes.get(usuarioId)
+  if (!sessao?.sock?.user) return null
+  let url: string | null = null
+  try {
+    url = await sessao.sock.profilePictureUrl(`${tel}@s.whatsapp.net`, 'image')
+  } catch {
+    url = null // sem foto ou privacidade do contato não permite
+  }
+  fotosPerfilCache.set(chave, { url, em: Date.now() })
+  return url
+}
+
 /**
  * Restaura, no boot do servidor, as sessões que estavam conectadas antes do restart (o container
  * pode subir de novo a qualquer momento — as credenciais persistidas no volume `wa-sessions`

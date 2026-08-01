@@ -1017,14 +1017,14 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 0 1px var(--cz-glow),
     0 0 32px rgba(255, 255, 255, 0.22), inset 0 0 14px rgba(255, 255, 255, 0.05);
 }
-.cz-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: #fff; background: linear-gradient(135deg, #a855f7, #ec4899); flex: 0 0 auto; }
+.cz-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: #fff; background: linear-gradient(135deg, #a855f7, #ec4899); flex: 0 0 auto; object-fit: cover; }
 .cz-avatar.sm { width: 38px; height: 38px; font-size: 14px; }
 .cz-item-main { flex: 1; min-width: 0; }
 .cz-item-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
 .cz-item-nome-tags { display: flex; align-items: center; min-width: 0; flex: 1; }
 .cz-item-top strong { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex-shrink: 1; }
 .cz-hora { font-size: 11px; color: var(--cz-mut); white-space: nowrap; }
-.cz-previa { font-size: 12.5px; color: var(--cz-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+.cz-previa { display: block; min-width: 0; font-size: 12.5px; color: var(--cz-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
 .cz-badge { background: linear-gradient(135deg, #a855f7, #7e22ce); color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 7px; min-width: 22px; text-align: center; box-shadow: 0 2px 8px #a855f766; align-self: center; }
 .cz-vazio { margin: auto; color: var(--cz-mut); }
 .cz-conv-top { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--cz-line); }

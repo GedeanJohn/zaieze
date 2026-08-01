@@ -50,6 +50,27 @@ function numeroDoJid(jid?: string | null): string | null {
   return jid.split('@')[0].split(':')[0].replace(/\D/g, '') || null
 }
 
+/** Resolve o telefone real por trás de um JID — trata o caso de `remoteJid` vir como `@lid`
+ * (identificador anônimo do WhatsApp, não o número), que passou a aparecer em alguns eventos
+ * (principalmente mensagens ENVIADAS ecoadas de outro aparelho vinculado, ex.: celular/Desktop).
+ * Sem essa tradução, os dígitos do LID eram tratados como se fossem telefone — criava um Cliente
+ * novo e errado em vez de cair na conversa certa (ex.: telefone "2504066654230", que nem é um
+ * número de verdade). `null` quando o LID ainda não tem mapeamento conhecido — mais seguro não
+ * processar a mensagem do que gravar num cliente errado. */
+async function resolverNumero(sock: any, jid?: string | null): Promise<string | null> {
+  if (!jid) return null
+  if (jid.endsWith('@lid')) {
+    try {
+      const pn = await sock.signalRepository?.lidMapping?.getPNForLID(jid)
+      return pn ? numeroDoJid(pn) : null
+    } catch (e) {
+      console.error('[baileys] falha ao resolver @lid pro telefone real', jid, e)
+      return null
+    }
+  }
+  return numeroDoJid(jid)
+}
+
 /** Tipo de mídia recebida (imagem/áudio/vídeo) — só pra rotular a mensagem no Chat Zaieze.
  * Decisão de produto: NÃO baixar/guardar o arquivo (a vendedora já vê a mídia no próprio celular,
  * que é o dono real da conversa no WhatsApp pessoal) — evita gasto de memória/storage à toa.
@@ -219,7 +240,7 @@ export async function iniciarConexao(usuarioId: string): Promise<{ qrCode?: stri
     sock.ev.on('messages.upsert', async ({ messages, type }: { messages: any[]; type: string }) => {
       if (type !== 'notify') return
       for (const m of messages) {
-        const numero = numeroDoJid(m.key?.remoteJid)
+        const numero = await resolverNumero(sock, m.key?.remoteJid)
         if (!numero) continue
         if (m.key?.fromMe) {
           // Eco de uma mensagem ENVIADA — se foi pelo próprio Chat Zaieze, já foi gravada na hora

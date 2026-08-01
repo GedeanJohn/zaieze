@@ -1001,7 +1001,7 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-tab.ativo { background: var(--cz-accent); border-color: var(--cz-accent); color: #fff; }
 .cz-tab-badge { background: linear-gradient(135deg, #ec4899, #db2777); color: #fff; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 0 6px; margin-left: 6px; min-width: 16px; display: inline-block; text-align: center; }
 .cz-itens { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px; display: flex; flex-direction: column; gap: 0; }
-.cz-item { display: flex; align-items: center; gap: 11px; width: 100%; max-width: 100%; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 12px; padding: 11px 10px; cursor: pointer; color: var(--cz-tx); position: relative; overflow: hidden; }
+.cz-item { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 12px; padding: 11px 10px; cursor: pointer; color: var(--cz-tx); position: relative; }
 .cz-item + .cz-item::before { content: ''; position: absolute; top: 0; left: 63px; right: 10px; border-top: 1px solid var(--cz-line); }
 .cz-item:hover { background: var(--cz-surf2); }
 .cz-item:hover::before, .cz-item.ativo::before, .cz-item.ativo + .cz-item::before { border-color: transparent; }

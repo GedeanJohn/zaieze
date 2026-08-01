@@ -849,12 +849,12 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-canal-tab {
   display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 0 0 auto;
   background: #111118; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px;
-  padding: 10px 16px; cursor: pointer; color: #9a95a8; font-size: 11px; font-weight: 600;
+  padding: 8px 12px; cursor: pointer; color: #9a95a8; font-size: 10.5px; font-weight: 600;
   transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
 .cz-canal-tab .cz-canal-ico {
-  width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  font-size: 15px; background: rgba(255, 255, 255, 0.06);
+  width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.06); color: #cfcbe0;
 }
 .cz-canal-tab.ativo {
   color: #f4f2f8; border-color: rgba(255, 255, 255, 0.4);
@@ -888,7 +888,13 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-ai-metrica { text-align: center; }
 .cz-ai-metrica strong { display: block; font-size: 18px; font-weight: 800; font-family: var(--fonte-titulo); color: #f4f2f8; }
 .cz-ai-metrica span { font-size: 10.5px; color: #9a95a8; white-space: nowrap; }
-@media (max-width: 720px) { .cz-ai-metricas { display: none; } }
+@media (max-width: 720px) {
+  .cz-ai-card { flex-wrap: wrap; padding: 14px 16px; gap: 10px; }
+  .cz-ai-avatar { width: 42px; height: 42px; font-size: 16px; }
+  .cz-ai-metricas { flex-basis: 100%; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid var(--cz-line); }
+  .cz-ai-metrica strong { font-size: 15px; }
+  .cz-ai-metrica span { font-size: 9px; }
+}
 
 .cz-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .cz-stat { background: #111118; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 11px; padding: 9px 12px; display: flex; flex-direction: column; gap: 3px; }
@@ -926,7 +932,8 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-avatar.sm { width: 38px; height: 38px; font-size: 14px; }
 .cz-item-main { flex: 1; min-width: 0; }
 .cz-item-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-.cz-item-top strong { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cz-item-nome-tags { display: flex; align-items: center; min-width: 0; flex: 1; }
+.cz-item-top strong { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex-shrink: 1; }
 .cz-hora { font-size: 11px; color: var(--cz-mut); white-space: nowrap; }
 .cz-previa { font-size: 12.5px; color: var(--cz-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
 .cz-badge { background: linear-gradient(135deg, #ec4899, #db2777); color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 7px; min-width: 22px; text-align: center; box-shadow: 0 2px 8px #ec489966; align-self: center; }
@@ -989,19 +996,21 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-avatar-wrap { position: relative; flex: 0 0 auto; display: inline-flex; }
 .cz-online { position: absolute; right: 0; bottom: 0; width: 11px; height: 11px; border-radius: 50%; background: #22c55e; border: 2px solid var(--cz-surf); }
 /* Selo de canal (WhatsApp/Instagram) no canto do avatar da conversa */
-.cz-canal { position: absolute; left: -2px; bottom: -2px; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; border: 2px solid var(--cz-surf); background: #f1efe9; }
+.cz-canal { position: absolute; left: -2px; bottom: -2px; width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; border: 2px solid var(--cz-surf); background: #f1efe9; }
 .cz-canal.whatsapp { background: #25d366; }
 .cz-canal.instagram { background: radial-gradient(circle at 30% 110%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%); }
 .cz-canal.messenger { background: linear-gradient(135deg, #00b2ff, #a033ff, #ff5280); }
 .cz-canal.email { background: #6b7280; }
 .cz-canal.telegram { background: #29a9eb; }
 
-/* Tags do card de conversa (VIP / nova mensagem) e linha de responsável+segmento */
-.cz-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 3px; }
-.cz-tag { font-size: 9.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; letter-spacing: 0.02em; white-space: nowrap; }
+/* Tags do card de conversa (VIP / nova mensagem), inline ao lado do nome, e linha de responsável+segmento */
+.cz-tags { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: middle; flex-shrink: 0; }
+.cz-tag { font-size: 9px; font-weight: 700; padding: 1px 7px; border-radius: 999px; letter-spacing: 0.02em; white-space: nowrap; }
 .cz-tag.vip { background: rgba(216, 180, 254, 0.18); color: #d8b4fe; border: 1px solid rgba(216, 180, 254, 0.35); }
 .cz-tag.novo { background: rgba(168, 85, 247, 0.85); color: #fff; }
-.cz-item-rodape { display: flex; align-items: center; gap: 4px; font-size: 10.5px; color: var(--cz-mut); margin-top: 3px; }
+.cz-item-rodape { display: flex; align-items: center; gap: 4px; font-size: 10.5px; color: var(--cz-mut); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Badge "tudo em dia" (sem pendência) — check discreto no lugar do número de não lidas */
+.cz-badge-ok { color: #6b7280; align-self: center; flex-shrink: 0; }
 .cz-verificado { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; margin-left: 5px; border-radius: 50%; background: #22c55e; color: #fff; font-size: 9px; vertical-align: middle; }
 .cz-item-top strong { display: inline-flex; align-items: center; }
 

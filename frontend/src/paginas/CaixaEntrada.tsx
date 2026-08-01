@@ -4,6 +4,7 @@ import { api, mensagemDeErro, formataReal } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
 import { useIdioma } from '../lib/i18n'
+import { IconeWhatsApp, IconeInstagram, IconeMessenger, IconeTelegram, IconeEmail, IconeTodosCanais } from '../componentes/IconesCanal'
 
 type Canal = 'whatsapp' | 'instagram'
 // Canais que ainda não têm integração de verdade — aparecem na barra (mockup multicanal), mas
@@ -14,6 +15,7 @@ type FiltroCanal = 'todas' | Canal
 interface Conversa {
   canal: Canal
   cliente: { id: string; nome: string; telefone: string | null; segmento: string; vendedoraId: string | null }
+  vendedoraNome: string | null
   ultimaMensagem: string
   ultimaDirecao: 'ENVIADA' | 'RECEBIDA'
   ultimaEm: string
@@ -41,10 +43,10 @@ interface ChatStats {
 
 // Canais que aparecem na barra do mockup mas ainda não têm integração — ícone + cor de marca,
 // pra já deixar o espaço reservado sem fingir que funcionam.
-const CANAIS_FUTUROS: { chave: CanalFuturo; rotulo: string; icone: string }[] = [
-  { chave: 'messenger', rotulo: 'Messenger', icone: '⚡' },
-  { chave: 'email', rotulo: 'Email', icone: '✉️' },
-  { chave: 'telegram', rotulo: 'Telegram', icone: '✈️' },
+const CANAIS_FUTUROS: { chave: CanalFuturo; rotulo: string; Icone: (p: { size?: number }) => JSX.Element }[] = [
+  { chave: 'messenger', rotulo: 'Messenger', Icone: IconeMessenger },
+  { chave: 'email', rotulo: 'Email', Icone: IconeEmail },
+  { chave: 'telegram', rotulo: 'Telegram', Icone: IconeTelegram },
 ]
 
 // Mídia recebida pelo WhatsApp pessoal (Baileys) vira só uma etiqueta — sem o arquivo em si
@@ -170,6 +172,7 @@ export default function CaixaEntrada() {
         setSel({
           canal,
           cliente: { id: data.id, nome: data.nome, telefone: data.telefone, segmento: data.segmento, vendedoraId: data.vendedoraId ?? null },
+          vendedoraNome: null,
           ultimaMensagem: '', ultimaDirecao: 'ENVIADA', ultimaEm: new Date().toISOString(), mensagens: 0, naoLidas: 0,
         })
         const t = await api.get(`/${canal}/conversas/${id}`, { params: escopo.params })
@@ -312,17 +315,17 @@ export default function CaixaEntrada() {
       {!temSel && (
         <div className="cz-canais">
           <button type="button" className={`cz-canal-tab${canalFiltro === 'todas' ? ' ativo' : ''}`} onClick={() => setCanalFiltro('todas')}>
-            <span className="cz-canal-ico">☰</span>{t('caixa.canalTodas')}
+            <span className="cz-canal-ico"><IconeTodosCanais size={13} /></span>{t('caixa.canalTodas')}
           </button>
           <button type="button" className={`cz-canal-tab${canalFiltro === 'whatsapp' ? ' ativo' : ''}`} onClick={() => setCanalFiltro('whatsapp')}>
-            <span className="cz-canal-ico wa">💬</span>WhatsApp
+            <span className="cz-canal-ico wa"><IconeWhatsApp size={13} /></span>WhatsApp
           </button>
           <button type="button" className={`cz-canal-tab${canalFiltro === 'instagram' ? ' ativo' : ''}`} onClick={() => setCanalFiltro('instagram')}>
-            <span className="cz-canal-ico instagram">📷</span>Instagram
+            <span className="cz-canal-ico instagram"><IconeInstagram size={13} /></span>Instagram
           </button>
           {CANAIS_FUTUROS.map((c) => (
             <button key={c.chave} type="button" className="cz-canal-tab" disabled title={t('caixa.canalEmBreve')} onClick={() => clicarCanalFuturo(c.rotulo)}>
-              <span className={`cz-canal-ico ${c.chave}`}>{c.icone}</span>{c.rotulo}
+              <span className={`cz-canal-ico ${c.chave}`}><c.Icone size={13} /></span>{c.rotulo}
             </button>
           ))}
         </div>
@@ -357,9 +360,6 @@ export default function CaixaEntrada() {
         {/* Lista (conversas ou grupos) */}
         <aside className="cz-lista">
           <div className="cz-lista-top">
-            <div className="cz-titulo">
-              {filtro === 'GRUPOS' ? <>{t('caixa.grupos')} <span className="cz-count">{grupos.length}</span></> : <>{t('caixa.conversas')} <span className="cz-count">{conversas.length}</span></>}
-            </div>
             <input className="cz-busca" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={filtro === 'GRUPOS' ? t('caixa.buscarGrupos') : t('caixa.buscarConversas')} />
             <div className="cz-tabs">
               <button type="button" className={`cz-tab${filtro === 'NOVIDADES' ? ' ativo' : ''}`} onClick={() => { setFiltro('NOVIDADES'); setGrupoSel(null) }}>{t('caixa.novidades')}</button>
@@ -391,23 +391,29 @@ export default function CaixaEntrada() {
                   <span className="cz-avatar-wrap">
                     <span className="cz-avatar">{iniciais(c.cliente.nome)}</span>
                     {c.online && <span className="cz-online" />}
-                    <span className={`cz-canal ${c.canal}`} title={c.canal === 'instagram' ? 'Instagram' : 'WhatsApp'}>{c.canal === 'instagram' ? '📷' : '💬'}</span>
+                    <span className={`cz-canal ${c.canal}`} title={c.canal === 'instagram' ? 'Instagram' : 'WhatsApp'}>
+                      {c.canal === 'instagram' ? <IconeInstagram size={9} /> : <IconeWhatsApp size={9} />}
+                    </span>
                   </span>
                   <span className="cz-item-main">
                     <span className="cz-item-top">
-                      <strong>{c.cliente.nome}{c.verificado && <span className="cz-verificado" title="Verificado">✔</span>}</strong>
+                      <span className="cz-item-nome-tags">
+                        <strong>{c.cliente.nome}{c.verificado && <span className="cz-verificado" title="Verificado">✔</span>}</strong>
+                        {(c.cliente.segmento === 'VIP' || ehNovaMensagem(c)) && (
+                          <span className="cz-tags">
+                            {c.cliente.segmento === 'VIP' && <span className="cz-tag vip">VIP</span>}
+                            {ehNovaMensagem(c) && <span className="cz-tag novo">{t('caixa.novaMensagem')}</span>}
+                          </span>
+                        )}
+                      </span>
                       <span className="cz-hora">{hora(c.ultimaEm)}</span>
                     </span>
                     <span className="cz-previa">{c.ultimaDirecao === 'ENVIADA' ? '↩ ' : ''}{c.ultimaMensagem}</span>
-                    {(c.cliente.segmento === 'VIP' || ehNovaMensagem(c)) && (
-                      <span className="cz-tags">
-                        {c.cliente.segmento === 'VIP' && <span className="cz-tag vip">VIP</span>}
-                        {ehNovaMensagem(c) && <span className="cz-tag novo">{t('caixa.novaMensagem')}</span>}
-                      </span>
-                    )}
-                    <span className="cz-item-rodape">👤 {c.cliente.segmento}</span>
+                    <span className="cz-item-rodape">👤 {c.vendedoraNome ?? '—'} · {c.cliente.segmento}</span>
                   </span>
-                  {c.naoLidas > 0 && <span className="cz-badge">{c.naoLidas}</span>}
+                  {c.naoLidas > 0
+                    ? <span className="cz-badge">{c.naoLidas}</span>
+                    : <span className="cz-badge-ok" title={t('caixa.tudoEmDia')}>✓</span>}
                 </button>
               ))}
               {lista.length === 0 && <div className="cz-aviso">{conversas.length === 0 ? t('caixa.nenhumaConversaAinda') : t('caixa.nadaEncontrado')}</div>}

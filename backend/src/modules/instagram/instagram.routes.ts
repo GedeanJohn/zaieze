@@ -237,7 +237,16 @@ export async function instagramRoutes(app: FastifyInstance) {
       }
     }
 
-    return [...porCliente.values()].sort((a, b) => b.ultimaEm.getTime() - a.ultimaEm.getTime())
+    // Nome da vendedora dona de cada card (mesmo padrão do WhatsApp — ver whatsapp.routes.ts).
+    const vendedoraIds = [...new Set([...porCliente.values()].map((c) => c.cliente.vendedoraId).filter((v): v is string => !!v))]
+    const vendedoras = vendedoraIds.length > 0
+      ? await prisma.usuario.findMany({ where: { id: { in: vendedoraIds } }, select: { id: true, nome: true } })
+      : []
+    const nomeVendedora = new Map(vendedoras.map((v) => [v.id, v.nome]))
+
+    return [...porCliente.values()]
+      .map((c) => ({ ...c, vendedoraNome: c.cliente.vendedoraId ? nomeVendedora.get(c.cliente.vendedoraId) ?? null : null }))
+      .sort((a, b) => b.ultimaEm.getTime() - a.ultimaEm.getTime())
   })
 
   app.get('/conversas/:clienteId', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request) => {

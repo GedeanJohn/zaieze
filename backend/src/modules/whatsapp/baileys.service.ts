@@ -302,6 +302,20 @@ export async function enviarAudioBaileys(usuarioId: string, telefone: string, bu
   }
 }
 
+/** Envia imagem (foto de produto, ex.) pelo WhatsApp pessoal — direto por URL, sem precisar baixar
+ * os bytes localmente (diferente do áudio, que precisa do buffer já em mãos). Sem sessão ativa → SIMULADA. */
+export async function enviarImagemBaileys(usuarioId: string, telefone: string, fotoUrl: string, caption?: string): Promise<{ status: StatusMensagem; waMessageId?: string; erro?: string }> {
+  const sessao = sessoes.get(usuarioId)
+  if (!sessao?.sock?.user) return { status: 'SIMULADA' }
+  try {
+    const jid = `${telefone.replace(/\D/g, '')}@s.whatsapp.net`
+    const r = await sessao.sock.sendMessage(jid, { image: { url: fotoUrl }, caption })
+    return { status: 'ENVIADA', waMessageId: r?.key?.id ?? undefined }
+  } catch (e) {
+    return { status: 'FALHA', erro: String(e) }
+  }
+}
+
 /** Lista real de grupos do WhatsApp pessoal (nome + telefones dos participantes, normalizados) —
  * usada pra "importar grupo do WhatsApp" como Grupo interno do Chat Zaieze (ver grupos.routes.ts).
  * `null` quando não há sessão Baileys ativa (a rota traduz pra "conecte seu WhatsApp primeiro"). */

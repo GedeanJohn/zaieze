@@ -5,7 +5,7 @@ import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
 import { lojaIdDe, redeIdDe } from '../../plugins/auth'
 import { requireFeature } from '../../plugins/planos'
-import { enviarWhatsapp, enviarWhatsappAudio, registrarMensagemRecebida } from './whatsapp.service'
+import { enviarWhatsapp, enviarWhatsappAudio, enviarWhatsappImagem, registrarMensagemRecebida } from './whatsapp.service'
 import { estaConectado as baileysConectado } from './baileys.service'
 import { metaConfigurado, cifrar, decifrar, podeCifrar, verificarNumero, enviarTexto, criarTemplateMeta, consultarTemplatesMeta, placeholdersDoCorpo, corpoParaMeta, mapearStatusTemplate, baixarMidia, extDoMime, assinaturaValida, techProviderConfigurado, trocarCodePorToken, inscreverWebhookWaba, registrarNumero } from './meta.service'
 import { marcarLeadAtendido } from '../leads/leads.service'
@@ -484,6 +484,57 @@ export async function whatsappRoutes(app: FastifyInstance) {
         lojaId, clienteId, vendedoraId: vendId,
         direcao: 'ENVIADA', status: r.status, origem: 'MANUAL', telefone: cliente.telefone,
         texto: '🎤 Mensagem de voz', tipoMidia: 'AUDIO', midiaUrl, waMessageId: r.waMessageId ?? null,
+      },
+    })
+    await marcarLeadAtendido({ lojaId, clienteId })
+    return msg
+  })
+
+  // Compartilha a foto de um produto da vitrine na conversa (foto + nome + código) — a vendedora
+  // manda, o cliente valida respondendo, e depois ela arrasta o card dessa mensagem até o botão
+  // "Carrinho" pra adicionar ao Orçamento (ver CarrinhoCliente.tsx / BolhaMensagem no frontend).
+  const enviarProdutoSchema = z.object({ produtoId: z.string(), variacaoId: z.string() })
+  app.post('/conversas/:clienteId/produto', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
+    const lojaId = await lojaIdDe(request)
+    const { clienteId } = request.params as { clienteId: string }
+    const body = enviarProdutoSchema.parse(request.body)
+
+    const cliente = await prisma.cliente.findFirst({ where: { id: clienteId, lojaId } })
+    if (!cliente) return reply.code(404).send({ erro: 'Cliente não encontrado' })
+    if (request.user.role === 'VENDEDORA' && cliente.vendedoraId !== request.user.sub) {
+      return reply.code(403).send({ erro: 'Cliente não está na sua carteira' })
+    }
+    if (!cliente.telefone) return reply.code(422).send({ erro: 'Cliente sem WhatsApp cadastrado.' })
+    const vendId = cliente.vendedoraId ?? (request.user.role === 'VENDEDORA' ? request.user.sub : null)
+    if (!vendId) return reply.code(422).send({ erro: 'Cliente sem vendedora responsável — defina a carteira primeiro.' })
+
+    const rede = await redeDaLoja(lojaId)
+    if (!rede) return reply.code(422).send({ erro: 'Loja sem marca vinculada' })
+
+    const variacao = await prisma.variacaoProduto.findFirst({
+      where: { id: body.variacaoId, produtoId: body.produtoId, produto: { redeId: rede.id, colecao: { lojas: { some: { lojaId } } } } },
+      include: { produto: { select: { nome: true, referencia: true, fotos: true, fotosCores: true } } },
+    })
+    if (!variacao) return reply.code(422).send({ erro: 'Produto indisponível nesta loja (coleção não distribuída)' })
+    // Prioriza a foto marcada com a cor da variação escolhida; senão, a primeira foto geral.
+    const idxCor = variacao.produto.fotosCores.findIndex((c) => c === variacao.cor)
+    const foto = (idxCor >= 0 ? variacao.produto.fotos[idxCor] : null) ?? variacao.produto.fotos[0]
+    if (!foto) return reply.code(422).send({ erro: 'Esse produto não tem foto cadastrada.' })
+
+    const codigo = variacao.produto.referencia || variacao.sku
+    const caption = `${variacao.produto.nome} — Ref. ${codigo}\n${variacao.cor}${variacao.estampa ? ` / ${variacao.estampa}` : ''} / ${variacao.tamanho}`
+
+    const viaBaileys = baileysConectado(vendId)
+    const r = viaBaileys || rede
+      ? await enviarWhatsappImagem({ rede, telefone: cliente.telefone, fotoUrl: foto, caption, vendedoraId: vendId })
+      : { status: 'SIMULADA' as StatusMensagem }
+    const msg = await prisma.mensagemWhatsapp.create({
+      data: {
+        lojaId, clienteId, vendedoraId: vendId,
+        direcao: 'ENVIADA', status: r.status, origem: 'MANUAL', telefone: cliente.telefone,
+        texto: caption, tipoMidia: 'PRODUTO', midiaUrl: foto,
+        produtoId: body.produtoId, variacaoId: body.variacaoId,
+        waMessageId: r.waMessageId ?? null,
       },
     })
     await marcarLeadAtendido({ lojaId, clienteId })

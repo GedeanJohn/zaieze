@@ -1156,6 +1156,7 @@ model Produto {
   colecao       Colecao?          @relation(fields: [colecaoId], references: [id], onDelete: SetNull)
   variacoes     VariacaoProduto[]
   looksProvador LookProvador[]
+  mensagens     MensagemWhatsapp[]
 
   @@unique([redeId, referencia])
   @@index([redeId, ativo])
@@ -1183,6 +1184,7 @@ model VariacaoProduto {
   movimentos     MovimentoEstoque[]
   pedidosReserva PedidoReserva[]
   itensOrcamento ItemOrcamento[]
+  mensagens      MensagemWhatsapp[]
 
   @@unique([produtoId, cor, estampa, tamanho])
   @@map("variacoes_produto")
@@ -1487,8 +1489,12 @@ model MensagemWhatsapp {
   telefone     String
   texto        String
   // Mídia (ex.: áudio/PTT). tipoMidia null = mensagem de texto pura.
-  tipoMidia    String? // 'AUDIO' (futuro: IMAGEM, VIDEO, DOC)
+  tipoMidia    String? // 'AUDIO' | 'IMAGEM' | 'PRODUTO' (compartilhou um produto da vitrine no chat)
   midiaUrl     String?
+  // Preenchidos só quando tipoMidia = 'PRODUTO' — qual produto/variação foi compartilhado, pra
+  // saber o que adicionar ao arrastar o card da mensagem até o Carrinho (ver CarrinhoCliente.tsx).
+  produtoId    String?
+  variacaoId   String?
   // Cloud API: id da mensagem na Meta (wamid) para correlacionar os recibos (status);
   // templateNome preenchido quando o envio foi por template HSM (fora da janela de 24h).
   waMessageId  String?
@@ -1499,6 +1505,8 @@ model MensagemWhatsapp {
   vendedora Usuario           @relation("MensagensVendedora", fields: [vendedoraId], references: [id])
   campanha  Campanha?         @relation(fields: [campanhaId], references: [id], onDelete: SetNull)
   grupo     GrupoTransmissao? @relation(fields: [grupoId], references: [id], onDelete: SetNull)
+  produto   Produto?          @relation(fields: [produtoId], references: [id], onDelete: SetNull)
+  variacao  VariacaoProduto?  @relation(fields: [variacaoId], references: [id], onDelete: SetNull)
 
   @@index([clienteId, createdAt])
   @@index([lojaId, createdAt])

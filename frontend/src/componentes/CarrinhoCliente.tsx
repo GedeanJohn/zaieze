@@ -1,9 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import {
-  DndContext, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors, useDraggable, useDroppable,
-  type DragEndEvent, type DragStartEvent,
-} from '@dnd-kit/core'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { api, formataReal, mensagemDeErro } from '../api'
 import { useLojaAtiva } from './SeletorLoja'
 import { useToast } from './Toast'
@@ -12,8 +8,8 @@ import { useIdioma } from '../lib/i18n'
 type StatusOrc = 'RASCUNHO' | 'AGUARDANDO_APROVACAO_DESCONTO' | 'ENVIADO' | 'ALTERACAO_SOLICITADA' | 'CONVERTIDO' | 'CANCELADO'
 const EDITAVEL: StatusOrc[] = ['RASCUNHO', 'AGUARDANDO_APROVACAO_DESCONTO', 'ALTERACAO_SOLICITADA']
 
-interface VariacaoP { id: string; cor: string; estampa: string; tamanho: string; estoque: number; estoqueVarejo: number }
-interface ProdutoP { id: string; nome: string; precoVarejo: string; precoAtacado?: string | null; fotos: string[]; variacoes: VariacaoP[] }
+export interface VariacaoP { id: string; cor: string; estampa: string; tamanho: string; estoque: number; estoqueVarejo: number }
+export interface ProdutoP { id: string; nome: string; precoVarejo: string; precoAtacado?: string | null; fotos: string[]; variacoes: VariacaoP[] }
 interface ItemOrcResp {
   variacaoId: string; quantidade: number; precoUnitario: string
   variacao: { produtoId: string; cor: string; estampa: string; tamanho: string; produto: { nome: string; fotos: string[] } }
@@ -25,9 +21,23 @@ interface LinhaCarrinho {
   cor: string; estampa: string; tamanho: string; quantidade: number; precoUnitario: number
 }
 
-interface Props { clienteId: string; atacado?: boolean; onFechar: () => void }
+/** Item que chegou arrastado da conversa (mensagem tipo 'PRODUTO') — só sabemos produto/variação,
+ * ainda falta buscar o objeto completo (foto/preço/nome) pra virar uma LinhaCarrinho de verdade. */
+export interface ItemPendente { produtoId: string; variacaoId: string }
 
-const ZONA_SOLTAR = 'cz-cart-drop'
+interface Props {
+  clienteId: string; atacado?: boolean; onFechar: () => void
+  itemPendente?: ItemPendente | null; onItemPendenteConsumido?: () => void
+  /** A mensagem-produto criada pelo envio — o pai (CaixaEntrada) precisa dela pra aparecer na
+   * conversa na hora, sem esperar um refetch/polling do thread. */
+  onProdutoEnviado?: (mensagem: unknown) => void
+}
+
+/** Exposto pro pai (CaixaEntrada) chamar quando um card da grade é solto no rodapé do painel —
+ * o `DndContext` mora lá em cima agora (precisa cobrir o botão "Carrinho" do cabeçalho também). */
+export interface CarrinhoClienteHandle { adicionarProdutoRapido: (produto: ProdutoP) => void }
+
+export const ZONA_SOLTAR = 'cz-cart-drop'
 
 /** Estoque disponível pra essa variação no modo de venda atual (a reserva de varejo, ver
  * VariacaoProduto no schema: o atacado só pode usar o restante além do que está reservado). */
@@ -45,7 +55,9 @@ function primeiraVariacaoDisponivel(produto: ProdutoP, atacado: boolean): Variac
 /** Carrinho do cliente aberto de dentro do Chat Zaieze — edita o mesmo `Orcamento` que a
  * vendedora usaria em Orçamentos/PDV, só que com grade de fotos em vez do formulário de
  * dropdowns (ver Orcamentos.tsx para a lógica de negócio original que isto espelha). */
-export default function CarrinhoCliente({ clienteId, atacado, onFechar }: Props) {
+const CarrinhoCliente = forwardRef<CarrinhoClienteHandle, Props>(function CarrinhoCliente(
+  { clienteId, atacado, onFechar, itemPendente, onItemPendenteConsumido, onProdutoEnviado }, ref,
+) {
   const { t } = useIdioma()
   const avisar = useToast()
   const escopo = useLojaAtiva()
@@ -59,15 +71,11 @@ export default function CarrinhoCliente({ clienteId, atacado, onFechar }: Props)
   const [produtoAberto, setProdutoAberto] = useState<ProdutoP | null>(null)
   const [salvando, setSalvando] = useState<'idle' | 'salvando' | 'erro'>('idle')
   const [erroSync, setErroSync] = useState('')
-  const [arrastando, setArrastando] = useState<ProdutoP | null>(null)
+  const [hidratado, setHidratado] = useState(false)
 
-  // Mesma configuração de sensores do Funil de vendas (Pipeline.tsx) — MouseSensor (não
-  // PointerSensor) com uma distância mínima antes de ativar, e TouchSensor com delay, pra não
-  // brigar com o toque normal de abrir a ficha do produto.
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
-  )
+  // O DndContext (sensores + overlay) mora em CaixaEntrada.tsx agora — precisa cobrir o botão
+  // "Carrinho" do cabeçalho também, que fica fora deste componente. Aqui só ficam os hooks de
+  // useDraggable/useDroppable, que funcionam em qualquer profundidade dentro do contexto do pai.
   const { setNodeRef: setZonaSoltarRef, isOver } = useDroppable({ id: ZONA_SOLTAR })
 
   const timerBusca = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -77,6 +85,7 @@ export default function CarrinhoCliente({ clienteId, atacado, onFechar }: Props)
   // Hidrata o orçamento editável já existente do cliente (se houver) — não cria nada ainda.
   useEffect(() => {
     if (!escopo.pronto) return
+    setHidratado(false)
     api.get('/orcamentos', { params: { ...escopo.params, clienteId } })
       .then(({ data }: { data: OrcamentoResp[] }) => {
         const editavel = data.find((o) => EDITAVEL.includes(o.status))
@@ -93,6 +102,7 @@ export default function CarrinhoCliente({ clienteId, atacado, onFechar }: Props)
         }
       })
       .catch((err) => avisar(mensagemDeErro(err), 'erro'))
+      .finally(() => setHidratado(true))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clienteId, escopo.pronto])
 
@@ -149,6 +159,25 @@ export default function CarrinhoCliente({ clienteId, atacado, onFechar }: Props)
     agendar()
   }, [clienteId, atacado, orcamentoId, escopo.params])
 
+  const [enviandoChat, setEnviandoChat] = useState(false)
+
+  // Manda a foto do produto pro WhatsApp de verdade do cliente (fora do Orçamento) — ele valida
+  // respondendo, e a vendedora arrasta o card dessa mensagem até o Carrinho depois (ver BolhaMensagem
+  // em CaixaEntrada.tsx). Fecha a ficha só quando o envio dá certo, pra poder tentar de novo no erro.
+  async function enviarProdutoNoChat(produto: ProdutoP, variacao: VariacaoP) {
+    setEnviandoChat(true)
+    try {
+      const { data } = await api.post(`/whatsapp/conversas/${clienteId}/produto`, { produtoId: produto.id, variacaoId: variacao.id }, { params: escopo.params })
+      onProdutoEnviado?.(data)
+      avisar(t('caixa.produtoEnviado'), 'sucesso')
+      setProdutoAberto(null)
+    } catch (err) {
+      avisar(mensagemDeErro(err) || t('caixa.erroEnviarProduto'), 'erro')
+    } finally {
+      setEnviandoChat(false)
+    }
+  }
+
   function adicionarItem(produto: ProdutoP, variacao: VariacaoP, quantidade: number) {
     setItens((atual) => {
       const idx = atual.findIndex((i) => i.variacaoId === variacao.id)
@@ -165,18 +194,35 @@ export default function CarrinhoCliente({ clienteId, atacado, onFechar }: Props)
     setProdutoAberto(null)
   }
 
-  function aoIniciarArrasto(event: DragStartEvent) {
-    setArrastando((event.active.data.current?.produto as ProdutoP | undefined) ?? null)
-  }
-
-  function aoSoltar(event: DragEndEvent) {
-    setArrastando(null)
-    const produto = event.active.data.current?.produto as ProdutoP | undefined
-    if (!produto || event.over?.id !== ZONA_SOLTAR) return
+  // Chamado pelo pai quando um card da grade é solto no rodapé do painel (ZONA_SOLTAR) — pega a
+  // 1ª variação com estoque, mesmo atalho de sempre (escolher variação específica ainda passa
+  // pela ficha normal).
+  function adicionarProdutoRapido(produto: ProdutoP) {
     const variacao = primeiraVariacaoDisponivel(produto, !!atacado)
     if (!variacao) { avisar(t('caixa.semEstoqueArrastar'), 'erro'); return }
     adicionarItem(produto, variacao, 1)
   }
+
+  useImperativeHandle(ref, () => ({ adicionarProdutoRapido }))
+
+  // Item que chegou arrastado de uma mensagem da conversa (produtoId/variacaoId só) — busca o
+  // produto completo (preço/foto/estoque) e adiciona, só depois que o orçamento existente já
+  // tiver sido hidratado (senão a hidratação sobrescreve o item recém-adicionado).
+  useEffect(() => {
+    if (!hidratado || !itemPendente) return
+    let cancelado = false
+    api.get(`/produtos/${itemPendente.produtoId}`, { params: escopo.params })
+      .then(({ data }: { data: ProdutoP }) => {
+        if (cancelado) return
+        const variacao = data.variacoes.find((v) => v.id === itemPendente.variacaoId)
+        if (variacao) adicionarItem(data, variacao, 1)
+        else avisar(t('caixa.erroAdicionarProduto'), 'erro')
+      })
+      .catch((err) => { if (!cancelado) avisar(mensagemDeErro(err), 'erro') })
+      .finally(() => { if (!cancelado) onItemPendenteConsumido?.() })
+    return () => { cancelado = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemPendente, hidratado])
 
   function mudarQuantidade(variacaoId: string, delta: number) {
     setItens((atual) => {
@@ -216,7 +262,6 @@ export default function CarrinhoCliente({ clienteId, atacado, onFechar }: Props)
   const bloqueado = orcamentoStatus != null && !EDITAVEL.includes(orcamentoStatus)
 
   return (
-    <DndContext sensors={sensors} onDragStart={aoIniciarArrasto} onDragEnd={aoSoltar}>
     <div className="cz-carrinho">
       <div className="cz-cart-topo">
         {produtoAberto ? (
@@ -230,7 +275,12 @@ export default function CarrinhoCliente({ clienteId, atacado, onFechar }: Props)
       {bloqueado && <div className="cz-cart-alerta">{t('caixa.orcamentoNaoEditavel')}</div>}
 
       {!bloqueado && (produtoAberto ? (
-        <FichaProduto produto={produtoAberto} atacado={!!atacado} onAdicionar={(v, q) => adicionarItem(produtoAberto, v, q)} />
+        <FichaProduto
+          produto={produtoAberto} atacado={!!atacado}
+          onAdicionar={(v, q) => adicionarItem(produtoAberto, v, q)}
+          onEnviarChat={(v) => enviarProdutoNoChat(produtoAberto, v)}
+          enviandoChat={enviandoChat}
+        />
       ) : (
         <div className="cz-cart-grid">
           {carregandoProdutos && <div className="cz-cart-vazio">{t('caixa.carregandoProdutos')}</div>}
@@ -278,29 +328,15 @@ export default function CarrinhoCliente({ clienteId, atacado, onFechar }: Props)
         {salvando === 'erro' && <div className="cz-cart-alerta">{erroSync || t('caixa.erroSincronizar')}</div>}
       </div>
     </div>
-    {createPortal(
-      // Porta pro <body> — o overlay do dnd-kit não se move sozinho pra fora da árvore, e ficando
-      // dentro de .cz-conversa (que tem backdrop-filter pro efeito de vidro) o "position: fixed"
-      // dele passa a ser relativo a esse ancestral em vez da janela, descolando do cursor ao
-      // arrastar. O contexto do React continua funcionando normal através do portal.
-      <DragOverlay>
-        {arrastando && (
-          <div className="cz-cart-card cz-cart-card-fantasma">
-            {arrastando.fotos?.[0] ? <img src={arrastando.fotos[0]} alt="" /> : <div className="cz-cart-semfoto" />}
-            <span className="cz-cart-card-nome">{arrastando.nome}</span>
-          </div>
-        )}
-      </DragOverlay>,
-      document.body,
-    )}
-    </DndContext>
   )
-}
+})
+
+export default CarrinhoCliente
 
 /** Card da grade, arrastável pro carrinho (adiciona a 1ª variação com estoque) — tocar/clicar
  * (sem arrastar) continua abrindo a ficha pra escolher cor/tamanho específicos. */
 function CardProdutoArrastavel({ produto, atacado, onTocar }: { produto: ProdutoP; atacado: boolean; onTocar: () => void }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `cz-cart-produto-${produto.id}`, data: { produto } })
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `cz-cart-produto-${produto.id}`, data: { tipo: 'grid-produto', produto } })
   return (
     <button
       ref={setNodeRef} {...listeners} {...attributes}
@@ -315,7 +351,10 @@ function CardProdutoArrastavel({ produto, atacado, onTocar }: { produto: Produto
 
 /** Ficha rápida do produto: cor → estampa (se houver) → tamanho, com estoque de varejo/atacado
  * já considerando a reserva (`estoqueVarejo`, ver VariacaoProduto no schema). */
-function FichaProduto({ produto, atacado, onAdicionar }: { produto: ProdutoP; atacado: boolean; onAdicionar: (v: VariacaoP, qtd: number) => void }) {
+function FichaProduto({ produto, atacado, onAdicionar, onEnviarChat, enviandoChat }: {
+  produto: ProdutoP; atacado: boolean; onAdicionar: (v: VariacaoP, qtd: number) => void
+  onEnviarChat: (v: VariacaoP) => void; enviandoChat: boolean
+}) {
   const { t } = useIdioma()
   const cores = useMemo(() => [...new Set(produto.variacoes.map((v) => v.cor))], [produto.variacoes])
   const [cor, setCor] = useState(cores[0] ?? '')
@@ -382,10 +421,16 @@ function FichaProduto({ produto, atacado, onAdicionar }: { produto: ProdutoP; at
         </div>
       )}
 
-      <button
-        type="button" className="btn cz-cart-adicionar" disabled={!podeAdicionar}
-        onClick={() => variacaoSel && onAdicionar(variacaoSel, qtd)}
-      >{t('caixa.adicionar')}</button>
+      <div className="cz-cart-ficha-acoes">
+        <button
+          type="button" className="btn cz-cart-adicionar" disabled={!podeAdicionar}
+          onClick={() => variacaoSel && onAdicionar(variacaoSel, qtd)}
+        >{t('caixa.adicionar')}</button>
+        <button
+          type="button" className="btn-secundario cz-cart-enviar-chat" disabled={!variacaoSel || enviandoChat}
+          onClick={() => variacaoSel && onEnviarChat(variacaoSel)}
+        >{enviandoChat ? t('caixa.enviando') : t('caixa.enviarNoChat')}</button>
+      </div>
     </div>
   )
 }

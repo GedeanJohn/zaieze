@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Menu, Search, SlidersHorizontal, Sparkles, ChevronRight, MoreHorizontal, Headset, Plus } from 'lucide-react'
+import {
+  DndContext, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors, useDraggable, pointerWithin,
+  type DragEndEvent, type DragStartEvent,
+} from '@dnd-kit/core'
+import { Menu, Search, SlidersHorizontal, Sparkles, ChevronRight, MoreHorizontal, Headset, Plus, ShoppingBag } from 'lucide-react'
 import { api, mensagemDeErro } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
 import { useIdioma } from '../lib/i18n'
 import { IconeWhatsApp, IconeInstagram, IconeMessenger, IconeTelegram, IconeEmail, IconeTodosCanais } from '../componentes/IconesCanal'
-import CarrinhoCliente from '../componentes/CarrinhoCliente'
+import CarrinhoCliente, { ZONA_SOLTAR, type CarrinhoClienteHandle, type ItemPendente } from '../componentes/CarrinhoCliente'
 
 type Canal = 'whatsapp' | 'instagram'
 // Canais que ainda não têm integração de verdade — aparecem na barra (mockup multicanal), mas
@@ -35,6 +40,8 @@ interface Mensagem {
   texto: string
   tipoMidia?: string | null
   midiaUrl?: string | null
+  produtoId?: string | null
+  variacaoId?: string | null
   createdAt: string
 }
 
@@ -102,6 +109,15 @@ export default function CaixaEntrada() {
   const [conversas, setConversas] = useState<Conversa[]>([])
   const [sel, setSel] = useState<Conversa | null>(null)
   const [carrinhoAberto, setCarrinhoAberto] = useState(false)
+  const [itemPendente, setItemPendente] = useState<ItemPendente | null>(null)
+  const carrinhoRef = useRef<CarrinhoClienteHandle>(null)
+  // Fantasma exibido durante o arrasto (card de produto da grade OU card de produto de uma
+  // mensagem) — union das duas formas de dado que os draggables desta tela carregam.
+  const [arrastando, setArrastando] = useState<
+    | { tipo: 'grid-produto'; produto: { nome: string; fotos: string[] } }
+    | { tipo: 'msg-produto'; nome: string; foto?: string | null }
+    | null
+  >(null)
   const [thread, setThread] = useState<Mensagem[]>([])
   const fimThreadRef = useRef<HTMLDivElement>(null)
   const [texto, setTexto] = useState('')
@@ -110,6 +126,69 @@ export default function CaixaEntrada() {
   const [canalFiltro, setCanalFiltro] = useState<FiltroCanal>('todas')
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
+
+  // Mesma configuração de sensores usada no Funil de vendas e no Carrinho — MouseSensor com
+  // distância mínima e TouchSensor com delay, pra não brigar com toque/clique normais.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  )
+
+  // O botão "Carrinho" do cabeçalho fica colado na borda superior da tela — um alvo pequeno bem
+  // perto da zona de auto-scroll do dnd-kit. O rect que ele usa internamente pra colisão (o do
+  // DragOverlay, não o do card de origem) e o cálculo de pointerCoordinates não batiam de forma
+  // confiável com um alvo tão pequeno e tão perto da borda (testado e confirmado com Playwright).
+  // Solução: rastrear o ponteiro por fora do dnd-kit (mousemove/touchmove nativos) e testar contra
+  // o rect real do botão na hora de soltar — sem depender da matemática interna de colisão dele.
+  const carrinhoHeaderElRef = useRef<HTMLButtonElement | null>(null)
+  const arrastandoAtivoRef = useRef(false)
+  const sobreHeaderRef = useRef(false)
+  const [arrastandoSobreHeader, setArrastandoSobreHeader] = useState(false)
+
+  useEffect(() => {
+    function pontoSobreHeader(x: number, y: number): boolean {
+      const el = carrinhoHeaderElRef.current
+      if (!el) return false
+      const r = el.getBoundingClientRect()
+      return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom
+    }
+    function aoMover(x: number, y: number) {
+      if (!arrastandoAtivoRef.current) return
+      const sobre = pontoSobreHeader(x, y)
+      if (sobre !== sobreHeaderRef.current) { sobreHeaderRef.current = sobre; setArrastandoSobreHeader(sobre) }
+    }
+    const mouse = (e: MouseEvent) => aoMover(e.clientX, e.clientY)
+    const touch = (e: TouchEvent) => { const t = e.touches[0]; if (t) aoMover(t.clientX, t.clientY) }
+    window.addEventListener('mousemove', mouse)
+    window.addEventListener('touchmove', touch)
+    return () => { window.removeEventListener('mousemove', mouse); window.removeEventListener('touchmove', touch) }
+  }, [])
+
+  function aoIniciarArrasto(event: DragStartEvent) {
+    arrastandoAtivoRef.current = true
+    const data = event.active.data.current as any
+    if (data?.tipo === 'grid-produto') setArrastando({ tipo: 'grid-produto', produto: data.produto })
+    else if (data?.tipo === 'msg-produto') setArrastando({ tipo: 'msg-produto', nome: data.nome, foto: data.foto })
+  }
+
+  // Dois destinos possíveis: o rodapé do painel já aberto (arrasto vindo da grade, fluxo que já
+  // existia, continua usando a colisão nativa do dnd-kit) ou o botão "Carrinho" do cabeçalho
+  // (arrasto vindo de uma mensagem-produto — abre o painel sozinho se ainda estiver fechado, usa
+  // o rastreamento manual do ponteiro em vez do `event.over`, ver useEffect acima).
+  function aoSoltar(event: DragEndEvent) {
+    arrastandoAtivoRef.current = false
+    const sobreHeader = sobreHeaderRef.current
+    sobreHeaderRef.current = false; setArrastandoSobreHeader(false)
+    setArrastando(null)
+    const data = event.active.data.current as any
+    if (!data) return
+    if (data.tipo === 'grid-produto' && event.over?.id === ZONA_SOLTAR) {
+      carrinhoRef.current?.adicionarProdutoRapido(data.produto)
+    } else if (data.tipo === 'msg-produto' && sobreHeader) {
+      setCarrinhoAberto(true)
+      setItemPendente({ produtoId: data.produtoId, variacaoId: data.variacaoId })
+    }
+  }
 
   // Gravação de áudio (mensagem de voz)
   const [gravando, setGravando] = useState(false)
@@ -338,7 +417,17 @@ export default function CaixaEntrada() {
 
   const temSel = !!sel || !!grupoSel
 
+  // pointerWithin (não o rectIntersection padrão do dnd-kit): o botão "Carrinho" do cabeçalho é um
+  // alvo pequeno perto do topo, e o card arrastado da conversa é bem mais alto — com detecção por
+  // retângulo inteiro, o rect de origem (ancorado no ponto onde o mouse pegou o card) quase nunca
+  // sobrepõe um alvo tão pequeno; por posição do ponteiro, sempre que o cursor está sobre o botão
+  // no momento de soltar, é reconhecido.
+  // autoScroll desligado: o botão "Carrinho" fica colado na borda superior da tela, dentro da zona
+  // de auto-scroll do dnd-kit — ela ficava rolando .cz-bolhas indefinidamente enquanto o ponteiro
+  // ficava parado ali perto, e o delta calculado (compensando o scroll) nunca batia com a posição
+  // real do botão, fazendo o "soltar" nunca ser reconhecido.
   return (
+    <DndContext sensors={sensors} collisionDetection={pointerWithin} autoScroll={false} onDragStart={aoIniciarArrasto} onDragEnd={aoSoltar}>
     <div className={`cz-pagina${temSel ? ' zen' : ''}`}>
       {!temSel && (
         <div className="cz-multicanal-topo">
@@ -575,35 +664,15 @@ export default function CaixaEntrada() {
                 </div>
                 <button className="cz-btn cz-btn-venda" onClick={() => navigate(`/vendas?cliente=${sel.cliente.id}`)} title={t('caixa.registrarVenda')}>🛒<span className="cz-btn-txt"> {t('caixa.registrarVenda')}</span></button>
                 <button
-                  type="button" className={`cz-btn cz-btn-venda cz-btn-carrinho${carrinhoAberto ? ' ativo' : ''}`}
+                  ref={carrinhoHeaderElRef}
+                  type="button" className={`cz-btn cz-btn-venda cz-btn-carrinho${carrinhoAberto ? ' ativo' : ''}${arrastandoSobreHeader ? ' arrastando-sobre' : ''}`}
                   onClick={() => setCarrinhoAberto((v) => !v)} title={t('caixa.carrinho')}
-                >🛍<span className="cz-btn-txt"> {t('caixa.carrinho')}</span></button>
+                ><ShoppingBag size={16} strokeWidth={1.8} /><span className="cz-btn-txt"> {t('caixa.carrinho')}</span></button>
               </div>
 
               <div className="cz-conv-corpo">
                 <div className="cz-bolhas">
-                  {thread.map((m) => (
-                    <div key={m.id} className={`cz-bolha ${m.direcao === 'ENVIADA' ? 'saida' : 'entrada'}`}>
-                      {m.tipoMidia === 'AUDIO' && m.midiaUrl
-                        ? <audio className="cz-audio" src={m.midiaUrl} controls preload="none" />
-                        : m.tipoMidia === 'IMAGEM' && m.midiaUrl
-                          ? <a href={m.midiaUrl} target="_blank" rel="noreferrer"><img className="cz-img" src={m.midiaUrl} alt="" /></a>
-                          : m.tipoMidia && !m.midiaUrl
-                            // Cliente enviou mídia pelo WhatsApp pessoal (Baileys) — só a etiqueta,
-                            // sem baixar o arquivo (a vendedora já vê no próprio celular, dono da conversa).
-                            ? (
-                              <div>
-                                <span className="cz-etiqueta-midia">{ROTULO_MIDIA[m.tipoMidia] ?? m.tipoMidia}</span>
-                                {!['[imagem]', '[áudio]', '[vídeo]'].includes(m.texto) && <div className="cz-etiqueta-legenda">{m.texto}</div>}
-                              </div>
-                            )
-                            : <div>{m.texto}</div>}
-                      <span className="cz-meta">
-                        {hora(m.createdAt)}
-                        {m.direcao === 'ENVIADA' && <> · <span style={m.status === 'LIDA' ? { color: '#53bdeb' } : undefined}>{recibo(m.status, t)}</span></>}
-                      </span>
-                    </div>
-                  ))}
+                  {thread.map((m) => <BolhaMensagem key={m.id} m={m} t={t} />)}
                   {thread.length === 0 && <div style={{ color: 'var(--cz-mut)', margin: 'auto' }}>{t('caixa.semMensagens')}</div>}
                   <div ref={fimThreadRef} />
                 </div>
@@ -630,9 +699,13 @@ export default function CaixaEntrada() {
               {carrinhoAberto && (
                 <div className="cz-carrinho-painel">
                   <CarrinhoCliente
+                    ref={carrinhoRef}
                     clienteId={sel.cliente.id}
                     atacado={sel.cliente.segmento === 'ATACADO'}
                     onFechar={() => setCarrinhoAberto(false)}
+                    itemPendente={itemPendente}
+                    onItemPendenteConsumido={() => setItemPendente(null)}
+                    onProdutoEnviado={(msg) => setThread((t) => [...t, msg as Mensagem])}
                   />
                 </div>
               )}
@@ -655,6 +728,76 @@ export default function CaixaEntrada() {
           onImportado={(id) => { setModalImportar(false); carregarGrupos(); abrirGrupo(id) }}
         />
       )}
+    </div>
+    {createPortal(
+      // Mesmo motivo do Carrinho (ver CarrinhoCliente.tsx): o overlay não se porta sozinho pra
+      // fora de ancestrais com backdrop-filter/transform, e .cz-conversa tem o efeito de vidro.
+      <DragOverlay>
+        {arrastando && (
+          <div className="cz-cart-card cz-cart-card-fantasma">
+            {(arrastando.tipo === 'grid-produto' ? arrastando.produto.fotos?.[0] : arrastando.foto)
+              ? <img src={arrastando.tipo === 'grid-produto' ? arrastando.produto.fotos[0] : arrastando.foto!} alt="" />
+              : <div className="cz-cart-semfoto" />}
+            <span className="cz-cart-card-nome">{arrastando.tipo === 'grid-produto' ? arrastando.produto.nome : arrastando.nome}</span>
+          </div>
+        )}
+      </DragOverlay>,
+      document.body,
+    )}
+    </DndContext>
+  )
+}
+
+/** Uma bolha da conversa. Precisou virar componente à parte (fora do .map inline) porque mensagens
+ * tipo 'PRODUTO' usam `useDraggable` — hooks não podem ser chamados dentro do callback de um .map. */
+function BolhaMensagem({ m, t }: { m: Mensagem; t: (chave: string, vars?: Record<string, string | number>) => string }) {
+  const ehProduto = m.tipoMidia === 'PRODUTO' && !!m.midiaUrl
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `msg-${m.id}`,
+    data: { tipo: 'msg-produto', produtoId: m.produtoId, variacaoId: m.variacaoId, foto: m.midiaUrl, nome: m.texto },
+    disabled: !ehProduto || !m.produtoId || !m.variacaoId,
+  })
+
+  if (ehProduto) {
+    const [nomeProduto, ...resto] = m.texto.split('\n')
+    return (
+      <div
+        ref={setNodeRef} {...listeners} {...attributes}
+        className={`cz-bolha ${m.direcao === 'ENVIADA' ? 'saida' : 'entrada'} cz-bolha-produto${isDragging ? ' arrastando' : ''}`}
+      >
+        <img src={m.midiaUrl!} alt="" />
+        <div className="cz-bolha-produto-info">
+          <strong>{nomeProduto}</strong>
+          {resto.length > 0 && <span>{resto.join(' ')}</span>}
+        </div>
+        <span className="cz-meta">
+          {hora(m.createdAt)}
+          {m.direcao === 'ENVIADA' && <> · <span style={m.status === 'LIDA' ? { color: '#53bdeb' } : undefined}>{recibo(m.status, t)}</span></>}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`cz-bolha ${m.direcao === 'ENVIADA' ? 'saida' : 'entrada'}`}>
+      {m.tipoMidia === 'AUDIO' && m.midiaUrl
+        ? <audio className="cz-audio" src={m.midiaUrl} controls preload="none" />
+        : m.tipoMidia === 'IMAGEM' && m.midiaUrl
+          ? <a href={m.midiaUrl} target="_blank" rel="noreferrer"><img className="cz-img" src={m.midiaUrl} alt="" /></a>
+          : m.tipoMidia && !m.midiaUrl
+            // Cliente enviou mídia pelo WhatsApp pessoal (Baileys) — só a etiqueta,
+            // sem baixar o arquivo (a vendedora já vê no próprio celular, dono da conversa).
+            ? (
+              <div>
+                <span className="cz-etiqueta-midia">{ROTULO_MIDIA[m.tipoMidia] ?? m.tipoMidia}</span>
+                {!['[imagem]', '[áudio]', '[vídeo]'].includes(m.texto) && <div className="cz-etiqueta-legenda">{m.texto}</div>}
+              </div>
+            )
+            : <div>{m.texto}</div>}
+      <span className="cz-meta">
+        {hora(m.createdAt)}
+        {m.direcao === 'ENVIADA' && <> · <span style={m.status === 'LIDA' ? { color: '#53bdeb' } : undefined}>{recibo(m.status, t)}</span></>}
+      </span>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { enviarTexto, uploadMidia, enviarMidia, type EnvioResultado, type RedeWA } from './meta.service'
-import { estaConectado as baileysConectado, enviarTextoBaileys, enviarAudioBaileys } from './baileys.service'
+import { estaConectado as baileysConectado, enviarTextoBaileys, enviarAudioBaileys, enviarImagemBaileys } from './baileys.service'
 import { prisma } from '../../lib/prisma'
 import { garantirCicloAberto } from '../leads/leads.service'
 import { usuarioEhAgenteIa, responderVendedoraZaieze } from '../vendedora-zaieze/vendedora-zaieze.service'
@@ -61,6 +61,29 @@ export async function enviarWhatsappAudio(opts: { rede: RedeWA; telefone: string
   const mediaId = await uploadMidia({ rede: opts.rede, buffer: opts.buffer, mime: 'audio/ogg', filename: 'audio.ogg' })
   if (!mediaId) return { status: 'SIMULADA' } // sem WABA (ou upload indisponível) → registra simulado
   return enviarMidia({ rede: opts.rede, telefone: opts.telefone, tipo: 'audio', mediaId })
+}
+
+/**
+ * Compartilha a foto de um produto da vitrine na conversa. Mesma prioridade dos demais: WhatsApp
+ * pessoal primeiro (manda direto por URL). Na Cloud API não dá pra referenciar uma URL externa —
+ * precisa baixar os bytes da foto (R2) e subir pra Meta antes (`uploadMidia`), só então enviar.
+ */
+export async function enviarWhatsappImagem(opts: { rede: RedeWA; telefone: string; fotoUrl: string; caption?: string; vendedoraId?: string | null }): Promise<EnvioResultado> {
+  if (opts.vendedoraId && baileysConectado(opts.vendedoraId)) {
+    return enviarImagemBaileys(opts.vendedoraId, opts.telefone, opts.fotoUrl, opts.caption)
+  }
+  let resp: Response
+  try {
+    resp = await fetch(opts.fotoUrl)
+  } catch {
+    return { status: 'FALHA', erro: 'Não foi possível baixar a foto do produto' }
+  }
+  if (!resp.ok) return { status: 'FALHA', erro: 'Não foi possível baixar a foto do produto' }
+  const buffer = Buffer.from(await resp.arrayBuffer())
+  const mime = resp.headers.get('content-type') || 'image/jpeg'
+  const mediaId = await uploadMidia({ rede: opts.rede, buffer, mime, filename: 'produto.jpg' })
+  if (!mediaId) return { status: 'SIMULADA' }
+  return enviarMidia({ rede: opts.rede, telefone: opts.telefone, tipo: 'image', mediaId, caption: opts.caption })
 }
 
 /** Cliente já resolvido (dono da conversa) — mesmo shape usado pelo roteamento do webhook da Meta. */

@@ -1059,13 +1059,22 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-audio { width: 220px; max-width: 100%; height: 40px; display: block; }
 .cz-img { max-width: 240px; max-height: 260px; border-radius: 10px; display: block; }
 .cz-bolha:has(.cz-img) { padding: 4px; }
+/* Card de produto compartilhado na conversa (ver BolhaMensagem em CaixaEntrada.tsx) — arrastável
+ * até o botão "Carrinho" do cabeçalho pra virar item do Orçamento. */
+.cz-bolha-produto { padding: 8px; max-width: 220px; cursor: grab; touch-action: none; }
+.cz-bolha-produto.arrastando { opacity: .5; }
+.cz-bolha-produto img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; display: block; }
+.cz-bolha-produto-info { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; font-size: 12.5px; }
+.cz-bolha-produto-info strong { font-size: 13px; }
+.cz-bolha.saida.cz-bolha-produto .cz-bolha-produto-info { color: #fff; }
+.cz-bolha.entrada.cz-bolha-produto .cz-bolha-produto-info { color: var(--cz-mut); }
 /* Balão de áudio compacto, em superfície escura (player nativo integra melhor que sobre o gradiente). */
 .cz-bolha:has(.cz-audio) { padding: 6px; max-width: 240px; }
 .cz-bolha.saida:has(.cz-audio) { background: #241f33; color: #ece9f5; }
 /* Etiqueta de mídia recebida pelo WhatsApp pessoal (sem arquivo anexado — ver CaixaEntrada.tsx) */
 .cz-etiqueta-midia { display: inline-block; font-size: 13px; font-weight: 600; opacity: 0.9; }
 .cz-etiqueta-legenda { margin-top: 4px; font-size: 13px; }
-.cz-btn { background: linear-gradient(135deg, #a855f7, #ec4899); border: none; color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.cz-btn { background: linear-gradient(135deg, #a855f7, #ec4899); border: none; color: #fff; border-radius: 10px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
 .cz-voltar { display: none; background: var(--cz-surf2); border: 1px solid var(--cz-line); color: var(--cz-tx); border-radius: 10px; padding: 4px 11px; font-size: 16px; cursor: pointer; }
 .cz-alerta { margin: 0 12px; background: #4a1d1d; color: #ffb4b4; border-radius: 10px; padding: 8px 12px; font-size: 13px; }
 .cz-aviso { color: var(--cz-mut); padding: 14px; font-size: 13px; }
@@ -1076,6 +1085,7 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
    desktop, sem lógica separada por breakpoint. */
 .cz-conv-corpo { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .cz-btn-carrinho.ativo { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+.cz-btn-carrinho.arrastando-sobre { outline: 2px solid #fff; outline-offset: 2px; }
 .cz-carrinho-painel {
   flex: 0 0 46%; min-height: 0; display: flex; flex-direction: column;
   border-top: 1px solid var(--cz-line); background: var(--cz-surf);
@@ -1122,7 +1132,9 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-cart-qtd span { min-width: 18px; text-align: center; font-weight: 600; }
 .cz-cart-qtd-ficha { align-self: center; }
 .cz-cart-estoque { font-size: 11px; color: var(--cz-mut); margin-left: 4px; }
+.cz-cart-ficha-acoes { align-self: stretch; display: flex; flex-direction: column; gap: 8px; }
 .cz-cart-adicionar { align-self: stretch; text-align: center; }
+.cz-cart-enviar-chat { align-self: stretch; text-align: center; }
 
 .cz-cart-rodape { flex: 0 0 auto; border-top: 1px solid var(--cz-line); transition: background-color .15s ease, box-shadow .15s ease; }
 .cz-cart-rodape.arrastando-sobre { background: rgba(168, 85, 247, .12); box-shadow: inset 0 0 0 2px var(--cz-accent); }

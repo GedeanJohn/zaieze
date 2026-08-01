@@ -229,7 +229,13 @@ export default function Layout() {
       <div className="shell-corpo">
       <aside
         className={`sidebar ${menuAberto ? 'aberta' : ''} ${menuRecolhido ? 'recolhida' : ''}`}
-        onClick={(e) => { if ((e.target as HTMLElement).closest('a, .sidebar-nav button')) setMenuAberto(false) }}
+        onClick={(e) => {
+          const alvo = e.target as HTMLElement
+          // O header da seção colapsável (accordion) só abre/fecha o grupo de itens — não deve
+          // fechar a sidebar inteira, senão o clique pra expandir a seção "engole" o menu no mobile.
+          if (alvo.closest('.sidebar-secao-header')) return
+          if (alvo.closest('a, .sidebar-nav button')) setMenuAberto(false)
+        }}
       >
         <button
           type="button" className="sidebar-recolher"

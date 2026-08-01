@@ -65,7 +65,10 @@ export default function AgenteLoja({ redeSlug, vendSlug, marcaNome, vendedora, p
     }
   }
 
-  const proximo: Record<string, string> = { pedido: 'telefone', procura: 'tamanho', tamanho: 'nome', nome: 'telefone', telefone: 'fim' }
+  // "pedido" (fechou carrinho) pula direto pro fim depois do nome -- perguntar o WhatsApp aqui é
+  // redundante: a mensagem já sai do número real do cliente, e o backend materializa o lead pelo
+  // telefone de verdade (ou pelo marcador ref:) assim que ela chega (ver catalogo.routes.ts).
+  const proximo: Record<string, string> = { pedido: 'fim', procura: 'tamanho', tamanho: 'nome', nome: 'telefone', telefone: 'fim' }
 
   function montarResumo(r: R): string {
     // Pedido montado no carrinho: usa o resumo do pedido + o contato.

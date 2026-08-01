@@ -853,20 +853,29 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-multicanal-topo { position: relative; padding: 6px 2px 26px; margin-bottom: -10px; }
 .cz-multicanal-linha { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .cz-multicanal-icone {
-  width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.16);
+  width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.04); color: #f4f2f8; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; flex-shrink: 0;
+  cursor: pointer; flex-shrink: 0; box-shadow: 0 0 14px rgba(255, 255, 255, 0.08);
 }
-.cz-multicanal-icone:hover { background: rgba(255, 255, 255, 0.1); }
+.cz-multicanal-icone:hover { background: rgba(255, 255, 255, 0.1); box-shadow: 0 0 18px rgba(255, 255, 255, 0.16); }
 .cz-multicanal-marca { text-align: center; flex: 1; }
 .cz-multicanal-marca strong { font-family: var(--marca); font-size: 22px; letter-spacing: 0.14em; color: #fff; line-height: 1; }
 .cz-multicanal-marca span { display: block; font-size: 8.5px; letter-spacing: 0.32em; color: #9a95a8; margin-top: 3px; }
 .cz-multicanal-acoes { display: flex; gap: 8px; flex-shrink: 0; }
 .cz-multicanal-arco {
   position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
-  width: min(420px, 90%); height: 20px; border-top: 1px solid rgba(255, 255, 255, 0.18);
+  width: min(420px, 90%); height: 20px; border-top: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 50%; pointer-events: none;
+  box-shadow: 0 -1px 16px 1px rgba(255, 255, 255, 0.28), 0 2px 24px rgba(255, 255, 255, 0.1);
 }
+.cz-multicanal-busca {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 11px; padding: 9px 12px; color: #9a95a8;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 0 18px rgba(255, 255, 255, 0.08);
+}
+.cz-multicanal-busca input { flex: 1; background: none; border: none; outline: none; color: #f4f2f8; font-size: 13px; }
+.cz-multicanal-busca input::placeholder { color: #9a95a8; }
 
 /* ── Abas de canal (Todas/WhatsApp/Instagram/Messenger/Email/Telegram) ── */
 .cz-canais { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 14px; }
@@ -881,8 +890,8 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   background: rgba(255, 255, 255, 0.06); color: #cfcbe0;
 }
 .cz-canal-tab.ativo {
-  color: #f4f2f8; border-color: rgba(255, 255, 255, 0.4);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22), 0 0 20px rgba(255, 255, 255, 0.12);
+  color: #f4f2f8; border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3), 0 0 26px rgba(255, 255, 255, 0.2);
 }
 .cz-canal-tab:disabled { cursor: not-allowed; opacity: 0.45; }
 .cz-canal-tab .cz-canal-ico.wa { background: #25d366; color: #fff; }
@@ -896,14 +905,15 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 
 /* ── Card "ZAI.AI" — resumo da IA de atendimento, estilo do mockup ── */
 .cz-ai-card {
-  display: flex; align-items: center; gap: 16px; background: #111118; border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 18px; padding: 16px 20px; margin-bottom: 14px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.03), 0 20px 50px rgba(0, 0, 0, 0.5);
+  display: flex; align-items: center; gap: 16px; background: #111118; border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px; padding: 16px 20px; margin-bottom: 14px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0 36px rgba(255, 255, 255, 0.07), 0 20px 50px rgba(0, 0, 0, 0.5);
 }
 .cz-ai-avatar {
   width: 52px; height: 52px; border-radius: 50%; flex: 0 0 auto; position: relative;
   display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; color: #0a0a10;
   background: radial-gradient(circle at 35% 30%, #ffffff 0%, #d8d8e6 55%, #9c9cb8 100%);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5), 0 0 24px rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 0 30px rgba(255, 255, 255, 0.45);
 }
 .cz-ai-info { flex: 1; min-width: 0; }
 .cz-ai-nome { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
@@ -916,11 +926,29 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-ai-metrica strong { display: block; font-size: 18px; font-weight: 800; font-family: var(--fonte-titulo); color: #f4f2f8; }
 .cz-ai-metrica span { font-size: 10.5px; color: #9a95a8; white-space: nowrap; }
 @media (max-width: 720px) {
-  .cz-ai-card { flex-wrap: wrap; padding: 14px 16px; gap: 10px; }
-  .cz-ai-avatar { width: 42px; height: 42px; font-size: 16px; }
-  .cz-ai-metricas { flex-basis: 100%; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid var(--cz-line); }
-  .cz-ai-metrica strong { font-size: 15px; }
-  .cz-ai-metrica span { font-size: 9px; }
+  .cz-multicanal-topo { padding: 2px 0 14px; }
+  .cz-multicanal-icone { width: 32px; height: 32px; border-radius: 9px; }
+  .cz-multicanal-marca strong { font-size: 16px; letter-spacing: 0.1em; }
+  .cz-multicanal-marca span { font-size: 7px; letter-spacing: 0.26em; margin-top: 2px; }
+  .cz-multicanal-arco { height: 12px; }
+  .cz-multicanal-busca { padding: 7px 10px; margin-top: 7px; }
+  .cz-multicanal-busca input { font-size: 12px; }
+
+  .cz-canais { gap: 5px; margin-bottom: 8px; }
+  .cz-canal-tab { padding: 5px 8px; font-size: 8.5px; gap: 3px; border-radius: 11px; }
+  .cz-canal-tab .cz-canal-ico { width: 20px; height: 20px; }
+
+  .cz-ai-card { padding: 9px 12px; gap: 8px; margin-bottom: 8px; border-radius: 14px; }
+  .cz-ai-avatar { width: 34px; height: 34px; font-size: 13px; }
+  .cz-ai-nome { font-size: 12px; gap: 5px; }
+  .cz-ai-beta { font-size: 8px; padding: 1px 6px; }
+  .cz-ai-sub { font-size: 9.5px; margin-top: 1px; }
+  .cz-ai-status { font-size: 8.5px; margin-top: 2px; }
+  .cz-ai-status-dot { width: 5px; height: 5px; }
+  .cz-ai-metricas { gap: 10px; }
+  .cz-ai-metrica strong { font-size: 12.5px; }
+  .cz-ai-metrica span { font-size: 7px; }
+  .cz-ai-seta { display: none; }
 }
 
 .cz-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
@@ -952,8 +980,8 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-item:hover { background: var(--cz-surf2); }
 .cz-item:hover::before, .cz-item.ativo::before, .cz-item.ativo + .cz-item::before { border-color: transparent; }
 .cz-item.ativo {
-  background: var(--cz-surf2); outline: none; border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 0 0 1px var(--cz-glow), 0 0 22px rgba(255, 255, 255, 0.14);
+  background: var(--cz-surf2); outline: none; border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 1px var(--cz-glow), 0 0 32px rgba(255, 255, 255, 0.22), inset 0 0 14px rgba(255, 255, 255, 0.05);
 }
 .cz-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: #fff; background: linear-gradient(135deg, #a855f7, #ec4899); flex: 0 0 auto; }
 .cz-avatar.sm { width: 38px; height: 38px; font-size: 14px; }
@@ -1161,8 +1189,17 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   .cz-meta-anel svg { width: 28px; height: 28px; }
   .cz-meta-pct { font-size: 9.5px; }
   .cz-marca { font-size: 24px; padding: 12px 26px; }
-  .chatz { grid-template-columns: 1fr; height: calc(100dvh - 110px - var(--zz-navh) - var(--zz-strip)); padding: 0; gap: 0; margin: 0 -16px; }
+  .cz-topo { margin-bottom: 8px; gap: 6px; }
+  .chatz { grid-template-columns: 1fr; height: calc(100dvh - 96px - var(--zz-navh) - var(--zz-strip)); padding: 0; gap: 0; margin: 0 -16px; }
   .cz-lista, .cz-conversa { border-radius: 0; }
+  .cz-lista-top { padding: 9px 10px; gap: 6px; }
+  .cz-tab { padding: 4px 10px; font-size: 11px; }
+  .cz-itens { padding: 3px; }
+  .cz-item { padding: 8px 8px; gap: 8px; }
+  .cz-item .cz-avatar { width: 36px; height: 36px; font-size: 12.5px; }
+  .cz-item-top strong { font-size: 13px; }
+  .cz-item-rodape { font-size: 9.5px; }
+  .cz-previa { font-size: 11.5px; }
 
   /* Dashboard ("Meu desempenho"): cards de KPI compactos e centralizados no celular */
   .grade-cards { gap: 8px; }

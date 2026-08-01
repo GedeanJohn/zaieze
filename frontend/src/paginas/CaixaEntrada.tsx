@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Menu, Search, Sparkles, ChevronRight, MoreHorizontal } from 'lucide-react'
+import { Menu, Search, X, Sparkles, ChevronRight, MoreHorizontal } from 'lucide-react'
 import { api, mensagemDeErro, formataReal } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
@@ -95,7 +95,7 @@ export default function CaixaEntrada() {
   const avisar = useToast()
   const [searchParams] = useSearchParams()
   const abriuParam = useRef(false)
-  const buscaRef = useRef<HTMLInputElement>(null)
+  const [buscaAberta, setBuscaAberta] = useState(false)
   const [stats, setStats] = useState<ChatStats | null>(null)
 
   const [conversas, setConversas] = useState<Conversa[]>([])
@@ -320,14 +320,25 @@ export default function CaixaEntrada() {
               <span>MULTICANAL</span>
             </div>
             <div className="cz-multicanal-acoes">
-              <button type="button" className="cz-multicanal-icone" onClick={() => buscaRef.current?.focus()} aria-label={t('caixa.buscarConversas')}>
-                <Search size={17} strokeWidth={1.8} />
+              <button type="button" className="cz-multicanal-icone" onClick={() => setBuscaAberta((v) => !v)} aria-label={t('caixa.buscarConversas')}>
+                {buscaAberta ? <X size={17} strokeWidth={1.8} /> : <Search size={17} strokeWidth={1.8} />}
               </button>
               <button type="button" className="cz-multicanal-icone" title="ZAI.AI" aria-hidden="true">
                 <Sparkles size={17} strokeWidth={1.8} />
               </button>
             </div>
           </div>
+          {buscaAberta && (
+            <div className="cz-multicanal-busca">
+              <Search size={14} strokeWidth={2} />
+              <input
+                autoFocus
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder={filtro === 'GRUPOS' ? t('caixa.buscarGrupos') : t('caixa.buscarConversas')}
+              />
+            </div>
+          )}
           <div className="cz-multicanal-arco" aria-hidden="true" />
         </div>
       )}
@@ -388,7 +399,6 @@ export default function CaixaEntrada() {
         {/* Lista (conversas ou grupos) */}
         <aside className="cz-lista">
           <div className="cz-lista-top">
-            <input ref={buscaRef} className="cz-busca" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={filtro === 'GRUPOS' ? t('caixa.buscarGrupos') : t('caixa.buscarConversas')} />
             <div className="cz-tabs">
               <button type="button" className={`cz-tab${filtro === 'NOVIDADES' ? ' ativo' : ''}`} onClick={() => { setFiltro('NOVIDADES'); setGrupoSel(null) }}>{t('caixa.novidades')}</button>
               <button type="button" className={`cz-tab${filtro === 'NAO_LIDAS' ? ' ativo' : ''}`} onClick={() => { setFiltro('NAO_LIDAS'); setGrupoSel(null) }}>

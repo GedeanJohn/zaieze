@@ -928,8 +928,8 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 }
 .cz-ai-avatar-orbita { position: relative; flex: 0 0 auto; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; }
 .cz-ai-anel {
-  position: absolute; inset: -5px; width: calc(100% + 10px); height: calc(100% + 10px);
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.45));
+  position: absolute; inset: -11px; width: calc(100% + 22px); height: calc(100% + 22px);
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.55));
   animation: cz-orbita-spin 12s linear infinite;
 }
 @keyframes cz-orbita-spin { to { transform: rotate(360deg); } }
@@ -1010,8 +1010,11 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-item { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 12px; padding: 11px 10px; cursor: pointer; color: var(--cz-tx); position: relative; }
 .cz-item + .cz-item::before { content: ''; position: absolute; top: 0; left: 63px; right: 10px; border-top: 1px solid var(--cz-line); }
 .cz-item:hover { background: var(--cz-surf2); }
-.cz-item:hover::before, .cz-item.ativo::before, .cz-item.ativo + .cz-item::before { border-color: transparent; }
-.cz-item.ativo {
+.cz-item:hover::before, .cz-item.ativo::before, .cz-item.ativo + .cz-item::before,
+.cz-item.destaque::before, .cz-item.destaque + .cz-item::before { border-color: transparent; }
+/* .destaque: spotlight só no primeiro card da lista, enquanto nada foi clicado ainda (mockup) —
+   mesmo glow do .ativo, mas sem ser uma seleção real (some assim que o usuário abre uma conversa). */
+.cz-item.ativo, .cz-item.destaque {
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03));
   outline: none; border: 1px solid rgba(255, 255, 255, 0.55);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 0 1px var(--cz-glow),

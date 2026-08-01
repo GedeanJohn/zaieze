@@ -363,9 +363,9 @@ export default function CaixaEntrada() {
         <div className="cz-ai-card">
           <div className="cz-ai-avatar-orbita">
             <svg className="cz-ai-anel" viewBox="0 0 64 64" aria-hidden="true">
-              <circle cx="32" cy="32" r="30" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="0.8" strokeDasharray="1.2 9" />
-              <circle cx="14" cy="7" r="2.2" fill="#fff" />
-              <circle cx="4" cy="48" r="1.6" fill="#fff" opacity="0.75" />
+              <circle cx="32" cy="32" r="30" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.6" strokeDasharray="2 8" />
+              <circle cx="15" cy="6" r="2.6" fill="#fff" />
+              <circle cx="4" cy="50" r="1.9" fill="#fff" opacity="0.8" />
             </svg>
             <div className="cz-ai-avatar">Z</div>
           </div>
@@ -439,8 +439,11 @@ export default function CaixaEntrada() {
             </div>
           ) : (
             <div className="cz-itens">
-              {lista.map((c) => (
-                <button key={`${c.canal}-${c.cliente.id}`} className={`cz-item${sel?.cliente.id === c.cliente.id && sel.canal === c.canal ? ' ativo' : ''}`} onClick={() => abrir(c)}>
+              {lista.map((c, i) => {
+                const ativo = sel?.cliente.id === c.cliente.id && sel.canal === c.canal
+                const destaque = !sel && !grupoSel && i === 0
+                return (
+                <button key={`${c.canal}-${c.cliente.id}`} className={`cz-item${ativo ? ' ativo' : ''}${destaque ? ' destaque' : ''}`} onClick={() => abrir(c)}>
                   <span className={`cz-avatar-wrap ${c.canal}`}>
                     <span className="cz-avatar">{iniciais(c.cliente.nome)}</span>
                     {c.online && <span className="cz-online" />}
@@ -468,7 +471,8 @@ export default function CaixaEntrada() {
                     ? <span className="cz-badge">{c.naoLidas}</span>
                     : <span className="cz-badge-ok" title={t('caixa.tudoEmDia')}>✓</span>}
                 </button>
-              ))}
+                )
+              })}
               {lista.length === 0 && <div className="cz-aviso">{conversas.length === 0 ? t('caixa.nenhumaConversaAinda') : t('caixa.nadaEncontrado')}</div>}
             </div>
           )}

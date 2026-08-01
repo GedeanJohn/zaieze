@@ -214,17 +214,28 @@ export async function dashboardRoutes(app: FastifyInstance) {
     const lojaId = ehVend ? null : await lojaIdDe(request)
     const esc = ehVend ? { vendedoraId: request.user.sub } : { lojaId: lojaId! }
     const desdeMes = inicioDoMes()
-    const [receita, ativos, novos, conv] = await Promise.all([
+    const [receita, ativos, novos, conv, respostas, avaliacoes] = await Promise.all([
       prisma.venda.aggregate({ where: { ...esc, status: 'CONCLUIDA', createdAt: { gte: desdeMes } }, _sum: { total: true } }),
       prisma.lead.count({ where: { ...esc, status: { in: ETAPAS_ABERTAS } } }),
       prisma.lead.count({ where: { ...esc, createdAt: { gte: desdeMes } } }),
       prisma.lead.count({ where: { ...esc, createdAt: { gte: desdeMes }, status: 'CONVERTIDO' } }),
+      // Tempo médio até o 1º atendimento (mesmo cálculo do Funil) — vira "Tempo médio de resposta" no card ZAI.AI.
+      prisma.lead.findMany({ where: { ...esc, atendidoEm: { not: null } }, select: { createdAt: true, atendidoEm: true }, take: 500, orderBy: { createdAt: 'desc' } }),
+      // Satisfação: média das avaliações aprovadas pelos clientes (1-5 estrelas) → %.
+      ehVend
+        ? prisma.vendedoraAvaliacao.aggregate({ where: { vendedoraId: request.user.sub, status: 'APROVADA' }, _avg: { nota: true } })
+        : prisma.vendedoraAvaliacao.aggregate({ where: { status: 'APROVADA', vendedora: { lojaId: lojaId! } }, _avg: { nota: true } }),
     ])
 
     // Meta do mês (modelo hierárquico marca→loja→vendedora).
     // Vendedora: meta da loja ÷ nº de vendedoras. Loja (gerente/gestor): meta da loja.
     const meta = ehVend ? await metaDaVendedora(request.user.sub) : await metaDaLoja(lojaId!)
     const receitaMes = num(receita._sum.total)
+
+    const somaResposta = respostas.reduce((s, l) => s + (l.atendidoEm!.getTime() - l.createdAt.getTime()), 0)
+    const tempoMedioRespostaMin = respostas.length > 0 ? Math.round(somaResposta / respostas.length / 60_000) : null
+    const notaMedia = avaliacoes._avg.nota
+    const satisfacaoPct = notaMedia != null ? Math.round((notaMedia / 5) * 100) : null
 
     return {
       receitaMes,
@@ -234,6 +245,10 @@ export async function dashboardRoutes(app: FastifyInstance) {
       // Medidor da meta (substitui o card "Negócios ativos" no Chat)
       metaMes: meta > 0 ? meta : null,
       pctMeta: meta > 0 ? Math.round((receitaMes / meta) * 100) : null,
+      // Card "ZAI.AI" (Chat Zaieze)
+      conversasAtivas: ativos,
+      tempoMedioRespostaMin,
+      satisfacaoPct,
     }
   })
 

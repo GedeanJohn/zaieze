@@ -2,9 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, mensagemDeErro, formataReal } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
+import { useToast } from '../componentes/Toast'
 import { useIdioma } from '../lib/i18n'
 
 type Canal = 'whatsapp' | 'instagram'
+// Canais que ainda não têm integração de verdade — aparecem na barra (mockup multicanal), mas
+// desabilitados, até termos a conexão oficial da Meta (Messenger) e decidirmos o provedor de e-mail.
+type CanalFuturo = 'messenger' | 'email' | 'telegram'
+type FiltroCanal = 'todas' | Canal
 
 interface Conversa {
   canal: Canal
@@ -29,7 +34,18 @@ interface Mensagem {
   createdAt: string
 }
 
-interface ChatStats { receitaMes: number; negociosAtivos: number; novosLeads: number; taxaConversao: number; metaMes: number | null; pctMeta: number | null }
+interface ChatStats {
+  receitaMes: number; negociosAtivos: number; novosLeads: number; taxaConversao: number; metaMes: number | null; pctMeta: number | null
+  conversasAtivas: number; tempoMedioRespostaMin: number | null; satisfacaoPct: number | null
+}
+
+// Canais que aparecem na barra do mockup mas ainda não têm integração — ícone + cor de marca,
+// pra já deixar o espaço reservado sem fingir que funcionam.
+const CANAIS_FUTUROS: { chave: CanalFuturo; rotulo: string; icone: string }[] = [
+  { chave: 'messenger', rotulo: 'Messenger', icone: '⚡' },
+  { chave: 'email', rotulo: 'Email', icone: '✉️' },
+  { chave: 'telegram', rotulo: 'Telegram', icone: '✈️' },
+]
 
 // Mídia recebida pelo WhatsApp pessoal (Baileys) vira só uma etiqueta — sem o arquivo em si
 // (a vendedora já vê no próprio celular, dono da conversa; ver baileys.service.ts no backend).
@@ -73,6 +89,7 @@ export default function CaixaEntrada() {
   const escopo = useLojaAtiva()
   const navigate = useNavigate()
   const { t } = useIdioma()
+  const avisar = useToast()
   const [searchParams] = useSearchParams()
   const abriuParam = useRef(false)
   const [stats, setStats] = useState<ChatStats | null>(null)
@@ -83,6 +100,7 @@ export default function CaixaEntrada() {
   const [texto, setTexto] = useState('')
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState<Filtro>('NOVIDADES')
+  const [canalFiltro, setCanalFiltro] = useState<FiltroCanal>('todas')
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
 
@@ -259,11 +277,23 @@ export default function CaixaEntrada() {
   const lista = useMemo(() => {
     const q = busca.trim().toLowerCase()
     return conversas.filter((c) => {
+      if (canalFiltro !== 'todas' && c.canal !== canalFiltro) return false
       if (filtro === 'NAO_LIDAS' && c.naoLidas === 0) return false
       if (!q) return true
       return c.cliente.nome.toLowerCase().includes(q) || (c.cliente.telefone ?? '').includes(q)
     })
-  }, [conversas, busca, filtro])
+  }, [conversas, busca, filtro, canalFiltro])
+
+  function clicarCanalFuturo(rotulo: string) {
+    avisar(`${rotulo}: em breve — chega junto com a conexão oficial da Meta / decisão do provedor de e-mail.`)
+  }
+
+  /** "Chegou agora": mensagem não lida nos últimos 10 minutos — vira a tag "Nova Mensagem" do mockup
+   * (diferente do badge numérico, que conta todo não lido, mesmo mais antigo). */
+  function ehNovaMensagem(c: Conversa): boolean {
+    if (c.naoLidas === 0 || c.ultimaDirecao !== 'RECEBIDA') return false
+    return Date.now() - new Date(c.ultimaEm).getTime() < 10 * 60_000
+  }
 
   const gruposFiltrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -279,6 +309,41 @@ export default function CaixaEntrada() {
           <SeletorLoja escopo={escopo} />
         </div>
       )}
+      {!temSel && (
+        <div className="cz-canais">
+          <button type="button" className={`cz-canal-tab${canalFiltro === 'todas' ? ' ativo' : ''}`} onClick={() => setCanalFiltro('todas')}>
+            <span className="cz-canal-ico">☰</span>{t('caixa.canalTodas')}
+          </button>
+          <button type="button" className={`cz-canal-tab${canalFiltro === 'whatsapp' ? ' ativo' : ''}`} onClick={() => setCanalFiltro('whatsapp')}>
+            <span className="cz-canal-ico wa">💬</span>WhatsApp
+          </button>
+          <button type="button" className={`cz-canal-tab${canalFiltro === 'instagram' ? ' ativo' : ''}`} onClick={() => setCanalFiltro('instagram')}>
+            <span className="cz-canal-ico instagram">📷</span>Instagram
+          </button>
+          {CANAIS_FUTUROS.map((c) => (
+            <button key={c.chave} type="button" className="cz-canal-tab" disabled title={t('caixa.canalEmBreve')} onClick={() => clicarCanalFuturo(c.rotulo)}>
+              <span className={`cz-canal-ico ${c.chave}`}>{c.icone}</span>{c.rotulo}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!temSel && (
+        <div className="cz-ai-card">
+          <div className="cz-ai-avatar">Z</div>
+          <div className="cz-ai-info">
+            <div className="cz-ai-nome">ZAI.AI <span className="cz-ai-beta">BETA</span></div>
+            <div className="cz-ai-sub">{t('caixa.aiSubtitulo')}</div>
+            <div className="cz-ai-status"><span className="cz-ai-status-dot" />{t('caixa.aiAtiva')}</div>
+          </div>
+          <div className="cz-ai-metricas">
+            <div className="cz-ai-metrica"><strong>{stats ? stats.conversasAtivas : '—'}</strong><span>{t('caixa.aiConversasAtivas')}</span></div>
+            <div className="cz-ai-metrica"><strong>{stats?.tempoMedioRespostaMin != null ? `${stats.tempoMedioRespostaMin}min` : '—'}</strong><span>{t('caixa.aiTempoMedio')}</span></div>
+            <div className="cz-ai-metrica"><strong>{stats?.satisfacaoPct != null ? `${stats.satisfacaoPct}%` : '—'}</strong><span>{t('caixa.aiSatisfacao')}</span></div>
+          </div>
+        </div>
+      )}
+
       {!temSel && (
         <div className="cz-stats">
           <StatCard rotulo={t('caixa.receitaMes')} valor={stats ? formataReal(stats.receitaMes) : '—'} cor="#a855f7" />
@@ -334,6 +399,13 @@ export default function CaixaEntrada() {
                       <span className="cz-hora">{hora(c.ultimaEm)}</span>
                     </span>
                     <span className="cz-previa">{c.ultimaDirecao === 'ENVIADA' ? '↩ ' : ''}{c.ultimaMensagem}</span>
+                    {(c.cliente.segmento === 'VIP' || ehNovaMensagem(c)) && (
+                      <span className="cz-tags">
+                        {c.cliente.segmento === 'VIP' && <span className="cz-tag vip">VIP</span>}
+                        {ehNovaMensagem(c) && <span className="cz-tag novo">{t('caixa.novaMensagem')}</span>}
+                      </span>
+                    )}
+                    <span className="cz-item-rodape">👤 {c.cliente.segmento}</span>
                   </span>
                   {c.naoLidas > 0 && <span className="cz-badge">{c.naoLidas}</span>}
                 </button>

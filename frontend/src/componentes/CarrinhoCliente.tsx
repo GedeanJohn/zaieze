@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  DndContext, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors, useDraggable, useDroppable,
+  type DragEndEvent, type DragStartEvent,
+} from '@dnd-kit/core'
 import { api, formataReal, mensagemDeErro } from '../api'
 import { useLojaAtiva } from './SeletorLoja'
 import { useToast } from './Toast'
@@ -22,6 +26,21 @@ interface LinhaCarrinho {
 
 interface Props { clienteId: string; atacado?: boolean; onFechar: () => void }
 
+const ZONA_SOLTAR = 'cz-cart-drop'
+
+/** Estoque disponível pra essa variação no modo de venda atual (a reserva de varejo, ver
+ * VariacaoProduto no schema: o atacado só pode usar o restante além do que está reservado). */
+function disponivel(v: VariacaoP, atacado: boolean): number {
+  return atacado ? v.estoque - v.estoqueVarejo : v.estoqueVarejo
+}
+
+/** Usada pelo arrastar-e-soltar: primeira variação com estoque, na ordem em que já vem do backend
+ * (cor/tamanho crescente) — atalho rápido; pra escolher uma variação específica, ainda dá pra
+ * tocar no produto e abrir a ficha normalmente. */
+function primeiraVariacaoDisponivel(produto: ProdutoP, atacado: boolean): VariacaoP | null {
+  return produto.variacoes.find((v) => disponivel(v, atacado) > 0) ?? null
+}
+
 /** Carrinho do cliente aberto de dentro do Chat Zaieze — edita o mesmo `Orcamento` que a
  * vendedora usaria em Orçamentos/PDV, só que com grade de fotos em vez do formulário de
  * dropdowns (ver Orcamentos.tsx para a lógica de negócio original que isto espelha). */
@@ -39,6 +58,16 @@ export default function CarrinhoCliente({ clienteId, atacado, onFechar }: Props)
   const [produtoAberto, setProdutoAberto] = useState<ProdutoP | null>(null)
   const [salvando, setSalvando] = useState<'idle' | 'salvando' | 'erro'>('idle')
   const [erroSync, setErroSync] = useState('')
+  const [arrastando, setArrastando] = useState<ProdutoP | null>(null)
+
+  // Mesma configuração de sensores do Funil de vendas (Pipeline.tsx) — MouseSensor (não
+  // PointerSensor) com uma distância mínima antes de ativar, e TouchSensor com delay, pra não
+  // brigar com o toque normal de abrir a ficha do produto.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  )
+  const { setNodeRef: setZonaSoltarRef, isOver } = useDroppable({ id: ZONA_SOLTAR })
 
   const timerBusca = useRef<ReturnType<typeof setTimeout> | null>(null)
   const timerSync = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -135,6 +164,19 @@ export default function CarrinhoCliente({ clienteId, atacado, onFechar }: Props)
     setProdutoAberto(null)
   }
 
+  function aoIniciarArrasto(event: DragStartEvent) {
+    setArrastando((event.active.data.current?.produto as ProdutoP | undefined) ?? null)
+  }
+
+  function aoSoltar(event: DragEndEvent) {
+    setArrastando(null)
+    const produto = event.active.data.current?.produto as ProdutoP | undefined
+    if (!produto || event.over?.id !== ZONA_SOLTAR) return
+    const variacao = primeiraVariacaoDisponivel(produto, !!atacado)
+    if (!variacao) { avisar(t('caixa.semEstoqueArrastar'), 'erro'); return }
+    adicionarItem(produto, variacao, 1)
+  }
+
   function mudarQuantidade(variacaoId: string, delta: number) {
     setItens((atual) => {
       const linha = atual.find((i) => i.variacaoId === variacaoId)
@@ -173,6 +215,7 @@ export default function CarrinhoCliente({ clienteId, atacado, onFechar }: Props)
   const bloqueado = orcamentoStatus != null && !EDITAVEL.includes(orcamentoStatus)
 
   return (
+    <DndContext sensors={sensors} onDragStart={aoIniciarArrasto} onDragEnd={aoSoltar}>
     <div className="cz-carrinho">
       <div className="cz-cart-topo">
         {produtoAberto ? (
@@ -192,18 +235,14 @@ export default function CarrinhoCliente({ clienteId, atacado, onFechar }: Props)
           {carregandoProdutos && <div className="cz-cart-vazio">{t('caixa.carregandoProdutos')}</div>}
           {!carregandoProdutos && produtos.length === 0 && <div className="cz-cart-vazio">{t('caixa.nadaEncontrado')}</div>}
           {produtos.map((p) => (
-            <button key={p.id} type="button" className="cz-cart-card" onClick={() => setProdutoAberto(p)}>
-              {p.fotos?.[0] ? <img src={p.fotos[0]} alt={p.nome} /> : <div className="cz-cart-semfoto" />}
-              <span className="cz-cart-card-nome">{p.nome}</span>
-              <span className="cz-cart-card-preco">{formataReal(atacado && p.precoAtacado ? Number(p.precoAtacado) : Number(p.precoVarejo))}</span>
-            </button>
+            <CardProdutoArrastavel key={p.id} produto={p} atacado={!!atacado} onTocar={() => setProdutoAberto(p)} />
           ))}
         </div>
       ))}
 
-      <div className="cz-cart-rodape">
+      <div ref={setZonaSoltarRef} className={`cz-cart-rodape${isOver ? ' arrastando-sobre' : ''}`}>
         {itens.length === 0 ? (
-          <span className="cz-cart-rodape-vazio">{t('caixa.carrinhoVazio')}</span>
+          <span className="cz-cart-rodape-vazio">{isOver ? t('caixa.soltarAqui') : t('caixa.carrinhoVazio')}</span>
         ) : (
           <div className="cz-cart-itens">
             {itens.map((i) => (
@@ -238,6 +277,31 @@ export default function CarrinhoCliente({ clienteId, atacado, onFechar }: Props)
         {salvando === 'erro' && <div className="cz-cart-alerta">{erroSync || t('caixa.erroSincronizar')}</div>}
       </div>
     </div>
+    <DragOverlay>
+      {arrastando && (
+        <div className="cz-cart-card cz-cart-card-fantasma">
+          {arrastando.fotos?.[0] ? <img src={arrastando.fotos[0]} alt="" /> : <div className="cz-cart-semfoto" />}
+          <span className="cz-cart-card-nome">{arrastando.nome}</span>
+        </div>
+      )}
+    </DragOverlay>
+    </DndContext>
+  )
+}
+
+/** Card da grade, arrastável pro carrinho (adiciona a 1ª variação com estoque) — tocar/clicar
+ * (sem arrastar) continua abrindo a ficha pra escolher cor/tamanho específicos. */
+function CardProdutoArrastavel({ produto, atacado, onTocar }: { produto: ProdutoP; atacado: boolean; onTocar: () => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `cz-cart-produto-${produto.id}`, data: { produto } })
+  return (
+    <button
+      ref={setNodeRef} {...listeners} {...attributes}
+      type="button" className={`cz-cart-card${isDragging ? ' arrastando' : ''}`} onClick={onTocar}
+    >
+      {produto.fotos?.[0] ? <img src={produto.fotos[0]} alt={produto.nome} /> : <div className="cz-cart-semfoto" />}
+      <span className="cz-cart-card-nome">{produto.nome}</span>
+      <span className="cz-cart-card-preco">{formataReal(atacado && produto.precoAtacado ? Number(produto.precoAtacado) : Number(produto.precoVarejo))}</span>
+    </button>
   )
 }
 
@@ -261,7 +325,7 @@ function FichaProduto({ produto, atacado, onAdicionar }: { produto: ProdutoP; at
   useEffect(() => { setQtd(1) }, [tamanho])
 
   const variacaoSel = opcoesTamanho.find((v) => v.tamanho === tamanho)
-  const estoqueSel = variacaoSel ? (atacado ? variacaoSel.estoque - variacaoSel.estoqueVarejo : variacaoSel.estoqueVarejo) : 0
+  const estoqueSel = variacaoSel ? disponivel(variacaoSel, atacado) : 0
   const podeAdicionar = !!variacaoSel && estoqueSel >= qtd
 
   return (
@@ -290,7 +354,7 @@ function FichaProduto({ produto, atacado, onAdicionar }: { produto: ProdutoP; at
           <span>{t('caixa.tamanho')}</span>
           <div className="cz-chips">
             {opcoesTamanho.map((v) => {
-              const disp = atacado ? v.estoque - v.estoqueVarejo : v.estoqueVarejo
+              const disp = disponivel(v, atacado)
               return (
                 <button key={v.tamanho} type="button" className={v.tamanho === tamanho ? 'on' : ''} disabled={disp <= 0} onClick={() => setTamanho(v.tamanho)}>
                   {v.tamanho}

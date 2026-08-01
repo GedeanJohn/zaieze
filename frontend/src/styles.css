@@ -861,7 +861,7 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 }
 .cz-multicanal-icone:hover { background: rgba(255, 255, 255, 0.12); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 18px rgba(255, 255, 255, 0.18); }
 .cz-multicanal-marca { text-align: center; flex: 1; }
-.cz-multicanal-marca strong { font-family: var(--marca); font-size: 22px; letter-spacing: 0.14em; color: #fff; line-height: 1; }
+.cz-multicanal-marca strong { font-family: var(--marca); font-size: 22px; letter-spacing: 0.3em; color: #fff; line-height: 1; }
 .cz-multicanal-marca span { display: block; font-size: 8.5px; letter-spacing: 0.32em; color: #9a95a8; margin-top: 3px; }
 .cz-multicanal-acoes { display: flex; gap: 8px; flex-shrink: 0; }
 .cz-multicanal-arco {
@@ -952,7 +952,7 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 @media (max-width: 720px) {
   .cz-multicanal-topo { padding: 2px 0 14px; }
   .cz-multicanal-icone { width: 32px; height: 32px; border-radius: 9px; }
-  .cz-multicanal-marca strong { font-size: 16px; letter-spacing: 0.1em; }
+  .cz-multicanal-marca strong { font-size: 16px; letter-spacing: 0.22em; }
   .cz-multicanal-marca span { font-size: 7px; letter-spacing: 0.26em; margin-top: 2px; }
   .cz-multicanal-arco { height: 12px; }
 
@@ -1006,12 +1006,9 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .cz-tab { background: transparent; border: 1px solid var(--cz-line); color: var(--cz-mut); border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .cz-tab.ativo { background: var(--cz-accent); border-color: var(--cz-accent); color: #fff; }
 .cz-tab-badge { background: linear-gradient(135deg, #ec4899, #db2777); color: #fff; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 0 6px; margin-left: 6px; min-width: 16px; display: inline-block; text-align: center; }
-.cz-itens { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px; padding-bottom: 56px; display: flex; flex-direction: column; gap: 0; }
+.cz-itens { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px; padding-bottom: 56px; display: flex; flex-direction: column; gap: 3px; }
 .cz-item { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 12px; padding: 11px 10px; cursor: pointer; color: var(--cz-tx); position: relative; }
-.cz-item + .cz-item::before { content: ''; position: absolute; top: 0; left: 63px; right: 10px; border-top: 1px solid var(--cz-line); }
 .cz-item:hover { background: var(--cz-surf2); }
-.cz-item:hover::before, .cz-item.ativo::before, .cz-item.ativo + .cz-item::before,
-.cz-item.destaque::before, .cz-item.destaque + .cz-item::before { border-color: transparent; }
 /* .destaque: spotlight só no primeiro card da lista, enquanto nada foi clicado ainda (mockup) —
    mesmo glow do .ativo, mas sem ser uma seleção real (some assim que o usuário abre uma conversa). */
 .cz-item.ativo, .cz-item.destaque {

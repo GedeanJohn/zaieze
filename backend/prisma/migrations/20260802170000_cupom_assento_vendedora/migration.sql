@@ -2,7 +2,11 @@
 BEGIN;
 CREATE TYPE "AplicacaoPromo_new" AS ENUM ('VENDEDORA', 'ASSESSOR');
 ALTER TABLE "public"."codigos_promocionais" ALTER COLUMN "aplicaA" DROP DEFAULT;
-ALTER TABLE "codigos_promocionais" ALTER COLUMN "aplicaA" TYPE "AplicacaoPromo_new" USING ("aplicaA"::text::"AplicacaoPromo_new");
+-- Cupons antigos de plano de Rede (aplicaA='REDE') migram pra VENDEDORA — 'REDE' não existe no
+-- enum novo, então um cast direto quebra se houver alguma linha assim (havia, em produção).
+ALTER TABLE "codigos_promocionais" ALTER COLUMN "aplicaA" TYPE "AplicacaoPromo_new" USING (
+  CASE "aplicaA"::text WHEN 'REDE' THEN 'VENDEDORA' ELSE "aplicaA"::text END::"AplicacaoPromo_new"
+);
 ALTER TYPE "AplicacaoPromo" RENAME TO "AplicacaoPromo_old";
 ALTER TYPE "AplicacaoPromo_new" RENAME TO "AplicacaoPromo";
 DROP TYPE "public"."AplicacaoPromo_old";

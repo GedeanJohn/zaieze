@@ -257,12 +257,15 @@ export async function adminRoutes(app: FastifyInstance) {
 
     const lojas = await prisma.loja.findMany({ where: { redeId: id }, select: { id: true } })
     const lojaIds = lojas.map((l) => l.id)
-    const [usuarios, produtos, campanhasModelo, mensagens, posts] = await Promise.all([
+    const [usuarios, produtos, campanhasModelo, mensagens, posts, mensagensInstagram, vendas, looksProvador] = await Promise.all([
       prisma.usuario.findMany({ where: { OR: [{ redeId: id }, { lojaId: { in: lojaIds } }] }, select: { fotoUrl: true } }),
       prisma.produto.findMany({ where: { redeId: id }, select: { fotos: true, videos: true } }),
       prisma.campanhaModelo.findMany({ where: { redeId: id }, select: { imagemUrl: true } }),
       prisma.mensagemWhatsapp.findMany({ where: { lojaId: { in: lojaIds } }, select: { midiaUrl: true } }),
       prisma.postMural.findMany({ where: { lojaId: { in: lojaIds } }, select: { imagemUrl: true } }),
+      prisma.mensagemInstagram.findMany({ where: { lojaId: { in: lojaIds } }, select: { midiaUrl: true } }),
+      prisma.venda.findMany({ where: { lojaId: { in: lojaIds } }, select: { comprovantePagamentoUrl: true } }),
+      prisma.lookProvador.findMany({ where: { redeId: id }, select: { fotoClienteUrl: true, fotoUrl: true, videoUrl: true } }),
     ])
     const urls = [
       rede.logoUrl, rede.bannerUrl,
@@ -271,6 +274,9 @@ export async function adminRoutes(app: FastifyInstance) {
       ...campanhasModelo.map((c) => c.imagemUrl),
       ...mensagens.map((m) => m.midiaUrl),
       ...posts.map((p) => p.imagemUrl),
+      ...mensagensInstagram.map((m) => m.midiaUrl),
+      ...vendas.map((v) => v.comprovantePagamentoUrl),
+      ...looksProvador.flatMap((l) => [l.fotoClienteUrl, l.fotoUrl, l.videoUrl]),
     ].filter((u): u is string => !!u)
     await excluirDoR2(urls).catch(() => { /* best-effort — não bloqueia a exclusão */ })
     await Promise.all(urls.map((u) => removerUploadLocal(u)))

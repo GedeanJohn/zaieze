@@ -6,6 +6,7 @@ import type { Prisma, Role } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
 import { normalizarTelefone } from '../../lib/telefone'
+import { solicitarAssentoVendedora, resolverConviteAceito } from '../vendedora-billing/assinatura-vendedora.service'
 
 /**
  * Convites por link (onboarding). Quem convida gera um link; a pessoa abre, CRIA A PRÓPRIA SENHA
@@ -58,6 +59,30 @@ export async function convitesRoutes(app: FastifyInstance) {
     const email = body.email.toLowerCase()
     if (await prisma.usuario.findUnique({ where: { email }, select: { id: true } })) {
       return reply.code(409).send({ erro: 'Já existe um usuário com este e-mail.' })
+    }
+
+    // VENDEDORA é o único papel cobrado (assento por conta de vendedora) — delega pro módulo de
+    // billing, que cria o Convite E a assinatura na mesma transação. Se quem convida é o GERENTE,
+    // fica aguardando aprovação do GESTOR antes de qualquer cobrança (ver
+    // assinatura-vendedora.service.ts).
+    if (body.role === 'VENDEDORA') {
+      const r = await solicitarAssentoVendedora({
+        redeId, lojaId: lojaId!, equipeId: body.equipeId ?? null,
+        nome: body.nome, email, telefone: body.telefone,
+        solicitadoPorId: request.user.sub, solicitadoPorRole: request.user.role,
+      })
+      if (!r.ok) return reply.code(422).send({ erro: r.erro })
+      if (r.aguardandoAprovacao) {
+        return reply.code(202).send({ aguardandoAprovacao: true, assinaturaId: r.assinaturaId, mensagem: 'Solicitação enviada para aprovação do gestor.' })
+      }
+      const assinatura = await prisma.assinaturaVendedora.findUniqueOrThrow({ where: { id: r.assinaturaId }, include: { convite: true } })
+      const convite = assinatura.convite!
+      const rede = await prisma.rede.findUnique({ where: { id: redeId }, select: { slug: true, nome: true } })
+      const link = `${env.TENANT_SCHEME}://${rede?.slug}.${env.DOMINIO_BASE}/convite/${convite.token}`
+      const primeiro = convite.nome.split(/\s+/)[0]
+      const msg = `Olá ${primeiro}! Você foi convidado(a) para o ${rede?.nome ?? 'sistema'} (ModaCRM). Crie seu acesso aqui: ${link}`
+      const whatsappUrl = `https://wa.me/${convite.telefone}?text=${encodeURIComponent(msg)}`
+      return reply.code(201).send({ link, whatsappUrl, expiraEm: convite.expiraEm, nome: convite.nome, role: 'VENDEDORA', simulado: r.simulado, initPoint: r.initPoint })
     }
 
     const token = randomBytes(24).toString('hex')
@@ -118,15 +143,18 @@ export async function convitesRoutes(app: FastifyInstance) {
       return reply.code(409).send({ erro: 'Este e-mail já tem conta. Faça login.' })
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.usuario.create({
+    const usuario = await prisma.$transaction(async (tx) => {
+      const usuario = await tx.usuario.create({
         data: {
           nome: c.nome, email: c.email, senhaHash: await bcrypt.hash(senha, 10), role: c.role,
           redeId: c.redeId, lojaId: c.lojaId, equipeId: c.equipeId, telefone: c.telefone, ativo: true,
         },
       })
       await tx.convite.update({ where: { id: c.id }, data: { usado: true } })
+      return usuario
     })
+    // Liga o assento de vendedora (se houver) ao Usuario recém-criado — no-op para os demais papéis.
+    await resolverConviteAceito(c.id, usuario.id)
 
     const rede = c.redeId ? await prisma.rede.findUnique({ where: { id: c.redeId }, select: { slug: true } }) : null
     return { ok: true, email: c.email, redeSlug: rede?.slug ?? null }

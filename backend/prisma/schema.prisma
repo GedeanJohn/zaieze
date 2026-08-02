@@ -207,32 +207,32 @@ enum StatusProvador {
 // ─────────────────────────── Rede (marca) — tenant raiz ───────────────────────────
 
 model Rede {
-  id                       String    @id @default(cuid())
-  nome                     String // nome da marca
-  slug                     String    @unique
-  plano                    Plano     @default(START)
-  ativo                    Boolean   @default(true)
+  id                   String  @id @default(cuid())
+  nome                 String // nome da marca
+  slug                 String  @unique
+  plano                Plano   @default(START)
+  ativo                Boolean @default(true)
   // Identidade visual da marca (usada no catálogo público / Portal do Cliente)
-  logoUrl                  String? // caminho do arquivo enviado pelo gestor (servido em /uploads)
-  bannerUrl                String? // banner do topo do catálogo público (faixa antes dos produtos)
+  logoUrl              String? // caminho do arquivo enviado pelo gestor (servido em /uploads)
+  bannerUrl            String? // banner do topo do catálogo público (faixa antes dos produtos)
   // Descrição da loja escrita pelo gestor: alimenta a meta description e o schema.org (JSON-LD)
   // do catálogo público — fonte de pesquisa para buscadores e IA (GEO).
-  descricaoPublica         String?
-  corPrimaria              String    @default("#111111") // cor de destaque (botões/CTA)
-  corSecundaria            String    @default("#ffffff") // cor de fundo
+  descricaoPublica     String?
+  corPrimaria          String  @default("#111111") // cor de destaque (botões/CTA)
+  corSecundaria        String  @default("#ffffff") // cor de fundo
   // SLA por etapa do funil (minutos): tempo máximo do ciclo em cada etapa antes de "atrasar".
-  slaEntrouMin             Int       @default(30) // 1ª resposta; estourou + auto = redistribui
-  slaAtendidoMin           Int       @default(1440) // avançar do "atendido" (1 dia)
-  slaNegociandoMin         Int       @default(4320) // fechar a negociação (3 dias)
-  slaAutoRedistribuir      Boolean   @default(false) // redistribui sozinho quando ENTROU estoura o prazo
+  slaEntrouMin         Int     @default(30) // 1ª resposta; estourou + auto = redistribui
+  slaAtendidoMin       Int     @default(1440) // avançar do "atendido" (1 dia)
+  slaNegociandoMin     Int     @default(4320) // fechar a negociação (3 dias)
+  slaAutoRedistribuir  Boolean @default(false) // redistribui sozinho quando ENTROU estoura o prazo
   // Card do funil colorido por tempo de espera: VERMELHO quando passa do SLA (atrasado);
   // LARANJA quando falta <= slaApertadoPct% do prazo; VERDE no resto.
-  slaApertadoPct           Int       @default(20)
+  slaApertadoPct       Int     @default(20)
   // Canal varejo×atacado por QUANTIDADE de peças no pedido/carrinho: pedido com nº de peças
   // >= este mínimo é ATACADO (aplica preço de atacado); abaixo é VAREJO. Definido pelo gestor.
-  pedidoMinimoAtacado      Int       @default(6)
+  pedidoMinimoAtacado  Int     @default(6)
   // Lote mínimo de atacado para INFANTIL (costuma ser maior, ex.: 12). Demais gêneros usam pedidoMinimoAtacado.
-  pedidoMinimoInfantil     Int       @default(12)
+  pedidoMinimoInfantil Int     @default(12)
   // ── Regras do Negócio (vitrine) — Parcelamento / Entrega / Devolução ──
   // Tudo aqui é só INFORMATIVO pro cliente (não há gateway de pagamento nem logística integrada:
   // a compra fecha pelo WhatsApp com a vendedora). Definido pelo gestor em Marca > Regras do Negócio.
@@ -246,7 +246,7 @@ model Rede {
   parcelasMinValor         Decimal   @default(0) @db.Decimal(12, 2) // 0 = sem valor mínimo
   // Entrega: texto livre (prazo varia por região/transportadora) + limiar opcional de frete grátis.
   entregaPrazoTexto        String? // ex.: "5 a 10 dias úteis, conforme a região"
-  entregaFreteGratisValor  Decimal? @db.Decimal(12, 2) // null = sem frete grátis configurado
+  entregaFreteGratisValor  Decimal?  @db.Decimal(12, 2) // null = sem frete grátis configurado
   entregaTexto             String? // condições adicionais (textarea livre do gestor)
   // Devolução: prazo em dias (padrão 7 = direito de arrependimento do CDC p/ compra online) + texto livre.
   devolucaoPrazoDias       Int       @default(7)
@@ -329,6 +329,7 @@ model Rede {
   perfilNegocio              PerfilNegocioRede?
   assinaturasChatAtendimento AssinaturaChatAtendimento[]
   prospeccoesBuscas          ProspeccaoBusca[]
+  assinaturasVendedora       AssinaturaVendedora[]
 
   @@map("redes")
 }
@@ -462,12 +463,12 @@ model ConfigPlano {
 
 /// Preço vigente de cada add-on (editável pelo SUPER_ADMIN) — mesmo padrão de ConfigPlano.
 model ConfigAddon {
-  tipo      TipoAddon @id
-  preco     Decimal   @db.Decimal(12, 2)
+  tipo            TipoAddon @id
+  preco           Decimal   @db.Decimal(12, 2)
   // Cota mensal de "créditos de IA Captador" — só usado pelo add-on RADAR (prospecção de
   // empresas novas via Google Places). null → usa o default hardcoded em addon.service.ts.
   cotaCreditosMes Int?
-  updatedAt DateTime  @default(now()) @updatedAt
+  updatedAt       DateTime  @default(now()) @updatedAt
 
   @@map("config_addons")
 }
@@ -507,6 +508,58 @@ model AssinaturaChatAtendimento {
   @@index([redeId])
   @@index([vendedoraId])
   @@map("assinaturas_chat_atendimento")
+}
+
+/// Preço vigente do "assento de vendedora" (editável pelo SUPER_ADMIN). Linha única (id=1),
+/// mesmo padrão de ConfigChatAtendimento — substitui ConfigPlano: não há mais 3 preços por
+/// tier, só 1 preço por conta de vendedora (ver AssinaturaVendedora).
+model ConfigAssentoVendedora {
+  id        Int      @id @default(1)
+  preco     Decimal  @default(159.90) @db.Decimal(10, 2)
+  updatedAt DateTime @updatedAt
+
+  @@map("config_assento_vendedora")
+}
+
+/// Assinatura do "assento de vendedora" — a cobrança do SaaS nasce POR VENDEDORA (não mais por
+/// Rede/Plano). Comprada pelo GESTOR ou pelo GERENTE (se houver um ativo); quando quem solicita
+/// é o GERENTE, fica aguardando aprovação do GESTOR (aprovadoEm null) antes de qualquer cobrança
+/// real — o gestor é o responsável jurídico/financeiro da rede. O pagamento acontece ANTES de
+/// existir o Usuario (fluxo de convite, ver convites.routes.ts): conviteId fica preenchido
+/// enquanto vendedoraId é null; ao aceitar o convite, vendedoraId é preenchido. Ao "desligar" uma
+/// vendedora, o assento fica RESERVADO (vendedoraId volta a null, status continua ATIVA) pra
+/// reatribuir sem cobrar de novo no mesmo ciclo — só cancela de fato via
+/// solicitarCancelamentoAssentoVendedora.
+model AssinaturaVendedora {
+  id                       String           @id @default(cuid())
+  redeId                   String
+  vendedoraId              String? // null = assento reservado (desligada) ou aguardando aceite do convite
+  conviteId                String?          @unique // preenchido enquanto ainda não existe Usuario
+  status                   StatusAssinatura @default(PENDENTE)
+  valor                    Decimal          @db.Decimal(10, 2)
+  mpPreapprovalId          String?          @unique
+  simulada                 Boolean          @default(false)
+  // Reajustes anuais (IGP-M) já aplicados a ESTE assento — mesmo mecanismo da antiga Assinatura de plano.
+  reajustesAplicados       Int              @default(0)
+  // Preserva trial/cortesia (ex.: migração de redes já ativas) — null = sem período grátis.
+  primeiraCobrancaEm       DateTime?
+  cicloFimEm               DateTime?
+  cancelamentoSolicitadoEm DateTime?
+  cancelamentoOrigem       String? // GESTOR | ADMIN | MERCADO_PAGO
+  // Aprovação do dono da rede quando quem solicita é o GERENTE (não cobra nada até aprovar).
+  solicitadoPorId          String // Usuario.id de quem iniciou (GESTOR, GERENTE ou SUPER_ADMIN)
+  aprovadoEm               DateTime? // null + solicitante GERENTE = aguardando aprovação do gestor
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+
+  rede          Rede     @relation(fields: [redeId], references: [id], onDelete: Cascade)
+  vendedora     Usuario? @relation("VendedoraAssentoVendedora", fields: [vendedoraId], references: [id], onDelete: SetNull)
+  convite       Convite? @relation(fields: [conviteId], references: [id], onDelete: SetNull)
+  solicitadoPor Usuario  @relation("SolicitanteAssentoVendedora", fields: [solicitadoPorId], references: [id])
+
+  @@index([redeId])
+  @@index([vendedoraId])
+  @@map("assinaturas_vendedora")
 }
 
 /// Perfil de negócio da MARCA (1:1 com Rede) — cache gerado por IA a partir do segmento
@@ -599,11 +652,12 @@ model ReajusteAssinatura {
 enum TipoPromocao {
   DIAS_GRATIS // começa a pagar depois de N dias (free trial)
   PERCENTUAL // % de desconto na mensalidade
+  VALOR_FIXO // desconto fixo em R$ na mensalidade
 }
 
 /// A qual assinatura o cupom se aplica — um mesmo código nunca vale para as duas.
 enum AplicacaoPromo {
-  REDE // assinatura de plano da loja/marca (START/PRO/ELITE)
+  VENDEDORA // assento de vendedora (ver AssinaturaVendedora) — substitui o antigo cupom de plano REDE
   ASSESSOR // assinatura do Assessor(a) de Moda
 }
 
@@ -612,14 +666,12 @@ model CodigoPromocional {
   id          String         @id @default(cuid())
   codigo      String         @unique
   tipo        TipoPromocao
-  // A qual tipo de assinatura o cupom se aplica — default REDE preserva o comportamento dos
-  // cupons já existentes (todos eram, até aqui, só de plano de loja/marca).
-  aplicaA     AplicacaoPromo @default(REDE)
-  // Plano ao qual o cupom se aplica (oferta completa: o link fica só ?cupom=). Só relevante
-  // quando aplicaA=REDE. Null = qualquer plano.
-  plano       Plano?
+  // A qual tipo de assinatura o cupom se aplica — default VENDEDORA preserva o comportamento dos
+  // cupons já existentes (todos eram, até aqui, só de plano de loja/marca; agora são de assento).
+  aplicaA     AplicacaoPromo @default(VENDEDORA)
   dias        Int? // DIAS_GRATIS: dias grátis antes da 1ª cobrança
   percentual  Decimal?       @db.Decimal(5, 2) // PERCENTUAL: % de desconto na mensalidade
+  valorFixo   Decimal?       @db.Decimal(10, 2) // VALOR_FIXO: desconto fixo em R$ na mensalidade
   descricao   String?
   validadeAte DateTime? // último dia em que pode ser usado (null = sem prazo)
   maxUsos     Int? // limite de usos (null = ilimitado)
@@ -686,46 +738,46 @@ model Equipe {
 // ─────────────────────────── Usuários ───────────────────────────
 
 model Usuario {
-  id             String   @id @default(cuid())
-  redeId         String? // GESTOR (escopo = rede inteira)
-  lojaId         String? // GERENTE / VENDEDORA
-  equipeId       String? // VENDEDORA (equipe do gerente)
-  nome           String
-  email          String   @unique
-  senhaHash      String
-  role           Role
+  id                   String    @id @default(cuid())
+  redeId               String? // GESTOR (escopo = rede inteira)
+  lojaId               String? // GERENTE / VENDEDORA
+  equipeId             String? // VENDEDORA (equipe do gerente)
+  nome                 String
+  email                String    @unique
+  senhaHash            String
+  role                 Role
   // Só relevante para role=SUPER_ADMIN: distingue o login "Gestor Comercial do Sistema" do
   // "Gestor Administrador do Sistema" — MESMAS atribuições (é o mesmo Role.SUPER_ADMIN por baixo,
   // nenhuma checagem de permissão olha este campo), é só o rótulo exibido que muda (ver Layout.tsx).
-  comercial      Boolean  @default(false)
+  comercial            Boolean   @default(false)
   // WhatsApp pessoal: recebe a senha provisória no "esqueci minha senha" E, pra VENDEDORA, é o
   // número usado no deep link wa.me do handoff "Falar com a vendedora" na vitrine (Portal do
   // Cliente) quando a marca ainda não conectou o WhatsApp oficial da MARCA (Rede.wa*).
-  telefone       String?
+  telefone             String?
   // WhatsApp pessoal via QR Code (Baileys) — conexão alternativa à Cloud API da marca, só
   // VENDEDORA. Sessão/credenciais ficam em disco (WA_SESSIONS_DIR/<usuarioId>), não no banco.
   waPessoalConectado   Boolean   @default(false)
   waPessoalConectadoEm DateTime?
   waPessoalNumero      String? // número detectado (JID) após conectar
   // foto de perfil da vendedora (exibida no cabeçalho do Chat Zaieze; URL no R2/local)
-  fotoUrl        String?
+  fotoUrl              String?
   // slug do catálogo da vendedora: loja.com/<loja>/<slugCatalogo> (fase 6)
-  slugCatalogo   String?
+  slugCatalogo         String?
   // bio/apresentação exibida no cabeçalho do catálogo público (loja da vendedora)
-  bioCatalogo    String?
-  metaMensal     Decimal? @db.Decimal(12, 2)
-  comissaoPadrao Decimal? @db.Decimal(5, 2) // % padrão da vendedora
+  bioCatalogo          String?
+  metaMensal           Decimal?  @db.Decimal(12, 2)
+  comissaoPadrao       Decimal?  @db.Decimal(5, 2) // % padrão da vendedora
   // Idioma preferencial da interface (pt | en | es). Escolhido no cadastro (checkout do GESTOR)
   // e editável depois em "Minha conta". Só afeta a UI — não traduz dados do usuário/catálogo.
-  idioma         String   @default("pt")
+  idioma               String    @default("pt")
   // Vendedora SINTÉTICA (não é uma pessoa real): representa a Vendedora ZAIEZE (addon
   // VENDEDORA_ZAIEZE) na loja padrão da rede. Existe pra reaproveitar toda a validação/lógica
   // de Venda (que exige um Usuario VENDEDORA de verdade) sem precisar de um "cliente especial"
   // à parte. Nunca gera comissão (comissaoPadrao fica null) nem faz login humano.
-  ehAgenteIa     Boolean  @default(false)
-  ativo          Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  ehAgenteIa           Boolean   @default(false)
+  ativo                Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   rede                       Rede?                       @relation(fields: [redeId], references: [id], onDelete: Cascade)
   loja                       Loja?                       @relation(fields: [lojaId], references: [id], onDelete: Cascade)
@@ -749,6 +801,8 @@ model Usuario {
   assinaturasChatAtendimento AssinaturaChatAtendimento[]
   avaliacoes                 VendedoraAvaliacao[]
   prospeccoesBuscas          ProspeccaoBusca[]
+  assentoVendedora           AssinaturaVendedora[]       @relation("VendedoraAssentoVendedora")
+  assentosSolicitados        AssinaturaVendedora[]       @relation("SolicitanteAssentoVendedora")
 
   @@unique([lojaId, slugCatalogo])
   @@index([lojaId, role])
@@ -786,6 +840,8 @@ model Convite {
   usado       Boolean  @default(false)
   expiraEm    DateTime
   createdAt   DateTime @default(now())
+
+  assinaturaVendedora AssinaturaVendedora?
 
   @@index([redeId, usado])
   @@map("convites")
@@ -1150,10 +1206,10 @@ model Produto {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  rede          Rede              @relation(fields: [redeId], references: [id], onDelete: Cascade)
-  categoria     Categoria?        @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
-  marca         Marca?            @relation(fields: [marcaId], references: [id], onDelete: SetNull)
-  colecao       Colecao?          @relation(fields: [colecaoId], references: [id], onDelete: SetNull)
+  rede          Rede               @relation(fields: [redeId], references: [id], onDelete: Cascade)
+  categoria     Categoria?         @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
+  marca         Marca?             @relation(fields: [marcaId], references: [id], onDelete: SetNull)
+  colecao       Colecao?           @relation(fields: [colecaoId], references: [id], onDelete: SetNull)
   variacoes     VariacaoProduto[]
   looksProvador LookProvador[]
   mensagens     MensagemWhatsapp[]

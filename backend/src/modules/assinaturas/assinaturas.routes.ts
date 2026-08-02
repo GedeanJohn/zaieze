@@ -7,23 +7,21 @@ import { redeIdDe } from '../../plugins/auth'
 import { consultarPreapproval, criarPreapproval, cancelarPreapproval, mpConfigurado } from './mercadopago.service'
 import { proximoCicloFim, reativarAssinatura, solicitarCancelamento } from './assinatura.service'
 import { listarPlanos, precoDoPlano, percentualDescontoAnual, valorAnual } from '../planos/planos.service'
-import { consumirCodigo, descricaoBeneficio, validarCodigo } from '../promo/promo.service'
+import { descricaoBeneficio, validarCodigo } from '../promo/promo.service'
 import { CONTRATO_VERSAO } from '../contrato/contrato.template'
 import { temAceiteVigente } from '../contrato/contrato.service'
 import { PRIVACIDADE_VERSAO } from '../privacidade/privacidade.template'
 import { TERMOS_USO_VERSAO } from '../termos-uso/termos-uso.template'
 import { normalizarTelefone } from '../../lib/telefone'
-import { confirmarCicloEComissionar, gerarComissaoDoCiclo, normalizarCodigo as normalizarCodigoAfiliado } from '../afiliados/afiliado.service'
+import { confirmarCicloEComissionar, normalizarCodigo as normalizarCodigoAfiliado } from '../afiliados/afiliado.service'
 import { obterCotacaoAtual } from '../cambio/cambio.service'
 import { confirmarCicloAddon, solicitarCancelamentoAddon } from '../addons/addon.service'
 import { confirmarCicloAssessor, solicitarCancelamentoAssessor } from '../assessores/assinatura-assessor.service'
 import { confirmarCicloChatAtendimento, solicitarCancelamentoChatAtendimento } from '../chat-atendimento/assinatura-chat-atendimento.service'
 import { normalizarSlug as normalizarSlugAssessor } from '../assessores/assessor.service'
-
-const arred2 = (n: number) => Math.round(n * 100) / 100
+import { confirmarCicloAssentoVendedora, solicitarCancelamentoAssentoVendedora } from '../vendedora-billing/assinatura-vendedora.service'
 
 const checkoutSchema = z.object({
-  plano: z.enum(['START', 'PRO', 'ELITE']),
   redeNome: z.string().min(2),
   slug: z.string().min(3).regex(/^[a-z0-9-]+$/, 'O endereço aceita apenas letras minúsculas, números e hífens'),
   gestorNome: z.string().min(2),
@@ -31,12 +29,10 @@ const checkoutSchema = z.object({
   telefone: z.string().min(8, 'Informe o WhatsApp com DDD').transform(normalizarTelefone),
   email: z.string().email(),
   senha: z.string().min(6),
-  codigoPromo: z.string().optional(),
   // Programa de Afiliados: código do link de indicação (?ref=), capturado pela landing/checkout.
   refAfiliado: z.string().trim().optional(),
   // Indicação por Assessor(a) de Moda: slug do link de indicação (?refAssessor=<slug>).
   refAssessor: z.string().trim().optional(),
-  periodicidade: z.enum(['MENSAL', 'ANUAL']).default('MENSAL'),
   // Idioma preferencial escolhido no cadastro (só afeta a UI do gestor; editável depois em "Minha conta").
   idioma: z.enum(['pt', 'en', 'en-gb', 'es']).default('pt'),
 })
@@ -61,7 +57,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     const { codigo } = request.query as { codigo?: string }
     const c = await validarCodigo(codigo)
     if (!c) return { valido: false }
-    return { valido: true, beneficio: descricaoBeneficio(c), tipo: c.tipo, dias: c.dias, percentual: c.percentual, plano: c.plano }
+    return { valido: true, beneficio: descricaoBeneficio(c), tipo: c.tipo, dias: c.dias, percentual: c.percentual }
   })
 
   // Verifica disponibilidade do endereço (slug) — usado pela landing em tempo real
@@ -74,6 +70,10 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     return { disponivel: !existe, motivo: existe ? 'em uso' : null }
   })
 
+  // Cadastro da marca — GRÁTIS (não há mais plano/mensalidade da Rede; a cobrança do SaaS nasce
+  // só quando o gestor ativa uma conta de vendedora, ver vendedora-billing/). Sem cupom aqui: o
+  // cupom (CodigoPromocional) agora se aplica ao assento de vendedora, informado de novo na
+  // primeira compra (GET /vendedora-billing/preco), não no cadastro da marca.
   app.post('/checkout', async (request, reply) => {
     const body = checkoutSchema.parse(request.body)
     const slug = body.slug.toLowerCase()
@@ -89,25 +89,10 @@ export async function assinaturasRoutes(app: FastifyInstance) {
       return reply.code(409).send({ erro: 'Já existe uma conta com este e-mail.' })
     }
 
-    // Código promocional (opcional): % de desconto na mensalidade ou dias grátis.
-    const promo = await validarCodigo(body.codigoPromo)
-    if (body.codigoPromo && body.codigoPromo.trim() && !promo) {
-      return reply.code(422).send({ erro: 'Código promocional inválido ou expirado.' })
-    }
-    // Cupom pode FIXAR o plano da oferta (link só ?cupom=): quando definido, ele manda no plano.
-    const plano = promo?.plano ?? body.plano
-    let valor = await precoDoPlano(plano)
-    // Plano ANUAL: cobra 1x/ano o total com desconto, em vez do valor mensal.
-    if (body.periodicidade === 'ANUAL') {
-      valor = valorAnual(valor, await percentualDescontoAnual())
-    }
-    if (promo?.tipo === 'PERCENTUAL' && promo.percentual) {
-      valor = arred2(valor * (1 - Number(promo.percentual) / 100))
-    }
-    const diasGratis = promo?.tipo === 'DIAS_GRATIS' ? promo.dias ?? 0 : 0
-
     // Programa de Afiliados: vincula a rede ao afiliado do link (?ref=), se o código existir e o
-    // afiliado estiver ativo. Gravado no ato — base do cálculo de comissão vitalícia.
+    // afiliado estiver ativo. Gravado no ato — base do cálculo de comissão vitalícia. A comissão em
+    // si nasce quando a rede ativa a 1ª conta de vendedora (não há mais valor a comissionar aqui,
+    // já que o cadastro da marca é grátis).
     const afiliado = body.refAfiliado
       ? await prisma.afiliado.findFirst({
           where: { codigo: normalizarCodigoAfiliado(body.refAfiliado), usuario: { ativo: true } },
@@ -125,33 +110,12 @@ export async function assinaturasRoutes(app: FastifyInstance) {
       : null
 
     const senhaHash = await bcrypt.hash(body.senha, 10)
-    const simulada = !mpConfigurado()
-    // 100% de desconto (valor zerado) → não há o que cobrar: ativa na hora, SEM passar pelo
-    // Mercado Pago (uma recorrência de R$0 nunca é confirmada e travaria o tenant em PENDENTE).
-    const gratuito = valor <= 0
-    const semCobranca = simulada || gratuito
 
-    // Início do 1º ciclo: com dias grátis, o acesso vai até now+dias (depois cobra).
-    const inicioCiclo = () => {
-      if (!diasGratis) return proximoCicloFim(new Date(), body.periodicidade)
-      const d = new Date(); d.setDate(d.getDate() + diasGratis); return d
-    }
-    // Data da 1ª cobrança quando há período grátis (free trial). Sem dias grátis, a
-    // cobrança é no ato (null = não há aviso de "1ª cobrança a caminho").
-    const primeiraCobrancaEm = diasGratis ? (() => { const d = new Date(); d.setDate(d.getDate() + diasGratis); return d })() : null
-    // Calculado uma única vez (fora da transação) e reaproveitado como cicloEm da comissão do
-    // afiliado abaixo — evita qualquer drift entre o valor gravado e o usado no cálculo.
-    const cicloFimEmInicial = semCobranca ? inicioCiclo() : null
-    // Cotação BRL→USD em cache no instante do checkout — só histórico/auditoria informativa
-    // (a cobrança no Mercado Pago é 100% em BRL, sem nenhuma relação com este valor).
-    const cotacaoAtual = await obterCotacaoAtual()
-
-    // Provisiona o tenant. Em modo simulado já nasce ATIVO; em modo real fica inativo
-    // até o webhook de pagamento aprovado liberar o acesso.
+    // Provisiona o tenant — sempre ativo na hora, não há cobrança/webhook a esperar.
     const rede = await prisma.$transaction(async (tx) => {
       const r = await tx.rede.create({
         data: {
-          nome: body.redeNome, slug, plano, ativo: semCobranca,
+          nome: body.redeNome, slug, ativo: true,
           afiliadoId: afiliado?.id ?? null,
           assessorOrigemId: assessorIndicador?.id ?? null,
         },
@@ -204,57 +168,14 @@ export async function assinaturasRoutes(app: FastifyInstance) {
           userAgent: request.headers['user-agent'] ?? null,
         },
       })
-      await tx.assinatura.create({
-        data: {
-          redeId: r.id, plano, valor, simulada: semCobranca, periodicidade: body.periodicidade,
-          status: semCobranca ? 'ATIVA' : 'PENDENTE',
-          // sem cobrança (simulado ou 100% off) já entra com ciclo; no modo pago o ciclo começa no webhook
-          cicloFimEm: cicloFimEmInicial,
-          primeiraCobrancaEm,
-          cotacaoUsdNaAssinatura: cotacaoAtual.usdPorBrl,
-          cotacaoUsdDataFonte: cotacaoAtual.dataCotacao,
-        },
-      })
       return r
     })
 
-    if (semCobranca) {
-      if (promo) await consumirCodigo(promo.id)
-      // Ativação instantânea (simulado/100% off) não passa pelo webhook — gera a comissão do
-      // 1º ciclo aqui, direto (se houver afiliado de origem e valor a comissionar).
-      if (afiliado && valor > 0) {
-        await gerarComissaoDoCiclo({ redeId: rede.id, cicloEm: cicloFimEmInicial ?? new Date(), valorBaseAssinatura: valor })
-      }
-      return reply.code(201).send({
-        simulado: true,
-        plano,
-        slug,
-        redirect: `${urlTenant(slug)}/login`,
-        mensagem: gratuito && !simulada
-          ? 'Assinatura ativada com 100% de desconto — seu painel já está no ar.'
-          : 'Assinatura simulada ativada — seu painel já está no ar.',
-      })
-    }
-
-    // Mercado Pago real: cria a assinatura recorrente e devolve o checkout
-    try {
-      const pre = await criarPreapproval({
-        reason: `ZAIEZE — Plano ${plano}`,
-        valor,
-        email,
-        redeSlug: slug,
-        backUrl: `${urlTenant(slug)}/login`,
-        diasGratis,
-        periodicidade: body.periodicidade,
-      })
-      await prisma.assinatura.update({ where: { redeId: rede.id }, data: { mpPreapprovalId: pre.id } })
-      if (promo) await consumirCodigo(promo.id)
-      return reply.code(201).send({ simulado: false, plano, slug, initPoint: pre.initPoint })
-    } catch (e) {
-      // Desfaz o provisionamento se o Mercado Pago falhar
-      await prisma.rede.delete({ where: { id: rede.id } })
-      throw e
-    }
+    return reply.code(201).send({
+      slug,
+      redirect: `${urlTenant(slug)}/login`,
+      mensagem: 'Conta criada — agora é só cadastrar sua equipe de vendedoras.',
+    })
   })
 
   // Webhook do Mercado Pago — sincroniza a assinatura/tenant consultando o STATUS REAL no MP.
@@ -305,7 +226,7 @@ export async function assinaturasRoutes(app: FastifyInstance) {
       return reply.code(200).send({ ok: true })
     }
 
-    // Nenhum dos anteriores — pode ser a assinatura do Chat de Atendimento (comprada pelo gestor).
+    // Nem os anteriores — pode ser a assinatura do Chat de Atendimento (comprada pelo gestor).
     const assinaturaChatAtendimento = await prisma.assinaturaChatAtendimento.findFirst({ where: { mpPreapprovalId: id } })
     if (assinaturaChatAtendimento) {
       const status = await consultarPreapproval(id)
@@ -313,6 +234,19 @@ export async function assinaturasRoutes(app: FastifyInstance) {
         await confirmarCicloChatAtendimento(assinaturaChatAtendimento.id)
       } else if (status === 'cancelled' || status === 'paused') {
         await solicitarCancelamentoChatAtendimento(assinaturaChatAtendimento.id, 'MERCADO_PAGO')
+      }
+      return reply.code(200).send({ ok: true })
+    }
+
+    // Nenhum dos anteriores — pode ser o assento de uma vendedora (billing por conta, ver
+    // vendedora-billing/assinatura-vendedora.service.ts).
+    const assinaturaVendedora = await prisma.assinaturaVendedora.findFirst({ where: { mpPreapprovalId: id } })
+    if (assinaturaVendedora) {
+      const status = await consultarPreapproval(id)
+      if (status === 'authorized') {
+        await confirmarCicloAssentoVendedora(assinaturaVendedora.id)
+      } else if (status === 'cancelled' || status === 'paused') {
+        await solicitarCancelamentoAssentoVendedora(assinaturaVendedora.id, 'MERCADO_PAGO')
       }
     }
     return reply.code(200).send({ ok: true })

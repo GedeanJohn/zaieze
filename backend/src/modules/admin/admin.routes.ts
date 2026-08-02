@@ -411,11 +411,11 @@ export async function adminRoutes(app: FastifyInstance) {
 
   const promoSchema = z.object({
     codigo: z.string().min(2).max(40),
-    tipo: z.enum(['DIAS_GRATIS', 'PERCENTUAL']),
-    aplicaA: z.enum(['REDE', 'ASSESSOR']).default('REDE'), // a qual assinatura o cupom vale
-    plano: z.enum(['START', 'PRO', 'ELITE']).nullish(), // fixa o plano da oferta — só faz sentido com aplicaA=REDE
+    tipo: z.enum(['DIAS_GRATIS', 'PERCENTUAL', 'VALOR_FIXO']),
+    aplicaA: z.enum(['VENDEDORA', 'ASSESSOR']).default('VENDEDORA'), // a qual assinatura o cupom vale
     dias: z.coerce.number().int().positive().optional(),
     percentual: z.coerce.number().positive().max(100).optional(),
+    valorFixo: z.coerce.number().positive().optional(),
     descricao: z.string().max(140).optional(),
     validadeAte: z.string().optional(),
     maxUsos: z.coerce.number().int().positive().optional(),
@@ -424,6 +424,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const b = promoSchema.parse(request.body)
     if (b.tipo === 'DIAS_GRATIS' && !b.dias) return reply.code(422).send({ erro: 'Informe os dias grátis.' })
     if (b.tipo === 'PERCENTUAL' && !b.percentual) return reply.code(422).send({ erro: 'Informe o percentual de desconto.' })
+    if (b.tipo === 'VALOR_FIXO' && !b.valorFixo) return reply.code(422).send({ erro: 'Informe o valor fixo de desconto.' })
     const codigo = normalizarCodigo(b.codigo)
     if (await prisma.codigoPromocional.findUnique({ where: { codigo } })) {
       return reply.code(409).send({ erro: 'Já existe um código com esse nome.' })
@@ -431,9 +432,9 @@ export async function adminRoutes(app: FastifyInstance) {
     const promo = await prisma.codigoPromocional.create({
       data: {
         codigo, tipo: b.tipo, aplicaA: b.aplicaA,
-        plano: b.aplicaA === 'REDE' ? b.plano ?? null : null,
         dias: b.tipo === 'DIAS_GRATIS' ? b.dias : null,
         percentual: b.tipo === 'PERCENTUAL' ? b.percentual : null,
+        valorFixo: b.tipo === 'VALOR_FIXO' ? b.valorFixo : null,
         descricao: b.descricao ?? null,
         validadeAte: b.validadeAte ? new Date(b.validadeAte) : null,
         maxUsos: b.maxUsos ?? null,

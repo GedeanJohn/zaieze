@@ -10,6 +10,7 @@ import { enviarParaR2 } from '../midia/r2.service'
 import { salvarUploadLocal } from '../midia/midia.routes'
 import { gerarSenhaProvisoria } from '../auth/senha-provisoria'
 import { normalizarTelefone } from '../../lib/telefone'
+import { liberarAssentoDaVendedora } from '../vendedora-billing/assinatura-vendedora.service'
 
 const TIPOS_IMG = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/avif'])
 
@@ -17,7 +18,10 @@ const criarUsuarioSchema = z.object({
   nome: z.string().min(2),
   email: z.string().email(),
   senha: z.string().min(6),
-  role: z.enum(['GERENTE', 'VENDEDORA']).default('VENDEDORA'),
+  // VENDEDORA não nasce mais aqui: é cobrada por assento (ver vendedora-billing/), então só
+  // entra por convite (POST /convites, que já cria o assento junto). Aceito no parse (em vez de
+  // restringir o enum a só GERENTE) pra devolver um erro explicativo em vez de um 400 genérico.
+  role: z.enum(['GERENTE', 'VENDEDORA']).default('GERENTE'),
   equipeId: z.string().optional(),
   // Obrigatório: é pra onde vai a senha provisória do "esqueci minha senha". Normalizado (só
   // dígitos) pra permitir busca exata nessa tela.
@@ -148,12 +152,16 @@ export async function usuariosRoutes(app: FastifyInstance) {
     const lojaId = await lojaIdDe(request)
     const body = criarUsuarioSchema.parse(request.body)
 
+    // VENDEDORA é cobrada por assento — cadastro só por convite (POST /convites), que já cria a
+    // assinatura junto (e, se for o GERENTE convidando, pede aprovação do gestor antes de cobrar).
+    if (body.role === 'VENDEDORA') {
+      return reply.code(422).send({ erro: 'Vendedora se cadastra por convite (envie o convite em Equipe → Convidar).' })
+    }
+
     // GERENTE só cria VENDEDORA; criar outro GERENTE é ato do GESTOR
     if (body.role === 'GERENTE' && request.user.role === 'GERENTE') {
       return reply.code(403).send({ erro: 'Apenas o gestor da rede pode denominar gerentes' })
     }
-
-    // Vendedoras ilimitadas em todos os planos — a diferenciação é por funcionalidade, não por quantidade.
 
     // Equipe precisa pertencer à mesma loja
     if (body.equipeId) {
@@ -292,6 +300,9 @@ export async function usuariosRoutes(app: FastifyInstance) {
       clientes = c.count; leads = l.count
     }
     await prisma.usuario.update({ where: { id }, data: { ativo: false } })
+    // Assento fica RESERVADO (não cancela) — pronto pra reatribuir a uma pessoa nova sem cobrar
+    // de novo no mesmo ciclo. No-op se este usuário não tinha assento (ex.: GERENTE, ESTOQUISTA).
+    await liberarAssentoDaVendedora(id)
     return { ok: true, clientesTransferidos: clientes, leadsTransferidos: leads }
   })
 }

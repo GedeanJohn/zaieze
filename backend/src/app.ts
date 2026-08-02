@@ -53,6 +53,7 @@ import { assessoresRoutes } from './modules/assessores/assessores.routes'
 import { vendedoraZaiezeRoutes } from './modules/vendedora-zaieze/vendedora-zaieze.routes'
 import { chatAtendimentoRoutes } from './modules/chat-atendimento/chat-atendimento.routes'
 import { recebimentoRoutes } from './modules/recebimento/recebimento.routes'
+import { vendedoraBillingRoutes } from './modules/vendedora-billing/vendedora-billing.routes'
 
 export async function buildApp() {
   // trustProxy: lê o IP real do cliente via X-Forwarded-For (atrás do nginx) — necessário p/ rate limit por IP
@@ -137,6 +138,7 @@ export async function buildApp() {
   await app.register(assessoresRoutes, { prefix: '/api/assessores' })
   await app.register(vendedoraZaiezeRoutes, { prefix: '/api/vendedora-zaieze' })
   await app.register(chatAtendimentoRoutes, { prefix: '/api/chat-atendimento' })
+  await app.register(vendedoraBillingRoutes, { prefix: '/api/vendedora-billing' })
   await app.register(recebimentoRoutes, { prefix: '/api/recebimento' })
 
   return app

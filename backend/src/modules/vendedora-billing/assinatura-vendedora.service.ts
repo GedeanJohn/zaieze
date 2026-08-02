@@ -2,7 +2,8 @@ import { randomBytes } from 'node:crypto'
 import type { Role } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
-import { criarPreapproval, mpConfigurado } from '../assinaturas/mercadopago.service'
+import { criarPreapproval, mpConfigurado, atualizarValorPreapproval } from '../assinaturas/mercadopago.service'
+import { validarCodigo, consumirCodigo, aplicarDesconto } from '../promo/promo.service'
 
 /**
  * Assento de vendedora — a cobrança do SaaS nasce POR VENDEDORA (não mais por Rede/Plano, ver
@@ -45,10 +46,24 @@ async function iniciarCobrancaAssento(assinaturaId: string): Promise<{ simulado:
   const a = await prisma.assinaturaVendedora.findUniqueOrThrow({ where: { id: assinaturaId } })
   const rede = await prisma.rede.findUniqueOrThrow({ where: { id: a.redeId }, select: { slug: true } })
 
+  // Cupom DIAS_GRATIS (atrasa a 1ª cobrança): o desconto em valor (PERCENTUAL/VALOR_FIXO) já foi
+  // aplicado em `valor`/`precoCheio` no momento da solicitação — aqui só falta o trial de dias.
+  // O uso do cupom só é consumido agora, quando a cobrança realmente nasce (não na solicitação —
+  // uma solicitação de GERENTE ainda pendente de aprovação não deve gastar o cupom).
+  let diasGratis: number | undefined
+  if (a.codigoPromoId) {
+    const c = await prisma.codigoPromocional.findUnique({ where: { id: a.codigoPromoId } })
+    if (c && c.ativo && (c.maxUsos == null || c.usos < c.maxUsos)) {
+      await consumirCodigo(c.id)
+      if (c.tipo === 'DIAS_GRATIS') diasGratis = c.dias ?? undefined
+    }
+  }
+
   if (!mpConfigurado()) {
+    const cicloFimEm = diasGratis ? new Date(Date.now() + diasGratis * 86_400_000) : proximoCicloFimAssentoVendedora()
     await prisma.assinaturaVendedora.update({
       where: { id: assinaturaId },
-      data: { status: 'ATIVA', simulada: true, cicloFimEm: proximoCicloFimAssentoVendedora() },
+      data: { status: 'ATIVA', simulada: true, cicloFimEm },
     })
     return { simulado: true }
   }
@@ -60,6 +75,7 @@ async function iniciarCobrancaAssento(assinaturaId: string): Promise<{ simulado:
     email: gestor?.email ?? '',
     redeSlug: rede.slug,
     backUrl: `${urlTenant(rede.slug)}/equipe`,
+    diasGratis,
   })
   await prisma.assinaturaVendedora.update({ where: { id: assinaturaId }, data: { mpPreapprovalId: pre.id } })
   return { simulado: false, initPoint: pre.initPoint }
@@ -80,6 +96,8 @@ export async function solicitarAssentoVendedora(input: {
   telefone: string
   solicitadoPorId: string
   solicitadoPorRole: Role
+  /** Cupom de desconto (distribuído pelo gestor da marca) — opcional. */
+  codigoPromo?: string | null
 }): Promise<
   | { ok: true; assinaturaId: string; aguardandoAprovacao: true }
   | { ok: true; assinaturaId: string; aguardandoAprovacao: false; simulado: boolean; initPoint?: string }
@@ -93,7 +111,23 @@ export async function solicitarAssentoVendedora(input: {
   const loja = await prisma.loja.findUnique({ where: { id: input.lojaId }, select: { redeId: true } })
   if (!loja || loja.redeId !== input.redeId) return { ok: false, erro: 'Loja inválida para esta rede.' }
 
-  const valor = await precoAssentoVendedora()
+  let valor = await precoAssentoVendedora()
+  let codigoPromoId: string | null = null
+  let precoCheio: number | null = null
+  let descontoCiclosRestantes: number | null = null
+
+  if (input.codigoPromo) {
+    const c = await validarCodigo(input.codigoPromo, 'VENDEDORA')
+    if (!c) return { ok: false, erro: 'Cupom inválido, expirado ou esgotado.' }
+    codigoPromoId = c.id
+    if (c.tipo === 'PERCENTUAL' || c.tipo === 'VALOR_FIXO') {
+      precoCheio = valor
+      valor = aplicarDesconto(valor, c)
+      descontoCiclosRestantes = c.duracaoCiclos ?? null
+    }
+    // DIAS_GRATIS não muda o valor da mensalidade — só atrasa a 1ª cobrança (ver iniciarCobrancaAssento).
+  }
+
   const token = randomBytes(24).toString('hex')
   const expiraEm = new Date(Date.now() + DIAS_VALIDADE_CONVITE * 86_400_000)
   const aprovadoDeCara = input.solicitadoPorRole !== 'GERENTE'
@@ -111,6 +145,7 @@ export async function solicitarAssentoVendedora(input: {
         redeId: input.redeId, conviteId: convite.id, valor,
         solicitadoPorId: input.solicitadoPorId,
         aprovadoEm: aprovadoDeCara ? new Date() : null,
+        codigoPromoId, precoCheio, descontoCiclosRestantes,
       },
     })
   })
@@ -159,11 +194,38 @@ export async function recusarAssentoVendedora(id: string, gestorId: string): Pro
   return { ok: true }
 }
 
-/** Ativa/renova o ciclo — chamado quando o pagamento é confirmado (webhook MP) ou no modo simulado. */
+/**
+ * Ativa/renova o ciclo — chamado quando o pagamento é confirmado (webhook MP) ou no modo simulado.
+ * Se o assento tem desconto por prazo (cupom PERCENTUAL/VALOR_FIXO com duracaoCiclos), decrementa
+ * a cada renovação; ao zerar, reverte o valor ao preço cheio (e atualiza a recorrência no MP,
+ * quando real — sem isso o preapproval continuaria cobrando o valor com desconto pra sempre).
+ */
 export async function confirmarCicloAssentoVendedora(id: string): Promise<void> {
+  const a = await prisma.assinaturaVendedora.findUniqueOrThrow({ where: { id } })
+  let valor: number | undefined
+  let descontoCiclosRestantes: number | null | undefined
+  let precoCheio: number | null | undefined
+
+  if (a.descontoCiclosRestantes != null) {
+    const restantes = a.descontoCiclosRestantes - 1
+    if (restantes <= 0 && a.precoCheio != null) {
+      valor = Number(a.precoCheio)
+      descontoCiclosRestantes = null
+      precoCheio = null
+      if (a.mpPreapprovalId) await atualizarValorPreapproval(a.mpPreapprovalId, valor)
+    } else {
+      descontoCiclosRestantes = restantes
+    }
+  }
+
   await prisma.assinaturaVendedora.update({
     where: { id },
-    data: { status: 'ATIVA', cicloFimEm: proximoCicloFimAssentoVendedora(), cancelamentoSolicitadoEm: null, cancelamentoOrigem: null },
+    data: {
+      status: 'ATIVA', cicloFimEm: proximoCicloFimAssentoVendedora(), cancelamentoSolicitadoEm: null, cancelamentoOrigem: null,
+      ...(valor !== undefined ? { valor } : {}),
+      ...(descontoCiclosRestantes !== undefined ? { descontoCiclosRestantes } : {}),
+      ...(precoCheio !== undefined ? { precoCheio } : {}),
+    },
   })
 }
 

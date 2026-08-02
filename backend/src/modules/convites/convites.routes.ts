@@ -30,6 +30,7 @@ const criarSchema = z.object({
   lojaId: z.string().optional(),
   equipeId: z.string().optional(),
   redeId: z.string().optional(), // só usado pelo SUPER_ADMIN
+  codigoPromo: z.string().optional(), // só vale pra VENDEDORA (assento cobrado à parte)
 })
 
 const DIAS_VALIDADE = 7
@@ -70,6 +71,7 @@ export async function convitesRoutes(app: FastifyInstance) {
         redeId, lojaId: lojaId!, equipeId: body.equipeId ?? null,
         nome: body.nome, email, telefone: body.telefone,
         solicitadoPorId: request.user.sub, solicitadoPorRole: request.user.role,
+        codigoPromo: body.codigoPromo,
       })
       if (!r.ok) return reply.code(422).send({ erro: r.erro })
       if (r.aguardandoAprovacao) {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, mensagemDeErro } from '../api'
 
 interface PapelOpcao { valor: string; rotulo: string }
@@ -19,12 +19,26 @@ export default function ConvidarModal({ papeis, lojas, onClose }: Props) {
   const [telefone, setTelefone] = useState('')
   const [role, setRole] = useState(papeis[0]?.valor ?? 'VENDEDORA')
   const [lojaId, setLojaId] = useState(lojas?.[0]?.id ?? '')
+  const [codigoPromo, setCodigoPromo] = useState('')
+  const [promoInfo, setPromoInfo] = useState<{ valido: boolean; beneficio?: string } | null>(null)
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [resultado, setResultado] = useState<{ link: string; whatsappUrl: string } | { aguardandoAprovacao: true } | null>(null)
   const [copiado, setCopiado] = useState(false)
 
   const precisaLoja = !!lojas && EXIGE_LOJA.includes(role)
+
+  // Cupom de desconto (distribuído pelo gestor da marca) — só faz sentido pra VENDEDORA, que é
+  // cobrada por assento. Confere o benefício antes de confirmar o convite.
+  useEffect(() => {
+    if (role !== 'VENDEDORA' || !codigoPromo.trim()) { setPromoInfo(null); return }
+    const t = setTimeout(() => {
+      api.get('/vendedora-billing/codigo-promo', { params: { codigo: codigoPromo.trim() } })
+        .then(({ data }) => setPromoInfo(data))
+        .catch(() => setPromoInfo({ valido: false }))
+    }, 400)
+    return () => clearTimeout(t)
+  }, [codigoPromo, role])
 
   async function gerar(e: React.FormEvent) {
     e.preventDefault()
@@ -33,6 +47,7 @@ export default function ConvidarModal({ papeis, lojas, onClose }: Props) {
     try {
       const corpo: Record<string, unknown> = { nome, email, telefone: telefone || undefined, role }
       if (precisaLoja) corpo.lojaId = lojaId
+      if (role === 'VENDEDORA' && codigoPromo.trim()) corpo.codigoPromo = codigoPromo.trim()
       const { data } = await api.post('/convites', corpo)
       // VENDEDORA é cobrada por assento: se quem convida é o GERENTE, a conta fica aguardando
       // aprovação do gestor antes de qualquer cobrança/link (ver vendedora-billing/).
@@ -93,6 +108,17 @@ export default function ConvidarModal({ papeis, lojas, onClose }: Props) {
                 </div>
               )}
             </div>
+            {role === 'VENDEDORA' && (
+              <div className="campo">
+                <label>Cupom de desconto (opcional)</label>
+                <input value={codigoPromo} onChange={(e) => setCodigoPromo(e.target.value.toUpperCase())} placeholder="Código recebido da ZAIEZE" />
+                {codigoPromo.trim() && promoInfo && (
+                  promoInfo.valido
+                    ? <small style={{ color: 'var(--success, #16a34a)' }}>✓ {promoInfo.beneficio}</small>
+                    : <small style={{ color: 'var(--danger)' }}>Cupom inválido, expirado ou esgotado.</small>
+                )}
+              </div>
+            )}
             <div className="acoes">
               <button type="button" className="btn secundario" onClick={onClose}>Cancelar</button>
               <button className="btn" disabled={salvando}>{salvando ? 'Gerando…' : 'Gerar link'}</button>

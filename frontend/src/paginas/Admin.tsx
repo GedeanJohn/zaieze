@@ -4,7 +4,7 @@ import { useToast } from '../componentes/Toast'
 import { entrarComoUsuario } from '../lib/impersonar'
 
 interface AddonAdmin { tipo: string; nome: string; resumo: string; preco: number; cotaCreditosMes: number | null }
-interface Promo { id: string; codigo: string; tipo: 'DIAS_GRATIS' | 'PERCENTUAL' | 'VALOR_FIXO'; aplicaA: 'VENDEDORA' | 'ASSESSOR'; dias: number | null; percentual: string | null; valorFixo: string | null; descricao: string | null; validadeAte: string | null; maxUsos: number | null; usos: number; ativo: boolean }
+interface Promo { id: string; codigo: string; tipo: 'DIAS_GRATIS' | 'PERCENTUAL' | 'VALOR_FIXO'; aplicaA: 'VENDEDORA' | 'ASSESSOR'; dias: number | null; percentual: string | null; valorFixo: string | null; duracaoCiclos: number | null; descricao: string | null; validadeAte: string | null; maxUsos: number | null; usos: number; ativo: boolean }
 
 const fmtData = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—')
 
@@ -299,6 +299,7 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
   const [dias, setDias] = useState('90')
   const [percentual, setPercentual] = useState('')
   const [valorFixo, setValorFixo] = useState('')
+  const [duracaoCiclos, setDuracaoCiclos] = useState('')
   const [descricao, setDescricao] = useState('')
   const [validadeAte, setValidadeAte] = useState('')
   const [maxUsos, setMaxUsos] = useState('')
@@ -313,11 +314,12 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
         dias: tipo === 'DIAS_GRATIS' ? Number(dias) : undefined,
         percentual: tipo === 'PERCENTUAL' ? Number(percentual) : undefined,
         valorFixo: tipo === 'VALOR_FIXO' ? Number(valorFixo) : undefined,
+        duracaoCiclos: tipo !== 'DIAS_GRATIS' && duracaoCiclos ? Number(duracaoCiclos) : undefined,
         descricao: descricao || undefined,
         validadeAte: validadeAte || undefined,
         maxUsos: maxUsos ? Number(maxUsos) : undefined,
       })
-      setCodigo(''); setDescricao(''); setValidadeAte(''); setMaxUsos(''); setPercentual(''); setValorFixo(''); setAplicaA('VENDEDORA')
+      setCodigo(''); setDescricao(''); setValidadeAte(''); setMaxUsos(''); setPercentual(''); setValorFixo(''); setDuracaoCiclos(''); setAplicaA('VENDEDORA')
       onChange()
     } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setOcupado(false) }
   }
@@ -325,9 +327,13 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
   async function alternar(p: Promo) { await api.patch(`/admin/promos/${p.id}`, { ativo: !p.ativo }).catch(() => {}); onChange() }
   async function remover(p: Promo) { if (window.confirm(`Excluir o código ${p.codigo}?`)) { await api.delete(`/admin/promos/${p.id}`).catch(() => {}); onChange() } }
   function copiarLink(p: Promo) {
-    const url = p.aplicaA === 'ASSESSOR'
-      ? `https://zaieze.com/assessor-de-moda/cadastro?cupom=${encodeURIComponent(p.codigo)}`
-      : `https://zaieze.com/checkout?cupom=${encodeURIComponent(p.codigo)}`
+    if (p.aplicaA === 'VENDEDORA') {
+      // Não é um link — o gestor da marca digita o código diretamente ao convidar uma vendedora.
+      navigator.clipboard?.writeText(p.codigo).catch(() => {})
+      window.alert(`Código copiado: ${p.codigo}\n\nRepasse ao gestor da marca — ele informa esse código ao convidar uma nova vendedora.`)
+      return
+    }
+    const url = `https://zaieze.com/assessor-de-moda/cadastro?cupom=${encodeURIComponent(p.codigo)}`
     navigator.clipboard?.writeText(url).catch(() => {})
     window.alert(`Link do cupom copiado:\n${url}`)
   }
@@ -336,8 +342,10 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
     <div className="cartao">
       <h2 style={{ marginTop: 0 }}>🎟️ Códigos promocionais</h2>
       <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
-        Aplicado na contratação de uma conta de vendedora. <strong>Dias grátis</strong> = "comece a pagar depois de N dias".
-        <strong> Percentual</strong> ou <strong>Valor fixo</strong> = desconto na mensalidade do assento.
+        Aplicado na contratação de uma conta de vendedora — o gestor da marca digita o código ao convidar uma vendedora (não é um link).
+        <strong> Dias grátis</strong> = "comece a pagar depois de N dias". <strong>Percentual</strong> ou <strong>Valor fixo</strong> = desconto na mensalidade,
+        por um nº de meses definido (depois volta ao preço cheio automaticamente) ou pra sempre. <strong>Máx. usos</strong> funciona como o limite por marca —
+        distribua o código só pra uma marca e o número de usos vira o teto de vendedoras dela com desconto.
       </div>
       <form onSubmit={criar} className="linha-campos" style={{ alignItems: 'end' }}>
         <div className="campo">
@@ -362,8 +370,11 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
         {tipo === 'DIAS_GRATIS' && <div className="campo"><label>Dias grátis</label><input type="number" min="1" value={dias} onChange={(e) => setDias(e.target.value)} /></div>}
         {tipo === 'PERCENTUAL' && <div className="campo"><label>Desconto (%)</label><input type="number" min="1" max="100" step="0.01" value={percentual} onChange={(e) => setPercentual(e.target.value)} /></div>}
         {tipo === 'VALOR_FIXO' && <div className="campo"><label>Desconto (R$)</label><input type="number" min="0.01" step="0.01" value={valorFixo} onChange={(e) => setValorFixo(e.target.value)} /></div>}
-        <div className="campo"><label>Validade (opcional)</label><input type="date" value={validadeAte} onChange={(e) => setValidadeAte(e.target.value)} /></div>
-        <div className="campo"><label>Máx. usos (opcional)</label><input type="number" min="1" value={maxUsos} onChange={(e) => setMaxUsos(e.target.value)} /></div>
+        {tipo !== 'DIAS_GRATIS' && (
+          <div className="campo"><label>Por quantos meses (opcional)</label><input type="number" min="1" placeholder="sempre" value={duracaoCiclos} onChange={(e) => setDuracaoCiclos(e.target.value)} /></div>
+        )}
+        <div className="campo"><label>Validade pra usar (opcional)</label><input type="date" value={validadeAte} onChange={(e) => setValidadeAte(e.target.value)} /></div>
+        <div className="campo"><label>Máx. usos / marcas (opcional)</label><input type="number" min="1" value={maxUsos} onChange={(e) => setMaxUsos(e.target.value)} /></div>
         <div><button className="btn" disabled={ocupado}>Criar código</button></div>
       </form>
       <div className="campo" style={{ marginTop: 6 }}>
@@ -381,13 +392,14 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
               <td>{p.aplicaA === 'ASSESSOR' ? 'Brand Partner' : 'Vendedora'}</td>
               <td>
                 {p.tipo === 'DIAS_GRATIS' ? `${p.dias} dias grátis` : p.tipo === 'PERCENTUAL' ? `${Number(p.percentual)}% off` : `${formataReal(Number(p.valorFixo))} off`}
+                {p.tipo !== 'DIAS_GRATIS' ? (p.duracaoCiclos ? ` por ${p.duracaoCiclos} mês(es)` : ' (sempre)') : ''}
                 {p.descricao ? ` · ${p.descricao}` : ''}
               </td>
               <td style={{ whiteSpace: 'nowrap' }}>{fmtData(p.validadeAte)}</td>
               <td>{p.usos}{p.maxUsos ? `/${p.maxUsos}` : ''}</td>
               <td><span className={`selo ${p.ativo ? 'ok' : 'baixo'}`}>{p.ativo ? 'ativo' : 'inativo'}</span></td>
               <td style={{ whiteSpace: 'nowrap' }}>
-                <a href="#" onClick={(e) => { e.preventDefault(); copiarLink(p) }}>copiar link</a>
+                <a href="#" onClick={(e) => { e.preventDefault(); copiarLink(p) }}>{p.aplicaA === 'VENDEDORA' ? 'copiar código' : 'copiar link'}</a>
                 {' · '}<a href="#" onClick={(e) => { e.preventDefault(); alternar(p) }}>{p.ativo ? 'desativar' : 'ativar'}</a>
                 {' · '}<a href="#" onClick={(e) => { e.preventDefault(); remover(p) }}>excluir</a>
               </td>

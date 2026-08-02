@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { redeIdDe, redeIdDeQualquer } from '../../plugins/auth'
 import { normalizarTelefone } from '../../lib/telefone'
+import { validarCodigo, descricaoBeneficio, aplicarDesconto } from '../promo/promo.service'
 import {
   precoAssentoVendedora, solicitarAssentoVendedora, aprovarAssentoVendedora, recusarAssentoVendedora,
   solicitarCancelamentoAssentoVendedora, reativarAssentoVendedora,
@@ -19,6 +20,18 @@ const num = (v: unknown) => Number(v ?? 0)
 export async function vendedoraBillingRoutes(app: FastifyInstance) {
   // Preço vigente do assento — público (landing + tela de contratação).
   app.get('/preco', async () => ({ preco: await precoAssentoVendedora() }))
+
+  // Preview do cupom antes de contratar (o gestor/gerente digita o código recebido do gestor da
+  // marca/SUPER_ADMIN e vê o benefício antes de confirmar). Autenticado só pra manter no mesmo
+  // padrão das outras rotas do módulo — a validação em si não expõe nada sensível.
+  app.get('/codigo-promo', { preHandler: [app.authorize('GESTOR', 'GERENTE', 'SUPER_ADMIN')] }, async (request) => {
+    const { codigo } = request.query as { codigo?: string }
+    const c = await validarCodigo(codigo, 'VENDEDORA')
+    if (!c) return { valido: false }
+    const preco = await precoAssentoVendedora()
+    const valorComDesconto = c.tipo === 'DIAS_GRATIS' ? preco : aplicarDesconto(preco, c)
+    return { valido: true, beneficio: descricaoBeneficio(c), tipo: c.tipo, valorComDesconto }
+  })
 
   // Assentos da rede logada. GESTOR/SUPER_ADMIN vê todos; GERENTE só o que ele mesmo solicitou
   // (aprovado ou não) — não deve enxergar assentos que o gestor comprou diretamente.
@@ -46,6 +59,7 @@ export async function vendedoraBillingRoutes(app: FastifyInstance) {
     telefone: z.string().min(8, 'Informe o WhatsApp com DDD').transform(normalizarTelefone),
     lojaId: z.string().optional(), // obrigatório pra GESTOR/SUPER_ADMIN; GERENTE usa a própria loja
     equipeId: z.string().optional(),
+    codigoPromo: z.string().optional(),
   })
   app.post('/checkout', { preHandler: [app.authorize('GESTOR', 'GERENTE', 'SUPER_ADMIN')] }, async (request, reply) => {
     const body = checkoutSchema.parse(request.body)
@@ -57,6 +71,7 @@ export async function vendedoraBillingRoutes(app: FastifyInstance) {
       redeId, lojaId, equipeId: body.equipeId ?? null,
       nome: body.nome, email: body.email, telefone: body.telefone,
       solicitadoPorId: request.user.sub, solicitadoPorRole: request.user.role,
+      codigoPromo: body.codigoPromo,
     })
     if (!r.ok) return reply.code(422).send({ erro: r.erro })
     if (r.aguardandoAprovacao) {

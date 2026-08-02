@@ -400,8 +400,13 @@ export async function adminRoutes(app: FastifyInstance) {
     dias: z.coerce.number().int().positive().optional(),
     percentual: z.coerce.number().positive().max(100).optional(),
     valorFixo: z.coerce.number().positive().optional(),
+    // Só pra PERCENTUAL/VALOR_FIXO: nº de ciclos (meses) com desconto antes de reverter ao preço
+    // cheio automaticamente. Vazio = desconto permanente enquanto o assento existir.
+    duracaoCiclos: z.coerce.number().int().positive().optional(),
     descricao: z.string().max(140).optional(),
     validadeAte: z.string().optional(),
+    // Também funciona como "limite por marca": o gestor da marca é quem distribui o código, então
+    // maxUsos = N restringe o desconto a N assentos daquela marca na prática.
     maxUsos: z.coerce.number().int().positive().optional(),
   })
   app.post('/promos', async (request, reply) => {
@@ -419,6 +424,7 @@ export async function adminRoutes(app: FastifyInstance) {
         dias: b.tipo === 'DIAS_GRATIS' ? b.dias : null,
         percentual: b.tipo === 'PERCENTUAL' ? b.percentual : null,
         valorFixo: b.tipo === 'VALOR_FIXO' ? b.valorFixo : null,
+        duracaoCiclos: b.tipo === 'DIAS_GRATIS' ? null : (b.duracaoCiclos ?? null),
         descricao: b.descricao ?? null,
         validadeAte: b.validadeAte ? new Date(b.validadeAte) : null,
         maxUsos: b.maxUsos ?? null,

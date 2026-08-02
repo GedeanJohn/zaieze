@@ -549,13 +549,21 @@ model AssinaturaVendedora {
   // Aprovação do dono da rede quando quem solicita é o GERENTE (não cobra nada até aprovar).
   solicitadoPorId          String // Usuario.id de quem iniciou (GESTOR, GERENTE ou SUPER_ADMIN)
   aprovadoEm               DateTime? // null + solicitante GERENTE = aguardando aprovação do gestor
+  // Cupom de desconto (distribuído pelo gestor da marca) aplicado na contratação deste assento.
+  // precoCheio guarda o valor sem desconto (referência pra reverter); descontoCiclosRestantes
+  // decrementa a cada renovação de ciclo — ao chegar a 0, `valor` volta a `precoCheio` (ver
+  // confirmarCicloAssentoVendedora). null = sem desconto com prazo (permanente ou sem cupom).
+  codigoPromoId            String?
+  precoCheio               Decimal?         @db.Decimal(10, 2)
+  descontoCiclosRestantes  Int?
   createdAt                DateTime         @default(now())
   updatedAt                DateTime         @updatedAt
 
-  rede          Rede     @relation(fields: [redeId], references: [id], onDelete: Cascade)
-  vendedora     Usuario? @relation("VendedoraAssentoVendedora", fields: [vendedoraId], references: [id], onDelete: SetNull)
-  convite       Convite? @relation(fields: [conviteId], references: [id], onDelete: SetNull)
-  solicitadoPor Usuario  @relation("SolicitanteAssentoVendedora", fields: [solicitadoPorId], references: [id], onDelete: Cascade)
+  rede          Rede               @relation(fields: [redeId], references: [id], onDelete: Cascade)
+  vendedora     Usuario?           @relation("VendedoraAssentoVendedora", fields: [vendedoraId], references: [id], onDelete: SetNull)
+  convite       Convite?           @relation(fields: [conviteId], references: [id], onDelete: SetNull)
+  solicitadoPor Usuario            @relation("SolicitanteAssentoVendedora", fields: [solicitadoPorId], references: [id], onDelete: Cascade)
+  codigoPromo   CodigoPromocional? @relation(fields: [codigoPromoId], references: [id], onDelete: SetNull)
 
   @@index([redeId])
   @@index([vendedoraId])
@@ -663,21 +671,29 @@ enum AplicacaoPromo {
 
 /// Código promocional aplicado no checkout (criado pelo SUPER_ADMIN).
 model CodigoPromocional {
-  id          String         @id @default(cuid())
-  codigo      String         @unique
-  tipo        TipoPromocao
+  id            String         @id @default(cuid())
+  codigo        String         @unique
+  tipo          TipoPromocao
   // A qual tipo de assinatura o cupom se aplica — default VENDEDORA preserva o comportamento dos
   // cupons já existentes (todos eram, até aqui, só de plano de loja/marca; agora são de assento).
-  aplicaA     AplicacaoPromo @default(VENDEDORA)
-  dias        Int? // DIAS_GRATIS: dias grátis antes da 1ª cobrança
-  percentual  Decimal?       @db.Decimal(5, 2) // PERCENTUAL: % de desconto na mensalidade
-  valorFixo   Decimal?       @db.Decimal(10, 2) // VALOR_FIXO: desconto fixo em R$ na mensalidade
-  descricao   String?
-  validadeAte DateTime? // último dia em que pode ser usado (null = sem prazo)
-  maxUsos     Int? // limite de usos (null = ilimitado)
-  usos        Int            @default(0)
-  ativo       Boolean        @default(true)
-  createdAt   DateTime       @default(now())
+  aplicaA       AplicacaoPromo @default(VENDEDORA)
+  dias          Int? // DIAS_GRATIS: dias grátis antes da 1ª cobrança
+  percentual    Decimal?       @db.Decimal(5, 2) // PERCENTUAL: % de desconto na mensalidade
+  valorFixo     Decimal?       @db.Decimal(10, 2) // VALOR_FIXO: desconto fixo em R$ na mensalidade
+  // PERCENTUAL/VALOR_FIXO: por quantos ciclos (meses) o desconto vale antes de reverter ao preço
+  // cheio automaticamente. null = desconto permanente enquanto o assento existir.
+  duracaoCiclos Int?
+  descricao     String?
+  validadeAte   DateTime? // último dia em que pode ser usado (null = sem prazo)
+  // Limite de usos do código (null = ilimitado). Também funciona como "limite por marca" na
+  // prática: o gestor da marca é quem distribui o código, então um maxUsos = N já restringe o
+  // desconto a N assentos — não há necessidade de um campo separado de escopo por rede.
+  maxUsos       Int?
+  usos          Int            @default(0)
+  ativo         Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+
+  assentosVendedora AssinaturaVendedora[]
 
   @@map("codigos_promocionais")
 }

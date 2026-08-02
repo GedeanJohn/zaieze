@@ -8,12 +8,12 @@ export function normalizarCodigo(codigo: string): string {
 
 /**
  * Valida um código no checkout: existe, ativo, dentro da validade e do limite de usos, e
- * corresponde ao tipo de assinatura esperado (`aplicaA`) — um cupom de Rede não vale pra
- * assinatura de Assessor, e vice-versa.
+ * corresponde ao tipo de assinatura esperado (`aplicaA`) — um cupom de assento de vendedora não
+ * vale pra assinatura de Assessor, e vice-versa.
  */
 export async function validarCodigo(
   codigoRaw?: string | null,
-  aplicaA: 'REDE' | 'ASSESSOR' = 'REDE',
+  aplicaA: 'VENDEDORA' | 'ASSESSOR' = 'VENDEDORA',
 ): Promise<CodigoPromocional | null> {
   if (!codigoRaw || !codigoRaw.trim()) return null
   const c = await prisma.codigoPromocional.findUnique({ where: { codigo: normalizarCodigo(codigoRaw) } })
@@ -30,7 +30,16 @@ export function consumirCodigo(id: string): Promise<unknown> {
 }
 
 /** Texto curto do benefício, para exibir no checkout. */
-export function descricaoBeneficio(c: Pick<CodigoPromocional, 'tipo' | 'dias' | 'percentual'>): string {
+export function descricaoBeneficio(c: Pick<CodigoPromocional, 'tipo' | 'dias' | 'percentual' | 'valorFixo' | 'duracaoCiclos'>): string {
   if (c.tipo === 'DIAS_GRATIS') return `${c.dias} dias grátis — só começa a pagar depois`
-  return `${Number(c.percentual)}% de desconto na mensalidade`
+  const valor = c.tipo === 'PERCENTUAL' ? `${Number(c.percentual)}%` : `R$ ${Number(c.valorFixo).toFixed(2)}`
+  const prazo = c.duracaoCiclos ? ` nos primeiros ${c.duracaoCiclos} mês(es)` : ' enquanto o assento existir'
+  return `${valor} de desconto na mensalidade${prazo}`
+}
+
+/** Aplica PERCENTUAL/VALOR_FIXO sobre um preço base. Nunca deixa o valor final abaixo de zero. */
+export function aplicarDesconto(precoBase: number, c: Pick<CodigoPromocional, 'tipo' | 'percentual' | 'valorFixo'>): number {
+  if (c.tipo === 'PERCENTUAL') return Math.max(0, precoBase * (1 - Number(c.percentual) / 100))
+  if (c.tipo === 'VALOR_FIXO') return Math.max(0, precoBase - Number(c.valorFixo))
+  return precoBase
 }

@@ -401,29 +401,34 @@ export async function catalogoRoutes(app: FastifyInstance) {
     // Quando a marca ainda não conectou a WABA, cai no número pessoal da vendedora (fallback).
     const marcaConectada = !!(rede.waPhoneNumberId && rede.waNumeroExibicao)
     const saudacaoPadrao = body.resumo?.trim() || `Olá ${vend.nome.split(/\s+/)[0]}! Vim pelo catálogo e quero saber mais. 😊`
-
-    // Sem telefone não dá para materializar o cliente aqui; ainda assim devolve o WhatsApp
-    // (ao mandar a mensagem, o webhook cria o lead — por telefone ou pelo marcador (ref:)).
     const telefone = body.telefone?.replace(/\D/g, '')
-    if (!telefone) {
+
+    // Sem telefone E sem carrinho: não há nada estruturado a materializar aqui — o webhook cria
+    // o lead quando a mensagem chegar (por telefone real ou pelo marcador (ref:)). Com carrinho,
+    // segue mesmo sem telefone (ver comentário no AgenteLoja.tsx: o fluxo do "pedido" nunca pede
+    // telefone, pois a mensagem já sai do número real do cliente) para não perder o link curto.
+    if (!telefone && !body.itens?.length) {
       const textoSemTelefone = marcaConectada ? `${saudacaoPadrao}\n\n(ref: ${vendSlug})` : saudacaoPadrao
       return { whatsappUrl: whatsappUrl(marcaConectada ? rede.waNumeroExibicao : vend.telefone, textoSemTelefone) }
     }
 
     // Cliente entra na carteira da vendedora dona do link (não rouba carteira existente).
-    const cliente = await prisma.cliente.upsert({
-      where: { lojaId_telefone: { lojaId: vend.lojaId!, telefone } },
-      create: {
-        lojaId: vend.lojaId!, telefone, nome: body.nome?.trim() || 'Cliente do catálogo',
-        vendedoraId: vend.id, consentimentoLgpd: true, observacoes: 'Entrou pelo catálogo (Portal do Cliente)',
-      },
-      update: {}, // mantém dados e carteira atuais
-      select: { id: true },
-    })
+    // Sem telefone não dá para materializar o Cliente (chave única lojaId+telefone) — segue sem.
+    const cliente = telefone
+      ? await prisma.cliente.upsert({
+          where: { lojaId_telefone: { lojaId: vend.lojaId!, telefone } },
+          create: {
+            lojaId: vend.lojaId!, telefone, nome: body.nome?.trim() || 'Cliente do catálogo',
+            vendedoraId: vend.id, consentimentoLgpd: true, observacoes: 'Entrou pelo catálogo (Portal do Cliente)',
+          },
+          update: {}, // mantém dados e carteira atuais
+          select: { id: true },
+        })
+      : null
 
     // Reaproveita o ciclo aberto do cliente ou abre um novo (reentrada após fechado = novo ciclo).
     const { leadId } = await garantirCicloAberto({
-      lojaId: vend.lojaId!, vendedoraId: vend.id, redeId: rede.id, clienteId: cliente.id,
+      lojaId: vend.lojaId!, vendedoraId: vend.id, redeId: rede.id, clienteId: cliente?.id,
       telefone, nome: body.nome?.trim(), slugCatalogo: vendSlug, produtoId: body.produtoId,
     })
 

@@ -153,7 +153,11 @@ a { color: var(--accent); text-decoration: none; }
 }
 .sidebar .rodape button:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
 
-.conteudo { flex: 1; padding: 32px 40px; max-width: 1600px; }
+/* min-width: 0 é o fix clássico de flexbox: sem isso, um item flex nunca encolhe abaixo da
+   largura do seu conteúdo (default min-width:auto) — então uma tabela larga dentro de .conteudo
+   empurra o container inteiro pra fora da tela em vez de rolar dentro da própria .tabela-scroll/
+   .conteudo table (que já tem overflow-x:auto, mas nunca chegava a precisar dele). */
+.conteudo { flex: 1; min-width: 0; padding: 32px 40px; max-width: 1600px; }
 .conteudo header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
 .conteudo header h1 { margin: 0; font-size: 26px; }
 
@@ -177,6 +181,15 @@ tr:hover td { background: #fdfaf6; }
 /* Mesma ideia da regra acima, mas como wrapper explícito — pra usar em páginas que não têm o
    ancestral .conteudo (ex.: painel do Brand Partner, fora do shell do CRM). */
 .tabela-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* Barra de rolagem sempre visível quando há conteúdo pra rolar — sem isso o scroll horizontal
+   funciona mas ninguém descobre sozinho (testado: dava pra rolar, mas não parecia). */
+.conteudo table, .tabela-scroll, .tabela-scroll table {
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+.conteudo table::-webkit-scrollbar, .tabela-scroll::-webkit-scrollbar, .tabela-scroll table::-webkit-scrollbar { height: 8px; }
+.conteudo table::-webkit-scrollbar-thumb, .tabela-scroll::-webkit-scrollbar-thumb, .tabela-scroll table::-webkit-scrollbar-thumb {
+  background: var(--border); border-radius: 4px;
+}
 .tabela-scroll table { white-space: nowrap; }
 
 /* Tabela de Coleções em telas estreitas: em vez de rolar na horizontal pra ver as outras

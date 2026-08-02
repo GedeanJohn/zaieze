@@ -77,47 +77,49 @@ export default function GestoresMarca() {
             <button type="button" className="btn-link" style={{ marginLeft: 10 }} onClick={() => setSenhaGestorGerada(null)}>fechar</button>
           </div>
         )}
-        <table>
-          <thead><tr><th>Marca</th><th>Endereço</th><th>Gestor</th><th>E-mail</th><th>Telefone</th><th>Vendedoras</th><th>MRR</th><th>Lojas</th><th>Usuários</th><th>Desde</th><th>Ações</th></tr></thead>
-          <tbody>
-            {redes.map((r) => (
-              <tr key={r.id} style={{ opacity: r.ativo ? 1 : 0.5 }}>
-                <td>{r.nome}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>{r.slug}.zaieze.com</td>
-                <td>{r.gestor?.nome ?? '—'}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>
-                  {r.gestor?.email ? <a href={`mailto:${r.gestor.email}`}>{r.gestor.email}</a> : '—'}
-                </td>
-                <td style={{ whiteSpace: 'nowrap' }}>
-                  {r.gestor?.telefone
-                    ? <a href={`https://wa.me/${r.gestor.telefone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">{r.gestor.telefone}</a>
-                    : '—'}
-                </td>
-                <td>{r.assentos.ocupados}/{r.assentos.ativos}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>{formataReal(r.assentos.mrr)}</td>
-                <td>{r.lojas}</td>
-                <td>{r.usuarios}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>{fmtData(r.criadoEm)}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>
-                  {!r.ativo && (
-                    <a href="#" onClick={(e) => { e.preventDefault(); ativarCortesia(r) }} style={{ color: '#16a34a', fontWeight: 600 }}>Ativar (cortesia)</a>
-                  )}
-                  {!r.ativo && ' · '}
-                  {r.gestor && (
-                    <a href="#" onClick={(e) => { e.preventDefault(); entrarComoGestor(r) }} style={{ fontWeight: 600 }}>Entrar como</a>
-                  )}
-                  {r.gestor && ' · '}
-                  {r.gestor && (
-                    <a href="#" onClick={(e) => { e.preventDefault(); resetarSenhaGestor(r) }} style={{ fontWeight: 600 }}>Resetar senha</a>
-                  )}
-                  {r.gestor && ' · '}
-                  <a href="#" onClick={(e) => { e.preventDefault(); excluirRede(r) }} style={{ color: 'var(--danger)', fontWeight: 600 }}>Excluir loja</a>
-                </td>
-              </tr>
-            ))}
-            {redes.length === 0 && <tr><td colSpan={12} style={{ color: 'var(--ink-soft)' }}>Nenhuma rede ainda.</td></tr>}
-          </tbody>
-        </table>
+        <div className="tabela-scroll">
+          <table>
+            <thead><tr><th>Marca</th><th>Endereço</th><th>Gestor</th><th>E-mail</th><th>Telefone</th><th>Vendedoras</th><th>MRR</th><th>Lojas</th><th>Usuários</th><th>Desde</th><th>Ações</th></tr></thead>
+            <tbody>
+              {redes.map((r) => (
+                <tr key={r.id} style={{ opacity: r.ativo ? 1 : 0.5 }}>
+                  <td>{r.nome}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{r.slug}.zaieze.com</td>
+                  <td>{r.gestor?.nome ?? '—'}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {r.gestor?.email ? <a href={`mailto:${r.gestor.email}`}>{r.gestor.email}</a> : '—'}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {r.gestor?.telefone
+                      ? <a href={`https://wa.me/${r.gestor.telefone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">{r.gestor.telefone}</a>
+                      : '—'}
+                  </td>
+                  <td>{r.assentos.ocupados}/{r.assentos.ativos}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{formataReal(r.assentos.mrr)}</td>
+                  <td>{r.lojas}</td>
+                  <td>{r.usuarios}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{fmtData(r.criadoEm)}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {!r.ativo && (
+                      <a href="#" onClick={(e) => { e.preventDefault(); ativarCortesia(r) }} style={{ color: '#16a34a', fontWeight: 600 }}>Ativar (cortesia)</a>
+                    )}
+                    {!r.ativo && ' · '}
+                    {r.gestor && (
+                      <a href="#" onClick={(e) => { e.preventDefault(); entrarComoGestor(r) }} style={{ fontWeight: 600 }}>Entrar como</a>
+                    )}
+                    {r.gestor && ' · '}
+                    {r.gestor && (
+                      <a href="#" onClick={(e) => { e.preventDefault(); resetarSenhaGestor(r) }} style={{ fontWeight: 600 }}>Resetar senha</a>
+                    )}
+                    {r.gestor && ' · '}
+                    <a href="#" onClick={(e) => { e.preventDefault(); excluirRede(r) }} style={{ color: 'var(--danger)', fontWeight: 600 }}>Excluir loja</a>
+                  </td>
+                </tr>
+              ))}
+              {redes.length === 0 && <tr><td colSpan={11} style={{ color: 'var(--ink-soft)' }}>Nenhuma rede ainda.</td></tr>}
+            </tbody>
+          </table>
+        </div>
       </div>
     </>
   )

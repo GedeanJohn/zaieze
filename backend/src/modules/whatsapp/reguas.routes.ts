@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
-import { requireFeature } from '../../plugins/planos'
 import { dispararParaClientes } from './disparo.service'
 
 const GESTAO = ['SUPER_ADMIN', 'GESTOR', 'GERENTE'] as const
@@ -22,7 +21,6 @@ const DEBOUNCE_DIAS = 7 // não reenvia régua ao mesmo cliente dentro deste pra
 
 /** Réguas de inatividade (30/60/90/180 dias) — módulo 10 da spec. */
 export async function reguasRoutes(app: FastifyInstance) {
-  app.addHook('onRequest', requireFeature('whatsapp'))
 
   app.get('/', { preHandler: [app.authorize(...GESTAO)] }, async (request) => {
     const lojaId = await lojaIdDe(request)

@@ -4,7 +4,6 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
 import { lojaIdDe, redeIdDe } from '../../plugins/auth'
-import { requireFeature } from '../../plugins/planos'
 import { igConfigurado, cifrar, decifrar, podeCifrar, assinaturaValida, verificarContaIg, enviarTextoIg, type RedeIG } from './instagram.service'
 import { marcarLeadAtendido, garantirCicloAberto } from '../leads/leads.service'
 import { contextoVendedoraIa, usuarioEhAgenteIa, responderVendedoraZaieze } from '../vendedora-zaieze/vendedora-zaieze.service'
@@ -134,7 +133,7 @@ export async function instagramRoutes(app: FastifyInstance) {
 
   // ─────────── Configuração da conta (Instagram Business) — GESTOR ───────────
 
-  app.get('/config', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request) => {
+  app.get('/config', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request) => {
     const redeId = redeIdDe(request)
     const r = await prisma.rede.findUniqueOrThrow({
       where: { id: redeId },
@@ -158,7 +157,7 @@ export async function instagramRoutes(app: FastifyInstance) {
   })
 
   // Grava a config; se houver conta + token válidos, valida no Graph e marca conectado.
-  app.put('/config', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
+  app.put('/config', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
     const redeId = redeIdDe(request)
     const b = configSchema.parse(request.body)
 
@@ -192,7 +191,7 @@ export async function instagramRoutes(app: FastifyInstance) {
 
   // Revalida as credenciais salvas — não existe "número de teste" no Instagram (só dá pra
   // mandar mensagem pra quem já mandou uma pra conta primeiro).
-  app.post('/testar', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
+  app.post('/testar', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
     const redeId = redeIdDe(request)
     const rede = await prisma.rede.findUniqueOrThrow({ where: { id: redeId }, select: selectRedeConfig })
     if (!igConfigurado(rede)) return reply.code(422).send({ erro: 'Configure a conta e o token antes de testar.' })
@@ -204,7 +203,7 @@ export async function instagramRoutes(app: FastifyInstance) {
   // ─────────── Caixa de entrada / conversas ───────────
 
   // ?vendedoraId= — usado pela supervisão (gerente/gestor) para espelhar só a carteira de uma vendedora.
-  app.get('/conversas', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request) => {
+  app.get('/conversas', { preHandler: [app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     const { vendedoraId } = request.query as { vendedoraId?: string }
     const where: Prisma.MensagemInstagramWhereInput = { lojaId, clienteId: { not: null } }
@@ -249,7 +248,7 @@ export async function instagramRoutes(app: FastifyInstance) {
       .sort((a, b) => b.ultimaEm.getTime() - a.ultimaEm.getTime())
   })
 
-  app.get('/conversas/:clienteId', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request) => {
+  app.get('/conversas/:clienteId', { preHandler: [app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     const { clienteId } = request.params as { clienteId: string }
     const { vendedoraId } = request.query as { vendedoraId?: string }
@@ -260,7 +259,7 @@ export async function instagramRoutes(app: FastifyInstance) {
   })
 
   // Responde uma DM. Sem template no Instagram: fora da janela de 24h não dá pra responder.
-  app.post('/conversas/:clienteId/responder', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
+  app.post('/conversas/:clienteId/responder', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { clienteId } = request.params as { clienteId: string }
     const { texto } = z.object({ texto: z.string().min(1) }).parse(request.body)

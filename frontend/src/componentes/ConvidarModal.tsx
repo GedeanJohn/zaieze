@@ -21,7 +21,7 @@ export default function ConvidarModal({ papeis, lojas, onClose }: Props) {
   const [lojaId, setLojaId] = useState(lojas?.[0]?.id ?? '')
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
-  const [resultado, setResultado] = useState<{ link: string; whatsappUrl: string } | null>(null)
+  const [resultado, setResultado] = useState<{ link: string; whatsappUrl: string } | { aguardandoAprovacao: true } | null>(null)
   const [copiado, setCopiado] = useState(false)
 
   const precisaLoja = !!lojas && EXIGE_LOJA.includes(role)
@@ -34,7 +34,9 @@ export default function ConvidarModal({ papeis, lojas, onClose }: Props) {
       const corpo: Record<string, unknown> = { nome, email, telefone: telefone || undefined, role }
       if (precisaLoja) corpo.lojaId = lojaId
       const { data } = await api.post('/convites', corpo)
-      setResultado({ link: data.link, whatsappUrl: data.whatsappUrl })
+      // VENDEDORA é cobrada por assento: se quem convida é o GERENTE, a conta fica aguardando
+      // aprovação do gestor antes de qualquer cobrança/link (ver vendedora-billing/).
+      setResultado(data.aguardandoAprovacao ? { aguardandoAprovacao: true } : { link: data.link, whatsappUrl: data.whatsappUrl })
     } catch (err) {
       setErro(mensagemDeErro(err))
     } finally {
@@ -43,7 +45,7 @@ export default function ConvidarModal({ papeis, lojas, onClose }: Props) {
   }
 
   async function copiar() {
-    if (!resultado) return
+    if (!resultado || 'aguardandoAprovacao' in resultado) return
     try { await navigator.clipboard.writeText(resultado.link) } catch { /* ignore */ }
     setCopiado(true); setTimeout(() => setCopiado(false), 1800)
   }
@@ -96,6 +98,17 @@ export default function ConvidarModal({ papeis, lojas, onClose }: Props) {
               <button className="btn" disabled={salvando}>{salvando ? 'Gerando…' : 'Gerar link'}</button>
             </div>
           </form>
+        ) : 'aguardandoAprovacao' in resultado ? (
+          <div>
+            <h2>Enviado para aprovação 🕓</h2>
+            <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
+              A conta de vendedora é cobrada à parte, então essa solicitação precisa ser aprovada pelo gestor da
+              marca antes de qualquer cobrança. Assim que ele aprovar, o link de cadastro é liberado.
+            </p>
+            <div className="acoes">
+              <button className="btn" onClick={onClose}>Entendi</button>
+            </div>
+          </div>
         ) : (
           <div>
             <h2>Convite criado ✅</h2>

@@ -2,13 +2,11 @@ import type { FastifyInstance } from 'fastify'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
-import { requireFeature } from '../../plugins/planos'
 
 const num = (v: unknown) => Number(v ?? 0)
 
 /** Sistema Atacado (módulo 14): clientes de atacado (sacoleiras/revendedores) e o giro do atacado. */
 export async function atacadoRoutes(app: FastifyInstance) {
-  app.addHook('onRequest', requireFeature('atacado'))
 
   app.get('/', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request) => {
     const lojaId = await lojaIdDe(request)

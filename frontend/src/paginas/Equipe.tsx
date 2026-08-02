@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, mensagemDeErro, temFeature, usuarioLogado } from '../api'
+import { api, mensagemDeErro, usuarioLogado } from '../api'
 import ConvidarModal from '../componentes/ConvidarModal'
 import { useToast } from '../componentes/Toast'
 import CampoSenha from '../componentes/CampoSenha'
@@ -75,10 +75,9 @@ export default function Equipe() {
   const usuario = usuarioLogado()!
   const { t } = useIdioma()
   const ehGestor = usuario.role === 'GESTOR' || usuario.role === 'SUPER_ADMIN'
-  const multiLoja = temFeature('multi_loja')
   // O gestor administra lojas e gestores de estoque (nível rede). O gerente só vê a equipe da própria loja.
-  const mostraLojas = ehGestor && multiLoja
-  const mostraEstoque = ehGestor && multiLoja
+  const mostraLojas = ehGestor
+  const mostraEstoque = ehGestor
 
   const [aba, setAba] = useState<Aba>('equipe')
 
@@ -299,8 +298,7 @@ export default function Equipe() {
         <>
           <div className="cartao" style={{ fontSize: 13, color: 'var(--ink-soft)', display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', justifyContent: 'space-between' }}>
             <span>
-              {t('equipe.planoInfo', { plano: usuario.rede?.plano ?? '—' })}
-              {ehGestor && ` ${t('equipe.gerenteAdministraVendedoras')}`}
+              {ehGestor && t('equipe.gerenteAdministraVendedoras')}
             </span>
             {ehGestor && lojas.length > 0 && (
               <span className="campo" style={{ minWidth: 220, marginBottom: 0 }}>

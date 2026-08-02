@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, Bot, Landmark, Sparkles, Contact2, Building2, Compass,
   type LucideIcon,
 } from 'lucide-react'
-import { api, rotuloPapel, temFeature, temAddon, usuarioLogado } from '../api'
+import { api, rotuloPapel, temAddon, usuarioLogado } from '../api'
 import { useIdioma } from '../lib/i18n'
 import ManualModal from '../componentes/ManualModal'
 
@@ -149,9 +149,9 @@ export default function Layout() {
     { to: '/vendas', label: t('layout.vendas'), Icone: ShoppingBag, mostrar: podeVendasClientes },
     { to: '/orcamentos', label: t('layout.orcamentos'), Icone: Receipt, mostrar: podeVendasClientes },
     { to: '/clientes', label: t('layout.clientes'), Icone: Users, mostrar: podeVendasClientes },
-    { to: '/funil', label: t('layout.funil'), Icone: Filter, mostrar: podeVendasClientes && temFeature('funil') },
+    { to: '/funil', label: t('layout.funil'), Icone: Filter, mostrar: podeVendasClientes },
     { to: '/radar', label: t('layout.radar'), Icone: Radar, mostrar: podeVendasClientes && temAddon('RADAR') },
-    { to: '/atacado', label: t('layout.atacado'), Icone: Package, mostrar: podeVendasClientes && temFeature('atacado') },
+    { to: '/atacado', label: t('layout.atacado'), Icone: Package, mostrar: podeVendasClientes },
   ].filter((i) => i.mostrar)
 
   const itensForcaIa: ItemMenu[] = [
@@ -162,9 +162,9 @@ export default function Layout() {
   ].filter((i) => i.mostrar)
 
   const itensComunicacao: ItemMenu[] = [
-    { to: '/caixa', label: t('layout.chatZaieze'), Icone: Inbox, mostrar: podeVendasClientes && temFeature('whatsapp') },
-    { to: '/supervisao', label: t('layout.supervisao'), Icone: Eye, mostrar: podeSupervisionar && temFeature('whatsapp') },
-    { to: '/campanhas', label: t('layout.campanhas'), Icone: MessageCircle, mostrar: podeVendasClientes && temFeature('whatsapp') },
+    { to: '/caixa', label: t('layout.chatZaieze'), Icone: Inbox, mostrar: podeVendasClientes },
+    { to: '/supervisao', label: t('layout.supervisao'), Icone: Eye, mostrar: podeSupervisionar },
+    { to: '/campanhas', label: t('layout.campanhas'), Icone: MessageCircle, mostrar: podeVendasClientes },
   ].filter((i) => i.mostrar)
 
   const itensProdutoEstoque: ItemMenu[] = [
@@ -176,14 +176,14 @@ export default function Layout() {
 
   const itensEquipe: ItemMenu[] = [
     { to: '/equipe', label: t('layout.equipe'), Icone: UsersRound, mostrar: podeEquipe },
-    { to: '/ranking', label: t('layout.ranking'), Icone: Trophy, mostrar: podeVendasClientes && temFeature('gamificacao') },
-    { to: '/mural', label: t('layout.mural'), Icone: Megaphone, mostrar: podeVendasClientes && temFeature('gamificacao') },
+    { to: '/ranking', label: t('layout.ranking'), Icone: Trophy, mostrar: podeVendasClientes },
+    { to: '/mural', label: t('layout.mural'), Icone: Megaphone, mostrar: podeVendasClientes },
   ].filter((i) => i.mostrar)
 
   const itensCanais: ItemMenu[] = [
-    { to: '/whatsapp-config', label: t('layout.whatsappOficial'), Icone: Smartphone, mostrar: ehDonoRede && temFeature('whatsapp') },
-    { to: '/instagram-config', label: t('layout.instagramOficial'), Icone: Camera, mostrar: ehDonoRede && temFeature('whatsapp') },
-    { to: '/mercadolivre-config', label: t('layout.mercadoLivre'), Icone: Store, mostrar: ehDonoRede && temFeature('marketplace') },
+    { to: '/whatsapp-config', label: t('layout.whatsappOficial'), Icone: Smartphone, mostrar: ehDonoRede },
+    { to: '/instagram-config', label: t('layout.instagramOficial'), Icone: Camera, mostrar: ehDonoRede },
+    { to: '/mercadolivre-config', label: t('layout.mercadoLivre'), Icone: Store, mostrar: ehDonoRede },
   ].filter((i) => i.mostrar)
 
   const itensFinanceiro: ItemMenu[] = [
@@ -193,7 +193,7 @@ export default function Layout() {
   ].filter((i) => i.mostrar)
 
   const itensInstitucional: ItemMenu[] = [
-    { to: '/marca', label: t('layout.minhaLoja'), Icone: Palette, mostrar: ehDonoRede && temFeature('portal_cliente') },
+    { to: '/marca', label: t('layout.minhaLoja'), Icone: Palette, mostrar: ehDonoRede },
     { to: '/privacidade', label: t('layout.privacidade'), Icone: FileText, mostrar: ehDonoRede },
     { to: '/termos-uso', label: t('layout.termosDeUso'), Icone: FileText, mostrar: ehDonoRede },
   ].filter((i) => i.mostrar)
@@ -218,7 +218,7 @@ export default function Layout() {
             ? <img src={usuario.fotoUrl} alt="" />
             : <span className="topbar-ini">{iniciais(usuario.nome)}</span>}
         </button>
-        {podeVendasClientes && temFeature('whatsapp') && (
+        {podeVendasClientes && (
           <button className="topbar-chat" onClick={() => navigate('/caixa')} title="Chat Zaieze" aria-label="Chat">
             <MessageCircle size={20} strokeWidth={1.9} />
           </button>
@@ -275,7 +275,6 @@ export default function Layout() {
               ? t('papel.superAdminComercial')
               : (t(`papel.${usuario.role}`) || rotuloPapel[usuario.role])}
           </div>
-          {usuario.rede && <div style={{ marginTop: 4 }}>{t('layout.plano')} <strong style={{ color: '#e8a87c' }}>{usuario.rede.plano}</strong></div>}
           <button onClick={sair} title={t('layout.sair')}><LogOut size={15} strokeWidth={1.75} /> <span>{t('layout.sair')}</span></button>
         </div>
       </aside>
@@ -333,7 +332,7 @@ export default function Layout() {
       <nav className="bottom-nav">
         <NavLink to="/" end className={cls}><LayoutDashboard size={20} strokeWidth={1.9} /><span>{t('layout.inicio')}</span></NavLink>
         {podeVendasClientes && <NavLink to="/vendas" className={cls}><ShoppingBag size={20} strokeWidth={1.9} /><span>{t('layout.vendas')}</span></NavLink>}
-        {podeVendasClientes && temFeature('whatsapp') && <NavLink to="/caixa" className={cls}><Inbox size={20} strokeWidth={1.9} /><span>{t('layout.chat')}</span></NavLink>}
+        {podeVendasClientes && <NavLink to="/caixa" className={cls}><Inbox size={20} strokeWidth={1.9} /><span>{t('layout.chat')}</span></NavLink>}
         {podeVendasClientes && <NavLink to="/clientes" className={cls}><Users size={20} strokeWidth={1.9} /><span>{t('layout.clientes')}</span></NavLink>}
         <button type="button" className={`bn-mais${menuAberto ? ' ativo' : ''}`} onClick={() => setMenuAberto(true)}>
           <Menu size={20} strokeWidth={1.9} /><span>{t('layout.mais')}</span>

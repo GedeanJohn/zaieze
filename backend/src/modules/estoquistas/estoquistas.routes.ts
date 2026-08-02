@@ -3,7 +3,6 @@ import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { redeIdDe } from '../../plugins/auth'
-import { requireFeature } from '../../plugins/planos'
 import { normalizarTelefone } from '../../lib/telefone'
 
 const criarSchema = z.object({
@@ -26,7 +25,6 @@ const selecao = { id: true, nome: true, email: true, telefone: true, ativo: true
 
 /** Estoquistas da rede — geridos pelo GESTOR (papel de nível de rede). */
 export async function estoquistasRoutes(app: FastifyInstance) {
-  app.addHook('onRequest', requireFeature('multi_loja'))
 
   app.get('/', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request) => {
     const redeId = redeIdDe(request)

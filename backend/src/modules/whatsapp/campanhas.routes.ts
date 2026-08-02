@@ -3,7 +3,6 @@ import { z } from 'zod'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe, redeIdDe, redeIdDeQualquer } from '../../plugins/auth'
-import { requireFeature } from '../../plugins/planos'
 import { dispararParaClientes } from './disparo.service'
 import { sugerirMensagem } from './ia.service'
 
@@ -47,7 +46,6 @@ function filtroCarteira(request: FastifyRequest, lojaId: string): Prisma.Cliente
 }
 
 export async function campanhasRoutes(app: FastifyInstance) {
-  app.addHook('onRequest', requireFeature('whatsapp'))
 
   // Sugestão de mensagem (IA quando há chave; senão modelo do segmento)
   app.post('/sugerir', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request) => {

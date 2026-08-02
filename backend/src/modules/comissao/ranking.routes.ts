@@ -1,7 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
-import { requireFeature } from '../../plugins/planos'
 import { metaDaLoja } from '../metas/metas.service'
 
 const num = (v: unknown) => Number(v ?? 0)
@@ -13,7 +12,6 @@ function janelaMes(mes?: string): { inicio: Date; fim: Date } {
 
 /** Ranking gamificado de vendedoras (módulo 11) — visível para toda a equipe. */
 export async function rankingRoutes(app: FastifyInstance) {
-  app.addHook('onRequest', requireFeature('gamificacao'))
 
   app.get('/', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request) => {
     const lojaId = await lojaIdDe(request)

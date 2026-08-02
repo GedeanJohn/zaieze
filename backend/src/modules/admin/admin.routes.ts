@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
-import { aplicarReajuste, definirPrecos, listarPlanos, listarReajustes, percentualDescontoAnual, definirDescontoAnual } from '../planos/planos.service'
+import { precoAssentoVendedora, definirPrecoAssentoVendedora } from '../vendedora-billing/assinatura-vendedora.service'
 import { listarAddons, definirPrecoAddon, definirCotaCreditosAddon } from '../addons/addon.service'
 import { precoChatAtendimento, definirPrecoChatAtendimento } from '../chat-atendimento/assinatura-chat-atendimento.service'
 import { normalizarCodigo } from '../promo/promo.service'
@@ -48,16 +48,12 @@ export async function adminRoutes(app: FastifyInstance) {
     return { senha }
   })
 
-  // ── Planos & Preços ──
-  app.get('/planos', async () => ({ planos: await listarPlanos() }))
-
-  const precosSchema = z.object({
-    precos: z.record(z.enum(['START', 'PRO', 'ELITE']), z.coerce.number().nonnegative()),
-  })
-  app.put('/planos', async (request) => {
-    const { precos } = precosSchema.parse(request.body)
-    await definirPrecos(precos)
-    return { ok: true, planos: await listarPlanos() }
+  // ── Preço do assento de vendedora (substitui os 3 preços de plano — ver vendedora-billing/) ──
+  app.get('/assento-vendedora-preco', async () => ({ preco: await precoAssentoVendedora() }))
+  app.put('/assento-vendedora-preco', async (request) => {
+    const { preco } = z.object({ preco: z.coerce.number().nonnegative() }).parse(request.body)
+    await definirPrecoAssentoVendedora(preco)
+    return { ok: true, preco }
   })
 
   // ── Add-ons (assinaturas à parte dos planos, ex.: Provador Virtual) ──
@@ -87,24 +83,7 @@ export async function adminRoutes(app: FastifyInstance) {
     return { ok: true, preco: await precoChatAtendimento() }
   })
 
-  // Desconto do plano ANUAL (a priori 10%) — vale para novas assinaturas/trocas de periodicidade.
-  app.get('/config-assinatura', async () => ({ percentualDescontoAnual: await percentualDescontoAnual() }))
-  app.put('/config-assinatura', async (request) => {
-    const { percentualDescontoAnual: pct } = z.object({ percentualDescontoAnual: z.coerce.number().min(0).max(90) }).parse(request.body)
-    await definirDescontoAnual(pct)
-    return { percentualDescontoAnual: pct }
-  })
-
-  // ── Reajuste por inflação (IGP-M acumulado) — só novas assinaturas/trocas ──
-  const reajusteSchema = z.object({ percentual: z.coerce.number().gt(0).max(100) })
-  app.post('/reajuste', async (request) => {
-    const { percentual } = reajusteSchema.parse(request.body)
-    const detalhe = await aplicarReajuste(percentual, 'IGP-M', request.user.nome)
-    return { ok: true, detalhe, planos: await listarPlanos() }
-  })
-  app.get('/reajustes', async () => ({ reajustes: await listarReajustes() }))
-
-  // ── Tabela do IGP-M (acumulado 12m por mês) — base do reajuste anual por aniversário ──
+  // ── Tabela do IGP-M (acumulado 12m por mês) — base do reajuste anual por aniversário do assento ──
   app.get('/igpm', async () => ({
     indices: await prisma.indiceIgpm.findMany({ orderBy: [{ ano: 'desc' }, { mes: 'desc' }] }),
   }))
@@ -140,23 +119,22 @@ export async function adminRoutes(app: FastifyInstance) {
     const redes = await prisma.rede.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        assinatura: { select: { plano: true, status: true, valor: true, cicloFimEm: true, cancelamentoSolicitadoEm: true, simulada: true } },
+        assinaturasVendedora: { where: { status: 'ATIVA' }, select: { valor: true, vendedoraId: true } },
         _count: { select: { lojas: true, usuarios: true } },
         usuarios: { where: { role: 'GESTOR' }, select: { id: true, nome: true, email: true, telefone: true }, take: 1 },
       },
     })
     return {
       redes: redes.map((r) => ({
-        id: r.id, nome: r.nome, slug: r.slug, plano: r.plano, ativo: r.ativo, criadoEm: r.createdAt,
+        id: r.id, nome: r.nome, slug: r.slug, ativo: r.ativo, criadoEm: r.createdAt,
         lojas: r._count.lojas, usuarios: r._count.usuarios,
         gestor: r.usuarios[0] ?? null,
-        assinatura: r.assinatura
-          ? {
-              plano: r.assinatura.plano, status: r.assinatura.status, valor: num(r.assinatura.valor),
-              cicloFimEm: r.assinatura.cicloFimEm, cancelamentoAgendado: Boolean(r.assinatura.cancelamentoSolicitadoEm),
-              simulada: r.assinatura.simulada,
-            }
-          : null,
+        // Assentos de vendedora ATIVOS (pagos ou reservados) e o MRR que eles representam.
+        assentos: {
+          ativos: r.assinaturasVendedora.length,
+          ocupados: r.assinaturasVendedora.filter((a) => a.vendedoraId).length,
+          mrr: r.assinaturasVendedora.reduce((s, a) => s + num(a.valor), 0),
+        },
       })),
     }
   })
@@ -184,8 +162,8 @@ export async function adminRoutes(app: FastifyInstance) {
     const alvo = await prisma.usuario.findUnique({
       where: { id },
       include: {
-        loja: { select: { id: true, nome: true, slug: true, rede: { select: { id: true, nome: true, slug: true, plano: true } } } },
-        rede: { select: { id: true, nome: true, slug: true, plano: true } },
+        loja: { select: { id: true, nome: true, slug: true, rede: { select: { id: true, nome: true, slug: true } } } },
+        rede: { select: { id: true, nome: true, slug: true } },
       },
     })
     if (!alvo) return reply.code(404).send({ erro: 'Usuário não encontrado' })
@@ -206,7 +184,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
     // Expira mais rápido que um login normal (12h) — sessão de suporte, não de trabalho do dia.
     const token = app.jwt.sign(
-      { sub: alvo.id, redeId, lojaId: alvo.lojaId, role: alvo.role, nome: alvo.nome, plano: rede?.plano ?? null },
+      { sub: alvo.id, redeId, lojaId: alvo.lojaId, role: alvo.role, nome: alvo.nome },
       { expiresIn: '2h' },
     )
     return {
@@ -216,7 +194,7 @@ export async function adminRoutes(app: FastifyInstance) {
       redeSlug: rede?.slug ?? null,
       usuario: {
         id: alvo.id, nome: alvo.nome, email: alvo.email, role: alvo.role, fotoUrl: alvo.fotoUrl, idioma: alvo.idioma,
-        rede: rede ? { id: rede.id, nome: rede.nome, plano: rede.plano } : null,
+        rede: rede ? { id: rede.id, nome: rede.nome } : null,
         loja: alvo.loja ? { id: alvo.loja.id, nome: alvo.loja.nome, slug: alvo.loja.slug } : null,
         assessor: assessor?.slug ? { slug: assessor.slug } : null,
       },

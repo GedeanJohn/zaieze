@@ -3,7 +3,6 @@ import { z } from 'zod'
 import type { Prisma, StatusLead } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
-import { requireFeature } from '../../plugins/planos'
 import {
   ETAPAS_ABERTAS, escolherVendedoraDisponivel, redistribuirLead, redistribuirAtrasados, moverEtapa, situacaoLead, apertadoPctDaRede,
 } from './leads.service'
@@ -47,7 +46,7 @@ async function pctDaLoja(lojaId: string): Promise<number> {
 
 export async function leadsRoutes(app: FastifyInstance) {
   // Lista plana (filtro por etapa). Vendedora vê só os próprios.
-  app.get('/', { preHandler: [requireFeature('funil'), app.authenticate] }, async (request) => {
+  app.get('/', { preHandler: [app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     const { status } = request.query as { status?: string }
     const where: Prisma.LeadWhereInput = { lojaId }
@@ -61,7 +60,7 @@ export async function leadsRoutes(app: FastifyInstance) {
   })
 
   // Pipeline: cards agrupados por etapa + métricas do funil.
-  app.get('/pipeline', { preHandler: [requireFeature('funil'), app.authenticate] }, async (request) => {
+  app.get('/pipeline', { preHandler: [app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     const q = request.query as { vendedoraId?: string }
     const base: Prisma.LeadWhereInput = { lojaId }
@@ -96,7 +95,7 @@ export async function leadsRoutes(app: FastifyInstance) {
     return { colunas, metricas }
   })
 
-  app.get('/resumo', { preHandler: [requireFeature('funil'), app.authenticate] }, async (request) => {
+  app.get('/resumo', { preHandler: [app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     const where: Prisma.LeadWhereInput = { lojaId }
     if (request.user.role === 'VENDEDORA') where.vendedoraId = request.user.sub
@@ -110,7 +109,7 @@ export async function leadsRoutes(app: FastifyInstance) {
   })
 
   // Move o ciclo de etapa (manual). Vendedora move os próprios; gestor/gerente, qualquer um da loja.
-  app.patch('/:id/etapa', { preHandler: [requireFeature('funil'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
+  app.patch('/:id/etapa', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { id } = request.params as { id: string }
     const body = z.object({ etapa: z.enum(['ENTROU', 'ATENDIDO', 'NEGOCIANDO', 'AGUARDANDO_PAGAMENTO', 'CONVERTIDO', 'PERDIDO']), motivoPerda: z.string().optional() }).parse(request.body)
@@ -124,7 +123,7 @@ export async function leadsRoutes(app: FastifyInstance) {
   })
 
   // Redistribui um ciclo manualmente. Sem vendedoraId → escolhe a mais ociosa.
-  app.post('/:id/redistribuir', { preHandler: [requireFeature('funil'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async (request, reply) => {
+  app.post('/:id/redistribuir', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { id } = request.params as { id: string }
     const body = z.object({ vendedoraId: z.string().optional() }).parse(request.body ?? {})
@@ -143,7 +142,7 @@ export async function leadsRoutes(app: FastifyInstance) {
     return redistribuirLead(id, novaId, lead.loja.redeId)
   })
 
-  app.post('/redistribuir-atrasados', { preHandler: [requireFeature('funil'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async () => {
+  app.post('/redistribuir-atrasados', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async () => {
     const redistribuidos = await redistribuirAtrasados()
     return { redistribuidos }
   })

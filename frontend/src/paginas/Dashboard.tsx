@@ -187,7 +187,6 @@ function DashboardGeral() {
       <>
         <header>
           <h1>{dados.rede.nome}</h1>
-          <span style={{ color: 'var(--ink-soft)', fontSize: 14 }}>{t('dash.redePlano')} {dados.rede.plano}</span>
         </header>
         {seletor && <div style={{ marginBottom: 16 }}>{seletor}</div>}
         <div className="grade-cards">

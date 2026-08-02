@@ -3,7 +3,6 @@ import { prisma } from '../../lib/prisma'
 import { aplicarTemplate, enviarWhatsapp } from './whatsapp.service'
 import { enviarTemplate } from './meta.service'
 import { garantirSlugCatalogo, urlCatalogoPublica } from '../catalogo/catalogo.routes'
-import { planoInclui } from '../../plugins/planos'
 
 const num = (v: unknown) => Number(v ?? 0)
 
@@ -45,7 +44,7 @@ export async function dispararParaClientes(opts: {
 }): Promise<ResultadoDisparo> {
   const loja = await prisma.loja.findUniqueOrThrow({
     where: { id: opts.lojaId },
-    select: { nome: true, redeId: true, rede: { select: { slug: true, plano: true, waPhoneNumberId: true, waTokenCifrado: true } } },
+    select: { nome: true, redeId: true, rede: { select: { slug: true, waPhoneNumberId: true, waTokenCifrado: true } } },
   })
   // Número oficial da marca (Cloud API). Sem config → envio SIMULADO.
   const redeWA = { waPhoneNumberId: loja.rede.waPhoneNumberId, waTokenCifrado: loja.rede.waTokenCifrado }
@@ -64,14 +63,11 @@ export async function dispararParaClientes(opts: {
     (await prisma.usuario.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, slugCatalogo: true } })).map((v) => [v.id, v]),
   )
 
-  // Link do catálogo de cada vendedora (Portal do Cliente). Só existe se o plano da marca inclui o portal.
-  const portalAtivo = planoInclui(loja.rede.plano, 'portal_cliente')
+  // Link do catálogo de cada vendedora (Portal do Cliente) — incluso pra toda conta de vendedora.
   const links = new Map<string, string>()
-  if (portalAtivo) {
-    for (const v of vendedoras.values()) {
-      const slug = await garantirSlugCatalogo(v, loja.redeId)
-      links.set(v.id, urlCatalogoPublica(loja.rede.slug, slug))
-    }
+  for (const v of vendedoras.values()) {
+    const slug = await garantirSlugCatalogo(v, loja.redeId)
+    links.set(v.id, urlCatalogoPublica(loja.rede.slug, slug))
   }
 
   for (const c of opts.clientes) {

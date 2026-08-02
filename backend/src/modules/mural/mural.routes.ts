@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
-import { requireFeature } from '../../plugins/planos'
 
 const postSchema = z.object({
   titulo: z.string().min(2),
@@ -12,7 +11,6 @@ const postSchema = z.object({
 
 /** Mural de Novidades (módulo 12): a marca/gerência publica; a equipe acompanha. */
 export async function muralRoutes(app: FastifyInstance) {
-  app.addHook('onRequest', requireFeature('gamificacao'))
 
   app.get('/', { preHandler: [app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)

@@ -231,7 +231,7 @@ export async function usuariosRoutes(app: FastifyInstance) {
     })
     if (!alvo) return reply.code(404).send({ erro: 'Usuário não encontrado na sua equipe' })
 
-    const rede = await prisma.rede.findUnique({ where: { id: redeId }, select: { id: true, nome: true, plano: true } })
+    const rede = await prisma.rede.findUnique({ where: { id: redeId }, select: { id: true, nome: true } })
 
     await prisma.impersonacaoLog.create({
       data: {
@@ -242,14 +242,14 @@ export async function usuariosRoutes(app: FastifyInstance) {
 
     // Expira mais rápido que um login normal (12h) — sessão de suporte, não de trabalho do dia.
     const token = app.jwt.sign(
-      { sub: alvo.id, redeId: alvo.redeId ?? redeId, lojaId: alvo.lojaId, role: alvo.role, nome: alvo.nome, plano: rede?.plano ?? null },
+      { sub: alvo.id, redeId: alvo.redeId ?? redeId, lojaId: alvo.lojaId, role: alvo.role, nome: alvo.nome },
       { expiresIn: '2h' },
     )
     return {
       token,
       usuario: {
         id: alvo.id, nome: alvo.nome, email: alvo.email, role: alvo.role, fotoUrl: alvo.fotoUrl, idioma: alvo.idioma,
-        rede: rede ? { id: rede.id, nome: rede.nome, plano: rede.plano } : null,
+        rede: rede ? { id: rede.id, nome: rede.nome } : null,
         loja: alvo.loja ? { id: alvo.loja.id, nome: alvo.loja.nome, slug: alvo.loja.slug } : null,
         assessor: null,
       },

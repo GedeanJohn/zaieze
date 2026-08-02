@@ -33,8 +33,8 @@ export async function authRoutes(app: FastifyInstance) {
     const usuario = await prisma.usuario.findUnique({
       where: { email: body.email.toLowerCase() },
       include: {
-        loja: { select: { id: true, nome: true, slug: true, ativo: true, rede: { select: { id: true, nome: true, slug: true, plano: true, ativo: true } } } },
-        rede: { select: { id: true, nome: true, slug: true, plano: true, ativo: true } },
+        loja: { select: { id: true, nome: true, slug: true, ativo: true, rede: { select: { id: true, nome: true, slug: true, ativo: true } } } },
+        rede: { select: { id: true, nome: true, slug: true, ativo: true } },
       },
     })
 
@@ -91,7 +91,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const token = app.jwt.sign(
-      { sub: usuario.id, redeId, lojaId: usuario.lojaId, role: usuario.role, nome: usuario.nome, plano: rede?.plano ?? null, comercial: usuario.comercial },
+      { sub: usuario.id, redeId, lojaId: usuario.lojaId, role: usuario.role, nome: usuario.nome, comercial: usuario.comercial },
       { expiresIn: '12h' },
     )
 
@@ -111,7 +111,7 @@ export async function authRoutes(app: FastifyInstance) {
         comercial: usuario.comercial,
         fotoUrl: usuario.fotoUrl,
         idioma: usuario.idioma,
-        rede: rede ? { id: rede.id, nome: rede.nome, plano: rede.plano, addonsAtivos } : null,
+        rede: rede ? { id: rede.id, nome: rede.nome, addonsAtivos } : null,
         loja: usuario.loja ? { id: usuario.loja.id, nome: usuario.loja.nome, slug: usuario.loja.slug } : null,
         assessor: assessorSlug ? { slug: assessorSlug } : null,
       },
@@ -160,8 +160,8 @@ export async function authRoutes(app: FastifyInstance) {
         id: true, nome: true, email: true, role: true, telefone: true, fotoUrl: true, idioma: true,
         metaMensal: true, comissaoPadrao: true,
         equipe: { select: { id: true, nome: true } },
-        rede: { select: { id: true, nome: true, plano: true } },
-        loja: { select: { id: true, nome: true, slug: true, rede: { select: { id: true, nome: true, plano: true } } } },
+        rede: { select: { id: true, nome: true } },
+        loja: { select: { id: true, nome: true, slug: true, rede: { select: { id: true, nome: true } } } },
       },
     })
 

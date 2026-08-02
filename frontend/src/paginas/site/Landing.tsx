@@ -1,23 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api, formataReal, formataUsd, rotuloFeature, FEATURE_MIN, type Plano } from '../../api'
+import { api, formataReal, formataUsd } from '../../api'
 import AgenteZaieze from './AgenteZaieze'
 import { useMetaTags } from '../../lib/useMetaTags'
 import { capturarRefAfiliado } from '../../lib/afiliado'
-import SeletorPeriodicidade, { type Periodicidade } from '../../componentes/SeletorPeriodicidade'
 import SeletorIdioma from '../../componentes/SeletorIdioma'
 import { useIdioma } from '../../lib/i18n'
-
-interface PlanoCatalogo {
-  plano: Plano
-  nome: string
-  preco: number
-  precoAnual: number
-  limite: string
-  resumo: string
-}
-
-const ORDEM: Record<Plano, number> = { START: 0, PRO: 1, ELITE: 2 }
 
 /** Glifo oficial do WhatsApp (herda a cor via currentColor — fica no estilo da marca). */
 function IconeWhatsApp({ size = 22 }: { size?: number }) {
@@ -89,23 +77,13 @@ function IconeCarteira({ size = 32 }: { size?: number }) {
   )
 }
 
-// IA avançada sai da lista de cada plano e vira um destaque à parte, logo abaixo dos cards
-// (ver seção "recursos de IA") — os bots de atendimento (add-ons independentes de plano) não
-// entram nessa lista de qualquer forma, então não precisam de tratamento especial aqui.
-function featuresAte(plano: Plano, t: (chave: string) => string): string[] {
-  return Object.entries(FEATURE_MIN)
-    .filter(([f, min]) => f !== 'ia_avancada' && ORDEM[min] <= ORDEM[plano])
-    .map(([f]) => t(`feature.${f}`) || rotuloFeature[f] || f)
-}
-
 interface AddonCatalogo { tipo: string; nome: string; preco: number }
 
 export default function Landing() {
-  const [planos, setPlanos] = useState<PlanoCatalogo[]>([])
+  const [precoAssento, setPrecoAssento] = useState(0)
+  const [qtdVendedoras, setQtdVendedoras] = useState(3)
   const [addons, setAddons] = useState<AddonCatalogo[]>([])
-  const [descontoAnual, setDescontoAnual] = useState(0)
   const [cambio, setCambio] = useState<{ usdPorBrl: number | null }>({ usdPorBrl: null })
-  const [periodicidade, setPeriodicidade] = useState<Periodicidade>('MENSAL')
   const [chatAberto, setChatAberto] = useState(false)
   const navigate = useNavigate()
   const { t, idioma } = useIdioma()
@@ -118,10 +96,9 @@ export default function Landing() {
 
   useEffect(() => {
     api.get('/assinaturas/planos').then(({ data }) => {
-      setPlanos(data.planos)
-      setDescontoAnual(data.percentualDescontoAnual ?? 0)
       setCambio(data.cambio ?? { usdPorBrl: null })
     }).catch(() => {})
+    api.get('/vendedora-billing/preco').then(({ data }) => setPrecoAssento(data.preco)).catch(() => {})
     api.get('/addons').then(({ data }) => setAddons(data.addons)).catch(() => {})
     api.get('/chat-atendimento/preco').then(({ data }) => {
       setAddons((atuais) => [...atuais, { tipo: 'CHAT_ATENDIMENTO', nome: 'Chat de Atendimento', preco: data.preco }])
@@ -218,40 +195,33 @@ export default function Landing() {
       <section className="planos-site" id="planos">
         <h2>{t('planos.titulo')}</h2>
         <p className="sub">{t('planos.sub')}</p>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
-          <SeletorPeriodicidade valor={periodicidade} onChange={setPeriodicidade} percentualDesconto={descontoAnual} />
-        </div>
-        <div className="planos-grid">
-          {planos.map((p) => (
-            <div key={p.plano} className={`plano-card ${p.plano === 'PRO' ? 'destaque' : ''}`}>
-              {p.plano === 'PRO' && <div className="tag">{t('planos.maisPopular')}</div>}
-              <h3>{p.nome}</h3>
-              {(() => {
-                const emUsd = idioma !== 'pt' && cambio.usdPorBrl != null
-                const formata = (v: number) => emUsd ? formataUsd(v * cambio.usdPorBrl!) : formataReal(v)
-                return periodicidade === 'ANUAL' ? (
-                  <>
-                    <div className="preco">{formata(p.precoAnual)}<span>/{t('unidade.ano')}</span></div>
-                    <div style={{ fontSize: 12, color: 'var(--zz-mut)', marginTop: -6, marginBottom: 6 }}>
-                      {t('planos.equivaleMes')} {formata(p.precoAnual / 12)}/{t('unidade.mes')}
-                    </div>
-                  </>
-                ) : (
-                  <div className="preco">{formata(p.preco)}<span>/{t('unidade.mes')}</span></div>
-                )
-              })()}
-              {idioma !== 'pt' && cambio.usdPorBrl != null && (
-                <div className="cambio-aprox">{t('cambio.aprox')}</div>
-              )}
-              <div className="limite">{p.limite}</div>
-              <ul>
-                {featuresAte(p.plano, t).map((f) => <li key={f}>{f}</li>)}
-              </ul>
-              <button className="btn grande" onClick={() => navigate(`/checkout?plano=${p.plano}&periodicidade=${periodicidade}`)}>
-                {t('planos.assinar')} {p.nome}
-              </button>
-            </div>
-          ))}
+
+        <div className="plano-card destaque" style={{ maxWidth: 420, margin: '0 auto 32px' }}>
+          {(() => {
+            const emUsd = idioma !== 'pt' && cambio.usdPorBrl != null
+            const formata = (v: number) => emUsd ? formataUsd(v * cambio.usdPorBrl!) : formataReal(v)
+            return (
+              <>
+                <div className="preco">{formata(precoAssento)}<span>/{t('unidade.mes')} {t('planos.porVendedora')}</span></div>
+                {idioma !== 'pt' && cambio.usdPorBrl != null && <div className="cambio-aprox">{t('cambio.aprox')}</div>}
+                <div className="limite">{t('planos.cadastroGratis')}</div>
+                <div style={{ margin: '16px 0', padding: '14px', background: 'rgba(255,255,255,.06)', borderRadius: 10 }}>
+                  <label style={{ display: 'block', fontSize: 13, marginBottom: 8 }}>{t('planos.calculadoraLabel')}</label>
+                  <input
+                    type="number" min={1} value={qtdVendedoras}
+                    onChange={(e) => setQtdVendedoras(Math.max(1, Number(e.target.value) || 1))}
+                    style={{ width: 80, textAlign: 'center', fontSize: 16, padding: '6px 8px', borderRadius: 6 }}
+                  />
+                  <div style={{ marginTop: 10, fontSize: 15 }}>
+                    {t('planos.totalEstimado')} <strong>{formata(precoAssento * qtdVendedoras)}/{t('unidade.mes')}</strong>
+                  </div>
+                </div>
+              </>
+            )
+          })()}
+          <button className="btn grande" onClick={() => navigate('/checkout')}>
+            {t('planos.comecarGratis')}
+          </button>
         </div>
 
         <div className="ia-banner">

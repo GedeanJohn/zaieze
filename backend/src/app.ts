@@ -32,7 +32,6 @@ import { comissoesRoutes } from './modules/comissao/comissoes.routes'
 import { rankingRoutes } from './modules/comissao/ranking.routes'
 import { muralRoutes } from './modules/mural/mural.routes'
 import { atacadoRoutes } from './modules/atacado/atacado.routes'
-import { planosRoutes } from './modules/planos/planos.routes'
 import { assinaturasRoutes } from './modules/assinaturas/assinaturas.routes'
 import { contratoRoutes } from './modules/contrato/contrato.routes'
 import { privacidadeRoutes } from './modules/privacidade/privacidade.routes'
@@ -118,7 +117,6 @@ export async function buildApp() {
   await app.register(rankingRoutes, { prefix: '/api/ranking' })
   await app.register(muralRoutes, { prefix: '/api/mural' })
   await app.register(atacadoRoutes, { prefix: '/api/atacado' })
-  await app.register(planosRoutes, { prefix: '/api/planos' })
   await app.register(assinaturasRoutes, { prefix: '/api/assinaturas' })
   await app.register(contratoRoutes, { prefix: '/api/contrato' })
   await app.register(privacidadeRoutes, { prefix: '/api/privacidade' })

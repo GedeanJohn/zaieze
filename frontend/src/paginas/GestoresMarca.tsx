@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { api, formataReal, mensagemDeErro, type Plano } from '../api'
+import { api, formataReal, mensagemDeErro } from '../api'
 import { useToast } from '../componentes/Toast'
 import { entrarComoUsuario } from '../lib/impersonar'
 
 interface RedeAdmin {
-  id: string; nome: string; slug: string; plano: Plano; ativo: boolean; criadoEm: string; lojas: number; usuarios: number
+  id: string; nome: string; slug: string; ativo: boolean; criadoEm: string; lojas: number; usuarios: number
   gestor: { id: string; nome: string; email: string; telefone: string | null } | null
-  assinatura: { plano: Plano; status: string; valor: number; cicloFimEm: string | null; cancelamentoAgendado: boolean; simulada: boolean } | null
+  assentos: { ativos: number; ocupados: number; mrr: number }
 }
 
 const fmtData = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—')
@@ -78,7 +78,7 @@ export default function GestoresMarca() {
           </div>
         )}
         <table>
-          <thead><tr><th>Marca</th><th>Endereço</th><th>Gestor</th><th>E-mail</th><th>Telefone</th><th>Plano</th><th>Assinatura</th><th>Valor</th><th>Lojas</th><th>Usuários</th><th>Desde</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Marca</th><th>Endereço</th><th>Gestor</th><th>E-mail</th><th>Telefone</th><th>Vendedoras</th><th>MRR</th><th>Lojas</th><th>Usuários</th><th>Desde</th><th>Ações</th></tr></thead>
           <tbody>
             {redes.map((r) => (
               <tr key={r.id} style={{ opacity: r.ativo ? 1 : 0.5 }}>
@@ -93,21 +93,16 @@ export default function GestoresMarca() {
                     ? <a href={`https://wa.me/${r.gestor.telefone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">{r.gestor.telefone}</a>
                     : '—'}
                 </td>
-                <td>{r.plano}</td>
-                <td>
-                  {r.assinatura
-                    ? <span className={`selo ${r.assinatura.status === 'ATIVA' ? 'ok' : r.assinatura.status === 'CANCELADA' ? 'baixo' : 'ATACADO'}`}>{r.assinatura.status}{r.assinatura.simulada ? ' (sim)' : ''}</span>
-                    : '—'}
-                </td>
-                <td style={{ whiteSpace: 'nowrap' }}>{r.assinatura ? formataReal(r.assinatura.valor) : '—'}</td>
+                <td>{r.assentos.ocupados}/{r.assentos.ativos}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{formataReal(r.assentos.mrr)}</td>
                 <td>{r.lojas}</td>
                 <td>{r.usuarios}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>{fmtData(r.criadoEm)}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  {(!r.ativo || r.assinatura?.status === 'PENDENTE') && (
+                  {!r.ativo && (
                     <a href="#" onClick={(e) => { e.preventDefault(); ativarCortesia(r) }} style={{ color: '#16a34a', fontWeight: 600 }}>Ativar (cortesia)</a>
                   )}
-                  {(!r.ativo || r.assinatura?.status === 'PENDENTE') && ' · '}
+                  {!r.ativo && ' · '}
                   {r.gestor && (
                     <a href="#" onClick={(e) => { e.preventDefault(); entrarComoGestor(r) }} style={{ fontWeight: 600 }}>Entrar como</a>
                   )}

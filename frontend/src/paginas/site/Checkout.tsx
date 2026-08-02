@@ -1,38 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, formataReal, formataUsd, mensagemDeErro, type Plano } from '../../api'
+import { Link, useNavigate } from 'react-router-dom'
+import { api, formataReal, formataUsd, mensagemDeErro } from '../../api'
 import { capturarRefAfiliado, refAfiliadoAtivo, capturarRefAssessor, refAssessorAtivo } from '../../lib/afiliado'
-import SeletorPeriodicidade, { type Periodicidade } from '../../componentes/SeletorPeriodicidade'
 import SeletorIdioma from '../../componentes/SeletorIdioma'
 import CampoSenha from '../../componentes/CampoSenha'
 import { useIdioma } from '../../lib/i18n'
 
-const NOME: Record<Plano, string> = { START: 'Start', PRO: 'Pro', ELITE: 'Elite' }
-
-interface PlanoInfo { plano: Plano; nome: string; preco: number; precoAnual: number }
-interface PromoInfo { valido: boolean; beneficio?: string; tipo?: 'DIAS_GRATIS' | 'PERCENTUAL'; dias?: number | null; percentual?: string | null; plano?: Plano | null }
 interface Clausula { n: number; titulo: string; paragrafos: string[] }
 interface ContratoMontado { titulo: string; qualificacao: string[]; clausulas: Clausula[] }
 interface SecaoDocumento { n: number; titulo: string; itens: (string | string[])[] }
 interface DocumentoMontado { titulo: string; secoes: SecaoDocumento[] }
 
 export default function Checkout() {
-  const [params] = useSearchParams()
   const navigate = useNavigate()
-  // Plano é estado: um cupom com plano definido troca/trava o plano (link fica só ?cupom=).
-  const [plano, setPlano] = useState<Plano>((params.get('plano') as Plano) || 'PRO')
-  const [periodicidade, setPeriodicidade] = useState<Periodicidade>((params.get('periodicidade') as Periodicidade) || 'MENSAL')
   const { idioma, t } = useIdioma()
   const [cambio, setCambio] = useState<{ usdPorBrl: number | null }>({ usdPorBrl: null })
 
   const [form, setForm] = useState({ redeNome: '', slug: '', gestorNome: '', telefone: '', email: '', senha: '' })
   const [dominio, setDominio] = useState('zaieze.com')
-  const [planos, setPlanos] = useState<PlanoInfo[]>([])
-  const [descontoAnual, setDescontoAnual] = useState(0)
+  // Preço do assento de vendedora — só pra contextualizar a mensagem "grátis até ativar alguém".
+  const [precoAssento, setPrecoAssento] = useState<number | null>(null)
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checando' | 'ok' | 'indisponivel'>('idle')
-  // Pré-preenche o cupom pela URL (?cupom= ou ?codigo=) — permite compartilhar um link já com o cupom.
-  const [codigoPromo, setCodigoPromo] = useState((params.get('cupom') || params.get('codigo') || '').toUpperCase())
-  const [promo, setPromo] = useState<PromoInfo | null>(null)
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [aceiteContrato, setAceiteContrato] = useState(false)
@@ -49,9 +37,9 @@ export default function Checkout() {
 
   useEffect(() => {
     api.get('/assinaturas/planos').then(({ data }) => {
-      setDominio(data.dominioBase); setPlanos(data.planos); setDescontoAnual(data.percentualDescontoAnual ?? 0)
-      setCambio(data.cambio ?? { usdPorBrl: null })
+      setDominio(data.dominioBase); setCambio(data.cambio ?? { usdPorBrl: null })
     }).catch(() => {})
+    api.get('/vendedora-billing/preco').then(({ data }) => setPrecoAssento(data.preco)).catch(() => {})
     capturarRefAfiliado()
     capturarRefAssessor()
   }, [])
@@ -61,18 +49,6 @@ export default function Checkout() {
     api.get('/privacidade/termos', { params: { idioma } }).then(({ data }) => setPrivacidade(data.privacidade)).catch(() => {})
     api.get('/termos-uso/termos', { params: { idioma } }).then(({ data }) => setTermosUso(data.termosUso)).catch(() => {})
   }, [idioma])
-
-  const info = planos.find((p) => p.plano === plano)
-  const preco = periodicidade === 'ANUAL' ? (info?.precoAnual ?? 0) : (info?.preco ?? 0)
-  const nome = info?.nome ?? NOME[plano]
-
-  // valor exibido considerando o código promocional (aplicado sobre o preço mensal ou anual)
-  const precoComDesc = useMemo(() => {
-    if (promo?.valido && promo.tipo === 'PERCENTUAL' && promo.percentual) {
-      return Math.round(preco * (1 - Number(promo.percentual) / 100) * 100) / 100
-    }
-    return preco
-  }, [promo, preco])
 
   function onNomeRede(v: string) {
     const sugestao = v.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -92,20 +68,6 @@ export default function Checkout() {
     return () => clearTimeout(t)
   }, [form.slug])
 
-  // valida o código promocional (debounce)
-  useEffect(() => {
-    const c = codigoPromo.trim()
-    if (!c) { setPromo(null); return }
-    const t = setTimeout(async () => {
-      try {
-        const { data } = await api.get('/assinaturas/codigo-promo', { params: { codigo: c } })
-        setPromo(data)
-        if (data.valido && data.plano) setPlano(data.plano) // cupom fixa o plano da oferta
-      } catch { setPromo({ valido: false }) }
-    }, 400)
-    return () => clearTimeout(t)
-  }, [codigoPromo])
-
   const podeEnviar = useMemo(
     () => form.redeNome && form.slug.length >= 3 && form.gestorNome && form.telefone.length >= 8 && form.email && form.senha.length >= 6 && slugStatus !== 'indisponivel' && aceiteContrato && aceitePrivacidade && aceiteTermosUso,
     [form, slugStatus, aceiteContrato, aceitePrivacidade, aceiteTermosUso],
@@ -116,15 +78,12 @@ export default function Checkout() {
     setErro(''); setEnviando(true)
     try {
       const { data } = await api.post('/assinaturas/checkout', {
-        plano, ...form, slug: form.slug.toLowerCase(),
-        codigoPromo: codigoPromo.trim() || undefined,
+        ...form, slug: form.slug.toLowerCase(),
         refAfiliado: refAfiliadoAtivo(),
         refAssessor: refAssessorAtivo(),
-        periodicidade,
         idioma,
       })
-      if (data.simulado) navigate(`/sucesso?slug=${data.slug}&plano=${plano}&simulado=1`)
-      else if (data.initPoint) window.location.href = data.initPoint
+      navigate(`/sucesso?slug=${data.slug}`)
     } catch (err) {
       setErro(mensagemDeErro(err))
     } finally {
@@ -140,31 +99,19 @@ export default function Checkout() {
       </div>
       <div className="checkout-card">
         <div className="checkout-resumo">
-          <h2>Plano {nome}</h2>
-          <div style={{ marginBottom: 12 }}>
-            <SeletorPeriodicidade valor={periodicidade} onChange={setPeriodicidade} percentualDesconto={descontoAnual} />
-          </div>
+          <h2>Crie sua conta grátis</h2>
           <div className="preco">
-            {(() => {
-              const emUsd = idioma !== 'pt' && cambio.usdPorBrl != null
-              const formata = (v: number) => emUsd ? formataUsd(v * cambio.usdPorBrl!) : formataReal(v)
-              return promo?.valido && promo.tipo === 'PERCENTUAL'
-                ? <><s style={{ opacity: .55, fontSize: '0.6em' }}>{formata(preco)}</s> {formata(precoComDesc)}<span>/{periodicidade === 'ANUAL' ? t('unidade.ano') : t('unidade.mes')}</span></>
-                : <>{formata(preco)}<span>/{periodicidade === 'ANUAL' ? t('unidade.ano') : t('unidade.mes')}</span></>
-            })()}
+            R$ 0<span>/mês</span>
           </div>
+          <p>
+            Cadastro da marca sem custo — lojas e coleções ilimitadas. Você só paga quando ativar uma conta de
+            vendedora{precoAssento != null && (
+              <> — {idioma !== 'pt' && cambio.usdPorBrl != null ? formataUsd(precoAssento * cambio.usdPorBrl) : formataReal(precoAssento)}/mês por vendedora, sem limite de quantidade</>
+            )}.
+          </p>
           {idioma !== 'pt' && cambio.usdPorBrl != null && (
             <div className="cambio-aprox">{t('cambio.aprox')}</div>
           )}
-          {periodicidade === 'ANUAL' && (
-            <p style={{ fontSize: 13, color: '#666', marginTop: -8 }}>
-              {t('planos.equivaleMes')} {idioma !== 'pt' && cambio.usdPorBrl != null ? formataUsd((precoComDesc / 12) * cambio.usdPorBrl) : formataReal(precoComDesc / 12)}/{t('unidade.mes')}
-            </p>
-          )}
-          {promo?.valido && promo.tipo === 'DIAS_GRATIS' && (
-            <p style={{ color: '#22c55e', fontWeight: 600 }}>🎁 {promo.dias} dias grátis — comece a pagar depois</p>
-          )}
-          <p>Lojas e vendedoras ilimitadas. Cobrança recorrente {periodicidade === 'ANUAL' ? 'anual' : 'mensal'} via Mercado Pago. Cancele quando quiser.</p>
         </div>
 
         <form className="checkout-form" onSubmit={assinar}>
@@ -211,16 +158,6 @@ export default function Checkout() {
           </div>
 
           <div className="campo">
-            <label>Código promocional (opcional)</label>
-            <input value={codigoPromo} onChange={(e) => setCodigoPromo(e.target.value.toUpperCase())} placeholder="Tem um cupom?" />
-            {codigoPromo.trim() && promo && (
-              promo.valido
-                ? <small className="dica ok">✓ {promo.beneficio}</small>
-                : <small className="dica erro">Código inválido ou expirado</small>
-            )}
-          </div>
-
-          <div className="campo">
             <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', fontWeight: 400 }}>
               <input type="checkbox" checked={aceiteContrato} onChange={(e) => setAceiteContrato(e.target.checked)} style={{ width: 'auto', marginTop: 3 }} required />
               <span>
@@ -257,10 +194,10 @@ export default function Checkout() {
           </div>
 
           <button className="btn grande" style={{ width: '100%' }} disabled={!podeEnviar || enviando}>
-            {enviando ? 'Processando…' : 'Ir para o pagamento'}
+            {enviando ? 'Processando…' : 'Criar minha conta grátis'}
           </button>
           <small className="dica" style={{ textAlign: 'center', display: 'block' }}>
-            Você será redirecionado ao Mercado Pago para concluir a assinatura.
+            Sem cartão de crédito. Você paga só quando cadastrar sua primeira vendedora.
           </small>
         </form>
       </div>

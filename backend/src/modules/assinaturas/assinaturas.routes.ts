@@ -3,13 +3,10 @@ import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
-import { redeIdDe } from '../../plugins/auth'
-import { consultarPreapproval, criarPreapproval, cancelarPreapproval, mpConfigurado } from './mercadopago.service'
-import { proximoCicloFim, reativarAssinatura, solicitarCancelamento } from './assinatura.service'
-import { listarPlanos, precoDoPlano, percentualDescontoAnual, valorAnual } from '../planos/planos.service'
+import { consultarPreapproval } from './mercadopago.service'
+import { solicitarCancelamento } from './assinatura.service'
 import { descricaoBeneficio, validarCodigo } from '../promo/promo.service'
 import { CONTRATO_VERSAO } from '../contrato/contrato.template'
-import { temAceiteVigente } from '../contrato/contrato.service'
 import { PRIVACIDADE_VERSAO } from '../privacidade/privacidade.template'
 import { TERMOS_USO_VERSAO } from '../termos-uso/termos-uso.template'
 import { normalizarTelefone } from '../../lib/telefone'
@@ -46,10 +43,10 @@ function urlTenant(slug: string): string {
 
 /** Billing SaaS — checkout público (landing) + webhook do Mercado Pago + provisionamento do tenant. */
 export async function assinaturasRoutes(app: FastifyInstance) {
-  // Catálogo público de planos (consumido pela landing) — sem autenticação
+  // Config pública do domínio + câmbio (consumido pela landing/checkout) — sem autenticação.
+  // O preço em si (assento de vendedora) vem de GET /vendedora-billing/preco.
   app.get('/planos', async () => ({
-    planos: await listarPlanos(), dominioBase: env.DOMINIO_BASE, percentualDescontoAnual: await percentualDescontoAnual(),
-    cambio: await obterCotacaoAtual(),
+    dominioBase: env.DOMINIO_BASE, cambio: await obterCotacaoAtual(),
   }))
 
   // Validação pública de código promocional (landing mostra o benefício antes do checkout)
@@ -277,147 +274,12 @@ export async function assinaturasRoutes(app: FastifyInstance) {
     return { encerraEm, cobrancaComecaEm }
   })
 
-  // Assinatura da rede logada
-  app.get('/minha', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request) => {
-    const redeId = redeIdDe(request)
-    const assinatura = await prisma.assinatura.findUnique({ where: { redeId } })
-    return { assinatura, mpConfigurado: mpConfigurado() }
-  })
-
-  const trocarSchema = z.object({ plano: z.enum(['START', 'PRO', 'ELITE']) })
-
-  // Trocar de plano (aplica imediatamente; em produção real exige atualizar o preapproval no MP)
-  app.post('/trocar-plano', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
-    const redeId = redeIdDe(request)
-    const { plano } = trocarSchema.parse(request.body)
-    const assinatura = await prisma.assinatura.findUnique({ where: { redeId } })
-    if (!assinatura) return reply.code(404).send({ erro: 'Rede sem assinatura' })
-    if (assinatura.plano === plano) return reply.code(422).send({ erro: 'A rede já está neste plano.' })
-
-    let valor = await precoDoPlano(plano)
-    // Preserva a periodicidade vigente da assinatura (mensal/anual) ao trocar de plano.
-    if (assinatura.periodicidade === 'ANUAL') valor = valorAnual(valor, await percentualDescontoAnual())
-    await prisma.$transaction([
-      prisma.assinatura.update({
-        where: { redeId },
-        data: {
-          plano, valor, status: 'ATIVA',
-          // trocar de plano reengaja: cancela um cancelamento agendado e garante ciclo vigente
-          cancelamentoSolicitadoEm: null, cancelamentoOrigem: null,
-          cicloFimEm: assinatura.cicloFimEm ?? proximoCicloFim(new Date(), assinatura.periodicidade),
-        },
-      }),
-      prisma.rede.update({ where: { id: redeId }, data: { plano, ativo: true } }),
-    ])
-    return { ok: true, plano, observacao: assinatura.simulada ? 'Plano alterado (modo simulado).' : 'Plano alterado. A próxima cobrança no Mercado Pago refletirá o novo valor.' }
-  })
-
-  const trocarPeriodicidadeSchema = z.object({ periodicidade: z.enum(['MENSAL', 'ANUAL']) })
-
-  // Trocar entre cobrança mensal e anual. O Mercado Pago não permite mudar a frequência de um
-  // preapproval já criado — em modo real, cancela a recorrência atual e cria uma nova (mesmo
-  // padrão do /reassinar), e o gestor reautoriza no MP. Em modo simulado, aplica na hora.
-  app.post('/trocar-periodicidade', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
-    const redeId = redeIdDe(request)
-    const { periodicidade } = trocarPeriodicidadeSchema.parse(request.body)
-    const rede = await prisma.rede.findUnique({ where: { id: redeId }, include: { assinatura: true } })
-    if (!rede?.assinatura) return reply.code(404).send({ erro: 'Rede sem assinatura' })
-    const assinatura = rede.assinatura
-    if (assinatura.periodicidade === periodicidade) {
-      return reply.code(422).send({ erro: `A assinatura já está no modo ${periodicidade === 'ANUAL' ? 'anual' : 'mensal'}.` })
-    }
-
-    let valor = await precoDoPlano(assinatura.plano)
-    if (periodicidade === 'ANUAL') valor = valorAnual(valor, await percentualDescontoAnual())
-
-    if (assinatura.simulada || !mpConfigurado()) {
-      await prisma.assinatura.update({
-        where: { redeId },
-        data: { periodicidade, valor, cicloFimEm: proximoCicloFim(new Date(), periodicidade) },
-      })
-      return { simulado: true }
-    }
-
-    // Modo real: a frequência de um preapproval não é editável — cancela o atual e cria um novo.
-    if (assinatura.mpPreapprovalId) await cancelarPreapproval(assinatura.mpPreapprovalId).catch(() => { /* pendente/sem efeito */ })
-    const gestor = await prisma.usuario.findFirst({ where: { redeId, role: 'GESTOR' }, orderBy: { createdAt: 'asc' } })
-    const pre = await criarPreapproval({
-      reason: `ZAIEZE — Plano ${assinatura.plano}`,
-      valor,
-      email: gestor?.email ?? '',
-      redeSlug: rede.slug,
-      backUrl: `${urlTenant(rede.slug)}/login`,
-      periodicidade,
-    })
-    await prisma.assinatura.update({ where: { redeId }, data: { mpPreapprovalId: pre.id, periodicidade, valor } })
-    return { simulado: false, initPoint: pre.initPoint }
-  })
-
-  // Cancelar a assinatura — política de FIM DE CICLO: mantém o acesso até cicloFimEm.
-  // Origem registrada: ADMIN (super admin) ou LOJISTA (gestor).
-  app.post('/cancelar', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
-    const redeId = redeIdDe(request)
-    const assinatura = await prisma.assinatura.findUnique({ where: { redeId } })
-    if (!assinatura) return reply.code(404).send({ erro: 'Rede sem assinatura' })
-    const origem = request.user.role === 'SUPER_ADMIN' ? 'ADMIN' : 'LOJISTA'
-    const { acessoAte } = await solicitarCancelamento(redeId, origem)
-    return { ok: true, acessoAte }
-  })
-
-  // Reativar (desfaz um cancelamento agendado enquanto o ciclo ainda não venceu)
-  app.post('/reativar', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
-    const redeId = redeIdDe(request)
-    const ok = await reativarAssinatura(redeId)
-    if (!ok) return reply.code(422).send({ erro: 'Assinatura já encerrada — faça uma nova assinatura.' })
-    return { ok: true }
-  })
-
-  // Reassinar = NOVO CONTRATO (nova recorrência), preservando a rede, lojas e todas as
-  // configurações. Exige o aceite da versão vigente. Usado após um distrato (recorrência
-  // cancelada) ou quando a assinatura foi encerrada.
-  app.post('/reassinar', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
-    const redeId = redeIdDe(request)
-    const rede = await prisma.rede.findUnique({ where: { id: redeId }, include: { assinatura: true } })
-    if (!rede?.assinatura) return reply.code(404).send({ erro: 'Rede sem assinatura' })
-    if (!(await temAceiteVigente(redeId))) {
-      return reply.code(409).send({ erro: 'Aceite os termos atualizados antes de reativar.' })
-    }
-
-    const plano = rede.assinatura.plano
-    const periodicidade = rede.assinatura.periodicidade
-    let valor = await precoDoPlano(plano)
-    if (periodicidade === 'ANUAL') valor = valorAnual(valor, await percentualDescontoAnual())
-
-    // Modo simulado: reativa direto (equivale ao webhook de pagamento aprovado).
-    if (!mpConfigurado()) {
-      await confirmarCicloEComissionar(redeId)
-      return { simulado: true, redirect: `${urlTenant(rede.slug)}/login` }
-    }
-
-    // Mercado Pago real: a recorrência anterior foi cancelada no distrato, então cria um
-    // NOVO preapproval. O acesso só é (re)ativado quando o pagamento confirma, via webhook.
-    const gestor = await prisma.usuario.findFirst({ where: { redeId, role: 'GESTOR' }, orderBy: { createdAt: 'asc' } })
-    const pre = await criarPreapproval({
-      reason: `ZAIEZE — Plano ${plano}`,
-      valor,
-      email: gestor?.email ?? '',
-      redeSlug: rede.slug,
-      backUrl: `${urlTenant(rede.slug)}/login`,
-      periodicidade,
-    })
-    await prisma.assinatura.update({ where: { redeId }, data: { mpPreapprovalId: pre.id, plano, valor } })
-    return { simulado: false, initPoint: pre.initPoint }
-  })
-
-  // Aprovação simulada (dev) — equivale ao webhook quando não há Mercado Pago configurado.
-  // SEGURANÇA: só existe em modo simulado; com o Mercado Pago configurado fica desabilitado,
-  // senão seria um bypass para ativar tenants sem pagar.
-  app.post('/simular-aprovacao/:slug', async (request, reply) => {
-    if (mpConfigurado()) return reply.code(404).send({ erro: 'Recurso indisponível' })
-    const { slug } = request.params as { slug: string }
-    const rede = await prisma.rede.findUnique({ where: { slug }, include: { assinatura: true } })
-    if (!rede?.assinatura) return reply.code(404).send({ erro: 'Assinatura não encontrada' })
-    await confirmarCicloEComissionar(rede.id)
-    return { ok: true, redirect: `${urlTenant(slug)}/login` }
-  })
+  // As rotas de gestão do plano da REDE (trocar/cancelar/reativar/reassinar) saíram daqui — não
+  // existe mais "plano da marca" (ver vendedora-billing/ pra gestão de assentos por vendedora).
+  // Os models Assinatura/ConfigPlano/enum Plano continuam no schema, dormentes, só como histórico
+  // das poucas redes que ainda os têm (nenhuma com cobrança real pendente) — não removidos ainda
+  // porque `aplicarFimDeCiclo`/`solicitarCancelamento` (assinatura.service.ts) seguem sendo
+  // chamados no login e no distrato de contrato/privacidade/termos de uso, e lidam bem com
+  // "rede sem Assinatura" (no-op). Retirar o model por completo fica pra uma limpeza futura,
+  // depois que essas redes dormentes forem encerradas/migradas.
 }

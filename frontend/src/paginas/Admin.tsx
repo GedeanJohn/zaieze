@@ -1,31 +1,25 @@
 import { useEffect, useState } from 'react'
-import { api, formataReal, mensagemDeErro, usuarioLogado, type Plano } from '../api'
+import { api, formataReal, mensagemDeErro, usuarioLogado } from '../api'
 import { useToast } from '../componentes/Toast'
 import { entrarComoUsuario } from '../lib/impersonar'
 
-interface PlanoAdmin { plano: Plano; nome: string; limite: string; resumo: string; preco: number }
 interface AddonAdmin { tipo: string; nome: string; resumo: string; preco: number; cotaCreditosMes: number | null }
-interface Promo { id: string; codigo: string; tipo: 'DIAS_GRATIS' | 'PERCENTUAL'; aplicaA: 'REDE' | 'ASSESSOR'; plano: string | null; dias: number | null; percentual: string | null; descricao: string | null; validadeAte: string | null; maxUsos: number | null; usos: number; ativo: boolean }
+interface Promo { id: string; codigo: string; tipo: 'DIAS_GRATIS' | 'PERCENTUAL' | 'VALOR_FIXO'; aplicaA: 'VENDEDORA' | 'ASSESSOR'; dias: number | null; percentual: string | null; valorFixo: string | null; descricao: string | null; validadeAte: string | null; maxUsos: number | null; usos: number; ativo: boolean }
 
 const fmtData = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—')
 
 export default function Admin() {
-  const [planos, setPlanos] = useState<PlanoAdmin[]>([])
-  const [precos, setPrecos] = useState<Record<string, string>>({})
+  const [precoAssento, setPrecoAssento] = useState('')
   const [addons, setAddons] = useState<AddonAdmin[]>([])
   const [precosAddon, setPrecosAddon] = useState<Record<string, string>>({})
   const [cotasAddon, setCotasAddon] = useState<Record<string, string>>({})
   const [precoChatAtendimento, setPrecoChatAtendimento] = useState('')
-  const [descontoAnual, setDescontoAnual] = useState('10')
   const [promos, setPromos] = useState<Promo[]>([])
   const [ocupado, setOcupado] = useState(false)
   const avisar = useToast()
 
   function carregar() {
-    api.get('/admin/planos').then(({ data }) => {
-      setPlanos(data.planos)
-      setPrecos(Object.fromEntries(data.planos.map((p: PlanoAdmin) => [p.plano, String(p.preco)])))
-    }).catch((e) => avisar(mensagemDeErro(e), 'erro'))
+    api.get('/admin/assento-vendedora-preco').then(({ data }) => setPrecoAssento(String(data.preco))).catch((e) => avisar(mensagemDeErro(e), 'erro'))
     api.get('/admin/addons').then(({ data }) => {
       setAddons(data.addons)
       setPrecosAddon(Object.fromEntries(data.addons.map((a: AddonAdmin) => [a.tipo, String(a.preco)])))
@@ -33,16 +27,14 @@ export default function Admin() {
     }).catch((e) => avisar(mensagemDeErro(e), 'erro'))
     api.get('/admin/chat-atendimento-preco').then(({ data }) => setPrecoChatAtendimento(String(data.preco))).catch(() => {})
     api.get('/admin/promos').then(({ data }) => setPromos(data.promos)).catch(() => {})
-    api.get('/admin/config-assinatura').then(({ data }) => setDescontoAnual(String(data.percentualDescontoAnual))).catch(() => {})
   }
   useEffect(() => { carregar() }, [])
 
-  async function salvarPrecos() {
+  async function salvarPrecoAssento() {
     setOcupado(true)
     try {
-      const corpo = Object.fromEntries(Object.entries(precos).map(([k, v]) => [k, Number(v)]))
-      await api.put('/admin/planos', { precos: corpo })
-      avisar('Preços salvos. Valem para novas assinaturas e trocas de plano.')
+      await api.put('/admin/assento-vendedora-preco', { preco: Number(precoAssento) })
+      avisar('Preço salvo. Vale para novos assentos de vendedora.')
       carregar()
     } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
   }
@@ -73,14 +65,6 @@ export default function Admin() {
     } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
   }
 
-  async function salvarDescontoAnual() {
-    setOcupado(true)
-    try {
-      await api.put('/admin/config-assinatura', { percentualDescontoAnual: Number(descontoAnual) })
-      avisar('Desconto do plano anual salvo.')
-    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
-  }
-
   return (
     <>
       <header><h1>🛠️ Painel do Admin</h1><span style={{ color: 'var(--ink-soft)', fontSize: 13 }}>Operação do SaaS</span></header>
@@ -91,41 +75,26 @@ export default function Admin() {
       {/* ── Gestores Comerciais do Sistema (login próprio, mesmas atribuições do SUPER_ADMIN) ── */}
       <GestoresComerciaisSection />
 
-      {/* ── Preços & Reajuste ── */}
+      {/* ── Preço do assento de vendedora ── */}
       <div className="cartao">
-        <h2 style={{ marginTop: 0 }}>💳 Planos & Preços</h2>
+        <h2 style={{ marginTop: 0 }}>💳 Conta de Vendedora</h2>
         <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
-          O preço vale para <strong>novas assinaturas e trocas de plano</strong>. Assinantes ativos seguem no valor antigo.
+          Preço único por conta de vendedora ativa. Vale para <strong>novos assentos</strong>; assentos já ativos seguem no valor contratado (reajustam por IGP-M no aniversário — ver seção abaixo).
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-          {planos.map((p) => (
-            <div key={p.plano} className="campo">
-              <label>{p.nome} (R$/mês)</label>
-              <input type="number" step="0.01" min="0" value={precos[p.plano] ?? ''} onChange={(e) => setPrecos({ ...precos, [p.plano]: e.target.value })} />
-            </div>
-          ))}
-        </div>
-        <div style={{ marginTop: 8 }}><button className="btn" onClick={salvarPrecos} disabled={ocupado}>Salvar preços</button></div>
-
-        <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-          <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 8 }}>
-            Desconto do <strong>plano anual</strong> (cobrança 1x/ano, à vista) sobre 12x o preço mensal.
+        <div className="linha-campos" style={{ alignItems: 'end' }}>
+          <div className="campo" style={{ maxWidth: 180 }}>
+            <label>Preço (R$/mês por vendedora)</label>
+            <input type="number" step="0.01" min="0" value={precoAssento} onChange={(e) => setPrecoAssento(e.target.value)} />
           </div>
-          <div className="linha-campos" style={{ alignItems: 'end' }}>
-            <div className="campo" style={{ maxWidth: 140 }}>
-              <label>% de desconto</label>
-              <input type="number" min="0" max="90" step="0.01" value={descontoAnual} onChange={(e) => setDescontoAnual(e.target.value)} />
-            </div>
-            <div><button className="btn secundario" onClick={salvarDescontoAnual} disabled={ocupado}>Salvar %</button></div>
-          </div>
+          <div><button className="btn" onClick={salvarPrecoAssento} disabled={ocupado}>Salvar preço</button></div>
         </div>
       </div>
 
-      {/* ── Add-ons (assinaturas à parte de qualquer plano) ── */}
+      {/* ── Add-ons (assinaturas à parte do assento de vendedora) ── */}
       <div className="cartao">
         <h2 style={{ marginTop: 0 }}>🧩 Add-ons & Preços</h2>
         <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
-          Recursos vendidos <strong>à parte</strong> de qualquer plano, com assinatura própria. O preço vale para <strong>novas assinaturas</strong>.
+          Recursos vendidos <strong>à parte</strong> do assento de vendedora, com assinatura própria. O preço vale para <strong>novas assinaturas</strong>.
         </div>
         {addons.map((a) => (
           <div key={a.tipo} className="linha-campos" style={{ alignItems: 'end' }}>
@@ -325,11 +294,11 @@ function IgpmSection() {
 // ── Seção de códigos promocionais ──
 function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => void }) {
   const [codigo, setCodigo] = useState('')
-  const [tipo, setTipo] = useState<'DIAS_GRATIS' | 'PERCENTUAL'>('DIAS_GRATIS')
-  const [aplicaA, setAplicaA] = useState<'REDE' | 'ASSESSOR'>('REDE')
-  const [plano, setPlano] = useState('')
+  const [tipo, setTipo] = useState<'DIAS_GRATIS' | 'PERCENTUAL' | 'VALOR_FIXO'>('DIAS_GRATIS')
+  const [aplicaA, setAplicaA] = useState<'VENDEDORA' | 'ASSESSOR'>('VENDEDORA')
   const [dias, setDias] = useState('90')
   const [percentual, setPercentual] = useState('')
+  const [valorFixo, setValorFixo] = useState('')
   const [descricao, setDescricao] = useState('')
   const [validadeAte, setValidadeAte] = useState('')
   const [maxUsos, setMaxUsos] = useState('')
@@ -341,14 +310,14 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
     try {
       await api.post('/admin/promos', {
         codigo, tipo, aplicaA,
-        plano: aplicaA === 'REDE' ? (plano || undefined) : undefined,
         dias: tipo === 'DIAS_GRATIS' ? Number(dias) : undefined,
         percentual: tipo === 'PERCENTUAL' ? Number(percentual) : undefined,
+        valorFixo: tipo === 'VALOR_FIXO' ? Number(valorFixo) : undefined,
         descricao: descricao || undefined,
         validadeAte: validadeAte || undefined,
         maxUsos: maxUsos ? Number(maxUsos) : undefined,
       })
-      setCodigo(''); setDescricao(''); setValidadeAte(''); setMaxUsos(''); setPercentual(''); setPlano(''); setAplicaA('REDE')
+      setCodigo(''); setDescricao(''); setValidadeAte(''); setMaxUsos(''); setPercentual(''); setValorFixo(''); setAplicaA('VENDEDORA')
       onChange()
     } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setOcupado(false) }
   }
@@ -356,7 +325,6 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
   async function alternar(p: Promo) { await api.patch(`/admin/promos/${p.id}`, { ativo: !p.ativo }).catch(() => {}); onChange() }
   async function remover(p: Promo) { if (window.confirm(`Excluir o código ${p.codigo}?`)) { await api.delete(`/admin/promos/${p.id}`).catch(() => {}); onChange() } }
   function copiarLink(p: Promo) {
-    // Cupom com plano → link completo (só ?cupom=). Sem plano → checkout abre no plano padrão.
     const url = p.aplicaA === 'ASSESSOR'
       ? `https://zaieze.com/assessor-de-moda/cadastro?cupom=${encodeURIComponent(p.codigo)}`
       : `https://zaieze.com/checkout?cupom=${encodeURIComponent(p.codigo)}`
@@ -368,7 +336,8 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
     <div className="cartao">
       <h2 style={{ marginTop: 0 }}>🎟️ Códigos promocionais</h2>
       <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
-        Use no checkout. <strong>Dias grátis</strong> = "comece a pagar depois de N dias" (free trial). <strong>Percentual</strong> = desconto na mensalidade.
+        Aplicado na contratação de uma conta de vendedora. <strong>Dias grátis</strong> = "comece a pagar depois de N dias".
+        <strong> Percentual</strong> ou <strong>Valor fixo</strong> = desconto na mensalidade do assento.
       </div>
       <form onSubmit={criar} className="linha-campos" style={{ alignItems: 'end' }}>
         <div className="campo">
@@ -377,32 +346,22 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
         </div>
         <div className="campo">
           <label>Tipo</label>
-          <select value={tipo} onChange={(e) => setTipo(e.target.value as 'DIAS_GRATIS' | 'PERCENTUAL')}>
+          <select value={tipo} onChange={(e) => setTipo(e.target.value as 'DIAS_GRATIS' | 'PERCENTUAL' | 'VALOR_FIXO')}>
             <option value="DIAS_GRATIS">Dias grátis</option>
             <option value="PERCENTUAL">% de desconto</option>
+            <option value="VALOR_FIXO">Valor fixo (R$)</option>
           </select>
         </div>
         <div className="campo">
           <label>Aplica a</label>
-          <select value={aplicaA} onChange={(e) => setAplicaA(e.target.value as 'REDE' | 'ASSESSOR')}>
-            <option value="REDE">Lojista (assinatura de plano)</option>
+          <select value={aplicaA} onChange={(e) => setAplicaA(e.target.value as 'VENDEDORA' | 'ASSESSOR')}>
+            <option value="VENDEDORA">Conta de vendedora</option>
             <option value="ASSESSOR">Brand Partner</option>
           </select>
         </div>
-        {aplicaA === 'REDE' && (
-          <div className="campo">
-            <label>Plano (opcional)</label>
-            <select value={plano} onChange={(e) => setPlano(e.target.value)}>
-              <option value="">Qualquer plano</option>
-              <option value="START">Start</option>
-              <option value="PRO">Pro</option>
-              <option value="ELITE">Elite</option>
-            </select>
-          </div>
-        )}
-        {tipo === 'DIAS_GRATIS'
-          ? <div className="campo"><label>Dias grátis</label><input type="number" min="1" value={dias} onChange={(e) => setDias(e.target.value)} /></div>
-          : <div className="campo"><label>Desconto (%)</label><input type="number" min="1" max="100" step="0.01" value={percentual} onChange={(e) => setPercentual(e.target.value)} /></div>}
+        {tipo === 'DIAS_GRATIS' && <div className="campo"><label>Dias grátis</label><input type="number" min="1" value={dias} onChange={(e) => setDias(e.target.value)} /></div>}
+        {tipo === 'PERCENTUAL' && <div className="campo"><label>Desconto (%)</label><input type="number" min="1" max="100" step="0.01" value={percentual} onChange={(e) => setPercentual(e.target.value)} /></div>}
+        {tipo === 'VALOR_FIXO' && <div className="campo"><label>Desconto (R$)</label><input type="number" min="0.01" step="0.01" value={valorFixo} onChange={(e) => setValorFixo(e.target.value)} /></div>}
         <div className="campo"><label>Validade (opcional)</label><input type="date" value={validadeAte} onChange={(e) => setValidadeAte(e.target.value)} /></div>
         <div className="campo"><label>Máx. usos (opcional)</label><input type="number" min="1" value={maxUsos} onChange={(e) => setMaxUsos(e.target.value)} /></div>
         <div><button className="btn" disabled={ocupado}>Criar código</button></div>
@@ -418,9 +377,12 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
         <tbody>
           {promos.map((p) => (
             <tr key={p.id} style={{ opacity: p.ativo ? 1 : 0.5 }}>
-              <td><strong>{p.codigo}</strong>{p.plano ? <span className="selo ATACADO" style={{ marginLeft: 6 }}>{p.plano}</span> : null}</td>
-              <td>{p.aplicaA === 'ASSESSOR' ? 'Brand Partner' : 'Lojista'}</td>
-              <td>{p.tipo === 'DIAS_GRATIS' ? `${p.dias} dias grátis` : `${Number(p.percentual)}% off`}{p.descricao ? ` · ${p.descricao}` : ''}</td>
+              <td><strong>{p.codigo}</strong></td>
+              <td>{p.aplicaA === 'ASSESSOR' ? 'Brand Partner' : 'Vendedora'}</td>
+              <td>
+                {p.tipo === 'DIAS_GRATIS' ? `${p.dias} dias grátis` : p.tipo === 'PERCENTUAL' ? `${Number(p.percentual)}% off` : `${formataReal(Number(p.valorFixo))} off`}
+                {p.descricao ? ` · ${p.descricao}` : ''}
+              </td>
               <td style={{ whiteSpace: 'nowrap' }}>{fmtData(p.validadeAte)}</td>
               <td>{p.usos}{p.maxUsos ? `/${p.maxUsos}` : ''}</td>
               <td><span className={`selo ${p.ativo ? 'ok' : 'baixo'}`}>{p.ativo ? 'ativo' : 'inativo'}</span></td>

@@ -1,5 +1,5 @@
 import '@fastify/jwt'
-import type { Role, Plano } from '@prisma/client'
+import type { Role } from '@prisma/client'
 
 export interface JwtUser {
   sub: string
@@ -7,7 +7,6 @@ export interface JwtUser {
   lojaId: string | null
   role: Role
   nome: string
-  plano: Plano | null
   // Só relevante para role SUPER_ADMIN: é o login "Gestor Comercial do Sistema" (mesmas
   // atribuições, exceto criar/gerenciar outros gestores comerciais — só o SUPER_ADMIN "titular" pode).
   comercial?: boolean

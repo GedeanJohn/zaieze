@@ -4,7 +4,6 @@ import type { Prisma, StatusMensagem } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
 import { lojaIdDe, redeIdDe } from '../../plugins/auth'
-import { requireFeature } from '../../plugins/planos'
 import { enviarWhatsapp, enviarWhatsappAudio, enviarWhatsappImagem, registrarMensagemRecebida } from './whatsapp.service'
 import { estaConectado as baileysConectado } from './baileys.service'
 import { metaConfigurado, cifrar, decifrar, podeCifrar, verificarNumero, enviarTexto, criarTemplateMeta, consultarTemplatesMeta, placeholdersDoCorpo, corpoParaMeta, mapearStatusTemplate, baixarMidia, extDoMime, assinaturaValida, techProviderConfigurado, trocarCodePorToken, inscreverWebhookWaba, registrarNumero } from './meta.service'
@@ -166,7 +165,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
   // ─────────── Configuração da WABA (número oficial por marca) — GESTOR ───────────
 
   // Lê a config atual (sem expor o token). Inclui a URL do webhook a configurar na Meta.
-  app.get('/config', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request) => {
+  app.get('/config', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request) => {
     const redeId = redeIdDe(request)
     const r = await prisma.rede.findUniqueOrThrow({
       where: { id: redeId },
@@ -197,7 +196,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
   // Conclui o Embedded Signup: troca o `code` por um token, inscreve o webhook central da ZAIEZE
   // na WABA do cliente e registra o número (best-effort — números que já vieram do wizard costumam
   // já estar registrados; erro nesse passo é esperado e ignorado).
-  app.post('/embedded-signup/callback', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
+  app.post('/embedded-signup/callback', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
     const redeId = redeIdDe(request)
     const { code, wabaId, phoneNumberId } = z.object({
       code: z.string().min(1), wabaId: z.string().min(1), phoneNumberId: z.string().min(1),
@@ -226,7 +225,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
   })
 
   // Grava a config; se houver número + token válidos, testa no Graph e marca conectado.
-  app.put('/config', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
+  app.put('/config', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
     const redeId = redeIdDe(request)
     const b = configSchema.parse(request.body)
 
@@ -261,7 +260,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
   })
 
   // Envia uma mensagem de teste pelo número da marca (valida ponta a ponta).
-  app.post('/testar', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
+  app.post('/testar', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
     const redeId = redeIdDe(request)
     const { telefone } = z.object({ telefone: z.string().min(8) }).parse(request.body)
     const rede = await prisma.rede.findUniqueOrThrow({ where: { id: redeId }, select: selectRedeConfig })
@@ -290,12 +289,12 @@ export async function whatsappRoutes(app: FastifyInstance) {
     idioma: z.string().default('pt_BR'),
   })
 
-  app.get('/templates', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request) => {
+  app.get('/templates', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request) => {
     const redeId = redeIdDe(request)
     return prisma.templateWhatsapp.findMany({ where: { redeId }, orderBy: { createdAt: 'desc' } })
   })
 
-  app.post('/templates', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
+  app.post('/templates', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
     const redeId = redeIdDe(request)
     const b = templateSchema.parse(request.body)
     const variaveis = placeholdersDoCorpo(b.corpo)
@@ -326,7 +325,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
   })
 
   // Sincroniza o status dos templates com a Meta (aprovado/rejeitado/pausado).
-  app.post('/templates/sync', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
+  app.post('/templates/sync', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
     const redeId = redeIdDe(request)
     const rede = await prisma.rede.findUniqueOrThrow({ where: { id: redeId }, select: { waWabaId: true, waTokenCifrado: true } })
     if (!(rede.waWabaId && rede.waTokenCifrado)) return reply.code(422).send({ erro: 'Conecte a WABA antes de sincronizar.' })
@@ -339,7 +338,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
     return { ok: true, sincronizados: n }
   })
 
-  app.delete('/templates/:id', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request) => {
+  app.delete('/templates/:id', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request) => {
     const redeId = redeIdDe(request)
     const { id } = request.params as { id: string }
     await prisma.templateWhatsapp.deleteMany({ where: { id, redeId } })
@@ -350,7 +349,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
 
   // Conversas (clientes com mensagens), com a última mensagem de cada um.
   // ?vendedoraId= — usado pela supervisão (gerente/gestor) para espelhar só a carteira de uma vendedora.
-  app.get('/conversas', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request) => {
+  app.get('/conversas', { preHandler: [app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     const { vendedoraId } = request.query as { vendedoraId?: string }
     const where: Prisma.MensagemWhatsappWhereInput = { lojaId, clienteId: { not: null } }
@@ -397,7 +396,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
   })
 
   // Histórico de conversa de um cliente (respeita o isolamento de carteira)
-  app.get('/conversas/:clienteId', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request) => {
+  app.get('/conversas/:clienteId', { preHandler: [app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     const { clienteId } = request.params as { clienteId: string }
     const { vendedoraId } = request.query as { vendedoraId?: string }
@@ -408,7 +407,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
   })
 
   // Responder a um cliente (texto). Respeita a janela de 24h quando a marca está conectada.
-  app.post('/conversas/:clienteId/responder', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
+  app.post('/conversas/:clienteId/responder', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { clienteId } = request.params as { clienteId: string }
     const { texto } = z.object({ texto: z.string().min(1) }).parse(request.body)
@@ -446,7 +445,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
 
   // Responder com MENSAGEM DE VOZ (PTT): grava o áudio (R2/local p/ o chat) e envia pela Cloud API
   // (upload de mídia + tipo audio). Sem WABA conectada → registra SIMULADA.
-  app.post('/conversas/:clienteId/audio', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
+  app.post('/conversas/:clienteId/audio', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { clienteId } = request.params as { clienteId: string }
     const arquivo = await request.file()
@@ -494,7 +493,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
   // manda, o cliente valida respondendo, e depois ela arrasta o card dessa mensagem até o botão
   // "Carrinho" pra adicionar ao Orçamento (ver CarrinhoCliente.tsx / BolhaMensagem no frontend).
   const enviarProdutoSchema = z.object({ produtoId: z.string(), variacaoId: z.string() })
-  app.post('/conversas/:clienteId/produto', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
+  app.post('/conversas/:clienteId/produto', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { clienteId } = request.params as { clienteId: string }
     const body = enviarProdutoSchema.parse(request.body)

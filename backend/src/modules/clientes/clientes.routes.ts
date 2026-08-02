@@ -3,7 +3,6 @@ import { z } from 'zod'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
-import { requireFeature } from '../../plugins/planos'
 import { SEGMENTOS, segmentarLoja, type Distribuicao } from './segmentacao'
 import { garantirSlugCatalogo, urlCatalogoPublica } from '../catalogo/catalogo.routes'
 import { enviarWhatsapp } from '../whatsapp/whatsapp.service'
@@ -192,7 +191,7 @@ export async function clientesRoutes(app: FastifyInstance) {
   })
 
   // Recalcula a segmentação automática da loja (módulo 3) — gerente/gestor
-  app.post('/segmentar', { preHandler: [requireFeature('crm_segmentacao'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async (request) => {
+  app.post('/segmentar', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     return segmentarLoja(lojaId)
   })

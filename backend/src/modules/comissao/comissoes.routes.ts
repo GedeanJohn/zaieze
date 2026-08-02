@@ -2,7 +2,6 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe, redeIdDeQualquer } from '../../plugins/auth'
-import { requireFeature } from '../../plugins/planos'
 import { metaDaLoja, numVendedorasAtivas } from '../metas/metas.service'
 
 const num = (v: unknown) => Number(v ?? 0)
@@ -26,7 +25,6 @@ const GESTAO = ['SUPER_ADMIN', 'GESTOR', 'GERENTE'] as const
  * (produto > categoria > marca > padrão) + bônus quando a vendedora bate a meta.
  */
 export async function comissoesRoutes(app: FastifyInstance) {
-  app.addHook('onRequest', requireFeature('gamificacao'))
 
   app.get('/', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request) => {
     const lojaId = await lojaIdDe(request)

@@ -4,7 +4,6 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
 import { lojaIdDe } from '../../plugins/auth'
-import { requireFeature, planoInclui } from '../../plugins/planos'
 import { garantirCicloAberto } from '../leads/leads.service'
 import { enviarTemplatePlataforma } from '../whatsapp/meta.service'
 import { TERMO_CLIENTE_VERSAO, TERMO_CLIENTE_TEXTO } from './termo-cliente.template'
@@ -13,7 +12,7 @@ import type { JwtUser } from '../../types/fastify'
 /** Token do cliente público verificado (perfil da vendedora) — formato bem diferente do JwtUser
  *  de funcionário (sem role/redeId), reaproveitando só o mecanismo de assinatura do @fastify/jwt.
  *  O cast via JwtUser é só pra satisfazer o tipo fixo de app.jwt.sign/verify — nunca passa por
- *  requireFeature/authorize (que exigem role), então não há confusão com o JWT de equipe. */
+ *  authorize (que exige role), então não há confusão com o JWT de equipe. */
 interface ClientePedidosPayload { tipo: 'cliente_pedidos'; lojaId: string; telefone: string }
 
 /** URL pública do catálogo da vendedora: <scheme>://<rede>.<dominio>/<slug>. */
@@ -79,14 +78,14 @@ async function resolverVendedoraPublica(redeSlug: string, vendSlug: string) {
   const rede = await prisma.rede.findUnique({
     where: { slug: redeSlug },
     select: {
-      id: true, nome: true, plano: true, ativo: true, logoUrl: true, bannerUrl: true, descricaoPublica: true, corPrimaria: true, corSecundaria: true,
+      id: true, nome: true, ativo: true, logoUrl: true, bannerUrl: true, descricaoPublica: true, corPrimaria: true, corSecundaria: true,
       pedidoMinimoAtacado: true, pedidoMinimoInfantil: true, waPhoneNumberId: true, waNumeroExibicao: true,
       parcelasMax: true, parcelasFormaPagamento: true, parcelasMinPecas: true, parcelasMinValor: true,
       entregaPrazoTexto: true, entregaFreteGratisValor: true, entregaTexto: true,
       devolucaoPrazoDias: true, devolucaoTexto: true,
     },
   })
-  if (!rede || !rede.ativo || !planoInclui(rede.plano, 'portal_cliente')) return null
+  if (!rede || !rede.ativo) return null
   const vend = await prisma.usuario.findFirst({
     where: { slugCatalogo: vendSlug, role: 'VENDEDORA', ativo: true, loja: { redeId: rede.id, ativo: true } },
     select: { id: true, nome: true, fotoUrl: true, bioCatalogo: true, telefone: true, lojaId: true, loja: { select: { id: true, nome: true } } },
@@ -135,7 +134,7 @@ const leadSchema = z.object({
 
 export async function catalogoRoutes(app: FastifyInstance) {
   // Link da própria vendedora (gera o slug na primeira vez).
-  app.get('/meu-link', { preHandler: [requireFeature('portal_cliente'), app.authorize('VENDEDORA')] }, async (request, reply) => {
+  app.get('/meu-link', { preHandler: [app.authorize('VENDEDORA')] }, async (request, reply) => {
     const vend = await prisma.usuario.findUniqueOrThrow({
       where: { id: request.user.sub },
       select: { id: true, nome: true, slugCatalogo: true, telefone: true, loja: { select: { nome: true, rede: { select: { id: true, slug: true } } } } },
@@ -146,7 +145,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
   })
 
   // Links de todas as vendedoras da loja (gestor/gerente distribuem/auditam).
-  app.get('/links', { preHandler: [requireFeature('portal_cliente'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async (request) => {
+  app.get('/links', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE')] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     const loja = await prisma.loja.findUniqueOrThrow({ where: { id: lojaId }, select: { redeId: true, rede: { select: { slug: true } } } })
     const vendedoras = await prisma.usuario.findMany({
@@ -366,7 +365,7 @@ export async function catalogoRoutes(app: FastifyInstance) {
   })
 
   // ─────────── Avaliações de atendimento (moderação da própria vendedora) ───────────
-  app.get('/minhas-avaliacoes', { preHandler: [requireFeature('portal_cliente'), app.authorize('VENDEDORA')] }, async (request) => {
+  app.get('/minhas-avaliacoes', { preHandler: [app.authorize('VENDEDORA')] }, async (request) => {
     const { status } = request.query as { status?: string }
     return prisma.vendedoraAvaliacao.findMany({
       where: { vendedoraId: request.user.sub, ...(status ? { status: status as 'PENDENTE' | 'APROVADA' | 'RECUSADA' } : {}) },
@@ -375,14 +374,14 @@ export async function catalogoRoutes(app: FastifyInstance) {
     })
   })
 
-  app.post('/minhas-avaliacoes/:id/aprovar', { preHandler: [requireFeature('portal_cliente'), app.authorize('VENDEDORA')] }, async (request, reply) => {
+  app.post('/minhas-avaliacoes/:id/aprovar', { preHandler: [app.authorize('VENDEDORA')] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const av = await prisma.vendedoraAvaliacao.findFirst({ where: { id, vendedoraId: request.user.sub } })
     if (!av) return reply.code(404).send({ erro: 'Avaliação não encontrada' })
     return prisma.vendedoraAvaliacao.update({ where: { id }, data: { status: 'APROVADA', moderadoEm: new Date() } })
   })
 
-  app.post('/minhas-avaliacoes/:id/recusar', { preHandler: [requireFeature('portal_cliente'), app.authorize('VENDEDORA')] }, async (request, reply) => {
+  app.post('/minhas-avaliacoes/:id/recusar', { preHandler: [app.authorize('VENDEDORA')] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const av = await prisma.vendedoraAvaliacao.findFirst({ where: { id, vendedoraId: request.user.sub } })
     if (!av) return reply.code(404).send({ erro: 'Avaliação não encontrada' })

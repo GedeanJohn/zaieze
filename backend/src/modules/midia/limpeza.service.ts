@@ -48,19 +48,16 @@ export async function limparAudiosAntigos(): Promise<number> {
 }
 
 /**
- * Limpeza de mídia do catálogo por plano (Cloudflare R2).
- * Retenção a partir de `Colecao.liberadaEm`: START 6 meses, PRO 12 meses, ELITE perpétuo
- * (enquanto a empresa estiver ativa). O gestor é avisado na tela de Coleções (data + dias
- * restantes) antes da remoção — para marcar Outlet/promover. Aqui só executa a remoção.
+ * Limpeza de mídia do catálogo (Cloudflare R2).
+ * Retenção PERPÉTUA pra todo mundo desde o fim dos 3 planos por Rede (cobrança agora é por
+ * conta de vendedora, sem diferenciação de retenção de mídia por tier). `limparMidiaExpirada`
+ * e `mesesRetencao` seguem existindo (mesma assinatura) só pra não precisar tocar em
+ * colecoes.routes.ts/Colecoes.tsx — na prática nunca mais apagam nada por tempo.
  */
 
-/** Meses de retenção da mídia por plano (null = perpétuo, não expira). */
-export function mesesRetencao(plano: Plano): number | null {
-  switch (plano) {
-    case 'START': return 6
-    case 'PRO': return 12
-    default: return null // ELITE: perpétuo
-  }
+/** Meses de retenção da mídia (sempre null = perpétuo, não expira — ver comentário acima). */
+export function mesesRetencao(_plano: Plano): number | null {
+  return null
 }
 
 /** Data em que a mídia da coleção expira (null = nunca, ou sem liberação). */

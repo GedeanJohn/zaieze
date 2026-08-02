@@ -3,7 +3,6 @@ import { z } from 'zod'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { lojaIdDe } from '../../plugins/auth'
-import { requireFeature } from '../../plugins/planos'
 import { dispararParaClientes } from './disparo.service'
 
 const criarSchema = z.object({
@@ -29,7 +28,7 @@ function escopoGrupo(request: { user: { role: string; sub: string } }, lojaId: s
  */
 export async function gruposRoutes(app: FastifyInstance) {
   // Lista os grupos no escopo, com contagem de membros e prévia do último disparo.
-  app.get('/grupos', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request) => {
+  app.get('/grupos', { preHandler: [app.authenticate] }, async (request) => {
     const lojaId = await lojaIdDe(request)
     const grupos = await prisma.grupoTransmissao.findMany({
       where: escopoGrupo(request, lojaId),
@@ -49,7 +48,7 @@ export async function gruposRoutes(app: FastifyInstance) {
   })
 
   // Detalhe de um grupo: membros + últimos disparos.
-  app.get('/grupos/:id', { preHandler: [requireFeature('whatsapp'), app.authenticate] }, async (request, reply) => {
+  app.get('/grupos/:id', { preHandler: [app.authenticate] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { id } = request.params as { id: string }
     const grupo = await prisma.grupoTransmissao.findFirst({
@@ -69,7 +68,7 @@ export async function gruposRoutes(app: FastifyInstance) {
   })
 
   // Cria um grupo. Membros precisam ser clientes da loja (e da carteira, se for vendedora).
-  app.post('/grupos', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
+  app.post('/grupos', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { nome, clienteIds } = criarSchema.parse(request.body)
     const ids = await idsClientesValidos(request, lojaId, clienteIds)
@@ -84,7 +83,7 @@ export async function gruposRoutes(app: FastifyInstance) {
   })
 
   // Renomeia / substitui a lista de membros.
-  app.patch('/grupos/:id', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
+  app.patch('/grupos/:id', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { id } = request.params as { id: string }
     const body = atualizarSchema.parse(request.body)
@@ -103,7 +102,7 @@ export async function gruposRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
-  app.delete('/grupos/:id', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
+  app.delete('/grupos/:id', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { id } = request.params as { id: string }
     const grupo = await prisma.grupoTransmissao.findFirst({ where: { id, ...escopoGrupo(request, lojaId) }, select: { id: true } })
@@ -113,7 +112,7 @@ export async function gruposRoutes(app: FastifyInstance) {
   })
 
   // Dispara uma mensagem para todos os membros (envio individual a cada um).
-  app.post('/grupos/:id/disparar', { preHandler: [requireFeature('whatsapp'), app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
+  app.post('/grupos/:id/disparar', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { id } = request.params as { id: string }
     const { texto } = z.object({ texto: z.string().min(1) }).parse(request.body)

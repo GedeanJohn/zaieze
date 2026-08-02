@@ -32,7 +32,7 @@ export interface Usuario {
   comercial?: boolean
   fotoUrl?: string | null
   idioma?: string
-  rede: { id: string; nome: string; plano: string; addonsAtivos?: string[] } | null
+  rede: { id: string; nome: string; addonsAtivos?: string[] } | null
   loja: { id: string; nome: string; slug: string } | null
   assessor?: { slug: string } | null
 }
@@ -92,40 +92,7 @@ export const rotuloForma: Record<string, string> = {
   OUTRO: 'Outro',
 }
 
-// ── Planos / entitlements (espelho da matriz do backend) ──
-export type Plano = 'START' | 'PRO' | 'ELITE'
-const ORDEM_PLANO: Record<Plano, number> = { START: 0, PRO: 1, ELITE: 2 }
-
-export const FEATURE_MIN: Record<string, Plano> = {
-  vendas: 'START', produtos: 'START', estoque: 'START', clientes: 'START', dashboard: 'START', forma_recebimento: 'START', whatsapp: 'START', multi_loja: 'START', funil: 'START', atacado: 'START', portal_cliente: 'START',
-  crm_segmentacao: 'PRO', gamificacao: 'PRO',
-  ia_avancada: 'ELITE',
-}
-
-// Rótulos amigáveis das funcionalidades (tela de Planos/Upgrade)
-export const rotuloFeature: Record<string, string> = {
-  vendas: 'PDV / Vendas', produtos: 'Loja online exclusiva para as vendedoras', estoque: 'Controle de estoque',
-  clientes: 'Cadastro de clientes', dashboard: 'Dashboard de vendas', forma_recebimento: 'Forma de recebimento',
-  whatsapp: 'WhatsApp (disparos, réguas, Chat Zaieze)',
-  funil: 'Funil de vendas (Kanban)',
-  crm_segmentacao: 'Carteira inteligente (segmentação)', gamificacao: 'Comissão, ranking e mural',
-  multi_loja: 'Operação em rede (várias lojas vendendo do estoque central da marca)',
-  atacado: 'Sistema de atacado',
-  ia_avancada: 'IA avançada', portal_cliente: 'Portal do Cliente',
-}
-
-export function planoAtual(): Plano {
-  return (usuarioLogado()?.rede?.plano as Plano) ?? 'START'
-}
-
-export function temFeature(feature: string): boolean {
-  const u = usuarioLogado()
-  if (u?.role === 'SUPER_ADMIN') return true
-  const plano = (u?.rede?.plano as Plano) ?? 'START'
-  return ORDEM_PLANO[plano] >= ORDEM_PLANO[FEATURE_MIN[feature] ?? 'START']
-}
-
-// ── Add-ons de IA (Força IA): contratados à parte de qualquer plano, ver backend/addons ──
+// ── Add-ons de IA (Força IA): contratados à parte do assento de vendedora, ver backend/addons ──
 export type TipoAddon = 'PROVADOR' | 'VENDEDORA_ZAIEZE' | 'ESTOQUE_INTELIGENTE' | 'RADAR'
 export function temAddon(tipo: TipoAddon): boolean {
   const u = usuarioLogado()

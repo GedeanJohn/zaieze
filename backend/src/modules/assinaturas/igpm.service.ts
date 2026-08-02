@@ -77,3 +77,55 @@ export async function aplicarReajustesIgpm(): Promise<number> {
   }
   return aplicados
 }
+
+/**
+ * Mesma lógica de reajuste anual por IGP-M, agora para os assentos de vendedora
+ * (AssinaturaVendedora) — cada assento reajusta no aniversário da PRÓPRIA contratação
+ * (createdAt), não no aniversário da rede. Job diário, mesmo padrão de aplicarReajustesIgpm.
+ */
+export async function aplicarReajustesIgpmAssentoVendedora(): Promise<number> {
+  const agora = new Date()
+  const assentos = await prisma.assinaturaVendedora.findMany({
+    where: { status: 'ATIVA' },
+    select: {
+      id: true, redeId: true, valor: true, createdAt: true, reajustesAplicados: true,
+      mpPreapprovalId: true, simulada: true, rede: { select: { nome: true } },
+    },
+  })
+
+  let aplicados = 0
+  for (const a of assentos) {
+    let valor = Number(a.valor)
+    let aplicadosN = a.reajustesAplicados
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const n = aplicadosN + 1
+      const aniv = aniversario(a.createdAt, n)
+      if (aniv > agora) break
+
+      const { ano, mes } = mesIndice(aniv)
+      const idx = await prisma.indiceIgpm.findUnique({ where: { ano_mes: { ano, mes } }, select: { percentual: true } })
+      if (!idx) break
+
+      const pct = Number(idx.percentual)
+      const valorAntes = valor
+      valor = arred2(valor * (1 + pct / 100))
+
+      await prisma.$transaction([
+        prisma.assinaturaVendedora.update({ where: { id: a.id }, data: { valor, reajustesAplicados: n } }),
+        prisma.reajusteAssinatura.create({
+          data: { redeId: a.redeId, redeNome: a.rede.nome, ano, mes, percentual: pct, valorAntes, valorDepois: valor },
+        }),
+      ])
+
+      if (!a.simulada && a.mpPreapprovalId && mpConfigurado()) {
+        await atualizarValorPreapproval(a.mpPreapprovalId, valor).catch(() => { /* tenta no próximo job */ })
+      }
+
+      aplicadosN = n
+      aplicados += 1
+    }
+  }
+  return aplicados
+}

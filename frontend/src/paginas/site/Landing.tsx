@@ -210,6 +210,8 @@ export default function Landing() {
                   <input
                     type="number" min={1} value={qtdVendedoras}
                     onChange={(e) => setQtdVendedoras(Math.max(1, Number(e.target.value) || 1))}
+                    onFocus={(e) => e.target.select()}
+                    onClick={(e) => e.currentTarget.select()}
                     style={{ width: 80, textAlign: 'center', fontSize: 16, padding: '6px 8px', borderRadius: 6 }}
                   />
                   <div style={{ marginTop: 10, fontSize: 15 }}>

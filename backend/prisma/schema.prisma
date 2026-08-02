@@ -555,7 +555,7 @@ model AssinaturaVendedora {
   rede          Rede     @relation(fields: [redeId], references: [id], onDelete: Cascade)
   vendedora     Usuario? @relation("VendedoraAssentoVendedora", fields: [vendedoraId], references: [id], onDelete: SetNull)
   convite       Convite? @relation(fields: [conviteId], references: [id], onDelete: SetNull)
-  solicitadoPor Usuario  @relation("SolicitanteAssentoVendedora", fields: [solicitadoPorId], references: [id])
+  solicitadoPor Usuario  @relation("SolicitanteAssentoVendedora", fields: [solicitadoPorId], references: [id], onDelete: Cascade)
 
   @@index([redeId])
   @@index([vendedoraId])
@@ -1288,7 +1288,7 @@ model Venda {
 
   loja             Loja           @relation(fields: [lojaId], references: [id], onDelete: Cascade)
   cliente          Cliente?       @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  vendedora        Usuario        @relation(fields: [vendedoraId], references: [id])
+  vendedora        Usuario        @relation(fields: [vendedoraId], references: [id], onDelete: Cascade)
   itens            ItemVenda[]
   leadsConvertidos Lead[]
   pedidoReserva    PedidoReserva?
@@ -1322,7 +1322,7 @@ model PedidoReserva {
 
   loja      Loja            @relation(fields: [lojaId], references: [id], onDelete: Cascade)
   cliente   Cliente?        @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  vendedora Usuario         @relation(fields: [vendedoraId], references: [id])
+  vendedora Usuario         @relation(fields: [vendedoraId], references: [id], onDelete: Cascade)
   variacao  VariacaoProduto @relation(fields: [variacaoId], references: [id], onDelete: Cascade)
   venda     Venda?          @relation(fields: [vendaId], references: [id], onDelete: SetNull)
 
@@ -1358,7 +1358,7 @@ model Orcamento {
 
   loja                Loja            @relation(fields: [lojaId], references: [id], onDelete: Cascade)
   cliente             Cliente         @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  vendedora           Usuario         @relation("OrcamentosVendedora", fields: [vendedoraId], references: [id])
+  vendedora           Usuario         @relation("OrcamentosVendedora", fields: [vendedoraId], references: [id], onDelete: Cascade)
   aprovadoDescontoPor Usuario?        @relation("OrcamentosDescontoAprovadoPor", fields: [aprovadoDescontoPorId], references: [id], onDelete: SetNull)
   venda               Venda?          @relation(fields: [vendaId], references: [id], onDelete: SetNull)
   itens               ItemOrcamento[]
@@ -1467,7 +1467,7 @@ model Campanha {
   createdAt        DateTime         @default(now())
 
   loja      Loja               @relation(fields: [lojaId], references: [id], onDelete: Cascade)
-  criadaPor Usuario            @relation(fields: [criadaPorId], references: [id])
+  criadaPor Usuario            @relation(fields: [criadaPorId], references: [id], onDelete: Cascade)
   modelo    CampanhaModelo?    @relation(fields: [modeloId], references: [id], onDelete: SetNull)
   mensagens MensagemWhatsapp[]
 
@@ -1493,7 +1493,7 @@ model CampanhaModelo {
   updatedAt        DateTime         @updatedAt
 
   rede      Rede       @relation(fields: [redeId], references: [id], onDelete: Cascade)
-  criadaPor Usuario    @relation("ModelosCampanhaCriados", fields: [criadaPorId], references: [id])
+  criadaPor Usuario    @relation("ModelosCampanhaCriados", fields: [criadaPorId], references: [id], onDelete: Cascade)
   disparos  Campanha[]
 
   @@index([redeId, ativa])
@@ -1558,7 +1558,7 @@ model MensagemWhatsapp {
   createdAt    DateTime        @default(now())
 
   cliente   Cliente?          @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  vendedora Usuario           @relation("MensagensVendedora", fields: [vendedoraId], references: [id])
+  vendedora Usuario           @relation("MensagensVendedora", fields: [vendedoraId], references: [id], onDelete: Cascade)
   campanha  Campanha?         @relation(fields: [campanhaId], references: [id], onDelete: SetNull)
   grupo     GrupoTransmissao? @relation(fields: [grupoId], references: [id], onDelete: SetNull)
   produto   Produto?          @relation(fields: [produtoId], references: [id], onDelete: SetNull)
@@ -1589,7 +1589,7 @@ model MensagemInstagram {
   createdAt   DateTime        @default(now())
 
   cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  vendedora Usuario  @relation("MensagensInstagramVendedora", fields: [vendedoraId], references: [id])
+  vendedora Usuario  @relation("MensagensInstagramVendedora", fields: [vendedoraId], references: [id], onDelete: Cascade)
 
   @@index([clienteId, createdAt])
   @@index([lojaId, createdAt])
@@ -1674,7 +1674,7 @@ model PostMural {
   createdAt DateTime @default(now())
 
   loja  Loja    @relation(fields: [lojaId], references: [id], onDelete: Cascade)
-  autor Usuario @relation(fields: [autorId], references: [id])
+  autor Usuario @relation(fields: [autorId], references: [id], onDelete: Cascade)
 
   @@index([lojaId, createdAt])
   @@map("posts_mural")
@@ -2210,7 +2210,7 @@ model LookProvador {
   rede      Rede    @relation(fields: [redeId], references: [id], onDelete: Cascade)
   loja      Loja    @relation(fields: [lojaId], references: [id], onDelete: Cascade)
   produto   Produto @relation(fields: [produtoBaseId], references: [id], onDelete: Cascade)
-  criadoPor Usuario @relation("LooksProvadorCriados", fields: [criadoPorId], references: [id])
+  criadoPor Usuario @relation("LooksProvadorCriados", fields: [criadoPorId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([redeId, createdAt])

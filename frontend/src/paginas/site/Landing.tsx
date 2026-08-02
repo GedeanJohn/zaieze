@@ -81,7 +81,11 @@ interface AddonCatalogo { tipo: string; nome: string; preco: number }
 
 export default function Landing() {
   const [precoAssento, setPrecoAssento] = useState(0)
-  const [qtdVendedoras, setQtdVendedoras] = useState(3)
+  // Guardado como string pra permitir o campo ficar vazio ENQUANTO o usuário apaga pra digitar
+  // um número novo — se forçássemos um mínimo a cada tecla, apagar até vazio voltava pro valor
+  // anterior na hora (parecia que o backspace não funcionava). Só valida o mínimo no blur.
+  const [qtdVendedorasInput, setQtdVendedorasInput] = useState('3')
+  const qtdVendedoras = Math.max(1, Number(qtdVendedorasInput) || 0)
   const [addons, setAddons] = useState<AddonCatalogo[]>([])
   const [cambio, setCambio] = useState<{ usdPorBrl: number | null }>({ usdPorBrl: null })
   const [chatAberto, setChatAberto] = useState(false)
@@ -208,14 +212,17 @@ export default function Landing() {
                 <div style={{ margin: '16px 0', padding: '14px', background: 'rgba(255,255,255,.06)', borderRadius: 10 }}>
                   <label style={{ display: 'block', fontSize: 13, marginBottom: 8 }}>{t('planos.calculadoraLabel')}</label>
                   <input
-                    type="number" min={1} value={qtdVendedoras}
-                    onChange={(e) => setQtdVendedoras(Math.max(1, Number(e.target.value) || 1))}
+                    type="number" min={1} value={qtdVendedorasInput}
+                    onChange={(e) => setQtdVendedorasInput(e.target.value)}
                     onFocus={(e) => e.target.select()}
                     onClick={(e) => e.currentTarget.select()}
+                    onBlur={() => setQtdVendedorasInput(String(qtdVendedoras))}
                     style={{ width: 80, textAlign: 'center', fontSize: 16, padding: '6px 8px', borderRadius: 6 }}
                   />
                   <div style={{ marginTop: 10, fontSize: 15 }}>
-                    {t('planos.totalEstimado')} <strong>{formata(precoAssento * qtdVendedoras)}/{t('unidade.mes')}</strong>
+                    {qtdVendedorasInput.trim() === ''
+                      ? t('planos.definirPosteriormente')
+                      : <>{t('planos.totalEstimado')} <strong>{formata(precoAssento * qtdVendedoras)}/{t('unidade.mes')}</strong></>}
                   </div>
                 </div>
               </>

@@ -16,6 +16,7 @@ import Separacao from './paginas/Separacao'
 import Clientes from './paginas/Clientes'
 import Campanhas from './paginas/Campanhas'
 import CaixaEntrada from './paginas/CaixaEntrada'
+import ModoFocoVendas from './paginas/ModoFocoVendas'
 import Supervisao from './paginas/Supervisao'
 import Radar from './paginas/Radar'
 import Ranking from './paginas/Ranking'
@@ -152,6 +153,8 @@ function CrmApp() {
         <Route path="clientes" element={<Clientes />} />
         <Route path="campanhas" element={<Campanhas />} />
         <Route path="caixa" element={<CaixaEntrada />} />
+        <Route path="foco" element={<ModoFocoVendas />} />
+        <Route path="foco/:clienteId" element={<ModoFocoVendas />} />
         <Route path="supervisao" element={<Supervisao />} />
         <Route path="radar" element={<Radar />} />
         <Route path="ranking" element={<Ranking />} />

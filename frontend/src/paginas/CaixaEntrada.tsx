@@ -5,7 +5,7 @@ import {
   DndContext, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors, useDraggable, pointerWithin,
   type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core'
-import { Menu, Search, SlidersHorizontal, Sparkles, ChevronRight, MoreHorizontal, Headset, Plus, ShoppingBag } from 'lucide-react'
+import { Menu, Search, SlidersHorizontal, Sparkles, ChevronRight, MoreHorizontal, Headset, Plus, ShoppingBag, Focus } from 'lucide-react'
 import { api, mensagemDeErro } from '../api'
 import { SeletorLoja, useLojaAtiva } from '../componentes/SeletorLoja'
 import { useToast } from '../componentes/Toast'
@@ -663,6 +663,12 @@ export default function CaixaEntrada() {
                   <span>{sel.canal === 'instagram' ? '📷 Instagram' : sel.cliente.telefone}</span>
                 </div>
                 <button className="cz-btn cz-btn-venda" onClick={() => navigate(`/vendas?cliente=${sel.cliente.id}`)} title={t('caixa.registrarVenda')}>🛒<span className="cz-btn-txt"> {t('caixa.registrarVenda')}</span></button>
+                {sel.canal === 'whatsapp' && (
+                  <button
+                    type="button" className="cz-btn cz-btn-venda cz-btn-foco"
+                    onClick={() => navigate(`/foco/${sel.cliente.id}`)} title={t('layout.modoFoco')}
+                  ><Focus size={16} strokeWidth={1.8} /><span className="cz-btn-txt"> {t('layout.modoFoco')}</span></button>
+                )}
                 <button
                   ref={carrinhoHeaderElRef}
                   type="button" className={`cz-btn cz-btn-venda cz-btn-carrinho${carrinhoAberto ? ' ativo' : ''}${arrastandoSobreHeader ? ' arrastando-sobre' : ''}`}

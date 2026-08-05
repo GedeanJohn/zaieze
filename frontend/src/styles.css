@@ -1354,3 +1354,147 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
   .cz-voltar { padding: 6px 10px; }
   .cz-avatar.sm { width: 36px; height: 36px; }
 }
+
+/* ═══════════════════════ Modo Foco de Vendas ═══════════════════════
+   Tela cheia (mesmo precedente do Chat Zaieze .zen — ver .app-shell:has()
+   abaixo), tema escuro dourado (Laranja Zaieze) — celular é o alvo
+   principal, tablet/desktop ganham o layout em duas colunas lado a lado. */
+.app-shell:has(.mf-pagina) .topbar,
+.app-shell:has(.mf-pagina) .bottom-nav { display: none; }
+
+.mf {
+  --mf-bg: #0a0a0d; --mf-surf: #131316; --mf-surf2: #1c1c20; --mf-line: rgba(255, 255, 255, 0.1);
+  --mf-gold: #d4a24a; --mf-gold-forte: #e8b95c; --mf-tx: #f5f1e8; --mf-mut: #9c9690;
+  --mf-verde: #34c77b; --mf-vermelho: #e5484d;
+  /* CarrinhoCliente.tsx (reaproveitado no cartão Pedido) usa var(--cz-*) — remapeando pro tema
+     dourado do Foco em vez do roxo do Chat Zaieze, sem precisar tocar no componente. */
+  --cz-bg: var(--mf-surf2); --cz-surf: var(--mf-surf); --cz-surf2: var(--mf-surf2);
+  --cz-line: var(--mf-line); --cz-tx: var(--mf-tx); --cz-mut: var(--mf-mut); --cz-accent: var(--mf-gold);
+
+  background: var(--mf-bg); color: var(--mf-tx); min-height: 100dvh;
+  display: flex; flex-direction: column;
+  font-family: inherit;
+}
+
+.mf-carregando, .mf-vazio { color: var(--mf-mut); font-size: 13.5px; text-align: center; padding: 24px 12px; }
+
+/* ── Cabeçalho ── */
+.mf-header {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-bottom: 1px solid var(--mf-line); background: var(--mf-surf);
+}
+.mf-voltar {
+  flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--mf-line);
+  background: var(--mf-surf2); color: var(--mf-tx); display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.mf-avatar {
+  flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%; background: var(--mf-surf2);
+  border: 1px solid var(--mf-gold); color: var(--mf-gold-forte); display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+}
+.mf-header-titulo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mf-header-titulo strong { font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-header-titulo span { font-size: 11.5px; color: var(--mf-mut); }
+.mf-chip-segmento {
+  align-self: flex-start; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+  padding: 2px 8px; border-radius: 999px; background: var(--mf-surf2); color: var(--mf-gold-forte); border: 1px solid var(--mf-line);
+}
+.mf-chip-segmento.seg-vip { color: #e8b95c; border-color: var(--mf-gold); }
+.mf-chip-segmento.seg-atacado { color: #7fd4a8; border-color: #2f6b4e; }
+.mf-chip-segmento.seg-inativo { color: var(--mf-mut); }
+
+.mf-meta-anel { position: relative; width: 40px; height: 40px; flex: 0 0 auto; }
+.mf-meta-anel svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.mf-anel-fundo { fill: none; stroke: var(--mf-line); stroke-width: 3.5; }
+.mf-anel-progresso { fill: none; stroke: var(--mf-gold); stroke-width: 3.5; stroke-linecap: round; transition: stroke-dasharray .3s ease; }
+.mf-meta-anel span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; }
+
+/* ── Faixa de KPIs ── */
+.mf-kpis {
+  flex: 0 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+  background: var(--mf-line); border-bottom: 1px solid var(--mf-line);
+}
+.mf-kpi { background: var(--mf-surf); padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mf-kpi-rotulo { font-size: 10px; color: var(--mf-mut); display: flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: .3px; }
+.mf-kpi strong { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-kpi-destaque { background: linear-gradient(135deg, rgba(212, 162, 74, .16), var(--mf-surf)); }
+.mf-kpi-destaque strong { color: var(--mf-gold-forte); font-size: 12.5px; }
+
+/* ── Corpo: chat + cartões ── */
+.mf-corpo { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.mf-coluna-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; border-bottom: 1px solid var(--mf-line); }
+.mf-coluna-cards { flex: 0 0 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; }
+
+.mf-conversa { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.mf-thread { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+.mf-bolha { max-width: 78%; padding: 8px 12px; border-radius: 14px; font-size: 13.5px; line-height: 1.45; }
+.mf-bolha p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.mf-bolha-hora { display: block; font-size: 10px; opacity: .6; margin-top: 3px; text-align: right; }
+.mf-bolha-in { align-self: flex-start; background: var(--mf-surf2); border: 1px solid var(--mf-line); border-bottom-left-radius: 4px; }
+.mf-bolha-out { align-self: flex-end; background: var(--mf-gold); color: #201603; border-bottom-right-radius: 4px; }
+.mf-bolha-out .mf-bolha-hora { color: #201603; }
+
+.mf-sugestao-tag {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 11.5px;
+  color: var(--mf-gold-forte); background: rgba(212, 162, 74, .12); border-top: 1px solid var(--mf-line);
+}
+.mf-compor { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--mf-line); background: var(--mf-surf); }
+.mf-btn-ia, .mf-btn-enviar {
+  flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--mf-line);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.mf-btn-ia { background: var(--mf-surf2); color: var(--mf-gold-forte); }
+.mf-btn-ia:disabled { opacity: .5; cursor: default; }
+.mf-btn-enviar { background: var(--mf-gold); color: #201603; border-color: transparent; }
+.mf-btn-enviar:disabled { opacity: .4; cursor: default; }
+.mf-compor input {
+  flex: 1; min-width: 0; background: var(--mf-surf2); border: 1px solid var(--mf-line); color: var(--mf-tx);
+  border-radius: 999px; padding: 10px 16px; font-size: 13.5px;
+}
+.mf-compor input::placeholder { color: var(--mf-mut); }
+
+/* ── Cartões inteligentes ── */
+.mf-cartao { background: var(--mf-surf); border: 1px solid var(--mf-line); border-radius: 14px; padding: 12px 14px; }
+.mf-cartao-titulo {
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--mf-gold-forte);
+  display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
+}
+.mf-cliente-grid { display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; }
+.mf-cliente-grid > div { display: flex; align-items: center; gap: 6px; color: var(--mf-tx); }
+.mf-cliente-grid svg { color: var(--mf-mut); flex: 0 0 auto; }
+.mf-obs { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--mf-line); display: flex; gap: 6px; font-size: 12px; color: var(--mf-mut); }
+.mf-obs svg { flex: 0 0 auto; margin-top: 1px; }
+.mf-meta-nota { margin-top: 10px; font-size: 10.5px; color: var(--mf-mut); font-style: italic; }
+
+.mf-cartao-pedido { padding: 0; overflow: hidden; }
+.mf-cartao-pedido .mf-cartao-titulo { padding: 12px 14px 0; margin-bottom: 0; }
+.mf-cartao-pedido .cz-carrinho { height: 420px; }
+.mf-cartao-pedido .cz-cart-fechar { display: none; } /* embutido, não é painel fechável aqui */
+
+.mf-timeline { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
+.mf-timeline-item { display: flex; flex-direction: column; gap: 2px; font-size: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--mf-line); }
+.mf-timeline-item:last-child { border-bottom: none; padding-bottom: 0; }
+.mf-timeline-data { font-size: 10px; color: var(--mf-mut); }
+
+/* ── Seletor de conversa (entrada sem cliente escolhido ainda) ── */
+.mf-seletor-lista { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.mf-seletor-item {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: none; border-bottom: 1px solid var(--mf-line);
+  background: transparent; color: var(--mf-tx); text-align: left; cursor: pointer;
+}
+.mf-seletor-item:hover { background: var(--mf-surf); }
+.mf-seletor-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mf-seletor-info strong { font-size: 13.5px; }
+.mf-seletor-info span { font-size: 12px; color: var(--mf-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mf-badge-nao-lidas {
+  flex: 0 0 auto; background: var(--mf-gold); color: #201603; font-size: 10.5px; font-weight: 700;
+  min-width: 18px; height: 18px; border-radius: 999px; display: flex; align-items: center; justify-content: center; padding: 0 5px;
+}
+
+/* Tablet/desktop: chat e cartões lado a lado (40/60), como pedido na spec original */
+@media (min-width: 900px) {
+  .mf-corpo { flex-direction: row; }
+  .mf-coluna-chat { flex: 0 0 40%; border-bottom: none; border-right: 1px solid var(--mf-line); }
+  .mf-coluna-cards { flex: 1; min-width: 0; }
+  .mf-kpis { grid-template-columns: repeat(4, minmax(0, 220px)); justify-content: start; }
+}

@@ -118,3 +118,50 @@ export async function explicarOportunidade(opts: {
     return { texto: fallback, viaIa: false }
   }
 }
+
+/**
+ * Modo Foco de Vendas: sugere UMA resposta para a última mensagem do cliente, a partir do
+ * histórico recente da conversa — a vendedora decide se usa, edita ou ignora (nunca é enviada
+ * automaticamente; quem chama esta função só mostra a sugestão numa UI de aprovação).
+ */
+export async function sugerirRespostaAtendimento(opts: {
+  cliente: { nome: string; segmento: string }
+  loja: string
+  vendedora: string
+  ultimasMensagens: { direcao: 'ENVIADA' | 'RECEBIDA'; texto: string }[]
+}): Promise<{ texto: string; viaIa: boolean }> {
+  const ultimaDoCliente = [...opts.ultimasMensagens].reverse().find((m) => m.direcao === 'RECEBIDA')
+  const fallback = ultimaDoCliente
+    ? `Oi ${opts.cliente.nome.split(' ')[0]}! Deixa eu verificar isso pra você e já te retorno 😊`
+    : `Oi ${opts.cliente.nome.split(' ')[0]}! Tudo bem? Como posso te ajudar hoje? 😊`
+  if (!env.ANTHROPIC_API_KEY) return { texto: fallback, viaIa: false }
+  if (opts.ultimasMensagens.length === 0) return { texto: fallback, viaIa: false }
+
+  try {
+    const { default: Anthropic } = await import('@anthropic-ai/sdk')
+    const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
+    const historico = opts.ultimasMensagens
+      .map((m) => `${m.direcao === 'RECEBIDA' ? 'Cliente' : 'Vendedora'}: ${m.texto}`)
+      .join('\n')
+    const resp = await client.messages.create({
+      model: MODELO_IA,
+      max_tokens: 300,
+      system:
+        'Você ajuda uma vendedora de loja de moda a responder o cliente no WhatsApp. Sugira APENAS UMA resposta ' +
+        'curta e natural em português do Brasil para a mensagem mais recente do cliente, considerando o histórico. ' +
+        'NUNCA invente preço, estoque, prazo de entrega ou desconto que não foram informados no histórico — se precisar ' +
+        'desses dados, sugira que a vendedora vá conferir. A vendedora vai revisar e editar antes de enviar, então seja ' +
+        'apenas um rascunho útil, não uma versão final. Responda só com o texto da sugestão, sem aspas, sem explicações.',
+      messages: [{
+        role: 'user',
+        content: `Loja: ${opts.loja}. Vendedora: ${opts.vendedora}. Cliente: ${opts.cliente.nome} (segmento ${opts.cliente.segmento}).\n\nHistórico recente:\n${historico}\n\nSugira a próxima resposta da vendedora.`,
+      }],
+    })
+    let texto2 = ''
+    for (const b of resp.content) if (b.type === 'text') texto2 += b.text
+    texto2 = texto2.trim()
+    return { texto: texto2 || fallback, viaIa: true }
+  } catch {
+    return { texto: fallback, viaIa: false }
+  }
+}

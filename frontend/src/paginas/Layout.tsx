@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingBag, Users, Inbox, MessageCircle, Filter, Radar, Trophy,
   Megaphone, Package, Tag, Layers, Boxes, UsersRound, Eye, Receipt,
   Palette, BookOpen, CreditCard, Menu, LogOut, UserCog, ClipboardCheck, FileText, Wrench, Smartphone, Camera, Store, Shirt,
-  ChevronLeft, ChevronRight, ChevronDown, Bot, Landmark, Sparkles, Contact2, Building2, Compass,
+  ChevronLeft, ChevronRight, ChevronDown, Bot, Landmark, Sparkles, Contact2, Building2, Compass, Focus,
   type LucideIcon,
 } from 'lucide-react'
 import { api, rotuloPapel, temAddon, usuarioLogado } from '../api'
@@ -248,6 +248,12 @@ export default function Layout() {
         <div className="sidebar-marca">{menuRecolhido ? 'Z' : 'ZAIEZE'}</div>
         <nav className="sidebar-nav">
         <NavLink to="/" end className={cls} title={t('layout.dashboard')}><LayoutDashboard {...ICON} /><span>{t('layout.dashboard')}</span></NavLink>
+
+        {podeVendasClientes && (
+          <NavLink to="/foco" className={({ isActive }) => `sidebar-destaque${isActive ? ' ativo' : ''}`} title={t('layout.modoFoco')}>
+            <Focus {...ICON} /><span>{t('layout.modoFoco')}</span>
+          </NavLink>
+        )}
 
         <SecaoMenu titulo={t('layout.secao.vendas')} itens={itensVendas} fechada={!!secoesFechadas.vendas} onToggle={() => alternarSecao('vendas')} />
         <SecaoMenu titulo={t('layout.secao.forcaIa')} itens={itensForcaIa} fechada={!!secoesFechadas.forcaIa} onToggle={() => alternarSecao('forcaIa')} />

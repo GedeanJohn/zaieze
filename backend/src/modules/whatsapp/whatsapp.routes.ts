@@ -443,6 +443,37 @@ export async function whatsappRoutes(app: FastifyInstance) {
     return msg
   })
 
+  // Modo Foco de Vendas — sugestão de resposta (nunca envia nada): a vendedora pede, a IA sugere
+  // com base no histórico recente, e ela decide usar/editar/ignorar no campo de mensagem.
+  app.post('/conversas/:clienteId/sugestao', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
+    const lojaId = await lojaIdDe(request)
+    const { clienteId } = request.params as { clienteId: string }
+
+    const cliente = await prisma.cliente.findFirst({ where: { id: clienteId, lojaId }, select: { nome: true, segmento: true, vendedoraId: true } })
+    if (!cliente) return reply.code(404).send({ erro: 'Cliente não encontrado' })
+    if (request.user.role === 'VENDEDORA' && cliente.vendedoraId !== request.user.sub) {
+      return reply.code(403).send({ erro: 'Cliente não está na sua carteira' })
+    }
+
+    const [loja, vendedora, mensagens] = await Promise.all([
+      prisma.loja.findUnique({ where: { id: lojaId }, select: { nome: true } }),
+      prisma.usuario.findUnique({ where: { id: request.user.sub }, select: { nome: true } }),
+      prisma.mensagemWhatsapp.findMany({
+        where: { clienteId, lojaId }, orderBy: { createdAt: 'desc' }, take: 10,
+        select: { direcao: true, texto: true },
+      }),
+    ])
+
+    const { sugerirRespostaAtendimento } = await import('./ia.service')
+    const sugestao = await sugerirRespostaAtendimento({
+      cliente: { nome: cliente.nome, segmento: cliente.segmento },
+      loja: loja?.nome ?? 'a loja',
+      vendedora: vendedora?.nome ?? 'a vendedora',
+      ultimasMensagens: mensagens.reverse().map((m) => ({ direcao: m.direcao, texto: m.texto })),
+    })
+    return sugestao
+  })
+
   // Responder com MENSAGEM DE VOZ (PTT): grava o áudio (R2/local p/ o chat) e envia pela Cloud API
   // (upload de mídia + tipo audio). Sem WABA conectada → registra SIMULADA.
   app.post('/conversas/:clienteId/audio', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {

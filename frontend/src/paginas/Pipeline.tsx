@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Focus } from 'lucide-react'
 import {
   DndContext, DragOverlay, MouseSensor, TouchSensor, closestCenter, useSensor, useSensors, useDraggable, useDroppable,
   MeasuringStrategy, type DragEndEvent, type DragStartEvent,
@@ -120,8 +121,9 @@ function ColunaDrop({ etapa, children }: { etapa: Etapa; children: ReactNode }) 
 // alternativa que não depende de drag-and-drop. No celular a alça some (não cabe/não funciona bem
 // numa tela estreita) e só o botão "Mover etapa" aparece. Clicar no nome/telefone abre a conversa
 // do cliente no Chat Zaieze.
-function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, aoMover, arrastavel, t }: {
+function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, abrirFoco, verPedido, aoMover, arrastavel, t }: {
   c: Card; redistribuir: (c: Card) => void; podeRedistribuir: boolean; abrirChat: (clienteId: string) => void
+  abrirFoco: (clienteId: string) => void
   verPedido: (pedido: PedidoCatalogo, etapa: Etapa) => void
   aoMover?: (c: Card) => void
   arrastavel?: boolean
@@ -155,6 +157,12 @@ function CardLead({ c, redistribuir, podeRedistribuir, abrirChat, verPedido, aoM
           <div style={{ fontWeight: 600, fontSize: 13, lineHeight: 1.25, color: clienteId ? 'var(--accent)' : undefined, overflowWrap: 'anywhere' }}>{nome}</div>
           <div style={{ fontSize: 12, color: 'var(--ink-soft)', lineHeight: 1.25, overflowWrap: 'anywhere' }}>{telefone}</div>
         </button>
+        {clienteId && telefone && (
+          <button type="button" onClick={() => abrirFoco(clienteId)} title={t('layout.modoFoco')}
+            style={{ flex: '0 0 auto', border: 'none', background: 'none', padding: 4, cursor: 'pointer', color: '#c9a25f', alignSelf: 'flex-start' }}>
+            <Focus size={16} strokeWidth={1.8} />
+          </button>
+        )}
       </div>
       <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <BadgeSituacao s={c.situacao} />
@@ -241,6 +249,7 @@ export default function Pipeline() {
   const escopo = useLojaAtiva()
   const navigate = useNavigate()
   const abrirChat = useCallback((clienteId: string) => navigate(`/caixa?cliente=${clienteId}`), [navigate])
+  const abrirFoco = useCallback((clienteId: string) => navigate(`/foco/${clienteId}`), [navigate])
   const { t } = useIdioma()
 
   const [pipe, setPipe] = useState<Pipeline | null>(null)
@@ -470,7 +479,7 @@ export default function Pipeline() {
                     <span style={{ color: 'var(--ink-soft)', fontSize: 12 }}>{cards.length}</span>
                   </div>
                   {cards.map((c) => (
-                    <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat}
+                    <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat} abrirFoco={abrirFoco}
                       verPedido={(pedido, etapa) => { setPedidoAberto(pedido); setPedidoAbertoEtapa(etapa) }}
                       arrastavel t={t} />
                   ))}
@@ -506,7 +515,7 @@ export default function Pipeline() {
           </div>
           <div className="funil-lista-mobile">
             {(pipeFiltrado?.colunas[abaMobile] ?? []).map((c) => (
-              <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat}
+              <CardLead key={c.id} c={c} redistribuir={redistribuir} podeRedistribuir={podeRedistribuir} abrirChat={abrirChat} abrirFoco={abrirFoco}
                 verPedido={(pedido, etapa) => { setPedidoAberto(pedido); setPedidoAbertoEtapa(etapa) }}
                 aoMover={(card) => setCardMoverMobile(card)} t={t} />
             ))}

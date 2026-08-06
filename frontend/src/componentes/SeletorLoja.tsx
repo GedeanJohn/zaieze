@@ -12,6 +12,12 @@ export function useLojaAtiva() {
   // Papéis de rede (gestor e estoquista) operam escolhendo a loja
   const ehGestor = usuario.role === 'GESTOR' || usuario.role === 'ESTOQUISTA'
   const [lojas, setLojas] = useState<LojaResumo[]>([])
+  // Marca quando a busca de lojas já respondeu — precisa ser um estado à parte de `lojaId`
+  // porque uma rede pode não ter NENHUMA loja ainda (gestor recém-cadastrado). Nesse caso
+  // `lojaId` nunca sai de null, e se `pronto` dependesse só dele, as telas que usam esse escopo
+  // (Coleções, Produtos etc.) ficavam esperando pra sempre e nunca chegavam a buscar/mostrar nada
+  // — sem erro nenhum na tela, parecia que o que era salvo "sumia".
+  const [lojasCarregadas, setLojasCarregadas] = useState(!ehGestor)
   const [lojaId, setLojaIdState] = useState<string | null>(
     ehGestor ? localStorage.getItem('modacrm_lojaId') : null,
   )
@@ -23,6 +29,7 @@ export function useLojaAtiva() {
       if (data.length && !data.some((l: LojaResumo) => l.id === lojaId)) {
         setLojaId(data[0].id)
       }
+      setLojasCarregadas(true)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ehGestor])
@@ -42,7 +49,7 @@ export function useLojaAtiva() {
     if (ehGestor && lojaId) p.lojaId = lojaId
     return p
   }, [ehGestor, lojaId])
-  const pronto = !ehGestor || lojaId !== null
+  const pronto = !ehGestor || lojasCarregadas
 
   return { ehGestor, lojas, lojaId, setLojaId, params, pronto }
 }

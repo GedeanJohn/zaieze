@@ -120,6 +120,21 @@ export async function assinaturasRoutes(app: FastifyInstance) {
       await tx.usuario.create({
         data: { redeId: r.id, nome: body.gestorNome, email, senhaHash, role: 'GESTOR', telefone: body.telefone, idioma: body.idioma },
       })
+      // Loja inicial "Matriz" — sem ela, o gestor cai numa rede sem nenhuma loja e as telas que
+      // dependem de uma loja ativa (Coleções, Produtos etc.) nunca têm o que carregar (ver bug
+      // corrigido em SeletorLoja.tsx: pronto travava pra sempre nesse caso). Sem gerente vinculado
+      // — o gestor cadastra a equipe depois; `Loja.slug` é único GLOBALMENTE (não só por rede,
+      // ver schema), então tenta o slug da própria rede e cai pra `-2`, `-3`... só na
+      // (improvável) colisão com a loja de outra marca.
+      for (let tentativa = 1; ; tentativa++) {
+        const slugLoja = tentativa === 1 ? slug : `${slug}-${tentativa}`
+        try {
+          await tx.loja.create({ data: { redeId: r.id, nome: 'Matriz', slug: slugLoja } })
+          break
+        } catch (e: unknown) {
+          if ((e as { code?: string }).code !== 'P2002' || tentativa >= 5) throw e
+        }
+      }
       // Indicação por Assessor(a): cria o cartão de representação já vinculado à rede, mas
       // pendente — só entra na vitrine dela depois que o gestor desta rede aceitar (ver
       // GET/POST /api/marca/solicitacao-assessor).

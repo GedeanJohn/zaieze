@@ -42,6 +42,34 @@ function urlOrcamentoPublico(redeSlug: string, token: string): string {
 }
 
 /**
+ * Resolve/valida as variações contra a coleção da loja e calcula o preço de cada item — mesma
+ * lógica usada em POST /, PATCH /:id e no PATCH público (cliente editando o próprio orçamento).
+ * Lança erro com `statusCode` (convertido em resposta 422 pelo caller) quando alguma variação
+ * não pertence à loja.
+ */
+async function calcularItens(
+  itens: { variacaoId: string; quantidade: number; precoUnitario?: number }[],
+  lojaId: string, redeId: string, atacado: boolean,
+): Promise<{ variacaoId: string; quantidade: number; precoUnitario: number }[]> {
+  const ids = itens.map((i) => i.variacaoId)
+  const variacoes = await prisma.variacaoProduto.findMany({
+    where: { id: { in: ids }, produto: { redeId, colecao: { lojas: { some: { lojaId } } } } },
+    include: { produto: { select: { nome: true, precoVarejo: true, precoAtacado: true } } },
+  })
+  const porId = new Map(variacoes.map((v) => [v.id, v]))
+  for (const item of itens) {
+    if (!porId.has(item.variacaoId)) {
+      throw Object.assign(new Error(`Variação ${item.variacaoId} indisponível nesta loja (coleção não distribuída)`), { statusCode: 422 })
+    }
+  }
+  return itens.map((item) => {
+    const v = porId.get(item.variacaoId)!
+    const preco = item.precoUnitario ?? (atacado && v.produto.precoAtacado ? Number(v.produto.precoAtacado) : Number(v.produto.precoVarejo))
+    return { variacaoId: item.variacaoId, quantidade: item.quantidade, precoUnitario: preco }
+  })
+}
+
+/**
  * Orçamentos: a vendedora monta uma proposta e manda o cliente aprovar (ou pedir alterações)
  * por um link público — NÃO reserva nem abate estoque (isso só acontece quando o cliente
  * aprova e o orçamento vira Venda de fato). Desconto acima do limite livre da vendedora fica
@@ -64,21 +92,14 @@ export async function orcamentosRoutes(app: FastifyInstance) {
     const redeId = ctx?.rede?.id
     if (!redeId) return reply.code(422).send({ erro: 'Loja sem marca vinculada' })
 
-    const ids = body.itens.map((i) => i.variacaoId)
-    const variacoes = await prisma.variacaoProduto.findMany({
-      where: { id: { in: ids }, produto: { redeId, colecao: { lojas: { some: { lojaId } } } } },
-      include: { produto: { select: { nome: true, precoVarejo: true, precoAtacado: true } } },
-    })
-    const porId = new Map(variacoes.map((v) => [v.id, v]))
-    for (const item of body.itens) {
-      if (!porId.has(item.variacaoId)) return reply.code(422).send({ erro: `Variação ${item.variacaoId} indisponível nesta loja (coleção não distribuída)` })
+    let itensCalculados: { variacaoId: string; quantidade: number; precoUnitario: number }[]
+    try {
+      itensCalculados = await calcularItens(body.itens, lojaId, redeId, body.atacado)
+    } catch (e) {
+      const statusCode = (e as { statusCode?: number }).statusCode
+      if (statusCode) return reply.code(statusCode).send({ erro: (e as Error).message })
+      throw e
     }
-
-    const itensCalculados = body.itens.map((item) => {
-      const v = porId.get(item.variacaoId)!
-      const preco = item.precoUnitario ?? (body.atacado && v.produto.precoAtacado ? Number(v.produto.precoAtacado) : Number(v.produto.precoVarejo))
-      return { variacaoId: item.variacaoId, quantidade: item.quantidade, precoUnitario: preco }
-    })
     const bruto = itensCalculados.reduce((s, i) => s + i.precoUnitario * i.quantidade, 0)
 
     const autoMax = ctx?.rede?.descontoAutoMaxPct != null ? Number(ctx.rede.descontoAutoMaxPct) : 10
@@ -184,13 +205,18 @@ export async function orcamentosRoutes(app: FastifyInstance) {
   app.patch('/:id', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
     const { id } = request.params as { id: string }
-    const body = criarOrcamentoSchema.omit({ vendedoraId: true }).parse(request.body)
+    const body = criarOrcamentoSchema.omit({ vendedoraId: true })
+      .extend({ expectedUpdatedAt: z.string().optional() })
+      .parse(request.body)
 
     const where: Prisma.OrcamentoWhereInput = { id, lojaId }
     if (request.user.role === 'VENDEDORA') where.vendedoraId = request.user.sub
-    const atual = await prisma.orcamento.findFirst({ where })
+    const atual = await prisma.orcamento.findFirst({ where, include: incluirDetalhe })
     if (!atual) return reply.code(404).send({ erro: 'Orçamento não encontrado' })
     if (!EDITAVEL.includes(atual.status)) return reply.code(422).send({ erro: 'Este orçamento não pode mais ser editado' })
+    if (body.expectedUpdatedAt && body.expectedUpdatedAt !== atual.updatedAt.toISOString()) {
+      return reply.code(409).send({ erro: 'Este orçamento foi alterado por outra pessoa agora há pouco — revise antes de salvar.', orcamento: atual })
+    }
 
     const cliente = await prisma.cliente.findFirst({ where: { id: body.clienteId, lojaId } })
     if (!cliente) return reply.code(422).send({ erro: 'Cliente inválido para esta loja' })
@@ -199,21 +225,14 @@ export async function orcamentosRoutes(app: FastifyInstance) {
     const redeId = ctx?.rede?.id
     if (!redeId) return reply.code(422).send({ erro: 'Loja sem marca vinculada' })
 
-    const ids = body.itens.map((i) => i.variacaoId)
-    const variacoes = await prisma.variacaoProduto.findMany({
-      where: { id: { in: ids }, produto: { redeId, colecao: { lojas: { some: { lojaId } } } } },
-      include: { produto: { select: { nome: true, precoVarejo: true, precoAtacado: true } } },
-    })
-    const porId = new Map(variacoes.map((v) => [v.id, v]))
-    for (const item of body.itens) {
-      if (!porId.has(item.variacaoId)) return reply.code(422).send({ erro: `Variação ${item.variacaoId} indisponível nesta loja (coleção não distribuída)` })
+    let itensCalculados: { variacaoId: string; quantidade: number; precoUnitario: number }[]
+    try {
+      itensCalculados = await calcularItens(body.itens, lojaId, redeId, body.atacado)
+    } catch (e) {
+      const statusCode = (e as { statusCode?: number }).statusCode
+      if (statusCode) return reply.code(statusCode).send({ erro: (e as Error).message })
+      throw e
     }
-
-    const itensCalculados = body.itens.map((item) => {
-      const v = porId.get(item.variacaoId)!
-      const preco = item.precoUnitario ?? (body.atacado && v.produto.precoAtacado ? Number(v.produto.precoAtacado) : Number(v.produto.precoVarejo))
-      return { variacaoId: item.variacaoId, quantidade: item.quantidade, precoUnitario: preco }
-    })
     const bruto = itensCalculados.reduce((s, i) => s + i.precoUnitario * i.quantidade, 0)
 
     const autoMax = ctx?.rede?.descontoAutoMaxPct != null ? Number(ctx.rede.descontoAutoMaxPct) : 10
@@ -327,6 +346,72 @@ export async function orcamentosRoutes(app: FastifyInstance) {
       },
     })
     if (!orcamento) return reply.code(404).send({ erro: 'Orçamento não encontrado' })
+    return orcamento
+  })
+
+  // Catálogo enxuto pro cliente escolher peça pra adicionar ao próprio orçamento (mesmo recorte
+  // de coleção liberada/distribuída que a vendedora vê — ver GET /produtos em produtos.routes.ts).
+  app.get('/publico/:token/produtos', async (request, reply) => {
+    const { token } = request.params as { token: string }
+    const { busca } = request.query as { busca?: string }
+    const orcamento = await prisma.orcamento.findUnique({ where: { tokenPublico: token }, select: { lojaId: true, loja: { select: { rede: { select: { id: true } } } } } })
+    if (!orcamento) return reply.code(404).send({ erro: 'Orçamento não encontrado' })
+    const redeId = orcamento.loja.rede.id
+
+    const and: Prisma.ProdutoWhereInput[] = [
+      { ativo: true },
+      { colecao: { lojas: { some: { lojaId: orcamento.lojaId } }, status: 'LIBERADA', OR: [{ validadeAte: null }, { validadeAte: { gte: new Date() } }] } },
+    ]
+    if (busca) and.push({ OR: [{ nome: { contains: busca, mode: 'insensitive' } }, { referencia: { contains: busca, mode: 'insensitive' } }] })
+
+    return prisma.produto.findMany({
+      where: { redeId, AND: and },
+      orderBy: { nome: 'asc' },
+      select: {
+        id: true, nome: true, referencia: true, fotos: true, precoVarejo: true, precoAtacado: true,
+        variacoes: { orderBy: [{ cor: 'asc' }, { tamanho: 'asc' }] },
+      },
+    })
+  })
+
+  const EDITAVEL_CLIENTE = ['RASCUNHO', 'ENVIADO', 'ALTERACAO_SOLICITADA']
+
+  // Cliente edita a própria lista de itens (adicionar peça, trocar variação, ajustar qtd,
+  // remover) — ao mesmo tempo que a vendedora pode estar editando do lado dela (ver
+  // CarrinhoCliente.tsx). Nunca aceita desconto/atacado/observação do cliente: recalcula o total
+  // com o que já está gravado no orçamento. `expectedUpdatedAt` é a mesma trava otimista do PATCH
+  // staff — evita que o último a salvar apague silenciosamente o que o outro acabou de adicionar.
+  app.post('/publico/:token/itens', async (request, reply) => {
+    const { token } = request.params as { token: string }
+    const body = z.object({ itens: z.array(itemSchema).min(1, 'Informe ao menos um item'), expectedUpdatedAt: z.string().optional() }).parse(request.body)
+
+    const atual = await prisma.orcamento.findUnique({ where: { tokenPublico: token }, include: { loja: { select: { rede: { select: { id: true } } } } } })
+    if (!atual) return reply.code(404).send({ erro: 'Orçamento não encontrado' })
+    if (!EDITAVEL_CLIENTE.includes(atual.status)) return reply.code(422).send({ erro: 'Este orçamento não está mais disponível para edição' })
+    if (body.expectedUpdatedAt && body.expectedUpdatedAt !== atual.updatedAt.toISOString()) {
+      const fresco = await prisma.orcamento.findUnique({ where: { tokenPublico: token }, include: incluirDetalhe })
+      return reply.code(409).send({ erro: 'A vendedora alterou o orçamento agora há pouco — revise antes de salvar.', orcamento: fresco })
+    }
+
+    let itensCalculados: { variacaoId: string; quantidade: number; precoUnitario: number }[]
+    try {
+      itensCalculados = await calcularItens(body.itens, atual.lojaId, atual.loja.rede.id, atual.atacado)
+    } catch (e) {
+      const statusCode = (e as { statusCode?: number }).statusCode
+      if (statusCode) return reply.code(statusCode).send({ erro: (e as Error).message })
+      throw e
+    }
+    const bruto = itensCalculados.reduce((s, i) => s + i.precoUnitario * i.quantidade, 0)
+    const total = Math.max(0, bruto - bruto * (Number(atual.descontoPct) / 100))
+
+    const orcamento = await prisma.$transaction(async (tx) => {
+      await tx.itemOrcamento.deleteMany({ where: { orcamentoId: atual.id } })
+      return tx.orcamento.update({
+        where: { id: atual.id },
+        data: { total, itens: { create: itensCalculados } },
+        include: incluirDetalhe,
+      })
+    })
     return orcamento
   })
 

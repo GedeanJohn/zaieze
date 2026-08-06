@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
+import { Link2 } from 'lucide-react'
 import { api, formataReal, mensagemDeErro } from '../api'
 import { useLojaAtiva } from './SeletorLoja'
 import { useToast } from './Toast'
@@ -7,6 +8,9 @@ import { useIdioma } from '../lib/i18n'
 
 type StatusOrc = 'RASCUNHO' | 'AGUARDANDO_APROVACAO_DESCONTO' | 'ENVIADO' | 'ALTERACAO_SOLICITADA' | 'CONVERTIDO' | 'CANCELADO'
 const EDITAVEL: StatusOrc[] = ['RASCUNHO', 'AGUARDANDO_APROVACAO_DESCONTO', 'ALTERACAO_SOLICITADA']
+// Status em que o cliente ainda pode estar editando do lado dele (ver EDITAVEL_CLIENTE no
+// backend) — enquanto algum desses vale a pena manter o polling ligado pra puxar o que ele mexeu.
+const VIVO: StatusOrc[] = ['RASCUNHO', 'AGUARDANDO_APROVACAO_DESCONTO', 'ENVIADO', 'ALTERACAO_SOLICITADA']
 
 export interface VariacaoP { id: string; cor: string; estampa: string; tamanho: string; estoque: number; estoqueVarejo: number }
 export interface ProdutoP { id: string; nome: string; precoVarejo: string; precoAtacado?: string | null; fotos: string[]; variacoes: VariacaoP[] }
@@ -14,7 +18,7 @@ interface ItemOrcResp {
   variacaoId: string; quantidade: number; precoUnitario: string
   variacao: { produtoId: string; cor: string; estampa: string; tamanho: string; produto: { nome: string; fotos: string[] } }
 }
-interface OrcamentoResp { id: string; status: StatusOrc; itens: ItemOrcResp[] }
+interface OrcamentoResp { id: string; status: StatusOrc; tokenPublico: string; updatedAt: string; itens: ItemOrcResp[] }
 
 interface LinhaCarrinho {
   variacaoId: string; produtoId: string; nome: string; foto?: string
@@ -67,6 +71,8 @@ const CarrinhoCliente = forwardRef<CarrinhoClienteHandle, Props>(function Carrin
   const [carregandoProdutos, setCarregandoProdutos] = useState(true)
   const [orcamentoId, setOrcamentoId] = useState<string | null>(null)
   const [orcamentoStatus, setOrcamentoStatus] = useState<StatusOrc | null>(null)
+  const [tokenPublico, setTokenPublico] = useState<string | null>(null)
+  const [orcamentoUpdatedAt, setOrcamentoUpdatedAt] = useState<string | null>(null)
   const [itens, setItens] = useState<LinhaCarrinho[]>([])
   const [produtoAberto, setProdutoAberto] = useState<ProdutoP | null>(null)
   const [salvando, setSalvando] = useState<'idle' | 'salvando' | 'erro'>('idle')
@@ -92,13 +98,15 @@ const CarrinhoCliente = forwardRef<CarrinhoClienteHandle, Props>(function Carrin
         if (editavel) {
           setOrcamentoId(editavel.id)
           setOrcamentoStatus(editavel.status)
+          setTokenPublico(editavel.tokenPublico)
+          setOrcamentoUpdatedAt(editavel.updatedAt)
           setItens(editavel.itens.map((i) => ({
             variacaoId: i.variacaoId, produtoId: i.variacao.produtoId, nome: i.variacao.produto.nome,
             foto: i.variacao.produto.fotos?.[0], cor: i.variacao.cor, estampa: i.variacao.estampa, tamanho: i.variacao.tamanho,
             quantidade: i.quantidade, precoUnitario: Number(i.precoUnitario),
           })))
         } else {
-          setOrcamentoId(null); setOrcamentoStatus(null); setItens([])
+          setOrcamentoId(null); setOrcamentoStatus(null); setTokenPublico(null); setOrcamentoUpdatedAt(null); setItens([])
         }
       })
       .catch((err) => avisar(mensagemDeErro(err), 'erro'))
@@ -121,6 +129,29 @@ const CarrinhoCliente = forwardRef<CarrinhoClienteHandle, Props>(function Carrin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busca, escopo.pronto])
 
+  // Puxa o que o cliente mexeu do lado dele (link público, ver OrcamentoPublico.tsx) — mesmo
+  // padrão de polling condicional já usado em LookProvador.tsx (setInterval + status "vivo").
+  // Pula o merge se houver uma sincronização local em voo ou agendada, pra não sobrescrever o que
+  // a vendedora acabou de digitar.
+  useEffect(() => {
+    if (!hidratado || !orcamentoId || !orcamentoStatus || !VIVO.includes(orcamentoStatus)) return
+    const intervalo = setInterval(() => {
+      if (syncEmVoo.current || timerSync.current) return
+      api.get(`/orcamentos/${orcamentoId}`, { params: escopo.params })
+        .then(({ data }: { data: OrcamentoResp }) => {
+          if (data.updatedAt === orcamentoUpdatedAt) return
+          setOrcamentoStatus(data.status); setOrcamentoUpdatedAt(data.updatedAt); setTokenPublico(data.tokenPublico)
+          setItens(data.itens.map((i) => ({
+            variacaoId: i.variacaoId, produtoId: i.variacao.produtoId, nome: i.variacao.produto.nome,
+            foto: i.variacao.produto.fotos?.[0], cor: i.variacao.cor, estampa: i.variacao.estampa, tamanho: i.variacao.tamanho,
+            quantidade: i.quantidade, precoUnitario: Number(i.precoUnitario),
+          })))
+        })
+        .catch(() => {})
+    }, 5000)
+    return () => clearInterval(intervalo)
+  }, [hidratado, orcamentoId, orcamentoStatus, orcamentoUpdatedAt, escopo.params])
+
   const total = useMemo(() => itens.reduce((s, i) => s + i.precoUnitario * i.quantidade, 0), [itens])
 
   // Sincroniza a lista inteira (POST se ainda não existe orçamento, PATCH se já existe). Se uma
@@ -140,24 +171,38 @@ const CarrinhoCliente = forwardRef<CarrinhoClienteHandle, Props>(function Carrin
       const corpo = {
         clienteId, atacado: !!atacado, descontoPct: 0,
         itens: novaLista.map((i) => ({ variacaoId: i.variacaoId, quantidade: i.quantidade, precoUnitario: i.precoUnitario })),
+        expectedUpdatedAt: orcamentoId ? orcamentoUpdatedAt ?? undefined : undefined,
       }
       try {
         if (orcamentoId) {
           const { data } = await api.patch(`/orcamentos/${orcamentoId}`, corpo, { params: escopo.params })
-          setOrcamentoStatus(data.status)
+          setOrcamentoStatus(data.status); setOrcamentoUpdatedAt(data.updatedAt); setTokenPublico(data.tokenPublico)
         } else {
           const { data } = await api.post('/orcamentos', corpo, { params: escopo.params })
-          setOrcamentoId(data.id); setOrcamentoStatus(data.status)
+          setOrcamentoId(data.id); setOrcamentoStatus(data.status); setOrcamentoUpdatedAt(data.updatedAt); setTokenPublico(data.tokenPublico)
         }
         setSalvando('idle')
-      } catch (err) {
-        setSalvando('erro'); setErroSync(mensagemDeErro(err))
+      } catch (err: unknown) {
+        const resp = (err as { response?: { status?: number; data?: { orcamento?: OrcamentoResp } } }).response
+        if (resp?.status === 409 && resp.data?.orcamento) {
+          const fresco = resp.data.orcamento
+          setOrcamentoStatus(fresco.status); setOrcamentoUpdatedAt(fresco.updatedAt); setTokenPublico(fresco.tokenPublico)
+          setItens(fresco.itens.map((i) => ({
+            variacaoId: i.variacaoId, produtoId: i.variacao.produtoId, nome: i.variacao.produto.nome,
+            foto: i.variacao.produto.fotos?.[0], cor: i.variacao.cor, estampa: i.variacao.estampa, tamanho: i.variacao.tamanho,
+            quantidade: i.quantidade, precoUnitario: Number(i.precoUnitario),
+          })))
+          setSalvando('idle')
+          avisar(t('caixa.clienteAlterouOrcamento'), 'erro')
+        } else {
+          setSalvando('erro'); setErroSync(mensagemDeErro(err))
+        }
       } finally {
         syncEmVoo.current = false
       }
     }
     agendar()
-  }, [clienteId, atacado, orcamentoId, escopo.params])
+  }, [clienteId, atacado, orcamentoId, orcamentoUpdatedAt, escopo.params, avisar, t])
 
   const [enviandoChat, setEnviandoChat] = useState(false)
 
@@ -256,10 +301,19 @@ const CarrinhoCliente = forwardRef<CarrinhoClienteHandle, Props>(function Carrin
         return
       }
     }
-    setItens([]); setOrcamentoId(null); setOrcamentoStatus(null); setSalvando('idle'); setErroSync('')
+    setItens([]); setOrcamentoId(null); setOrcamentoStatus(null); setTokenPublico(null); setOrcamentoUpdatedAt(null); setSalvando('idle'); setErroSync('')
   }
 
   const bloqueado = orcamentoStatus != null && !EDITAVEL.includes(orcamentoStatus)
+
+  function copiarLink() {
+    if (!tokenPublico) return
+    const link = `${window.location.origin}/orcamento/publico/${tokenPublico}`
+    navigator.clipboard.writeText(link).then(
+      () => avisar(t('caixa.linkCopiado'), 'sucesso'),
+      () => avisar(t('caixa.erroCopiarLink'), 'erro'),
+    )
+  }
 
   return (
     <div className="cz-carrinho">
@@ -319,11 +373,18 @@ const CarrinhoCliente = forwardRef<CarrinhoClienteHandle, Props>(function Carrin
         )}
         <div className="cz-cart-total-linha">
           <span>{t('caixa.itensNoCarrinho', { n: itens.length })} · {formataReal(total)}</span>
-          {itens.length > 0 && (
-            <span className={`cz-cart-status ${salvando}`}>
-              {salvando === 'salvando' ? t('caixa.sincronizando') : salvando === 'erro' ? '⚠' : '✓'}
-            </span>
-          )}
+          <span className="cz-cart-total-acoes">
+            {tokenPublico && (
+              <button type="button" className="cz-cart-link" onClick={copiarLink} title={t('caixa.copiarLinkCliente')}>
+                <Link2 size={14} strokeWidth={1.8} />
+              </button>
+            )}
+            {itens.length > 0 && (
+              <span className={`cz-cart-status ${salvando}`}>
+                {salvando === 'salvando' ? t('caixa.sincronizando') : salvando === 'erro' ? '⚠' : '✓'}
+              </span>
+            )}
+          </span>
         </div>
         {salvando === 'erro' && <div className="cz-cart-alerta">{erroSync || t('caixa.erroSincronizar')}</div>}
       </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Download, Share, X, PlusSquare, Copy, Check, Smartphone } from 'lucide-react'
+import { Download, Share, X, PlusSquare, Copy, Check, Smartphone, Monitor } from 'lucide-react'
 import { useToast } from './Toast'
 
 interface EventoInstalacao extends Event {
@@ -15,15 +15,23 @@ function ehIos(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent)
 }
 
-/** Botão "Instalar app" — no Android/Chrome dispara o prompt nativo de instalação (PWA);
- *  no iPhone/Safari (sem esse evento) mostra o passo a passo do "Adicionar à Tela de Início".
+function ehMacSafari(): boolean {
+  const ua = navigator.userAgent
+  return /macintosh/i.test(ua) && /^((?!chrome|crios|edg|android|firefox|fxios|opr).)*safari/i.test(ua)
+}
+
+/** Botão "Instalar app" — no Android/Chrome/Edge (também no Mac) dispara o prompt nativo de
+ *  instalação (PWA); no iPhone/Safari e no Mac/Safari (sem esse evento) mostra o passo a passo
+ *  manual ("Adicionar à Tela de Início" ou "Adicionar ao Dock").
  *  Some sozinho se o app já estiver instalado (aberto em modo standalone). */
 export default function BotaoInstalarApp({ className = 'vit-icone-botao' }: { className?: string }) {
   const [promptEvento, setPromptEvento] = useState<EventoInstalacao | null>(null)
-  const [instrucoesIosAbertas, setInstrucoesIosAbertas] = useState(false)
+  const [instrucoesAbertas, setInstrucoesAbertas] = useState(false)
   const [instalado, setInstalado] = useState(estaStandalone())
   const [linkCopiado, setLinkCopiado] = useState(false)
   const avisar = useToast()
+  const mostrarInstrucoesIos = ehIos()
+  const mostrarInstrucoesMac = !mostrarInstrucoesIos && ehMacSafari()
 
   useEffect(() => {
     if (instalado) return
@@ -41,7 +49,7 @@ export default function BotaoInstalarApp({ className = 'vit-icone-botao' }: { cl
   }, [instalado])
 
   if (instalado) return null
-  if (!promptEvento && !ehIos()) return null // navegador sem suporte (ex.: Firefox mobile) — não mostra nada
+  if (!promptEvento && !mostrarInstrucoesIos && !mostrarInstrucoesMac) return null // navegador sem suporte (ex.: Firefox) — não mostra nada
 
   async function clicar() {
     if (promptEvento) {
@@ -51,7 +59,7 @@ export default function BotaoInstalarApp({ className = 'vit-icone-botao' }: { cl
       setPromptEvento(null)
       return
     }
-    setInstrucoesIosAbertas(true)
+    setInstrucoesAbertas(true)
   }
 
   async function copiarLink() {
@@ -69,29 +77,38 @@ export default function BotaoInstalarApp({ className = 'vit-icone-botao' }: { cl
   return (
     <>
       <button type="button" className={className} aria-label="Instalar app" onClick={clicar}><Download size={18} /></button>
-      {instrucoesIosAbertas && (
+      {instrucoesAbertas && (
         // Estilo próprio, isolado por classes "zz-pwa-*" (não depende de CSS da página que renderiza
         // este componente) — ele é usado em telas com temas diferentes (Brand Partner, vitrine da
         // vendedora), e depender de CSS externo deixava o modal sem estilo (texto ilegível, botão
         // parecendo desativado) fora da página onde essas classes foram originalmente definidas.
-        <div className="zz-pwa-fundo" onClick={() => setInstrucoesIosAbertas(false)}>
+        <div className="zz-pwa-fundo" onClick={() => setInstrucoesAbertas(false)}>
           <ZzPwaEstilos />
           <div className="zz-pwa-janela" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="zz-pwa-fechar" onClick={() => setInstrucoesIosAbertas(false)} aria-label="Fechar"><X size={18} /></button>
-            <div className="zz-pwa-selo"><Smartphone size={22} /></div>
-            <h3 className="zz-pwa-titulo">Instalar na tela de início</h3>
+            <button type="button" className="zz-pwa-fechar" onClick={() => setInstrucoesAbertas(false)} aria-label="Fechar"><X size={18} /></button>
+            <div className="zz-pwa-selo">{mostrarInstrucoesMac ? <Monitor size={22} /> : <Smartphone size={22} />}</div>
+            <h3 className="zz-pwa-titulo">{mostrarInstrucoesMac ? 'Adicionar ao Dock' : 'Instalar na tela de início'}</h3>
             <p className="zz-pwa-texto">
-              Abriu esse link pelo WhatsApp, Instagram ou outro app? "Adicionar à Tela de Início" só
-              funciona no Safari de verdade — copie o link abaixo e cole no Safari.
+              {mostrarInstrucoesMac
+                ? 'Abriu esse link dentro de outro app (e-mail, mensagens)? "Adicionar ao Dock" só funciona no Safari de verdade — copie o link abaixo e cole no Safari.'
+                : 'Abriu esse link pelo WhatsApp, Instagram ou outro app? "Adicionar à Tela de Início" só funciona no Safari de verdade — copie o link abaixo e cole no Safari.'}
             </p>
             <button type="button" className="zz-pwa-botao" onClick={copiarLink}>
               {linkCopiado ? <Check size={18} /> : <Copy size={18} />} {linkCopiado ? 'Link copiado' : 'Copiar link'}
             </button>
-            <ol className="zz-pwa-passos">
-              <li><span className="zz-pwa-passo-num">1</span> Abra o Safari e cole o link.</li>
-              <li><span className="zz-pwa-passo-num">2</span> Toque no ícone <Share size={14} style={{ verticalAlign: 'middle' }} /> <strong>Compartilhar</strong> na barra do Safari.</li>
-              <li><span className="zz-pwa-passo-num">3</span> Escolha <strong>Adicionar à Tela de Início</strong> <PlusSquare size={14} style={{ verticalAlign: 'middle' }} />.</li>
-            </ol>
+            {mostrarInstrucoesMac ? (
+              <ol className="zz-pwa-passos">
+                <li><span className="zz-pwa-passo-num">1</span> No Safari, abra o menu <strong>Arquivo</strong> na barra superior.</li>
+                <li><span className="zz-pwa-passo-num">2</span> Escolha <strong>Adicionar ao Dock</strong>.</li>
+                <li><span className="zz-pwa-passo-num">3</span> O ícone aparece no Dock, como um app separado.</li>
+              </ol>
+            ) : (
+              <ol className="zz-pwa-passos">
+                <li><span className="zz-pwa-passo-num">1</span> Abra o Safari e cole o link.</li>
+                <li><span className="zz-pwa-passo-num">2</span> Toque no ícone <Share size={14} style={{ verticalAlign: 'middle' }} /> <strong>Compartilhar</strong> na barra do Safari.</li>
+                <li><span className="zz-pwa-passo-num">3</span> Escolha <strong>Adicionar à Tela de Início</strong> <PlusSquare size={14} style={{ verticalAlign: 'middle' }} />.</li>
+              </ol>
+            )}
           </div>
         </div>
       )}

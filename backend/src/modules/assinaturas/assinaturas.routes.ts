@@ -16,7 +16,8 @@ import { confirmarCicloAddon, solicitarCancelamentoAddon } from '../addons/addon
 import { confirmarCicloAssessor, solicitarCancelamentoAssessor } from '../assessores/assinatura-assessor.service'
 import { confirmarCicloChatAtendimento, solicitarCancelamentoChatAtendimento } from '../chat-atendimento/assinatura-chat-atendimento.service'
 import { normalizarSlug as normalizarSlugAssessor } from '../assessores/assessor.service'
-import { confirmarCicloAssentoVendedora, solicitarCancelamentoAssentoVendedora } from '../vendedora-billing/assinatura-vendedora.service'
+import { cancelarAssentoVendedora } from '../vendedora-billing/assinatura-vendedora.service'
+import { confirmarCicloAssentoVendedoraRede, solicitarCancelamentoAssentoVendedoraRede } from '../vendedora-billing/assinatura-vendedora-rede.service'
 
 const checkoutSchema = z.object({
   redeNome: z.string().min(2),
@@ -250,15 +251,27 @@ export async function assinaturasRoutes(app: FastifyInstance) {
       return reply.code(200).send({ ok: true })
     }
 
-    // Nenhum dos anteriores — pode ser o assento de uma vendedora (billing por conta, ver
-    // vendedora-billing/assinatura-vendedora.service.ts).
+    // LEGADO: assento com preapproval PRÓPRIO, de antes da cobrança virar consolidada por marca
+    // (nenhum assento novo ganha mpPreapprovalId mais — ver assinatura-vendedora-rede.service.ts).
+    // 'authorized' não faz nada aqui: o assento legado já está ATIVA sem cobrança própria a confirmar.
     const assinaturaVendedora = await prisma.assinaturaVendedora.findFirst({ where: { mpPreapprovalId: id } })
     if (assinaturaVendedora) {
       const status = await consultarPreapproval(id)
+      if (status === 'cancelled' || status === 'paused') {
+        await cancelarAssentoVendedora(assinaturaVendedora.id)
+      }
+      return reply.code(200).send({ ok: true })
+    }
+
+    // Nenhum dos anteriores — pode ser a cobrança consolidada de vendedoras de uma marca (ver
+    // vendedora-billing/assinatura-vendedora-rede.service.ts).
+    const assinaturaVendedoraRede = await prisma.assinaturaVendedoraRede.findFirst({ where: { mpPreapprovalId: id } })
+    if (assinaturaVendedoraRede) {
+      const status = await consultarPreapproval(id)
       if (status === 'authorized') {
-        await confirmarCicloAssentoVendedora(assinaturaVendedora.id)
+        await confirmarCicloAssentoVendedoraRede(assinaturaVendedoraRede.id)
       } else if (status === 'cancelled' || status === 'paused') {
-        await solicitarCancelamentoAssentoVendedora(assinaturaVendedora.id, 'MERCADO_PAGO')
+        await solicitarCancelamentoAssentoVendedoraRede(assinaturaVendedoraRede.redeId, 'MERCADO_PAGO')
       }
     }
     return reply.code(200).send({ ok: true })

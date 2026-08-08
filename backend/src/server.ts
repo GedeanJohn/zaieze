@@ -6,14 +6,14 @@ import { limparMidiaExpirada, limparAudiosAntigos, limparLooksAntigos } from './
 import { iniciarWorkerProvador } from './modules/provador/provador.worker'
 import { encerrarAssinaturasVencidas } from './modules/assinaturas/assinatura.service'
 import { encerrarAssessorasVencidas } from './modules/assessores/assinatura-assessor.service'
-import { aplicarReajustesIgpm, aplicarReajustesIgpmAssentoVendedora } from './modules/assinaturas/igpm.service'
+import { aplicarReajustesIgpm } from './modules/assinaturas/igpm.service'
 import { aplicarDistratoTermos } from './modules/contrato/contrato.service'
 import { aplicarDistratoPrivacidade } from './modules/privacidade/privacidade.service'
 import { aplicarDistratoTermosUso } from './modules/termos-uso/termos-uso.service'
 import { atualizarCotacaoUsd } from './modules/cambio/cambio.service'
 import { atualizarPerfisNegocioVencidos } from './modules/chat-atendimento/perfil-negocio.service'
 import { encerrarChatAtendimentoVencidos } from './modules/chat-atendimento/assinatura-chat-atendimento.service'
-import { encerrarAssentoVendedoraVencidos } from './modules/vendedora-billing/assinatura-vendedora.service'
+import { encerrarAssentoVendedoraRedeVencidos } from './modules/vendedora-billing/assinatura-vendedora-rede.service'
 import { restaurarConexoes } from './modules/whatsapp/baileys.service'
 import { sincronizarZaiezeLeads } from './modules/zaiezeleads/zaiezeleads.service'
 
@@ -75,18 +75,21 @@ async function main() {
       .then((e) => { if (e > 0) app.log.info(`Assinaturas encerradas (ciclo vencido): ${e}`) })
       .then(() => encerrarAssessorasVencidas())
       .then((e) => { if (e > 0) app.log.info(`Assinaturas de assessor(a) encerradas (ciclo vencido): ${e}`) })
-      .then(() => encerrarAssentoVendedoraVencidos())
-      .then((e) => { if (e > 0) app.log.info(`Assentos de vendedora encerrados (ciclo vencido): ${e}`) })
+      .then(() => encerrarAssentoVendedoraRedeVencidos())
+      .then((e) => { if (e > 0) app.log.info(`Cobranças consolidadas de vendedora encerradas (ciclo vencido): ${e}`) })
       .catch((err) => app.log.error({ err }, 'Falha no job de termos/assinaturas'))
     aplicarTermos()
     setInterval(aplicarTermos, UM_DIA_MS).unref()
 
     // Reajuste anual por IGP-M nos contratos existentes: no aniversário de cada contrato aplica
     // a taxa do mês anterior (12º mês do contrato), se já lançada na tabela. Boot + 24h.
+    // NOTA: reajuste por assento de vendedora (aplicarReajustesIgpmAssentoVendedora) foi
+    // desligado daqui — cobrança de vendedora virou consolidada por marca (ver
+    // assinatura-vendedora-rede.service.ts), reajustar o valor de cada assento individual não
+    // tem mais efeito real (nenhum tem mpPreapprovalId próprio). Reajuste anual da cobrança
+    // consolidada fica como próximo passo, não implementado ainda.
     const reajustarIgpm = () => aplicarReajustesIgpm()
       .then((n) => { if (n > 0) app.log.info(`Reajustes IGP-M aplicados (aniversário): ${n}`) })
-      .then(() => aplicarReajustesIgpmAssentoVendedora())
-      .then((n) => { if (n > 0) app.log.info(`Reajustes IGP-M aplicados (assentos de vendedora): ${n}`) })
       .catch((err) => app.log.error({ err }, 'Falha no reajuste IGP-M por aniversário'))
     reajustarIgpm()
     setInterval(reajustarIgpm, UM_DIA_MS).unref()

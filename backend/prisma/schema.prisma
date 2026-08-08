@@ -330,6 +330,7 @@ model Rede {
   assinaturasChatAtendimento AssinaturaChatAtendimento[]
   prospeccoesBuscas          ProspeccaoBusca[]
   assinaturasVendedora       AssinaturaVendedora[]
+  assinaturaVendedoraRede    AssinaturaVendedoraRede?
 
   @@map("redes")
 }
@@ -573,6 +574,45 @@ model AssinaturaVendedora {
   @@index([redeId])
   @@index([vendedoraId])
   @@map("assinaturas_vendedora")
+}
+
+/// Tabela de desconto por volume (SUPER_ADMIN edita, painel Admin): quantidade de vendedoras
+/// PAGAS na rede -> valor mensal TOTAL da marca. Consultada por precoParaQuantidade() em
+/// faixa-desconto.service.ts. Mesmo padrão de tabela editável de IndiceIgpm.
+model FaixaDescontoVendedora {
+  id         String   @id @default(cuid())
+  quantidade Int      @unique
+  valorTotal Decimal  @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("faixas_desconto_vendedora")
+}
+
+/// Cobrança CONSOLIDADA por marca (substitui, a partir daqui, a cobrança individual por assento
+/// em AssinaturaVendedora — ver assinatura-vendedora-rede.service.ts). Uma linha por Rede: o
+/// valor reflete a faixa de desconto pra quantidade de assentos PAGOS ativos (assento gratuito
+/// por cupom não conta). Mesmo padrão de ciclo/cancelamento de Assinatura (plano por rede).
+model AssinaturaVendedoraRede {
+  id                       String           @id @default(cuid())
+  redeId                   String           @unique
+  status                   StatusAssinatura @default(PENDENTE)
+  valor                    Decimal          @db.Decimal(10, 2)
+  // Downgrade calculado mas ainda não aplicado — só vira `valor` de fato na renovação
+  // (confirmarCicloAssentoVendedoraRede), pra não cortar no meio do que já foi pago.
+  valorProximoCiclo        Decimal?         @db.Decimal(10, 2)
+  qtdPaga                  Int              @default(0)
+  mpPreapprovalId          String?          @unique
+  simulada                 Boolean          @default(false)
+  cicloFimEm               DateTime?
+  cancelamentoSolicitadoEm DateTime?
+  cancelamentoOrigem       String?
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+
+  rede Rede @relation(fields: [redeId], references: [id], onDelete: Cascade)
+
+  @@map("assinaturas_vendedora_rede")
 }
 
 /// Perfil de negócio da MARCA (1:1 com Rede) — cache gerado por IA a partir do segmento

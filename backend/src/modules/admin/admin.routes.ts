@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../lib/prisma'
-import { precoAssentoVendedora, definirPrecoAssentoVendedora } from '../vendedora-billing/assinatura-vendedora.service'
+import { listarFaixasDesconto, definirFaixaDesconto, removerFaixaDesconto } from '../vendedora-billing/faixa-desconto.service'
 import { listarAddons, definirPrecoAddon, definirCotaCreditosAddon } from '../addons/addon.service'
 import { precoChatAtendimento, definirPrecoChatAtendimento } from '../chat-atendimento/assinatura-chat-atendimento.service'
 import { normalizarCodigo } from '../promo/promo.service'
@@ -48,12 +48,23 @@ export async function adminRoutes(app: FastifyInstance) {
     return { senha }
   })
 
-  // ── Preço do assento de vendedora (substitui os 3 preços de plano — ver vendedora-billing/) ──
-  app.get('/assento-vendedora-preco', async () => ({ preco: await precoAssentoVendedora() }))
-  app.put('/assento-vendedora-preco', async (request) => {
-    const { preco } = z.object({ preco: z.coerce.number().nonnegative() }).parse(request.body)
-    await definirPrecoAssentoVendedora(preco)
-    return { ok: true, preco }
+  // ── Faixas de desconto por volume de vendedoras (cobrança consolidada por marca — substitui o
+  // preço fixo por assento; ver vendedora-billing/faixa-desconto.service.ts) ──
+  app.get('/faixas-vendedora', async () => ({ faixas: await listarFaixasDesconto() }))
+
+  const faixaVendedoraSchema = z.object({
+    quantidade: z.coerce.number().int().min(1).max(1000),
+    valorTotal: z.coerce.number().nonnegative(),
+  })
+  app.put('/faixas-vendedora', async (request) => {
+    const b = faixaVendedoraSchema.parse(request.body)
+    const faixa = await definirFaixaDesconto(b.quantidade, b.valorTotal)
+    return { ok: true, faixa }
+  })
+  app.delete('/faixas-vendedora/:quantidade', async (request) => {
+    const { quantidade } = request.params as { quantidade: string }
+    await removerFaixaDesconto(Number(quantidade))
+    return { ok: true }
   })
 
   // ── Add-ons (assinaturas à parte dos planos, ex.: Provador Virtual) ──

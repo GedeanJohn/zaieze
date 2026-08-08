@@ -4,22 +4,23 @@ import { prisma } from '../../lib/prisma'
 import { redeIdDe, redeIdDeQualquer } from '../../plugins/auth'
 import { normalizarTelefone } from '../../lib/telefone'
 import { validarCodigo, descricaoBeneficio, aplicarDesconto } from '../promo/promo.service'
+import { precoParaQuantidade } from './faixa-desconto.service'
 import {
-  precoAssentoVendedora, solicitarAssentoVendedora, aprovarAssentoVendedora, recusarAssentoVendedora,
-  solicitarCancelamentoAssentoVendedora, reativarAssentoVendedora, aplicarCupomAssentoVendedora,
+  solicitarAssentoVendedora, aprovarAssentoVendedora, recusarAssentoVendedora,
+  cancelarAssentoVendedora, aplicarCupomAssentoVendedora,
 } from './assinatura-vendedora.service'
 
 const num = (v: unknown) => Number(v ?? 0)
 
 /**
- * Assento de vendedora — a cobrança do SaaS nasce POR VENDEDORA (substitui os 3 planos por
- * Rede). Comprado pelo GESTOR ou pelo GERENTE ativo; quando é o GERENTE quem solicita, fica
- * aguardando aprovação do GESTOR antes de qualquer cobrança real (ver
- * assinatura-vendedora.service.ts). Mesmo padrão de rotas do Chat de Atendimento.
+ * Assento de vendedora = MEMBRO (quem ocupa a vaga) — ver assinatura-vendedora.service.ts. A
+ * cobrança em si é CONSOLIDADA por marca, com desconto por volume (ver GET /rede e
+ * assinatura-vendedora-rede.service.ts). Comprado pelo GESTOR ou pelo GERENTE; quando é o
+ * GERENTE quem solicita, fica aguardando aprovação do GESTOR antes de contar pra cobrança.
  */
 export async function vendedoraBillingRoutes(app: FastifyInstance) {
-  // Preço vigente do assento — público (landing + tela de contratação).
-  app.get('/preco', async () => ({ preco: await precoAssentoVendedora() }))
+  // Preço de referência (1ª vendedora) — público (landing + tela de contratação).
+  app.get('/preco', async () => ({ preco: await precoParaQuantidade(1) }))
 
   // Preview do cupom antes de contratar (o gestor/gerente digita o código recebido do gestor da
   // marca/SUPER_ADMIN e vê o benefício antes de confirmar). Autenticado só pra manter no mesmo
@@ -28,31 +29,43 @@ export async function vendedoraBillingRoutes(app: FastifyInstance) {
     const { codigo } = request.query as { codigo?: string }
     const c = await validarCodigo(codigo, 'VENDEDORA')
     if (!c) return { valido: false }
-    const preco = await precoAssentoVendedora()
+    const preco = await precoParaQuantidade(1)
     const valorComDesconto = c.tipo === 'DIAS_GRATIS' ? preco : aplicarDesconto(preco, c)
     return { valido: true, beneficio: descricaoBeneficio(c), tipo: c.tipo, valorComDesconto }
   })
 
-  // Assentos da rede logada. GESTOR/SUPER_ADMIN vê todos; GERENTE só o que ele mesmo solicitou
-  // (aprovado ou não) — não deve enxergar assentos que o gestor comprou diretamente.
+  // Cobrança CONSOLIDADA da marca (uma só, não por vendedora) — card principal da tela Planos.
+  app.get('/rede', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request) => {
+    const redeId = redeIdDe(request)
+    const a = await prisma.assinaturaVendedoraRede.findUnique({ where: { redeId } })
+    if (!a) return { existe: false as const }
+    return {
+      existe: true as const,
+      status: a.status, valor: num(a.valor), valorProximoCiclo: a.valorProximoCiclo != null ? num(a.valorProximoCiclo) : null,
+      qtdPaga: a.qtdPaga, simulada: a.simulada, cicloFimEm: a.cicloFimEm,
+      cancelamentoSolicitadoEm: a.cancelamentoSolicitadoEm,
+    }
+  })
+
+  // Assentos (membros) da rede logada. GESTOR/SUPER_ADMIN vê todos; GERENTE só o que ele mesmo
+  // solicitou (aprovado ou não) — não deve enxergar assentos que o gestor comprou diretamente.
   app.get('/minhas', { preHandler: [app.authorize('GESTOR', 'GERENTE', 'SUPER_ADMIN')] }, async (request) => {
     const redeId = await redeIdDeQualquer(request)
     const where = request.user.role === 'GERENTE' ? { redeId, solicitadoPorId: request.user.sub } : { redeId }
     const assinaturas = await prisma.assinaturaVendedora.findMany({
-      where, orderBy: { createdAt: 'asc' },
+      where, orderBy: { numeroAssento: 'asc' },
       include: { vendedora: { select: { id: true, nome: true } }, convite: { select: { nome: true, email: true, telefone: true } } },
     })
     return {
       assinaturas: assinaturas.map((a) => ({
-        id: a.id, status: a.status, valor: num(a.valor), simulada: a.simulada,
-        cicloFimEm: a.cicloFimEm, cancelamentoSolicitadoEm: a.cancelamentoSolicitadoEm, aprovadoEm: a.aprovadoEm,
+        id: a.id, numeroAssento: a.numeroAssento, status: a.status, gratuito: num(a.valor) === 0, aprovadoEm: a.aprovadoEm,
         vendedoraId: a.vendedoraId, vendedoraNome: a.vendedora?.nome ?? a.convite?.nome ?? null,
       })),
     }
   })
 
-  // Contrata um novo assento (cria o convite da vendedora + o billing). GESTOR/SUPER_ADMIN segue
-  // direto pra cobrança; GERENTE fica aguardando aprovação do gestor.
+  // Contrata um novo assento (cria o convite da vendedora + o membro). GESTOR/SUPER_ADMIN segue
+  // direto pra ATIVA (recalcula a cobrança da marca); GERENTE fica aguardando aprovação do gestor.
   const checkoutSchema = z.object({
     nome: z.string().min(2),
     email: z.string().email(),
@@ -77,7 +90,7 @@ export async function vendedoraBillingRoutes(app: FastifyInstance) {
     if (r.aguardandoAprovacao) {
       return reply.code(202).send({ aguardandoAprovacao: true, id: r.assinaturaId, mensagem: 'Solicitação enviada para aprovação do gestor.' })
     }
-    return reply.code(201).send({ aguardandoAprovacao: false, id: r.assinaturaId, simulado: r.simulado, initPoint: r.initPoint })
+    return reply.code(201).send({ aguardandoAprovacao: false, id: r.assinaturaId, initPoint: r.initPoint })
   })
 
   // Solicitações de GERENTE aguardando aprovação — só o dono da rede vê.
@@ -90,7 +103,7 @@ export async function vendedoraBillingRoutes(app: FastifyInstance) {
     })
     return {
       pendentes: pendentes.map((a) => ({
-        id: a.id, valor: num(a.valor), createdAt: a.createdAt,
+        id: a.id, createdAt: a.createdAt,
         nome: a.convite?.nome ?? null, email: a.convite?.email ?? null, telefone: a.convite?.telefone ?? null,
         solicitadoPorNome: a.solicitadoPor.nome,
       })),
@@ -101,7 +114,7 @@ export async function vendedoraBillingRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string }
     const r = await aprovarAssentoVendedora(id, request.user.sub)
     if (!r.ok) return reply.code(422).send({ erro: r.erro })
-    return { ok: true, simulado: r.simulado, initPoint: r.initPoint }
+    return { ok: true, initPoint: r.initPoint }
   })
 
   app.post('/:id/recusar', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
@@ -111,19 +124,19 @@ export async function vendedoraBillingRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
+  // Cancela o assento (terminal — corta o membro na hora; a cobrança consolidada da marca só
+  // reflete o downgrade no próximo ciclo, ver assinatura-vendedora-rede.service.ts).
   app.post('/:id/cancelar', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
     const redeId = await redeIdDeQualquer(request)
     const { id } = request.params as { id: string }
     const a = await prisma.assinaturaVendedora.findUnique({ where: { id } })
     if (!a || a.redeId !== redeId) return reply.code(404).send({ erro: 'Assento não encontrado.' })
-    const origem = request.user.role === 'SUPER_ADMIN' ? 'ADMIN' : 'GESTOR'
-    const r = await solicitarCancelamentoAssentoVendedora(id, origem)
-    return { ok: true, acessoAte: r.acessoAte }
+    await cancelarAssentoVendedora(id)
+    return { ok: true }
   })
 
-  // Aplica um cupom a um assento PENDENTE já existente (ex.: gestor esqueceu de usar na hora do
-  // convite e prefere resolver com cupom em vez de pagar). Zera o valor → ativa na hora; desconto
-  // parcial → devolve um novo initPoint com o valor já descontado.
+  // Aplica um cupom de 100% a um assento já ATIVA e hoje pago (ex.: o gestor esqueceu de usar na
+  // hora do convite e prefere resolver com cupom em vez de esperar a cobrança consolidada).
   app.post('/:id/aplicar-cupom', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
     const redeId = await redeIdDeQualquer(request)
     const { id } = request.params as { id: string }
@@ -132,16 +145,6 @@ export async function vendedoraBillingRoutes(app: FastifyInstance) {
     if (!a || a.redeId !== redeId) return reply.code(404).send({ erro: 'Assento não encontrado.' })
     const r = await aplicarCupomAssentoVendedora(id, codigo)
     if (!r.ok) return reply.code(422).send({ erro: r.erro })
-    return { ok: true, simulado: r.simulado, initPoint: r.initPoint }
-  })
-
-  app.post('/:id/reativar', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
-    const redeId = await redeIdDeQualquer(request)
-    const { id } = request.params as { id: string }
-    const a = await prisma.assinaturaVendedora.findUnique({ where: { id } })
-    if (!a || a.redeId !== redeId) return reply.code(404).send({ erro: 'Assento não encontrado.' })
-    const ok = await reativarAssentoVendedora(id)
-    if (!ok) return reply.code(422).send({ erro: 'Assento já encerrado — solicite um novo.' })
     return { ok: true }
   })
 }

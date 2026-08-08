@@ -15,19 +15,28 @@ interface AssinaturaAddon {
 
 interface AssentoVendedora {
   id: string
+  numeroAssento: number
   status: 'PENDENTE' | 'ATIVA' | 'CANCELADA'
-  valor: number
-  simulada: boolean
-  cicloFimEm: string | null
-  cancelamentoSolicitadoEm: string | null
+  gratuito: boolean
   aprovadoEm: string | null
   vendedoraId: string | null
   vendedoraNome: string | null
 }
 
+/** Cobrança CONSOLIDADA da marca (uma só, com desconto por volume — não é mais por vendedora). */
+interface AssinaturaRede {
+  existe: boolean
+  status?: 'PENDENTE' | 'ATIVA' | 'CANCELADA'
+  valor?: number
+  valorProximoCiclo?: number | null
+  qtdPaga?: number
+  simulada?: boolean
+  cicloFimEm?: string | null
+  cancelamentoSolicitadoEm?: string | null
+}
+
 interface PendenteAprovacao {
   id: string
-  valor: number
   createdAt: string
   nome: string | null
   email: string | null
@@ -44,6 +53,7 @@ export default function Planos() {
   const usuario = usuarioLogado()!
   const ehGestor = usuario.role === 'GESTOR' || usuario.role === 'SUPER_ADMIN'
   const [precoAssento, setPrecoAssento] = useState(0)
+  const [assinaturaRede, setAssinaturaRede] = useState<AssinaturaRede>({ existe: false })
   const [assentos, setAssentos] = useState<AssentoVendedora[]>([])
   const [pendentes, setPendentes] = useState<PendenteAprovacao[]>([])
   const [addonsCatalogo, setAddonsCatalogo] = useState<AddonCatalogo[]>([])
@@ -59,6 +69,7 @@ export default function Planos() {
     api.get('/vendedora-billing/preco').then(({ data }) => setPrecoAssento(data.preco)).catch(() => {})
     api.get('/vendedora-billing/minhas').then(({ data }) => setAssentos(data.assinaturas)).catch(() => setAssentos([]))
     if (ehGestor) {
+      api.get('/vendedora-billing/rede').then(({ data }) => setAssinaturaRede(data)).catch(() => setAssinaturaRede({ existe: false }))
       api.get('/vendedora-billing/pendentes-aprovacao').then(({ data }) => setPendentes(data.pendentes)).catch(() => setPendentes([]))
       api.get('/lojas').then(({ data }) => setLojas(data.map((l: { id: string; nome: string }) => ({ id: l.id, nome: l.nome })))).catch(() => setLojas([]))
     }
@@ -92,20 +103,11 @@ export default function Planos() {
   }
 
   async function cancelarAssento(a: AssentoVendedora) {
-    if (!window.confirm(`Cancelar este assento${a.vendedoraNome ? ` (${a.vendedoraNome})` : ''}? Mantém acesso até o fim do ciclo já pago.`)) return
+    if (!window.confirm(`Cancelar este assento${a.vendedoraNome ? ` (${a.vendedoraNome})` : ''}? O acesso dela é cortado na hora. Se ela era um assento pago, a cobrança da marca só reflete o valor menor a partir da próxima renovação.`)) return
     setErro(''); setMsg(''); setOcupado(true)
     try {
-      const { data } = await api.post(`/vendedora-billing/${a.id}/cancelar`)
-      setMsg(`Cancelamento agendado — acesso garantido até ${fmtData(data.acessoAte)}.`)
-      carregar()
-    } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
-  }
-
-  async function reativarAssento(a: AssentoVendedora) {
-    setErro(''); setMsg(''); setOcupado(true)
-    try {
-      await api.post(`/vendedora-billing/${a.id}/reativar`)
-      setMsg('Assento reativado.')
+      await api.post(`/vendedora-billing/${a.id}/cancelar`)
+      setMsg('Assento cancelado.')
       carregar()
     } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
   }
@@ -115,9 +117,8 @@ export default function Planos() {
     if (!codigo) return
     setErro(''); setMsg(''); setOcupado(true)
     try {
-      const { data } = await api.post(`/vendedora-billing/${a.id}/aplicar-cupom`, { codigo })
-      if (data.initPoint) { window.location.href = data.initPoint; return }
-      setMsg(`Cupom aplicado${a.vendedoraNome ? ` — ${a.vendedoraNome}` : ''} já pode usar o sistema.`)
+      await api.post(`/vendedora-billing/${a.id}/aplicar-cupom`, { codigo })
+      setMsg(`Cupom aplicado${a.vendedoraNome ? ` — ${a.vendedoraNome}` : ''} agora é gratuita.`)
       setCupomPorAssento((s) => ({ ...s, [a.id]: '' }))
       carregar()
     } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
@@ -153,7 +154,7 @@ export default function Planos() {
   }
 
   const assentosAtivos = assentos.filter((a) => a.status !== 'CANCELADA')
-  const mrr = assentosAtivos.reduce((s, a) => s + a.valor, 0)
+  const mudaDeFaixa = assinaturaRede.existe && assinaturaRede.valorProximoCiclo != null && assinaturaRede.valorProximoCiclo !== assinaturaRede.valor
 
   return (
     <>
@@ -161,7 +162,7 @@ export default function Planos() {
         <div>
           <h1>💳 Contas de vendedora</h1>
           <div style={{ color: 'var(--ink-soft)', fontSize: 13 }}>
-            Cobrança por conta de vendedora — {formataReal(precoAssento)}/mês cada, sem limite de quantidade.
+            Cobrança consolidada por marca, com desconto por volume — a partir de {formataReal(precoAssento)}/mês.
           </div>
         </div>
         {ehGestor && <button className="btn" onClick={() => setConvidarAberto(true)}>+ Nova vendedora</button>}
@@ -177,26 +178,50 @@ export default function Planos() {
       {erro && <div className="alerta">{erro}</div>}
       {msg && <div className="sucesso">{msg}</div>}
 
-      <div className="cartao" style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-        <div><div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Assentos ativos</div><div style={{ fontSize: 22, fontWeight: 800 }}>{assentosAtivos.length}</div></div>
-        <div><div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Custo mensal (MRR)</div><div style={{ fontSize: 22, fontWeight: 800 }}>{formataReal(mrr)}</div></div>
-      </div>
+      {ehGestor && (
+        <div className="cartao">
+          <h2 style={{ marginTop: 0, fontSize: 16 }}>Cobrança consolidada da marca</h2>
+          {!assinaturaRede.existe ? (
+            <p style={{ fontSize: 13, color: 'var(--ink-soft)', margin: 0 }}>
+              Nenhuma vendedora paga ainda — a cobrança nasce quando a 1ª vendedora sem cupom for aprovada.
+            </p>
+          ) : (
+            <>
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                <div><div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Vendedoras pagas</div><div style={{ fontSize: 22, fontWeight: 800 }}>{assinaturaRede.qtdPaga}</div></div>
+                <div><div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Valor mensal</div><div style={{ fontSize: 22, fontWeight: 800 }}>{formataReal(assinaturaRede.valor ?? 0)}{assinaturaRede.simulada && <span style={{ fontSize: 11, color: 'var(--ink-soft)', fontWeight: 400 }}> (sim)</span>}</div></div>
+                <div><div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Status</div><div style={{ fontSize: 22, fontWeight: 800 }}><span className={`selo ${assinaturaRede.status === 'ATIVA' ? 'ok' : assinaturaRede.status === 'CANCELADA' ? 'baixo' : 'ATACADO'}`}>{assinaturaRede.status}</span></div></div>
+              </div>
+              {mudaDeFaixa && (
+                <div className="alerta" style={{ marginTop: 12 }}>
+                  Sua cobrança muda de {formataReal(assinaturaRede.valor ?? 0)} pra {formataReal(assinaturaRede.valorProximoCiclo ?? 0)}
+                  {' '}a partir de {fmtData(assinaturaRede.cicloFimEm ?? null)}, porque agora você tem {assinaturaRede.qtdPaga} vendedora(s) paga(s).
+                </div>
+              )}
+              {assinaturaRede.cancelamentoSolicitadoEm && (
+                <div className="alerta" style={{ marginTop: 12 }}>
+                  Cobrança encerra em {fmtData(assinaturaRede.cicloFimEm ?? null)} — não sobrou nenhuma vendedora paga.
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {ehGestor && pendentes.length > 0 && (
         <div className="cartao" style={{ borderLeft: '4px solid var(--accent)' }}>
           <h2 style={{ marginTop: 0, fontSize: 16 }}>🕓 Aguardando sua aprovação ({pendentes.length})</h2>
           <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
-            O gerente solicitou estas contas de vendedora — nada foi cobrado ainda. Aprove para iniciar a cobrança.
+            O gerente solicitou estas contas de vendedora — nada foi cobrado ainda. Aprove pra entrar na cobrança da marca.
           </p>
           <table>
-            <thead><tr><th>Vendedora</th><th>Contato</th><th>Solicitado por</th><th>Valor</th><th></th></tr></thead>
+            <thead><tr><th>Vendedora</th><th>Contato</th><th>Solicitado por</th><th></th></tr></thead>
             <tbody>
               {pendentes.map((p) => (
                 <tr key={p.id}>
                   <td>{p.nome ?? '—'}</td>
                   <td style={{ fontSize: 12 }}>{p.email}<br />{p.telefone}</td>
                   <td>{p.solicitadoPorNome}</td>
-                  <td>{formataReal(p.valor)}/mês</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <a href="#" onClick={(e) => { e.preventDefault(); aprovar(p) }} style={{ fontWeight: 600 }}>Aprovar</a>
                     {' · '}
@@ -210,25 +235,19 @@ export default function Planos() {
       )}
 
       <div className="cartao">
-        <h2 style={{ marginTop: 0 }}>Minhas contas de vendedora</h2>
+        <h2 style={{ marginTop: 0 }}>Minhas contas de vendedora ({assentosAtivos.length})</h2>
         <table>
-          <thead><tr><th>Vendedora</th><th>Status</th><th>Valor</th><th>Ciclo</th><th></th></tr></thead>
+          <thead><tr><th>Vendedora</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            {assentos.map((a) => {
-              const agendado = !!a.cancelamentoSolicitadoEm && a.status !== 'CANCELADA'
-              return (
+            {assentos.map((a) => (
                 <tr key={a.id}>
                   <td>{a.vendedoraNome ?? <span style={{ color: 'var(--ink-soft)' }}>aguardando cadastro</span>}</td>
                   <td>
                     <span className={`selo ${a.status === 'ATIVA' ? 'ok' : a.status === 'CANCELADA' ? 'baixo' : 'ATACADO'}`}>{a.status}</span>
-                    {a.simulada && <span style={{ fontSize: 11, color: 'var(--ink-soft)' }}> (sim)</span>}
-                  </td>
-                  <td>{formataReal(a.valor)}/mês</td>
-                  <td style={{ fontSize: 12, color: agendado ? 'var(--danger)' : 'var(--ink-soft)' }}>
-                    {agendado ? `cancela em ${fmtData(a.cicloFimEm)}` : a.cicloFimEm ? `renova em ${fmtData(a.cicloFimEm)}` : '—'}
+                    {a.gratuito && <span style={{ fontSize: 11, color: 'var(--ink-soft)' }}> (grátis — cupom)</span>}
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
-                    {a.status === 'PENDENTE' && (
+                    {a.status === 'ATIVA' && !a.gratuito && (
                       <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                         <input
                           value={cupomPorAssento[a.id] ?? ''}
@@ -240,15 +259,12 @@ export default function Planos() {
                       </div>
                     )}
                     {a.status !== 'CANCELADA' && (
-                      agendado
-                        ? <a href="#" onClick={(e) => { e.preventDefault(); reativarAssento(a) }}>reativar</a>
-                        : <a href="#" onClick={(e) => { e.preventDefault(); cancelarAssento(a) }} style={{ color: 'var(--danger)' }}>cancelar</a>
+                      <a href="#" onClick={(e) => { e.preventDefault(); cancelarAssento(a) }} style={{ color: 'var(--danger)' }}>cancelar</a>
                     )}
                   </td>
                 </tr>
-              )
-            })}
-            {assentos.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--ink-soft)' }}>Nenhuma conta de vendedora ainda.</td></tr>}
+            ))}
+            {assentos.length === 0 && <tr><td colSpan={3} style={{ color: 'var(--ink-soft)' }}>Nenhuma conta de vendedora ainda.</td></tr>}
           </tbody>
         </table>
       </div>

@@ -9,7 +9,6 @@ interface Promo { id: string; codigo: string; tipo: 'DIAS_GRATIS' | 'PERCENTUAL'
 const fmtData = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—')
 
 export default function Admin() {
-  const [precoAssento, setPrecoAssento] = useState('')
   const [addons, setAddons] = useState<AddonAdmin[]>([])
   const [precosAddon, setPrecosAddon] = useState<Record<string, string>>({})
   const [cotasAddon, setCotasAddon] = useState<Record<string, string>>({})
@@ -19,7 +18,6 @@ export default function Admin() {
   const avisar = useToast()
 
   function carregar() {
-    api.get('/admin/assento-vendedora-preco').then(({ data }) => setPrecoAssento(String(data.preco))).catch((e) => avisar(mensagemDeErro(e), 'erro'))
     api.get('/admin/addons').then(({ data }) => {
       setAddons(data.addons)
       setPrecosAddon(Object.fromEntries(data.addons.map((a: AddonAdmin) => [a.tipo, String(a.preco)])))
@@ -29,15 +27,6 @@ export default function Admin() {
     api.get('/admin/promos').then(({ data }) => setPromos(data.promos)).catch(() => {})
   }
   useEffect(() => { carregar() }, [])
-
-  async function salvarPrecoAssento() {
-    setOcupado(true)
-    try {
-      await api.put('/admin/assento-vendedora-preco', { preco: Number(precoAssento) })
-      avisar('Preço salvo. Vale para novos assentos de vendedora.')
-      carregar()
-    } catch (e) { avisar(mensagemDeErro(e), 'erro') } finally { setOcupado(false) }
-  }
 
   async function salvarPrecoAddon(tipo: string) {
     setOcupado(true)
@@ -75,20 +64,8 @@ export default function Admin() {
       {/* ── Gestores Comerciais do Sistema (login próprio, mesmas atribuições do SUPER_ADMIN) ── */}
       <GestoresComerciaisSection />
 
-      {/* ── Preço do assento de vendedora ── */}
-      <div className="cartao">
-        <h2 style={{ marginTop: 0 }}>💳 Conta de Vendedora</h2>
-        <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
-          Preço único por conta de vendedora ativa. Vale para <strong>novos assentos</strong>; assentos já ativos seguem no valor contratado (reajustam por IGP-M no aniversário — ver seção abaixo).
-        </div>
-        <div className="linha-campos" style={{ alignItems: 'end' }}>
-          <div className="campo" style={{ maxWidth: 180 }}>
-            <label>Preço (R$/mês por vendedora)</label>
-            <input type="number" step="0.01" min="0" value={precoAssento} onChange={(e) => setPrecoAssento(e.target.value)} />
-          </div>
-          <div><button className="btn" onClick={salvarPrecoAssento} disabled={ocupado}>Salvar preço</button></div>
-        </div>
-      </div>
+      {/* ── Faixas de desconto por volume de vendedoras (cobrança consolidada por marca) ── */}
+      <FaixasVendedoraSection />
 
       {/* ── Add-ons (assinaturas à parte do assento de vendedora) ── */}
       <div className="cartao">
@@ -194,6 +171,66 @@ function SolicitacoesSenhaSection() {
               <td><a href="#" onClick={(e) => { e.preventDefault(); gerar(s) }}>gerar senha</a></td>
             </tr>
           ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Faixas de desconto por volume de vendedoras (cobrança consolidada por marca) ──
+interface FaixaVendedora { id: string; quantidade: number; valorTotal: string }
+
+function FaixasVendedoraSection() {
+  const [faixas, setFaixas] = useState<FaixaVendedora[]>([])
+  const [quantidade, setQuantidade] = useState('')
+  const [valorTotal, setValorTotal] = useState('')
+  const [erro, setErro] = useState('')
+  const [ocupado, setOcupado] = useState(false)
+
+  function carregar() {
+    api.get('/admin/faixas-vendedora').then(({ data }) => setFaixas(data.faixas)).catch(() => {})
+  }
+  useEffect(() => { carregar() }, [])
+
+  async function salvar(e: React.FormEvent) {
+    e.preventDefault(); setErro(''); setOcupado(true)
+    try {
+      await api.put('/admin/faixas-vendedora', { quantidade: Number(quantidade), valorTotal: Number(valorTotal) })
+      setQuantidade(''); setValorTotal(''); carregar()
+    } catch (e2) { setErro(mensagemDeErro(e2)) } finally { setOcupado(false) }
+  }
+  async function remover(f: FaixaVendedora) {
+    if (!window.confirm(`Excluir a faixa de ${f.quantidade} vendedora(s)?`)) return
+    await api.delete(`/admin/faixas-vendedora/${f.quantidade}`).catch(() => {}); carregar()
+  }
+
+  return (
+    <div className="cartao">
+      <h2 style={{ marginTop: 0 }}>💳 Faixas de desconto — Conta de Vendedora</h2>
+      <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 12 }}>
+        Cobrança <strong>consolidada por marca</strong> (uma só cobrança, não por vendedora): o valor mensal total depende de
+        quantas vendedoras <strong>pagas</strong> a marca tem ativas (assento gratuito por cupom não conta). Acima da maior
+        faixa cadastrada, o sistema extrapola repetindo o incremento entre as duas últimas. Editar aqui vale só pra
+        próxima vez que a cobrança de cada marca for recalculada — não repreça quem já está pagando.
+      </div>
+      <form onSubmit={salvar} className="linha-campos" style={{ alignItems: 'end' }}>
+        <div className="campo"><label>Vendedoras pagas</label><input type="number" min="1" value={quantidade} onChange={(e) => setQuantidade(e.target.value)} required /></div>
+        <div className="campo"><label>Valor mensal total (R$)</label><input type="number" step="0.01" min="0" value={valorTotal} onChange={(e) => setValorTotal(e.target.value)} required /></div>
+        <div><button className="btn" disabled={ocupado}>Salvar faixa</button></div>
+      </form>
+      {erro && <div className="alerta" style={{ marginTop: 8 }}>{erro}</div>}
+
+      <table style={{ marginTop: 12 }}>
+        <thead><tr><th>Vendedoras pagas</th><th>Valor mensal</th><th></th></tr></thead>
+        <tbody>
+          {faixas.map((f) => (
+            <tr key={f.id}>
+              <td>{f.quantidade}</td>
+              <td>{formataReal(Number(f.valorTotal))}</td>
+              <td><a href="#" onClick={(e) => { e.preventDefault(); remover(f) }}>excluir</a></td>
+            </tr>
+          ))}
+          {faixas.length === 0 && <tr><td colSpan={3} style={{ color: 'var(--ink-soft)' }}>Nenhuma faixa cadastrada ainda.</td></tr>}
         </tbody>
       </table>
     </div>

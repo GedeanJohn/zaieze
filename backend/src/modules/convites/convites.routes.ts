@@ -84,7 +84,7 @@ export async function convitesRoutes(app: FastifyInstance) {
       const primeiro = convite.nome.split(/\s+/)[0]
       const msg = `Olá ${primeiro}! Você foi convidado(a) para o ${rede?.nome ?? 'sistema'} (ModaCRM). Crie seu acesso aqui: ${link}`
       const whatsappUrl = `https://wa.me/${convite.telefone}?text=${encodeURIComponent(msg)}`
-      return reply.code(201).send({ link, whatsappUrl, expiraEm: convite.expiraEm, nome: convite.nome, role: 'VENDEDORA', simulado: r.simulado, initPoint: r.initPoint })
+      return reply.code(201).send({ link, whatsappUrl, expiraEm: convite.expiraEm, nome: convite.nome, role: 'VENDEDORA', initPoint: r.initPoint })
     }
 
     const token = randomBytes(24).toString('hex')

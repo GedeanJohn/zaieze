@@ -204,6 +204,11 @@ function FaixasVendedoraSection() {
     await api.delete(`/admin/faixas-vendedora/${f.quantidade}`).catch(() => {}); carregar()
   }
 
+  function editar(f: FaixaVendedora) {
+    setQuantidade(String(f.quantidade))
+    setValorTotal(String(Number(f.valorTotal)))
+  }
+
   return (
     <div className="cartao">
       <h2 style={{ marginTop: 0 }}>💳 Faixas de desconto — Conta de Vendedora</h2>
@@ -227,7 +232,11 @@ function FaixasVendedoraSection() {
             <tr key={f.id}>
               <td>{f.quantidade}</td>
               <td>{formataReal(Number(f.valorTotal))}</td>
-              <td><a href="#" onClick={(e) => { e.preventDefault(); remover(f) }}>excluir</a></td>
+              <td style={{ whiteSpace: 'nowrap' }}>
+                <a href="#" onClick={(e) => { e.preventDefault(); editar(f) }}>editar</a>
+                {' · '}
+                <a href="#" onClick={(e) => { e.preventDefault(); remover(f) }}>excluir</a>
+              </td>
             </tr>
           ))}
           {faixas.length === 0 && <tr><td colSpan={3} style={{ color: 'var(--ink-soft)' }}>Nenhuma faixa cadastrada ainda.</td></tr>}

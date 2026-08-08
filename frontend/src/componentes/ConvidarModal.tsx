@@ -23,7 +23,7 @@ export default function ConvidarModal({ papeis, lojas, onClose }: Props) {
   const [promoInfo, setPromoInfo] = useState<{ valido: boolean; beneficio?: string } | null>(null)
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
-  const [resultado, setResultado] = useState<{ link: string; whatsappUrl: string } | { aguardandoAprovacao: true } | null>(null)
+  const [resultado, setResultado] = useState<{ link: string; whatsappUrl: string; initPoint?: string } | { aguardandoAprovacao: true } | null>(null)
   const [copiado, setCopiado] = useState(false)
 
   const precisaLoja = !!lojas && EXIGE_LOJA.includes(role)
@@ -50,8 +50,13 @@ export default function ConvidarModal({ papeis, lojas, onClose }: Props) {
       if (role === 'VENDEDORA' && codigoPromo.trim()) corpo.codigoPromo = codigoPromo.trim()
       const { data } = await api.post('/convites', corpo)
       // VENDEDORA é cobrada por assento: se quem convida é o GERENTE, a conta fica aguardando
-      // aprovação do gestor antes de qualquer cobrança/link (ver vendedora-billing/).
-      setResultado(data.aguardandoAprovacao ? { aguardandoAprovacao: true } : { link: data.link, whatsappUrl: data.whatsappUrl })
+      // aprovação do gestor antes de qualquer cobrança/link (ver vendedora-billing/). Quando o
+      // assento não foi coberto por cupom (100%/dias grátis), o convite já existe mas a vendedora
+      // só consegue USAR a conta depois que o gestor pagar — por isso `initPoint` vem junto pra
+      // ele completar o checkout do Mercado Pago sem sair desta tela.
+      setResultado(data.aguardandoAprovacao
+        ? { aguardandoAprovacao: true }
+        : { link: data.link, whatsappUrl: data.whatsappUrl, initPoint: data.initPoint })
     } catch (err) {
       setErro(mensagemDeErro(err))
     } finally {
@@ -138,6 +143,15 @@ export default function ConvidarModal({ papeis, lojas, onClose }: Props) {
         ) : (
           <div>
             <h2>Convite criado ✅</h2>
+            {resultado.initPoint && (
+              <div className="alerta" style={{ marginBottom: 12 }}>
+                A vendedora já pode criar a senha dela, mas só consegue <strong>usar</strong> o sistema depois que
+                o pagamento do assento for confirmado. Complete o pagamento agora pra não atrasar o acesso dela:
+                <div style={{ marginTop: 8 }}>
+                  <a className="btn" href={resultado.initPoint} target="_blank" rel="noreferrer">💳 Pagar assento no Mercado Pago</a>
+                </div>
+              </div>
+            )}
             <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>Envie o link abaixo para a pessoa criar o acesso dela:</p>
             <div style={{ background: '#0000000d', border: '1px solid var(--border)', borderRadius: 8, padding: 10, fontSize: 12, wordBreak: 'break-all', marginBottom: 12 }}>
               {resultado.link}

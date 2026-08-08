@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { api, atualizarUsuarioLocal, formataReal, mensagemDeErro, usuarioLogado } from '../api'
 import { useIdioma } from '../lib/i18n'
+import ConvidarModal from '../componentes/ConvidarModal'
 
 interface AddonCatalogo { tipo: string; nome: string; resumo: string; preco: number }
 interface AssinaturaAddon {
@@ -51,12 +51,16 @@ export default function Planos() {
   const [erro, setErro] = useState('')
   const [msg, setMsg] = useState('')
   const [ocupado, setOcupado] = useState(false)
+  const [lojas, setLojas] = useState<{ id: string; nome: string }[]>([])
+  const [convidarAberto, setConvidarAberto] = useState(false)
+  const [cupomPorAssento, setCupomPorAssento] = useState<Record<string, string>>({})
 
   function carregar() {
     api.get('/vendedora-billing/preco').then(({ data }) => setPrecoAssento(data.preco)).catch(() => {})
     api.get('/vendedora-billing/minhas').then(({ data }) => setAssentos(data.assinaturas)).catch(() => setAssentos([]))
     if (ehGestor) {
       api.get('/vendedora-billing/pendentes-aprovacao').then(({ data }) => setPendentes(data.pendentes)).catch(() => setPendentes([]))
+      api.get('/lojas').then(({ data }) => setLojas(data.map((l: { id: string; nome: string }) => ({ id: l.id, nome: l.nome })))).catch(() => setLojas([]))
     }
     api.get('/addons').then(({ data }) => setAddonsCatalogo(data.addons)).catch(() => {})
     api.get('/addons/minha').then(({ data }) => {
@@ -106,6 +110,19 @@ export default function Planos() {
     } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
   }
 
+  async function aplicarCupom(a: AssentoVendedora) {
+    const codigo = (cupomPorAssento[a.id] ?? '').trim()
+    if (!codigo) return
+    setErro(''); setMsg(''); setOcupado(true)
+    try {
+      const { data } = await api.post(`/vendedora-billing/${a.id}/aplicar-cupom`, { codigo })
+      if (data.initPoint) { window.location.href = data.initPoint; return }
+      setMsg(`Cupom aplicado${a.vendedoraNome ? ` — ${a.vendedoraNome}` : ''} já pode usar o sistema.`)
+      setCupomPorAssento((s) => ({ ...s, [a.id]: '' }))
+      carregar()
+    } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
+  }
+
   async function assinarAddon(tipo: string) {
     setErro(''); setMsg(''); setOcupado(true)
     try {
@@ -140,13 +157,22 @@ export default function Planos() {
 
   return (
     <>
-      <header>
-        <h1>💳 Contas de vendedora</h1>
-        <div style={{ color: 'var(--ink-soft)', fontSize: 13 }}>
-          Cobrança por conta de vendedora — {formataReal(precoAssento)}/mês cada, sem limite de quantidade. Para
-          cadastrar uma nova vendedora, use o convite em <Link to="/equipe">Equipe</Link>.
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1>💳 Contas de vendedora</h1>
+          <div style={{ color: 'var(--ink-soft)', fontSize: 13 }}>
+            Cobrança por conta de vendedora — {formataReal(precoAssento)}/mês cada, sem limite de quantidade.
+          </div>
         </div>
+        {ehGestor && <button className="btn" onClick={() => setConvidarAberto(true)}>+ Nova vendedora</button>}
       </header>
+      {convidarAberto && (
+        <ConvidarModal
+          papeis={[{ valor: 'VENDEDORA', rotulo: 'Vendedora' }]}
+          lojas={lojas}
+          onClose={() => { setConvidarAberto(false); carregar() }}
+        />
+      )}
 
       {erro && <div className="alerta">{erro}</div>}
       {msg && <div className="sucesso">{msg}</div>}
@@ -202,6 +228,17 @@ export default function Planos() {
                     {agendado ? `cancela em ${fmtData(a.cicloFimEm)}` : a.cicloFimEm ? `renova em ${fmtData(a.cicloFimEm)}` : '—'}
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
+                    {a.status === 'PENDENTE' && (
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                        <input
+                          value={cupomPorAssento[a.id] ?? ''}
+                          onChange={(e) => setCupomPorAssento((s) => ({ ...s, [a.id]: e.target.value.toUpperCase() }))}
+                          placeholder="Cupom"
+                          style={{ width: 90, fontSize: 12, padding: '2px 6px' }}
+                        />
+                        <a href="#" onClick={(e) => { e.preventDefault(); aplicarCupom(a) }} style={{ fontWeight: 600 }}>aplicar</a>
+                      </div>
+                    )}
                     {a.status !== 'CANCELADA' && (
                       agendado
                         ? <a href="#" onClick={(e) => { e.preventDefault(); reativarAssento(a) }}>reativar</a>

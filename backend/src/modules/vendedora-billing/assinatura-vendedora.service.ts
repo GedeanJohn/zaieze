@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import type { Role } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
-import { criarPreapproval, mpConfigurado, atualizarValorPreapproval } from '../assinaturas/mercadopago.service'
+import { criarPreapproval, cancelarPreapproval, mpConfigurado, atualizarValorPreapproval } from '../assinaturas/mercadopago.service'
 import { validarCodigo, consumirCodigo, aplicarDesconto } from '../promo/promo.service'
 
 /**
@@ -59,18 +59,22 @@ async function iniciarCobrancaAssento(assinaturaId: string): Promise<{ simulado:
     }
   }
 
-  if (!mpConfigurado()) {
+  // Sem token do MP OU cupom que zerou a mensalidade (100%/duração indefinida): não há o que
+  // cobrar de verdade — ativa direto, sem tentar criar um preapproval de R$0 no Mercado Pago
+  // (a API dele rejeita valor <= 0 numa assinatura recorrente).
+  if (!mpConfigurado() || Number(a.valor) <= 0) {
     const cicloFimEm = diasGratis ? new Date(Date.now() + diasGratis * 86_400_000) : proximoCicloFimAssentoVendedora()
     await prisma.assinaturaVendedora.update({
       where: { id: assinaturaId },
-      data: { status: 'ATIVA', simulada: true, cicloFimEm },
+      data: { status: 'ATIVA', simulada: !mpConfigurado(), cicloFimEm },
     })
-    return { simulado: true }
+    return { simulado: !mpConfigurado() }
   }
 
   const gestor = await prisma.usuario.findFirst({ where: { redeId: a.redeId, role: 'GESTOR' }, orderBy: { createdAt: 'asc' }, select: { email: true } })
   const pre = await criarPreapproval({
-    reason: 'ZAIEZE — Conta de vendedora',
+    // Rótulo genérico (não o nome da vendedora) — é isso que aparece na fatura do cartão do gestor.
+    reason: `ZAIEZE — Conta de vendedora: vendedora${a.numeroAssento}`,
     valor: Number(a.valor),
     email: gestor?.email ?? '',
     redeSlug: rede.slug,
@@ -140,9 +144,12 @@ export async function solicitarAssentoVendedora(input: {
         criadoPorId: input.solicitadoPorId, expiraEm,
       },
     })
+    // Numeração nunca reciclada: conta TODOS os assentos já existentes da rede (inclusive
+    // cancelados), então o próximo número nunca colide nem se repete.
+    const totalAssentos = await tx.assinaturaVendedora.count({ where: { redeId: input.redeId } })
     return tx.assinaturaVendedora.create({
       data: {
-        redeId: input.redeId, conviteId: convite.id, valor,
+        redeId: input.redeId, numeroAssento: totalAssentos + 1, conviteId: convite.id, valor,
         solicitadoPorId: input.solicitadoPorId,
         aprovadoEm: aprovadoDeCara ? new Date() : null,
         codigoPromoId, precoCheio, descontoCiclosRestantes,
@@ -173,6 +180,45 @@ export async function aprovarAssentoVendedora(
   if (a.status === 'CANCELADA') return { ok: false, erro: 'Essa solicitação foi recusada/cancelada.' }
 
   await prisma.assinaturaVendedora.update({ where: { id }, data: { aprovadoEm: new Date() } })
+  const r = await iniciarCobrancaAssento(id)
+  return { ok: true, ...r }
+}
+
+/**
+ * Aplica um cupom a um assento que já existe e está PENDENTE (ex.: o gestor esqueceu de usar o
+ * cupom na hora de convidar e quer aplicar depois, em vez de pagar). Recalcula o valor sobre o
+ * preço cheio original, cancela um preapproval real que porventura já tenha sido criado (fica
+ * órfão no Mercado Pago — sem isso o pagador veria duas cobranças pendentes) e reinicia a
+ * cobrança: cupom que zera o valor ativa na hora, senão gera um novo link de pagamento com o
+ * valor já descontado.
+ */
+export async function aplicarCupomAssentoVendedora(
+  id: string, codigo: string,
+): Promise<{ ok: true; simulado: boolean; initPoint?: string } | { ok: false; erro: string }> {
+  const a = await prisma.assinaturaVendedora.findUnique({ where: { id } })
+  if (!a) return { ok: false, erro: 'Assento não encontrado.' }
+  if (a.status !== 'PENDENTE') return { ok: false, erro: 'Só é possível aplicar cupom num assento pendente de pagamento.' }
+
+  const c = await validarCodigo(codigo, 'VENDEDORA')
+  if (!c) return { ok: false, erro: 'Cupom inválido, expirado ou esgotado.' }
+
+  const precoBase = Number(a.precoCheio ?? a.valor)
+  let valor = precoBase
+  let precoCheio: number | null = null
+  let descontoCiclosRestantes: number | null = null
+  if (c.tipo === 'PERCENTUAL' || c.tipo === 'VALOR_FIXO') {
+    precoCheio = precoBase
+    valor = aplicarDesconto(precoBase, c)
+    descontoCiclosRestantes = c.duracaoCiclos ?? null
+  }
+
+  if (a.mpPreapprovalId) await cancelarPreapproval(a.mpPreapprovalId).catch(() => {})
+
+  await prisma.assinaturaVendedora.update({
+    where: { id },
+    data: { codigoPromoId: c.id, valor, precoCheio, descontoCiclosRestantes, mpPreapprovalId: null },
+  })
+
   const r = await iniciarCobrancaAssento(id)
   return { ok: true, ...r }
 }

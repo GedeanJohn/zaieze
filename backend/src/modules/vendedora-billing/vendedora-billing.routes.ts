@@ -6,7 +6,7 @@ import { normalizarTelefone } from '../../lib/telefone'
 import { validarCodigo, descricaoBeneficio, aplicarDesconto } from '../promo/promo.service'
 import {
   precoAssentoVendedora, solicitarAssentoVendedora, aprovarAssentoVendedora, recusarAssentoVendedora,
-  solicitarCancelamentoAssentoVendedora, reativarAssentoVendedora,
+  solicitarCancelamentoAssentoVendedora, reativarAssentoVendedora, aplicarCupomAssentoVendedora,
 } from './assinatura-vendedora.service'
 
 const num = (v: unknown) => Number(v ?? 0)
@@ -119,6 +119,20 @@ export async function vendedoraBillingRoutes(app: FastifyInstance) {
     const origem = request.user.role === 'SUPER_ADMIN' ? 'ADMIN' : 'GESTOR'
     const r = await solicitarCancelamentoAssentoVendedora(id, origem)
     return { ok: true, acessoAte: r.acessoAte }
+  })
+
+  // Aplica um cupom a um assento PENDENTE já existente (ex.: gestor esqueceu de usar na hora do
+  // convite e prefere resolver com cupom em vez de pagar). Zera o valor → ativa na hora; desconto
+  // parcial → devolve um novo initPoint com o valor já descontado.
+  app.post('/:id/aplicar-cupom', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
+    const redeId = await redeIdDeQualquer(request)
+    const { id } = request.params as { id: string }
+    const { codigo } = z.object({ codigo: z.string().min(1) }).parse(request.body)
+    const a = await prisma.assinaturaVendedora.findUnique({ where: { id } })
+    if (!a || a.redeId !== redeId) return reply.code(404).send({ erro: 'Assento não encontrado.' })
+    const r = await aplicarCupomAssentoVendedora(id, codigo)
+    if (!r.ok) return reply.code(422).send({ erro: r.erro })
+    return { ok: true, simulado: r.simulado, initPoint: r.initPoint }
   })
 
   app.post('/:id/reativar', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {

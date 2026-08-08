@@ -533,6 +533,10 @@ model ConfigAssentoVendedora {
 model AssinaturaVendedora {
   id                       String           @id @default(cuid())
   redeId                   String
+  // Rótulo estável do assento dentro da rede (1, 2, 3…) — usado no `reason` da cobrança no
+  // Mercado Pago ("vendedora1", "vendedora2"…) pra não expor o nome real da vendedora na fatura
+  // do cartão do gestor. Atribuído uma vez na criação; nunca é reciclado nem reordenado.
+  numeroAssento            Int
   vendedoraId              String? // null = assento reservado (desligada) ou aguardando aceite do convite
   conviteId                String?          @unique // preenchido enquanto ainda não existe Usuario
   status                   StatusAssinatura @default(PENDENTE)
@@ -565,6 +569,7 @@ model AssinaturaVendedora {
   solicitadoPor Usuario            @relation("SolicitanteAssentoVendedora", fields: [solicitadoPorId], references: [id], onDelete: Cascade)
   codigoPromo   CodigoPromocional? @relation(fields: [codigoPromoId], references: [id], onDelete: SetNull)
 
+  @@unique([redeId, numeroAssento])
   @@index([redeId])
   @@index([vendedoraId])
   @@map("assinaturas_vendedora")

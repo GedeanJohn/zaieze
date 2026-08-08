@@ -5,6 +5,7 @@ import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
 import { aplicarFimDeCiclo } from '../assinaturas/assinatura.service'
 import { aplicarFimDeCicloAssessor } from '../assessores/assinatura-assessor.service'
+import { aplicarFimDeCicloAssentoVendedora } from '../vendedora-billing/assinatura-vendedora.service'
 import { enviarTemplatePlataforma } from '../whatsapp/meta.service'
 import { gerarSenhaProvisoria } from './senha-provisoria'
 import { normalizarTelefone } from '../../lib/telefone'
@@ -78,6 +79,24 @@ export async function authRoutes(app: FastifyInstance) {
             ? 'Sua assinatura ainda não foi confirmada pelo Mercado Pago.'
             : 'Sua assinatura foi encerrada. Assine novamente para voltar a acessar.',
         })
+      }
+    }
+
+    // Assento de vendedora: só bloqueia quem TEM um assento vinculado (nasceu pelo convite pago,
+    // ver vendedora-billing/) e ele não está ATIVA (pagamento pendente/cancelado). Vendedora sem
+    // nenhum assento é conta legada (anterior a esse modelo de cobrança) e não é afetada.
+    if (usuario.role === 'VENDEDORA' && !usuario.ehAgenteIa) {
+      const assento = await prisma.assinaturaVendedora.findFirst({ where: { vendedoraId: usuario.id } })
+      if (assento) {
+        await aplicarFimDeCicloAssentoVendedora(assento.id)
+        const status = (await prisma.assinaturaVendedora.findUniqueOrThrow({ where: { id: assento.id }, select: { status: true } })).status
+        if (status !== 'ATIVA') {
+          return reply.code(403).send({
+            erro: status === 'PENDENTE'
+              ? 'Sua conta ainda não foi liberada — peça ao seu gestor para concluir o pagamento ou aplicar um cupom.'
+              : 'Sua conta foi desativada — fale com seu gestor.',
+          })
+        }
       }
     }
 

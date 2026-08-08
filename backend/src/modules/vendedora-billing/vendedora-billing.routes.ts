@@ -7,7 +7,7 @@ import { validarCodigo, descricaoBeneficio, aplicarDesconto } from '../promo/pro
 import { precoParaQuantidade } from './faixa-desconto.service'
 import {
   solicitarAssentoVendedora, aprovarAssentoVendedora, recusarAssentoVendedora,
-  cancelarAssentoVendedora, aplicarCupomAssentoVendedora,
+  cancelarAssentoVendedora, reativarAssentoVendedora, aplicarCupomAssentoVendedora,
 } from './assinatura-vendedora.service'
 
 const num = (v: unknown) => Number(v ?? 0)
@@ -39,9 +39,22 @@ export async function vendedoraBillingRoutes(app: FastifyInstance) {
     const redeId = redeIdDe(request)
     const a = await prisma.assinaturaVendedoraRede.findUnique({ where: { redeId } })
     if (!a) return { existe: false as const }
+
+    // Prévia do próximo ciclo: se algum assento tem cancelamento agendado, o valor guardado
+    // (`valorProximoCiclo`) ainda não reflete isso — ele só é decidido de verdade na renovação
+    // (ver confirmarCicloAssentoVendedoraRede). Calcula ao vivo pra avisar o gestor com precisão.
+    let valorProximoCiclo = a.valorProximoCiclo != null ? num(a.valorProximoCiclo) : null
+    if (valorProximoCiclo == null) {
+      const qtdSemAgendados = await prisma.assinaturaVendedora.count({
+        where: { redeId, status: 'ATIVA', valor: { gt: 0 }, cancelamentoSolicitadoEm: null },
+      })
+      const preview = await precoParaQuantidade(qtdSemAgendados)
+      if (preview !== num(a.valor)) valorProximoCiclo = preview
+    }
+
     return {
       existe: true as const,
-      status: a.status, valor: num(a.valor), valorProximoCiclo: a.valorProximoCiclo != null ? num(a.valorProximoCiclo) : null,
+      status: a.status, valor: num(a.valor), valorProximoCiclo,
       qtdPaga: a.qtdPaga, simulada: a.simulada, cicloFimEm: a.cicloFimEm,
       cancelamentoSolicitadoEm: a.cancelamentoSolicitadoEm,
     }
@@ -59,6 +72,7 @@ export async function vendedoraBillingRoutes(app: FastifyInstance) {
     return {
       assinaturas: assinaturas.map((a) => ({
         id: a.id, numeroAssento: a.numeroAssento, status: a.status, gratuito: num(a.valor) === 0, aprovadoEm: a.aprovadoEm,
+        cancelamentoAgendado: a.cancelamentoSolicitadoEm != null,
         vendedoraId: a.vendedoraId, vendedoraNome: a.vendedora?.nome ?? a.convite?.nome ?? null,
       })),
     }
@@ -124,14 +138,26 @@ export async function vendedoraBillingRoutes(app: FastifyInstance) {
     return { ok: true }
   })
 
-  // Cancela o assento (terminal — corta o membro na hora; a cobrança consolidada da marca só
-  // reflete o downgrade no próximo ciclo, ver assinatura-vendedora-rede.service.ts).
+  // Cancela o assento. Se era pago e a marca já tem cobrança em andamento, o acesso da vendedora
+  // — e a contagem dela na faixa — ficam garantidos até o fim do ciclo já pago (não prorrateia).
   app.post('/:id/cancelar', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
     const redeId = await redeIdDeQualquer(request)
     const { id } = request.params as { id: string }
     const a = await prisma.assinaturaVendedora.findUnique({ where: { id } })
     if (!a || a.redeId !== redeId) return reply.code(404).send({ erro: 'Assento não encontrado.' })
-    await cancelarAssentoVendedora(id)
+    const r = await cancelarAssentoVendedora(id)
+    if (!r.ok) return reply.code(422).send({ erro: r.erro })
+    return { ok: true, acessoAte: r.acessoAte }
+  })
+
+  // Desfaz um cancelamento agendado (ainda dentro da carência).
+  app.post('/:id/reativar', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request, reply) => {
+    const redeId = await redeIdDeQualquer(request)
+    const { id } = request.params as { id: string }
+    const a = await prisma.assinaturaVendedora.findUnique({ where: { id } })
+    if (!a || a.redeId !== redeId) return reply.code(404).send({ erro: 'Assento não encontrado.' })
+    const ok = await reativarAssentoVendedora(id)
+    if (!ok) return reply.code(422).send({ erro: 'Este assento não tem cancelamento agendado.' })
     return { ok: true }
   })
 

@@ -1,6 +1,6 @@
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
-import { criarPreapproval, atualizarValorPreapproval, mpConfigurado } from '../assinaturas/mercadopago.service'
+import { criarPreapproval, atualizarValorPreapproval, cancelarPreapproval, mpConfigurado } from '../assinaturas/mercadopago.service'
 import { precoParaQuantidade } from './faixa-desconto.service'
 
 /**
@@ -126,17 +126,41 @@ export async function recomputarAssinaturaRede(redeId: string): Promise<{ initPo
   return {}
 }
 
-/** Chamada pelo webhook do MP quando o preapproval é confirmado (authorized). */
+/**
+ * Chamada pelo webhook do MP quando o preapproval é confirmado (authorized) — é o momento exato
+ * em que o ciclo anterior vira. Antes de fixar o valor do novo ciclo, finaliza qualquer assento
+ * com cancelamento agendado (a carência dele ia exatamente até aqui — ver
+ * assinatura-vendedora.service.ts): a partir de agora eles saem de vez da contagem paga.
+ */
 export async function confirmarCicloAssentoVendedoraRede(id: string): Promise<void> {
   const a = await prisma.assinaturaVendedoraRede.findUniqueOrThrow({ where: { id } })
+
+  await prisma.assinaturaVendedora.updateMany({
+    where: { redeId: a.redeId, status: 'ATIVA', cancelamentoSolicitadoEm: { not: null } },
+    data: { status: 'CANCELADA' },
+  })
+
+  const qtd = await contarAssentosPagos(a.redeId)
+  const valor = await precoParaQuantidade(qtd)
+
+  if (valor <= 0) {
+    // Ninguém mais pagando: não tem o que renovar (MP rejeita preapproval de R$0) — encerra de
+    // vez e avisa o MP pra não tentar cobrar nada no próximo mês.
+    if (!a.simulada && a.mpPreapprovalId) await cancelarPreapproval(a.mpPreapprovalId).catch(() => {})
+    await prisma.assinaturaVendedoraRede.update({ where: { id }, data: { status: 'CANCELADA', valorProximoCiclo: null } })
+    return
+  }
+
+  if (!a.simulada && a.mpPreapprovalId && valor !== Number(a.valor)) {
+    await atualizarValorPreapproval(a.mpPreapprovalId, valor).catch(() => { /* tenta de novo no próximo ciclo */ })
+  }
+
   await prisma.assinaturaVendedoraRede.update({
     where: { id },
     data: {
-      status: 'ATIVA',
+      status: 'ATIVA', valor, qtdPaga: qtd, valorProximoCiclo: null,
       cicloFimEm: proximoCicloFimVendedoraRede(),
-      cancelamentoSolicitadoEm: null,
-      cancelamentoOrigem: null,
-      ...(a.valorProximoCiclo != null ? { valor: a.valorProximoCiclo, valorProximoCiclo: null } : {}),
+      cancelamentoSolicitadoEm: null, cancelamentoOrigem: null,
     },
   })
 }

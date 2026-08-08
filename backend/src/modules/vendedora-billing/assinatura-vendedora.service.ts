@@ -195,10 +195,37 @@ export async function liberarAssentoDaVendedora(vendedoraId: string): Promise<vo
  * hora; a cobrança consolidada da marca é recalculada (o downgrade só entra em vigor no próximo
  * ciclo, ver recomputarAssinaturaRede).
  */
-export async function cancelarAssentoVendedora(id: string): Promise<{ ok: true } | { ok: false; erro: string }> {
+/**
+ * Cancela um assento. Se ele era pago e a marca já tem uma cobrança consolidada em andamento, o
+ * acesso da vendedora — e a contagem dela na faixa de desconto — ficam garantidos até o fim do
+ * ciclo JÁ PAGO (não é prorrateado: mesmo usada só 15 dos 30 dias, a marca paga o ciclo inteiro
+ * com ela contando). A baixa de verdade (status CANCELADA, sai da contagem) só acontece na
+ * renovação seguinte, ver confirmarCicloAssentoVendedoraRede. Assento gratuito (cupom) ou sem
+ * nenhuma cobrança ainda em andamento não tem ciclo pago a proteger — corta na hora.
+ */
+export async function cancelarAssentoVendedora(id: string): Promise<{ ok: true; acessoAte: Date | null } | { ok: false; erro: string }> {
   const a = await prisma.assinaturaVendedora.findUnique({ where: { id } })
-  if (!a || a.status === 'CANCELADA') return { ok: true }
-  await prisma.assinaturaVendedora.update({ where: { id }, data: { status: 'CANCELADA' } })
-  await recomputarAssinaturaRede(a.redeId)
-  return { ok: true }
+  if (!a || a.status === 'CANCELADA') return { ok: true, acessoAte: null }
+
+  const elegivelACarencia = a.status === 'ATIVA' && Number(a.valor) > 0
+  const rede = elegivelACarencia ? await prisma.assinaturaVendedoraRede.findUnique({ where: { redeId: a.redeId } }) : null
+  const acessoAte = rede && rede.status !== 'CANCELADA' && rede.cicloFimEm && rede.cicloFimEm.getTime() > Date.now() ? rede.cicloFimEm : null
+
+  if (!acessoAte) {
+    await prisma.assinaturaVendedora.update({ where: { id }, data: { status: 'CANCELADA', cancelamentoSolicitadoEm: null, cancelamentoOrigem: null } })
+    await recomputarAssinaturaRede(a.redeId)
+    return { ok: true, acessoAte: null }
+  }
+
+  // Continua ATIVA (segue contando na faixa da marca) até a renovação finalizar o corte de verdade.
+  await prisma.assinaturaVendedora.update({ where: { id }, data: { cancelamentoSolicitadoEm: new Date(), cancelamentoOrigem: 'GESTOR' } })
+  return { ok: true, acessoAte }
+}
+
+/** Desfaz um cancelamento agendado (ainda dentro da carência) — a vendedora continua normalmente. */
+export async function reativarAssentoVendedora(id: string): Promise<boolean> {
+  const a = await prisma.assinaturaVendedora.findUnique({ where: { id } })
+  if (!a || a.status !== 'ATIVA' || !a.cancelamentoSolicitadoEm) return false
+  await prisma.assinaturaVendedora.update({ where: { id }, data: { cancelamentoSolicitadoEm: null, cancelamentoOrigem: null } })
+  return true
 }

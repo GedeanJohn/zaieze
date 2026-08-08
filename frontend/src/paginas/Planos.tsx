@@ -18,6 +18,7 @@ interface AssentoVendedora {
   numeroAssento: number
   status: 'PENDENTE' | 'ATIVA' | 'CANCELADA'
   gratuito: boolean
+  cancelamentoAgendado: boolean
   aprovadoEm: string | null
   vendedoraId: string | null
   vendedoraNome: string | null
@@ -103,11 +104,20 @@ export default function Planos() {
   }
 
   async function cancelarAssento(a: AssentoVendedora) {
-    if (!window.confirm(`Cancelar este assento${a.vendedoraNome ? ` (${a.vendedoraNome})` : ''}? O acesso dela é cortado na hora. Se ela era um assento pago, a cobrança da marca só reflete o valor menor a partir da próxima renovação.`)) return
+    if (!window.confirm(`Cancelar este assento${a.vendedoraNome ? ` (${a.vendedoraNome})` : ''}? Se for um assento pago, ela mantém o acesso e continua contando na cobrança até o fim do ciclo já pago (não é prorrateado).`)) return
     setErro(''); setMsg(''); setOcupado(true)
     try {
-      await api.post(`/vendedora-billing/${a.id}/cancelar`)
-      setMsg('Assento cancelado.')
+      const { data } = await api.post(`/vendedora-billing/${a.id}/cancelar`)
+      setMsg(data.acessoAte ? `Cancelamento agendado — acesso garantido até ${fmtData(data.acessoAte)}.` : 'Assento cancelado.')
+      carregar()
+    } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
+  }
+
+  async function reativarAssento(a: AssentoVendedora) {
+    setErro(''); setMsg(''); setOcupado(true)
+    try {
+      await api.post(`/vendedora-billing/${a.id}/reativar`)
+      setMsg('Cancelamento desfeito.')
       carregar()
     } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
   }
@@ -195,7 +205,8 @@ export default function Planos() {
               {mudaDeFaixa && (
                 <div className="alerta" style={{ marginTop: 12 }}>
                   Sua cobrança muda de {formataReal(assinaturaRede.valor ?? 0)} pra {formataReal(assinaturaRede.valorProximoCiclo ?? 0)}
-                  {' '}a partir de {fmtData(assinaturaRede.cicloFimEm ?? null)}, porque agora você tem {assinaturaRede.qtdPaga} vendedora(s) paga(s).
+                  {' '}a partir de {fmtData(assinaturaRede.cicloFimEm ?? null)}. Até lá, o valor atual continua valendo — vendedora
+                  cancelada nesse meio-tempo mantém acesso e continua contando na faixa até essa data, sem desconto proporcional.
                 </div>
               )}
               {assinaturaRede.cancelamentoSolicitadoEm && (
@@ -245,9 +256,12 @@ export default function Planos() {
                   <td>
                     <span className={`selo ${a.status === 'ATIVA' ? 'ok' : a.status === 'CANCELADA' ? 'baixo' : 'ATACADO'}`}>{a.status}</span>
                     {a.gratuito && <span style={{ fontSize: 11, color: 'var(--ink-soft)' }}> (grátis — cupom)</span>}
+                    {a.cancelamentoAgendado && (
+                      <div style={{ fontSize: 11, color: 'var(--danger)' }}>cancela em {fmtData(assinaturaRede.cicloFimEm ?? null)}</div>
+                    )}
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
-                    {a.status === 'ATIVA' && !a.gratuito && (
+                    {a.status === 'ATIVA' && !a.gratuito && !a.cancelamentoAgendado && (
                       <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                         <input
                           value={cupomPorAssento[a.id] ?? ''}
@@ -259,7 +273,9 @@ export default function Planos() {
                       </div>
                     )}
                     {a.status !== 'CANCELADA' && (
-                      <a href="#" onClick={(e) => { e.preventDefault(); cancelarAssento(a) }} style={{ color: 'var(--danger)' }}>cancelar</a>
+                      a.cancelamentoAgendado
+                        ? <a href="#" onClick={(e) => { e.preventDefault(); reativarAssento(a) }}>reativar</a>
+                        : <a href="#" onClick={(e) => { e.preventDefault(); cancelarAssento(a) }} style={{ color: 'var(--danger)' }}>cancelar</a>
                     )}
                   </td>
                 </tr>

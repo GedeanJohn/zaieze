@@ -19,8 +19,14 @@ const num = (v: unknown) => Number(v ?? 0)
  * GERENTE quem solicita, fica aguardando aprovação do GESTOR antes de contar pra cobrança.
  */
 export async function vendedoraBillingRoutes(app: FastifyInstance) {
-  // Preço de referência (1ª vendedora) — público (landing + tela de contratação).
-  app.get('/preco', async () => ({ preco: await precoParaQuantidade(1) }))
+  // Preço de referência (1ª vendedora) — público (landing + tela de contratação). Com `?qtd=`,
+  // devolve o valor TOTAL real daquela faixa (não o preço unitário × quantidade, que ignora o
+  // desconto por volume) — usado pela calculadora da landing.
+  app.get('/preco', async (request) => {
+    const { qtd } = request.query as { qtd?: string }
+    const quantidade = qtd ? Math.max(1, Number(qtd) || 1) : 1
+    return { preco: await precoParaQuantidade(quantidade) }
+  })
 
   // Preview do cupom antes de contratar (o gestor/gerente digita o código recebido do gestor da
   // marca/SUPER_ADMIN e vê o benefício antes de confirmar). Autenticado só pra manter no mesmo

@@ -86,6 +86,9 @@ export default function Landing() {
   // anterior na hora (parecia que o backspace não funcionava). Só valida o mínimo no blur.
   const [qtdVendedorasInput, setQtdVendedorasInput] = useState('3')
   const qtdVendedoras = Math.max(1, Number(qtdVendedorasInput) || 0)
+  // Valor TOTAL real da faixa pra essa quantidade (vem do backend — nunca precoAssento × qtd,
+  // que ignora o desconto por volume cadastrado no Admin). null enquanto carrega.
+  const [precoTotalFaixa, setPrecoTotalFaixa] = useState<number | null>(null)
   const [addons, setAddons] = useState<AddonCatalogo[]>([])
   const [cambio, setCambio] = useState<{ usdPorBrl: number | null }>({ usdPorBrl: null })
   const [chatAberto, setChatAberto] = useState(false)
@@ -110,6 +113,17 @@ export default function Landing() {
   }, [])
 
   useEffect(() => { capturarRefAfiliado() }, [])
+
+  // Valor real da faixa pra quantidade digitada na calculadora (debounce pra não bater a API a
+  // cada tecla). precoAssento × qtd NÃO serve aqui — ignora o desconto por volume.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      api.get('/vendedora-billing/preco', { params: { qtd: qtdVendedoras } })
+        .then(({ data }) => setPrecoTotalFaixa(data.preco))
+        .catch(() => {})
+    }, 300)
+    return () => clearTimeout(t)
+  }, [qtdVendedoras])
 
   return (
     <div className="site">
@@ -222,8 +236,19 @@ export default function Landing() {
                   <div style={{ marginTop: 10, fontSize: 15 }}>
                     {qtdVendedorasInput.trim() === ''
                       ? t('planos.definirPosteriormente')
-                      : <>{t('planos.totalEstimado')} <strong>{formata(precoAssento * qtdVendedoras)}/{t('unidade.mes')}</strong></>}
+                      : <>{t('planos.totalEstimado')} <strong>{formata(precoTotalFaixa ?? precoAssento * qtdVendedoras)}/{t('unidade.mes')}</strong></>}
                   </div>
+                  {qtdVendedorasInput.trim() !== '' && qtdVendedoras > 1 && precoTotalFaixa != null && (() => {
+                    const precoLinear = precoAssento * qtdVendedoras
+                    const economia = precoLinear - precoTotalFaixa
+                    if (economia <= 0) return null
+                    const percentual = Math.round((economia / precoLinear) * 100)
+                    return (
+                      <div style={{ marginTop: 6, fontSize: 13, color: '#4ade80' }}>
+                        {t('planos.economiaFaixa', { valor: formata(economia), percentual })}
+                      </div>
+                    )
+                  })()}
                 </div>
               </>
             )

@@ -1,4 +1,5 @@
 import { env } from '../../env'
+import { temAssentoVendedoraPagante } from '../vendedora-billing/assinatura-vendedora-rede.service'
 
 // Modelo de IA: Haiku 4.5 (claude-haiku-4-5), via API oficial da Anthropic
 // (créditos comprados direto na Anthropic — NÃO usamos AWS Bedrock).
@@ -45,13 +46,15 @@ export async function sugerirLook(base: string, complementos: string[]): Promise
 }
 
 /**
- * Sugere uma mensagem de campanha. Usa Claude (Haiku 4.5) quando há
- * ANTHROPIC_API_KEY; caso contrário, devolve a mensagem-modelo do segmento.
+ * Sugere uma mensagem de campanha. Usa Claude (Haiku 4.5) quando há ANTHROPIC_API_KEY E a rede
+ * tem pelo menos 1 cadeira de vendedora paga ativa (sem add-on próprio, então só libera pra quem
+ * já é assinante — ver temAssentoVendedoraPagante); caso contrário, mensagem-modelo do segmento.
  */
-export async function sugerirMensagem(opts: { segmento?: string | null; contexto?: string }): Promise<{ texto: string; viaIa: boolean }> {
+export async function sugerirMensagem(opts: { redeId: string; segmento?: string | null; contexto?: string }): Promise<{ texto: string; viaIa: boolean }> {
   const seg = opts.segmento ?? 'GERAL'
   const fallback = FALLBACK[seg] ?? FALLBACK.GERAL
   if (!env.ANTHROPIC_API_KEY) return { texto: fallback, viaIa: false }
+  if (!(await temAssentoVendedoraPagante(opts.redeId))) return { texto: fallback, viaIa: false }
 
   try {
     const { default: Anthropic } = await import('@anthropic-ai/sdk')
@@ -122,9 +125,11 @@ export async function explicarOportunidade(opts: {
 /**
  * Modo Foco de Vendas: sugere UMA resposta para a última mensagem do cliente, a partir do
  * histórico recente da conversa — a vendedora decide se usa, edita ou ignora (nunca é enviada
- * automaticamente; quem chama esta função só mostra a sugestão numa UI de aprovação).
+ * automaticamente; quem chama esta função só mostra a sugestão numa UI de aprovação). Sem add-on
+ * próprio, então só chama a IA de verdade se a rede tiver pelo menos 1 cadeira paga ativa.
  */
 export async function sugerirRespostaAtendimento(opts: {
+  redeId: string
   cliente: { nome: string; segmento: string }
   loja: string
   vendedora: string
@@ -136,6 +141,7 @@ export async function sugerirRespostaAtendimento(opts: {
     : `Oi ${opts.cliente.nome.split(' ')[0]}! Tudo bem? Como posso te ajudar hoje? 😊`
   if (!env.ANTHROPIC_API_KEY) return { texto: fallback, viaIa: false }
   if (opts.ultimasMensagens.length === 0) return { texto: fallback, viaIa: false }
+  if (!(await temAssentoVendedoraPagante(opts.redeId))) return { texto: fallback, viaIa: false }
 
   try {
     const { default: Anthropic } = await import('@anthropic-ai/sdk')

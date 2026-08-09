@@ -24,6 +24,13 @@ async function contarAssentosPagos(redeId: string): Promise<number> {
   return prisma.assinaturaVendedora.count({ where: { redeId, status: 'ATIVA', valor: { gt: 0 } } })
 }
 
+/** Rede tem pelo menos 1 cadeira de vendedora paga e ATIVA agora? Usado pra liberar as IAs sem
+ *  add-on próprio (custo baixo mas real, ver ia.service.ts) só pra quem já é assinante pagante —
+ *  não pra qualquer conta com acesso básico/gratuito. */
+export async function temAssentoVendedoraPagante(redeId: string): Promise<boolean> {
+  return (await contarAssentosPagos(redeId)) > 0
+}
+
 /**
  * (Re)abre a cobrança consolidada da marca (nasceu agora ou estava CANCELADA e ganhou uma
  * vendedora paga de novo). Sem token do MP, ativa direto (simulado); com token, cria o

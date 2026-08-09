@@ -50,7 +50,8 @@ export async function campanhasRoutes(app: FastifyInstance) {
   // Sugestão de mensagem (IA quando há chave; senão modelo do segmento)
   app.post('/sugerir', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request) => {
     const body = sugerirSchema.parse(request.body)
-    return sugerirMensagem(body)
+    const redeId = await redeIdDeQualquer(request)
+    return sugerirMensagem({ ...body, redeId })
   })
 
   app.get('/', { preHandler: [app.authenticate] }, async (request) => {

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { Prisma, StatusMensagem } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
-import { lojaIdDe, redeIdDe } from '../../plugins/auth'
+import { lojaIdDe, redeIdDe, redeIdDeQualquer } from '../../plugins/auth'
 import { enviarWhatsapp, enviarWhatsappAudio, enviarWhatsappImagem, registrarMensagemRecebida } from './whatsapp.service'
 import { estaConectado as baileysConectado } from './baileys.service'
 import { metaConfigurado, cifrar, decifrar, podeCifrar, verificarNumero, enviarTexto, criarTemplateMeta, consultarTemplatesMeta, placeholdersDoCorpo, corpoParaMeta, mapearStatusTemplate, baixarMidia, extDoMime, assinaturaValida, techProviderConfigurado, trocarCodePorToken, inscreverWebhookWaba, registrarNumero } from './meta.service'
@@ -447,6 +447,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
   // com base no histórico recente, e ela decide usar/editar/ignorar no campo de mensagem.
   app.post('/conversas/:clienteId/sugestao', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR', 'GERENTE', 'VENDEDORA')] }, async (request, reply) => {
     const lojaId = await lojaIdDe(request)
+    const redeId = await redeIdDeQualquer(request)
     const { clienteId } = request.params as { clienteId: string }
 
     const cliente = await prisma.cliente.findFirst({ where: { id: clienteId, lojaId }, select: { nome: true, segmento: true, vendedoraId: true } })
@@ -466,6 +467,7 @@ export async function whatsappRoutes(app: FastifyInstance) {
 
     const { sugerirRespostaAtendimento } = await import('./ia.service')
     const sugestao = await sugerirRespostaAtendimento({
+      redeId,
       cliente: { nome: cliente.nome, segmento: cliente.segmento },
       loja: loja?.nome ?? 'a loja',
       vendedora: vendedora?.nome ?? 'a vendedora',

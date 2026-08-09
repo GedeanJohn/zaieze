@@ -988,10 +988,14 @@ model Cliente {
   // sem verificar, os favoritos ficam só no aparelho (não chegam aqui).
   favoritosVitrine         String[]        @default([])
   // Chat de Atendimento (add-on por vendedora): estado do pré-atendimento roteirizado deste
-  // cliente. null = ainda não passou pelo bot (ou a vendedora não tem o add-on); intercepta só
-  // no 1º contato — uma vez CONCLUIDO, nunca mais roda pra este cliente (ver chat-atendimento.service.ts).
+  // cliente. null = ainda não passou pelo bot (ou a vendedora não tem o add-on); intercepta o
+  // 1º contato e continua enquanto EM_ANDAMENTO — uma vez CONCLUIDO, nunca mais roda pra este
+  // cliente (ver chat-atendimento/motor.service.ts).
   chatAtendimentoStatus    String? // 'EM_ANDAMENTO' | 'CONCLUIDO'
   chatAtendimentoRespostas Json? // { peca?, tamanho?, faixaPreco? } — o que já foi coletado
+  // Última vez que o motor tocou o estado acima. Se ficar EM_ANDAMENTO por mais de 12h sem
+  // resposta do cliente, a próxima mensagem trata como um novo 1º contato (ver motor.service.ts).
+  chatAtendimentoAtualizadoEm DateTime?
   ativo                    Boolean         @default(true)
   createdAt                DateTime        @default(now())
   updatedAt                DateTime        @updatedAt

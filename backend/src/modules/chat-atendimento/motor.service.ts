@@ -9,11 +9,16 @@ import { roteiroEfetivoDaRede, MENSAGEM_CONCLUSAO_PADRAO, MENSAGEM_HANDOFF_PADRA
  * conversa (ver roteiro_schema.md). Consome o `Roteiro` cacheado (gerado 1x/semana por
  * `perfil-negocio.service.ts`) e decide a próxima mensagem por palavra-chave/estado.
  *
- * Intercepta só o 1º contato de cada cliente (Cliente.chatAtendimentoStatus == null) e para
- * de atuar assim que conclui/desiste (CONCLUIDO) — nunca mais roda pra esse cliente.
+ * Intercepta o 1º contato (Cliente.chatAtendimentoStatus == null) e continua enquanto
+ * EM_ANDAMENTO; para de atuar assim que conclui/desiste (CONCLUIDO) — nunca mais roda pra esse
+ * cliente. Se ficar EM_ANDAMENTO por mais de 12h sem resposta (EXPIRACAO_MS), a próxima
+ * mensagem é tratada como um novo 1º contato em vez de retomar de onde parou.
  */
 
 const MAX_TURNOS = 5
+// Conversa EM_ANDAMENTO parada por mais de 12h sem resposta do cliente: a próxima mensagem
+// é tratada como um novo 1º contato em vez de continuar de onde a qualificação parou.
+const EXPIRACAO_MS = 12 * 60 * 60 * 1000
 
 interface Respostas {
   peca?: string
@@ -125,7 +130,7 @@ export async function responderChatAtendimento(params: { clienteId: string; text
       where: { id: params.clienteId },
       select: {
         id: true, telefone: true, igScopedId: true, vendedoraId: true,
-        chatAtendimentoStatus: true, chatAtendimentoRespostas: true,
+        chatAtendimentoStatus: true, chatAtendimentoRespostas: true, chatAtendimentoAtualizadoEm: true,
         loja: { select: { id: true, redeId: true, nome: true, rede: true } },
         vendedora: { select: { nome: true } },
       },
@@ -135,10 +140,15 @@ export async function responderChatAtendimento(params: { clienteId: string; text
     const nomeLoja = cliente.loja.rede.nome || cliente.loja.nome
     const nomeVendedora = cliente.vendedora?.nome ?? 'a vendedora'
     const roteiro = await roteiroEfetivoDaRede(cliente.loja.redeId)
-    const respostasAtuais = (cliente.chatAtendimentoRespostas as Respostas | null) ?? {}
+
+    const expirou = cliente.chatAtendimentoStatus === 'EM_ANDAMENTO'
+      && cliente.chatAtendimentoAtualizadoEm != null
+      && Date.now() - cliente.chatAtendimentoAtualizadoEm.getTime() > EXPIRACAO_MS
+    const statusEfetivo = expirou ? null : cliente.chatAtendimentoStatus
+    const respostasAtuais = expirou ? {} : ((cliente.chatAtendimentoRespostas as Respostas | null) ?? {})
 
     const { resultado, novoStatus, novasRespostas } = processar(
-      params.texto, nomeLoja, nomeVendedora, roteiro, cliente.chatAtendimentoStatus, respostasAtuais,
+      params.texto, nomeLoja, nomeVendedora, roteiro, statusEfetivo, respostasAtuais,
     )
 
     await prisma.cliente.update({
@@ -146,6 +156,7 @@ export async function responderChatAtendimento(params: { clienteId: string; text
       data: {
         chatAtendimentoStatus: novoStatus,
         chatAtendimentoRespostas: novasRespostas as never,
+        chatAtendimentoAtualizadoEm: new Date(),
         ...(novoStatus === 'CONCLUIDO' ? { observacoes: `Chat de Atendimento: ${resumoRespostas(novasRespostas)}` } : {}),
       },
     })

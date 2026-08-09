@@ -116,9 +116,10 @@ export async function registrarMensagemRecebida(params: {
   await prisma.cliente.update({ where: { id: cliente.id }, data: { waUltimaEntradaEm: new Date() } })
 
   const atendidoPelaIa = await usuarioEhAgenteIa(cliente.vendedoraId)
-  // Chat de Atendimento: vendedora HUMANA (não a IA), cliente ainda não passou pelo bot (1º
-  // contato) e ela tem o add-on ativo — pré-qualifica antes de cair como lead cru na carteira.
-  const chatAtendimentoVaiRodar = !atendidoPelaIa && cliente.chatAtendimentoStatus === null && (await chatAtendimentoAtivo(cliente.vendedoraId))
+  // Chat de Atendimento: vendedora HUMANA (não a IA), cliente ainda não concluiu/desistiu do bot
+  // (null = 1º contato, EM_ANDAMENTO = continuando a qualificação) e ela tem o add-on ativo —
+  // pré-qualifica antes de cair como lead cru na carteira.
+  const chatAtendimentoVaiRodar = !atendidoPelaIa && cliente.chatAtendimentoStatus !== 'CONCLUIDO' && (await chatAtendimentoAtivo(cliente.vendedoraId))
 
   const ciclo = await garantirCicloAberto({
     lojaId: cliente.lojaId, vendedoraId: cliente.vendedoraId, redeId: cliente.loja.redeId,

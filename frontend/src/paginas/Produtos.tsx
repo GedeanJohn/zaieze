@@ -542,15 +542,15 @@ export default function Produtos() {
                 </div>
                 <div className="gv-cell">
                   <span>{t('prod.colEstoque')}</span>
-                  <input type="number" min="0" value={v.estoque} onChange={(e) => mudarVariacao(i, 'estoque', e.target.value)} onFocus={(e) => e.target.select()} onMouseUp={(e) => e.preventDefault()} />
+                  <input type="number" min="0" value={v.estoque} onChange={(e) => mudarVariacao(i, 'estoque', e.target.value)} onFocus={(e) => e.target.select()} />
                 </div>
                 <div className="gv-cell">
                   <span title={t('prod.reservaVarejoTitle')}>{t('prod.varejoLabel')}</span>
-                  <input type="number" min="0" max={v.estoque} value={v.estoqueVarejo ?? 0} onChange={(e) => mudarVariacao(i, 'estoqueVarejo', e.target.value)} onFocus={(e) => e.target.select()} onMouseUp={(e) => e.preventDefault()} title={t('prod.reservaVarejoTitle2')} />
+                  <input type="number" min="0" max={v.estoque} value={v.estoqueVarejo ?? 0} onChange={(e) => mudarVariacao(i, 'estoqueVarejo', e.target.value)} onFocus={(e) => e.target.select()} title={t('prod.reservaVarejoTitle2')} />
                 </div>
                 <div className="gv-cell">
                   <span>{t('prod.minimoLabel')}</span>
-                  <input type="number" min="0" value={v.estoqueMinimo} onChange={(e) => mudarVariacao(i, 'estoqueMinimo', e.target.value)} onFocus={(e) => e.target.select()} onMouseUp={(e) => e.preventDefault()} />
+                  <input type="number" min="0" value={v.estoqueMinimo} onChange={(e) => mudarVariacao(i, 'estoqueMinimo', e.target.value)} onFocus={(e) => e.target.select()} />
                 </div>
                 <button
                   type="button" className="remover" title={t('prod.remover')}
@@ -605,7 +605,7 @@ export default function Produtos() {
               <div className="linha-campos">
                 <div className="campo">
                   <label>{t('prod.pesoLabel')}</label>
-                  <input type="number" min="0" value={form.pesoGramas ?? ''} onChange={(e) => setForm({ ...form, pesoGramas: e.target.value })} onFocus={(e) => e.target.select()} onMouseUp={(e) => e.preventDefault()} />
+                  <input type="number" min="0" value={form.pesoGramas ?? ''} onChange={(e) => setForm({ ...form, pesoGramas: e.target.value })} onFocus={(e) => e.target.select()} />
                 </div>
                 <div className="campo">
                   <label>{t('prod.faixaEtariaLabel')}</label>

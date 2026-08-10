@@ -67,4 +67,16 @@ export async function redesRoutes(app: FastifyInstance) {
       include: { _count: { select: { lojas: true } } },
     })
   })
+
+  // Pública (sem login): dados mínimos pra identificar a loja na tela de login do tenant
+  // (<slug>.zaieze.com/login) — só nome/logo, nada sensível.
+  app.get('/publico/:slug', async (request, reply) => {
+    const { slug } = request.params as { slug: string }
+    const rede = await prisma.rede.findUnique({
+      where: { slug: slug.toLowerCase() },
+      select: { nome: true, logoUrl: true },
+    })
+    if (!rede) return reply.code(404).send({ message: 'Loja não encontrada' })
+    return rede
+  })
 }

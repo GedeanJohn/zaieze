@@ -1,9 +1,29 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, mensagemDeErro } from '../api'
+import { api, mensagemDeErro, usuarioLogado } from '../api'
 import { HOST } from '../host'
 import { useIdioma, ehIdiomaValido } from '../lib/i18n'
 import CampoSenha from '../componentes/CampoSenha'
+
+interface RedePublica { nome: string; logoUrl: string | null }
+
+/** Cabeçalho comum: marca Zaieze + (quando o subdomínio resolve pra uma loja) nome/logo dela —
+ *  crucial pra quem tem o app instalado como PWA, onde não dá pra ver a URL/subdomínio. */
+function CabecalhoLoja({ loja }: { loja: RedePublica | null }) {
+  const { t } = useIdioma()
+  return (
+    <>
+      <h1><a href="https://zaieze.com" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>Zaieze</a></h1>
+      <p className="login-lema">{t('footer.tagline')}</p>
+      {loja && (
+        <div className="login-loja">
+          {loja.logoUrl && <img src={loja.logoUrl} alt="" />}
+          <span>{t('login.loja', { nome: loja.nome })}</span>
+        </div>
+      )}
+    </>
+  )
+}
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -11,8 +31,23 @@ export default function Login() {
   const [erro, setErro] = useState('')
   const [carregando, setCarregando] = useState(false)
   const [esqueci, setEsqueci] = useState(false)
+  const [loja, setLoja] = useState<RedePublica | null>(null)
+  // Sessão de uma conta ainda guardada neste aparelho/PWA pra este mesmo tenant — comum em app
+  // instalado, onde não fica óbvio "em qual loja/conta eu estou" nem como trocar.
+  const [sessaoExistente, setSessaoExistente] = useState(() => usuarioLogado())
   const navigate = useNavigate()
   const { t, setIdioma } = useIdioma()
+
+  useEffect(() => {
+    if (!HOST.slug) return
+    api.get(`/redes/publico/${HOST.slug}`).then(({ data }) => setLoja(data)).catch(() => setLoja(null))
+  }, [])
+
+  function sairDaSessaoExistente() {
+    localStorage.removeItem('modacrm_token')
+    localStorage.removeItem('modacrm_usuario')
+    setSessaoExistente(null)
+  }
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault()
@@ -34,11 +69,25 @@ export default function Login() {
 
   if (esqueci) return <EsqueciSenha onVoltar={() => setEsqueci(false)} />
 
+  if (sessaoExistente) {
+    return (
+      <div className="login-wrap">
+        <div className="login-card">
+          <CabecalhoLoja loja={loja} />
+          <p style={{ marginTop: 8 }}>{t('login.jaLogadoComo', { nome: sessaoExistente.nome })}</p>
+          <button className="btn" style={{ width: '100%' }} onClick={() => navigate('/')}>{t('login.continuar')}</button>
+          <button type="button" className="btn-link" style={{ display: 'block', margin: '14px auto 0' }} onClick={sairDaSessaoExistente}>
+            {t('login.trocarConta')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={entrar}>
-        <h1><a href="https://zaieze.com" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>Zaieze</a></h1>
-        <p className="login-lema">{t('footer.tagline')}</p>
+        <CabecalhoLoja loja={loja} />
         {erro && <div className="alerta">{erro}</div>}
         <div className="campo">
           <label>{t('login.email')}</label>

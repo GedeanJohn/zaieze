@@ -71,7 +71,7 @@ interface Paleta { fundo: string; texto: string; textoSuave: string; borda: stri
  *  superfícies (cards, modais, inputs) se adaptam pra continuar legíveis nela, seja clara ou
  *  escura. corPrimaria vira o acento — só cai pro dourado padrão se o contraste dela contra ESSE
  *  fundo for baixo demais pra enxergar (ex.: corPrimaria muito parecida com corSecundaria). */
-function montarPaleta(corPrimaria: string, corSecundaria: string): Paleta {
+export function montarPaleta(corPrimaria: string, corSecundaria: string): Paleta {
   const rgbFundo = hexParaRgb(corSecundaria) ?? [255, 255, 255]
   const fundo = `rgb(${rgbFundo.join(',')})`
   const lumFundo = luminanciaRel(rgbFundo)
@@ -482,7 +482,7 @@ function ModalAvaliacao({ redeSlug, vendSlug, onClose }: { redeSlug: string; ven
   )
 }
 
-function PerfilVendedoraEstilos() {
+export function PerfilVendedoraEstilos() {
   return (
     <style>{`
       .pv-root {

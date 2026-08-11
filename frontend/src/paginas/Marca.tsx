@@ -238,7 +238,7 @@ export default function Marca() {
       <div className="cartao">
         <h2 style={{ marginTop: 0 }}>{t('marca.bannerTitulo')}</h2>
         <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 0 }}>
-          {t('marca.bannerExplicacao1')} <strong>{t('marca.catalogoPublicoDestaque')}</strong>{t('marca.bannerExplicacao2')}
+          {t('marca.bannerExplicacao')}
         </p>
         <div style={{
           width: '100%', maxWidth: 520, aspectRatio: '3 / 1', borderRadius: 12,
@@ -461,7 +461,6 @@ export default function Marca() {
         <PreviewLoja
           nome={marca.nome}
           logoUrl={marca.logoUrl}
-          bannerUrl={marca.bannerUrl}
           corPrimaria={marca.corPrimaria}
           corSecundaria={marca.corSecundaria}
           onClose={() => setPreview(false)}

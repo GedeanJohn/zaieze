@@ -128,7 +128,7 @@ export async function vendedoraBillingRoutes(app: FastifyInstance) {
   app.get('/pendentes-aprovacao', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request) => {
     const redeId = redeIdDe(request)
     const pendentes = await prisma.assinaturaVendedora.findMany({
-      where: { redeId, aprovadoEm: null, status: { not: 'CANCELADA' } },
+      where: { redeId, status: 'PENDENTE' },
       orderBy: { createdAt: 'asc' },
       include: { convite: { select: { nome: true, email: true, telefone: true } }, solicitadoPor: { select: { nome: true } } },
     })

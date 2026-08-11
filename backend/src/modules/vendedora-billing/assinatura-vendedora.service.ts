@@ -117,7 +117,7 @@ export async function aprovarAssentoVendedora(
   const a = await prisma.assinaturaVendedora.findUnique({ where: { id } })
   if (!a) return { ok: false, erro: 'Solicitação não encontrada.' }
   if (gestor.role === 'GESTOR' && a.redeId !== gestor.redeId) return { ok: false, erro: 'Fora da sua rede.' }
-  if (a.aprovadoEm) return { ok: false, erro: 'Essa solicitação já foi aprovada.' }
+  if (a.status === 'ATIVA') return { ok: false, erro: 'Essa solicitação já foi aprovada.' }
   if (a.status === 'CANCELADA') return { ok: false, erro: 'Essa solicitação foi recusada/cancelada.' }
 
   await prisma.assinaturaVendedora.update({ where: { id }, data: { aprovadoEm: new Date(), status: 'ATIVA' } })
@@ -160,7 +160,7 @@ export async function recusarAssentoVendedora(id: string, gestorId: string): Pro
   const a = await prisma.assinaturaVendedora.findUnique({ where: { id } })
   if (!a) return { ok: false, erro: 'Solicitação não encontrada.' }
   if (gestor.role === 'GESTOR' && a.redeId !== gestor.redeId) return { ok: false, erro: 'Fora da sua rede.' }
-  if (a.aprovadoEm) return { ok: false, erro: 'Já foi aprovada — cancele em vez de recusar.' }
+  if (a.status !== 'PENDENTE') return { ok: false, erro: 'Já foi aprovada — cancele em vez de recusar.' }
 
   await prisma.$transaction(async (tx) => {
     await tx.assinaturaVendedora.update({ where: { id }, data: { status: 'CANCELADA' } })

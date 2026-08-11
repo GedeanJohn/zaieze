@@ -824,6 +824,7 @@ export function VitrineEstilos() {
       .vit-modal-fechar { position: absolute; top: 14px; right: 14px; background: none; border: none; color: #ccc; cursor: pointer; }
       .vit-modal-logo { width: 56px; height: 56px; object-fit: contain; border-radius: 10px; margin: 0 auto 10px; display: block; background: #1e1e1e; }
       .vit-modal-nome { margin: 0 0 18px; font-size: 18px; }
+      .vit-detalhe-foto { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; display: block; }
       .vit-modal-catalogo {
         display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px;
         padding: 12px 14px; border-radius: 10px; background: linear-gradient(135deg, #d6b06f, #b8863f);

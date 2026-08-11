@@ -488,7 +488,7 @@ function FichaProduto({ produto, atacado, onAdicionar, onEnviarChat, enviandoCha
           onClick={() => variacaoSel && onAdicionar(variacaoSel, qtd)}
         >{t('caixa.adicionar')}</button>
         <button
-          type="button" className="btn-secundario cz-cart-enviar-chat" disabled={!variacaoSel || enviandoChat}
+          type="button" className="btn secundario cz-cart-enviar-chat" disabled={!variacaoSel || enviandoChat}
           onClick={() => variacaoSel && onEnviarChat(variacaoSel)}
         >{enviandoChat ? t('caixa.enviando') : t('caixa.enviarNoChat')}</button>
       </div>

@@ -57,7 +57,7 @@ export default function PreviewVitrine({ nome, fotoUrl, tagline, bio, disponivel
       <section className="vit-marcas-secao">
         <div className="vit-marcas-cabec"><h2>Marcas que represento</h2></div>
         <div className="vit-grid">
-          {PLACEHOLDERS.map((p) => <div key={p} className="vit-cardMarca"><div className="vit-cardMarca-semImagem">{p}</div></div>)}
+          {PLACEHOLDERS.map((p) => <div key={p} className="vit-cardMarca"><div className="vit-cardMarca-nome">{p}</div></div>)}
         </div>
       </section>
 

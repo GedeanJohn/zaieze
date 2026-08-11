@@ -422,6 +422,9 @@ function OrcamentoEstilos() {
         .orc-folha { padding: 20px 16px; }
         .orc-acoes-principais { flex-direction: column; }
       }
+      @media print {
+        .orc-noprint { display: none; }
+      }
     `}</style>
   )
 }

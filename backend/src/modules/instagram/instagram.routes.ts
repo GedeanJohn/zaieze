@@ -4,7 +4,10 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '../../lib/prisma'
 import { env } from '../../env'
 import { lojaIdDe, redeIdDe } from '../../plugins/auth'
-import { igConfigurado, cifrar, decifrar, podeCifrar, assinaturaValida, verificarContaIg, enviarTextoIg, type RedeIG } from './instagram.service'
+import {
+  igConfigurado, cifrar, decifrar, podeCifrar, assinaturaValida, verificarContaIg, enviarTextoIg,
+  appTechProviderConfigurado, trocarCodePorToken, buscarPaginasComInstagram, type RedeIG,
+} from './instagram.service'
 import { marcarLeadAtendido, garantirCicloAberto } from '../leads/leads.service'
 import { contextoVendedoraIa, usuarioEhAgenteIa, responderVendedoraZaieze } from '../vendedora-zaieze/vendedora-zaieze.service'
 import { chatAtendimentoAtivo } from '../chat-atendimento/assinatura-chat-atendimento.service'
@@ -154,7 +157,65 @@ export async function instagramRoutes(app: FastifyInstance) {
       conectadoEm: r.igConectadoEm,
       webhookUrl: `${env.TENANT_SCHEME}://${r.slug}.${env.DOMINIO_BASE}/api/instagram/webhook/${r.slug}`,
       servidorPodeCifrar: podeCifrar(),
+      // Conexão automática (Facebook Login comum — ver instagram.service.ts): não exige
+      // META_CONFIG_ID, que é específico do wizard "Embedded Signup" do WhatsApp.
+      conexaoAutomaticaDisponivel: appTechProviderConfigurado(),
+      metaAppId: env.META_APP_ID ?? null,
+      metaConfigId: env.META_CONFIG_ID ?? null,
     }
+  })
+
+  // Conclui a conexão automática do Instagram (Facebook Login comum, sem wizard dedicado — ver
+  // instagram.service.ts). Duas formas de chamar:
+  // 1) { code } — logo após o FB.login: troca o code por um token do usuário e lista as Páginas
+  //    dele com Instagram Business vinculado. 1 candidata → conecta direto; 2+ → devolve a lista
+  //    para o gestor escolher (o frontend chama de novo com `escolha`).
+  // 2) { escolha } — o gestor já escolheu a Página; o pageToken dela já é o token final, sem
+  //    precisar trocar nada de novo.
+  const embeddedSignupSchema = z.union([
+    z.object({ code: z.string().min(1) }),
+    z.object({ escolha: z.object({
+      pageId: z.string().min(1), igBusinessAccountId: z.string().min(1), pageToken: z.string().min(1),
+    }) }),
+  ])
+  app.post('/embedded-signup/callback', { preHandler: [app.authorize('SUPER_ADMIN', 'GESTOR')] }, async (request, reply) => {
+    const redeId = redeIdDe(request)
+    const body = embeddedSignupSchema.parse(request.body)
+
+    let igBusinessAccountId: string
+    let pageToken: string
+    let usernameConhecido: string | undefined
+
+    if ('escolha' in body) {
+      igBusinessAccountId = body.escolha.igBusinessAccountId
+      pageToken = body.escolha.pageToken
+    } else {
+      const troca = await trocarCodePorToken(body.code)
+      if (!troca.ok || !troca.accessToken) return reply.code(502).send({ erro: troca.erro ?? 'Falha ao trocar o code por um token.' })
+
+      const candidatos = await buscarPaginasComInstagram(troca.accessToken)
+      if (candidatos.length === 0) {
+        return reply.code(422).send({ erro: 'Nenhuma Página do Facebook com Instagram Business vinculado foi encontrada. Vincule uma conta Instagram Business à sua Página antes de conectar.' })
+      }
+      if (candidatos.length > 1) {
+        return { escolhaNecessaria: true, candidatos }
+      }
+      igBusinessAccountId = candidatos[0].igBusinessAccountId
+      pageToken = candidatos[0].pageToken
+      usernameConhecido = candidatos[0].username
+    }
+
+    if (!podeCifrar()) return reply.code(422).send({ erro: 'Servidor sem WA_TOKEN_SECRET — não é possível guardar o token com segurança.' })
+
+    const v = await verificarContaIg(igBusinessAccountId, pageToken)
+    await prisma.rede.update({
+      where: { id: redeId },
+      data: {
+        igBusinessAccountId, igTokenCifrado: cifrar(pageToken),
+        igUsername: v.username ?? usernameConhecido ?? null, igConectado: v.ok, igConectadoEm: v.ok ? new Date() : null,
+      },
+    })
+    return { ok: true, conectado: v.ok, username: v.username ?? usernameConhecido ?? null, erro: v.ok ? null : v.erro ?? null }
   })
 
   // Grava a config; se houver conta + token válidos, valida no Graph e marca conectado.

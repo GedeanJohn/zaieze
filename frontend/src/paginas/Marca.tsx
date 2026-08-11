@@ -218,16 +218,19 @@ export default function Marca() {
         <h2 style={{ marginTop: 0 }}>{t('marca.logoTitulo')}</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
           <div style={{
-            width: 140, height: 140, borderRadius: 12, background: marca.corSecundaria,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #00000022', overflow: 'hidden',
+            width: 140, height: 140, borderRadius: 12,
+            background: marca.logoUrl ? marca.corSecundaria : '#00000009',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+            border: marca.logoUrl ? '1px solid #00000022' : '2px dashed #00000028',
           }}>
             {marca.logoUrl
               ? <img src={marca.logoUrl} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-              : <span style={{ color: '#999', fontSize: 12 }}>{t('marca.semLogo')}</span>}
+              : <span style={{ color: '#00000066', fontSize: 12, fontWeight: 600, textAlign: 'center', padding: '0 10px' }}>512 × 512 px</span>}
           </div>
           <div>
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={enviarLogo} />
             <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 6 }}>{t('marca.logoFormatos')}</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2, maxWidth: 320 }}>{t('marca.logoDica')}</div>
           </div>
         </div>
       </div>
@@ -238,12 +241,14 @@ export default function Marca() {
           {t('marca.bannerExplicacao1')} <strong>{t('marca.catalogoPublicoDestaque')}</strong>{t('marca.bannerExplicacao2')}
         </p>
         <div style={{
-          width: '100%', maxWidth: 520, aspectRatio: '3 / 1', borderRadius: 12, background: '#00000010',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #00000022', overflow: 'hidden',
+          width: '100%', maxWidth: 520, aspectRatio: '3 / 1', borderRadius: 12,
+          background: marca.bannerUrl ? '#00000010' : '#00000009',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+          border: marca.bannerUrl ? '1px solid #00000022' : '2px dashed #00000028',
         }}>
           {marca.bannerUrl
             ? <img src={marca.bannerUrl} alt="Banner" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <span style={{ color: '#999', fontSize: 12 }}>{t('marca.semBanner')}</span>}
+            : <span style={{ color: '#00000066', fontSize: 12, fontWeight: 600 }}>1200 × 400 px</span>}
         </div>
         <div style={{ marginTop: 10, display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
           <input ref={bannerRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={enviarBanner} />

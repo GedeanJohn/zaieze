@@ -341,7 +341,7 @@ export default function Produtos() {
             {produtos.map((p) => (
               <tr key={p.id}>
                 <td style={{ fontFamily: 'Consolas, monospace', fontSize: 12 }}>{p.referencia ?? '—'}</td>
-                <td>{p.nome}</td>
+                <td style={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{p.nome}</td>
                 <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{rotuloGenero(p.genero, t)}</td>
                 <td>{p.categoria?.nome ?? '—'}</td>
                 <td>R$ {Number(p.precoVarejo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>

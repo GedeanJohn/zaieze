@@ -191,7 +191,7 @@ export default function Colecoes() {
           <tbody>
             {lista.map((c) => (
               <tr key={c.id}>
-                <td>
+                <td style={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
                   <strong>{c.nome}</strong>
                   {c.outlet && (
                     <span className="selo" style={{ marginLeft: 8, background: '#f59e0b22', color: '#f59e0b', border: '1px solid #f59e0b55' }}>

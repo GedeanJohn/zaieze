@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma'
 import { redeIdDe, redeIdDeQualquer } from '../../plugins/auth'
 import { normalizarTelefone } from '../../lib/telefone'
 import { validarCodigo, descricaoBeneficio, aplicarDesconto } from '../promo/promo.service'
+import { obterInitPointPreapproval } from '../assinaturas/mercadopago.service'
 import { precoParaQuantidade } from './faixa-desconto.service'
 import {
   solicitarAssentoVendedora, aprovarAssentoVendedora, recusarAssentoVendedora,
@@ -64,6 +65,16 @@ export async function vendedoraBillingRoutes(app: FastifyInstance) {
       qtdPaga: a.qtdPaga, simulada: a.simulada, cicloFimEm: a.cicloFimEm,
       cancelamentoSolicitadoEm: a.cancelamentoSolicitadoEm,
     }
+  })
+
+  // Link do Mercado Pago pra retomar uma cobrança consolidada PENDENTE (o gestor aprovou/criou o
+  // assento mas fechou a aba antes de autorizar o cartão) — sem isso não tinha como voltar a essa
+  // tela depois; só existia o link mostrado uma única vez na hora da aprovação/criação.
+  app.get('/rede/link-pagamento', { preHandler: [app.authorize('GESTOR', 'SUPER_ADMIN')] }, async (request) => {
+    const redeId = redeIdDe(request)
+    const a = await prisma.assinaturaVendedoraRede.findUnique({ where: { redeId } })
+    if (!a || a.status !== 'PENDENTE' || !a.mpPreapprovalId) return { initPoint: null }
+    return { initPoint: await obterInitPointPreapproval(a.mpPreapprovalId) }
   })
 
   // Assentos (membros) da rede logada. GESTOR/SUPER_ADMIN vê todos; GERENTE só o que ele mesmo

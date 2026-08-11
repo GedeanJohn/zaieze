@@ -114,3 +114,17 @@ export async function consultarPreapproval(id: string): Promise<string | null> {
   const data = (await resp.json()) as { status?: string }
   return data.status ?? null
 }
+
+/**
+ * Recupera o link de checkout (init_point) de um preapproval já criado — pra deixar o gestor
+ * retomar uma autorização de cartão pendente sem precisar cancelar e criar tudo de novo.
+ */
+export async function obterInitPointPreapproval(id: string): Promise<string | null> {
+  if (!env.MERCADOPAGO_ACCESS_TOKEN) return null
+  const resp = await fetch(`https://api.mercadopago.com/preapproval/${id}`, {
+    headers: { Authorization: `Bearer ${env.MERCADOPAGO_ACCESS_TOKEN}` },
+  })
+  if (!resp.ok) return null
+  const data = (await resp.json()) as { init_point?: string }
+  return data.init_point ?? null
+}

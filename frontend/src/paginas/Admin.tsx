@@ -436,7 +436,7 @@ function PromoSection({ promos, onChange }: { promos: Promo[]; onChange: () => v
             <tr key={p.id} style={{ opacity: p.ativo ? 1 : 0.5 }}>
               <td><strong>{p.codigo}</strong></td>
               <td>{p.aplicaA === 'ASSESSOR' ? 'Brand Partner' : 'Vendedora'}</td>
-              <td>
+              <td style={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
                 {p.tipo === 'DIAS_GRATIS' ? `${p.dias} dias grátis` : p.tipo === 'PERCENTUAL' ? `${Number(p.percentual)}% off` : `${formataReal(Number(p.valorFixo))} off`}
                 {p.tipo !== 'DIAS_GRATIS' ? (p.duracaoCiclos ? ` por ${p.duracaoCiclos} mês(es)` : ' (sempre)') : ''}
                 {p.descricao ? ` · ${p.descricao}` : ''}

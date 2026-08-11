@@ -219,7 +219,7 @@ export default function Estoque() {
                 <tbody>
                   {dash.parados.map((p, i) => (
                     <tr key={i}>
-                      <td>{p.produto}<div style={{ fontSize: 12, color: 'var(--ink-soft)', fontFamily: 'Consolas, monospace' }}>{p.referencia ?? ''}</div></td>
+                      <td style={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{p.produto}<div style={{ fontSize: 12, color: 'var(--ink-soft)', fontFamily: 'Consolas, monospace' }}>{p.referencia ?? ''}</div></td>
                       <td style={{ color: 'var(--ink-soft)' }}>{p.cor}/{p.tamanho}</td>
                       <td>{p.estoque}</td>
                       <td>{formataReal(p.valorCusto)}</td>
@@ -264,7 +264,7 @@ export default function Estoque() {
             <tbody>
               {demanda.map((d) => (
                 <tr key={d.variacaoId}>
-                  <td>{d.produto}<div style={{ fontSize: 12, color: 'var(--ink-soft)', fontFamily: 'Consolas, monospace' }}>{d.referencia ?? ''}</div></td>
+                  <td style={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{d.produto}<div style={{ fontSize: 12, color: 'var(--ink-soft)', fontFamily: 'Consolas, monospace' }}>{d.referencia ?? ''}</div></td>
                   <td style={{ color: 'var(--ink-soft)' }}>{d.cor}/{d.tamanho}</td>
                   <td>{d.estoqueAtual}</td>
                   <td><span className="selo ATACADO">{d.quantidadePendente}</span></td>
@@ -301,7 +301,7 @@ export default function Estoque() {
                 <td style={{ fontWeight: 600, color: m.quantidade >= 0 ? 'var(--ok)' : 'var(--danger)' }}>
                   {m.quantidade > 0 ? `+${m.quantidade}` : m.quantidade}
                 </td>
-                <td style={{ fontSize: 13, color: 'var(--ink-soft)' }}>{m.motivo ?? '—'}</td>
+                <td style={{ fontSize: 13, color: 'var(--ink-soft)', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{m.motivo ?? '—'}</td>
               </tr>
             ))}
             {movimentos.length === 0 && (

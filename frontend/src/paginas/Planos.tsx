@@ -65,6 +65,7 @@ export default function Planos() {
   const [lojas, setLojas] = useState<{ id: string; nome: string }[]>([])
   const [convidarAberto, setConvidarAberto] = useState(false)
   const [cupomPorAssento, setCupomPorAssento] = useState<Record<string, string>>({})
+  const [linkPagamento, setLinkPagamento] = useState<string | null>(null)
 
   function carregar() {
     api.get('/vendedora-billing/preco').then(({ data }) => setPrecoAssento(data.preco)).catch(() => {})
@@ -85,11 +86,21 @@ export default function Planos() {
   useEffect(() => { carregar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function aprovar(p: PendenteAprovacao) {
-    setErro(''); setMsg(''); setOcupado(true)
+    setErro(''); setMsg(''); setLinkPagamento(null); setOcupado(true)
     try {
-      await api.post(`/vendedora-billing/${p.id}/aprovar`)
+      const { data } = await api.post(`/vendedora-billing/${p.id}/aprovar`)
       setMsg(`Solicitação de ${p.nome ?? 'vendedora'} aprovada.`)
+      if (data.initPoint) setLinkPagamento(data.initPoint)
       carregar()
+    } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
+  }
+
+  async function buscarLinkPagamentoRede() {
+    setErro(''); setOcupado(true)
+    try {
+      const { data } = await api.get('/vendedora-billing/rede/link-pagamento')
+      if (data.initPoint) window.open(data.initPoint, '_blank')
+      else setErro('Não foi possível recuperar o link de pagamento agora. Tente de novo em instantes.')
     } catch (e) { setErro(mensagemDeErro(e)) } finally { setOcupado(false) }
   }
 
@@ -187,6 +198,17 @@ export default function Planos() {
 
       {erro && <div className="alerta">{erro}</div>}
       {msg && <div className="sucesso">{msg}</div>}
+      {linkPagamento && (
+        <div className="alerta">
+          Assento aprovado, mas falta autorizar o cartão pra essa cobrança valer — sem isso a vendedora
+          fica sem acesso quando o prazo vencer. Complete agora:
+          <div style={{ marginTop: 8 }}>
+            <a className="btn" href={linkPagamento} target="_blank" rel="noreferrer" onClick={() => setLinkPagamento(null)}>
+              💳 Pagar assento no Mercado Pago
+            </a>
+          </div>
+        </div>
+      )}
 
       {ehGestor && (
         <div className="cartao">
@@ -202,6 +224,15 @@ export default function Planos() {
                 <div><div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Valor mensal</div><div style={{ fontSize: 22, fontWeight: 800 }}>{formataReal(assinaturaRede.valor ?? 0)}{assinaturaRede.simulada && <span style={{ fontSize: 11, color: 'var(--ink-soft)', fontWeight: 400 }}> (sim)</span>}</div></div>
                 <div><div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Status</div><div style={{ fontSize: 22, fontWeight: 800 }}><span className={`selo ${assinaturaRede.status === 'ATIVA' ? 'ok' : assinaturaRede.status === 'CANCELADA' ? 'baixo' : 'ATACADO'}`}>{assinaturaRede.status}</span></div></div>
               </div>
+              {assinaturaRede.status === 'PENDENTE' && !assinaturaRede.simulada && (
+                <div className="alerta" style={{ marginTop: 12 }}>
+                  Falta autorizar o cartão no Mercado Pago pra essa cobrança valer — sem isso as vendedoras
+                  ficam sem acesso quando o prazo vencer.
+                  <div style={{ marginTop: 8 }}>
+                    <button className="btn" onClick={buscarLinkPagamentoRede} disabled={ocupado}>💳 Completar pagamento</button>
+                  </div>
+                </div>
+              )}
               {mudaDeFaixa && (
                 <div className="alerta" style={{ marginTop: 12 }}>
                   Sua cobrança muda de {formataReal(assinaturaRede.valor ?? 0)} pra {formataReal(assinaturaRede.valorProximoCiclo ?? 0)}

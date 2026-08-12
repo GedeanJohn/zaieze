@@ -739,6 +739,26 @@ body.protegido-copia img { -webkit-user-drag: none; user-select: none; -webkit-t
 .pagina-texto-lema strong { font-family: var(--marca); font-size: 20px; letter-spacing: 0.1em; text-transform: uppercase; }
 .pagina-texto-lema span { color: var(--zz-mut); font-size: 14px; letter-spacing: 0.02em; }
 
+/* Página Perguntas Frequentes — busca + accordion nativo (mesma técnica de
+   details.mais-detalhes, aqui com o tema escuro do site público). */
+.faq-busca { margin: 30px 0 10px; }
+.faq-busca input {
+  background: #111; color: #fff; border-color: var(--zz-line); border-radius: 8px;
+  font-family: var(--leitura); font-size: 14px;
+}
+.faq-busca input:focus { outline: none; border-color: #fff; }
+.faq-lista { margin-top: 10px; }
+.faq-vazio { text-align: center; }
+.faq-item { border-top: 1px solid var(--zz-line); padding: 18px 0; }
+.faq-item summary {
+  cursor: pointer; font-size: 16px; color: #fff; font-weight: 600; letter-spacing: 0.01em;
+  list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 14px;
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::after { content: '+'; color: var(--accent); font-size: 20px; flex-shrink: 0; }
+.faq-item[open] summary::after { content: '−'; }
+.faq-item p { margin: 14px 0 0; }
+
 /* Fale Conosco (WhatsApp) — estilo ZAIEZE (branco/preto, minimalista) */
 .fale-conosco { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 44px; text-align: center; }
 .fale-conosco > span { color: var(--zz-mut); font-size: 15px; letter-spacing: 0.02em; }

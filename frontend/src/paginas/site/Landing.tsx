@@ -304,7 +304,7 @@ export default function Landing() {
 
       <footer className="site-rodape">
         <div>CNPJ: 43.391.734/0001-51 · ZAIEZE · {t('footer.tagline')} © {new Date().getFullYear()}</div>
-        <div><Link to="/quem-somos">{t('footer.quemSomos')}</Link> · <Link to="/lgpd">{t('footer.lgpd')}</Link> · <Link to="/privacidade">{t('footer.privacidade')}</Link> · {t('footer.pagamento')}</div>
+        <div><Link to="/quem-somos">{t('footer.quemSomos')}</Link> · <Link to="/lgpd">{t('footer.lgpd')}</Link> · <Link to="/privacidade">{t('footer.privacidade')}</Link> · <Link to="/perguntas-frequentes">{t('footer.faq')}</Link> · {t('footer.pagamento')}</div>
       </footer>
     </div>
   )

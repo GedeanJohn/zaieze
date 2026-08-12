@@ -63,6 +63,7 @@ import AssessorDeModa from './paginas/site/AssessorDeModa'
 import CadastroAssessor from './paginas/site/CadastroAssessor'
 import Lgpd from './paginas/site/Lgpd'
 import PoliticaPrivacidade from './paginas/site/PoliticaPrivacidade'
+import PerguntasFrequentes from './paginas/site/PerguntasFrequentes'
 import { aplicarImpersonacaoDaUrl } from './lib/impersonar'
 import { aplicarIdentidadeAssessoraNoPWA } from './lib/pwaAssessora'
 import BannerImpersonar from './componentes/BannerImpersonar'
@@ -122,6 +123,7 @@ function SiteApp() {
       <Route path="/assessor-de-moda/cadastro" element={<CadastroAssessor />} />
       <Route path="/lgpd" element={<Lgpd />} />
       <Route path="/privacidade" element={<PoliticaPrivacidade />} />
+      <Route path="/perguntas-frequentes" element={<PerguntasFrequentes />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
